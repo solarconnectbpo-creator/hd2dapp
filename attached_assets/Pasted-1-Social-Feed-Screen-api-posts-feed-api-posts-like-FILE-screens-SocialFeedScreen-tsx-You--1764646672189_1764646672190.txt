@@ -1,0 +1,551 @@
+1️⃣ Social Feed Screen → /api/posts/feed + /api/posts/like
+
+FILE: screens/SocialFeedScreen.tsx
+(You can replace your current Social screen with this one.)
+
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  FlatList,
+  StyleSheet,
+  View,
+  RefreshControl,
+  Pressable,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Avatar } from "@/components/Avatar";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+type SocialStackParamList = {
+  SocialFeed: undefined;
+  CreatePost: undefined;
+};
+
+type Props = NativeStackScreenProps<SocialStackParamList, "SocialFeed">;
+
+export interface Post {
+  id: string;
+  user_id: string;
+  user_name?: string;
+  content: string;
+  media_url?: string;
+  hashtags?: string;
+  likes?: number;
+  comments?: number;
+  created_at: string;
+}
+
+export default function SocialFeedScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const { token, companyId, user } = useAuth();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [liking, setLiking] = useState<string | null>(null);
+
+  const loadFeed = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await api.get<Post[]>("/api/posts/feed", {
+        token,
+        companyId,
+      });
+      setPosts(res);
+    } catch (e) {
+      console.error("Error loading feed:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, companyId]);
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  const handleLike = async (postId: string) => {
+    if (!token) return;
+    setLiking(postId);
+    try {
+      await api.post(
+        "/api/posts/like",
+        { postId },
+        { token, companyId }
+      );
+      // Optimistic update
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, likes: (p.likes || 0) + 1 } : p
+        )
+      );
+    } catch (e) {
+      console.error("Like error:", e);
+    } finally {
+      setLiking(null);
+    }
+  };
+
+  const renderPost = ({ item }: { item: Post }) => {
+    const hashtagsArray =
+      item.hashtags?.length ? item.hashtags.split(",") : [];
+
+    return (
+      <Card style={styles.card}>
+        <View style={styles.headerRow}>
+          <Avatar
+            name={item.user_name || "User"}
+            size={40}
+            style={styles.avatar}
+          />
+          <View style={styles.headerText}>
+            <ThemedText type="h4">
+              {item.user_name || "Unknown User"}
+            </ThemedText>
+            <ThemedText type="caption" style={styles.meta}>
+              {item.created_at}
+            </ThemedText>
+          </View>
+        </View>
+
+        <ThemedText type="body" style={styles.content}>
+          {item.content}
+        </ThemedText>
+
+        {hashtagsArray.length ? (
+          <View style={styles.hashtagsRow}>
+            {hashtagsArray.map((tag) => (
+              <ThemedText
+                key={tag}
+                type="caption"
+                style={styles.hashtag}
+              >
+                #{tag.trim()}
+              </ThemedText>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={styles.footerRow}>
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => handleLike(item.id)}
+            disabled={liking === item.id}
+          >
+            <Feather
+              name="heart"
+              size={18}
+              color={liking === item.id ? AppColors.primary : theme.text}
+            />
+            <ThemedText type="caption" style={styles.iconText}>
+              {item.likes ?? 0}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable style={styles.iconButton}>
+            <Feather name="message-circle" size={18} color={theme.text} />
+            <ThemedText type="caption" style={styles.iconText}>
+              {item.comments ?? 0}
+            </ThemedText>
+          </Pressable>
+        </View>
+      </Card>
+    );
+  };
+
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.header}>
+        <ThemedText type="h2">Closer Feed</ThemedText>
+        <Button
+          variant="secondary"
+          style={styles.newPostButton}
+          onPress={() => navigation.navigate("CreatePost")}
+        >
+          New Post
+        </Button>
+      </View>
+
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderPost}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={loadFeed}
+            tintColor={theme.text}
+          />
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <ThemedText type="small" style={styles.empty}>
+              No posts yet. Be the first closer to drop some game.
+            </ThemedText>
+          ) : null
+        }
+      />
+
+      {/* Floating Create Button */}
+      <Pressable
+        onPress={() => navigation.navigate("CreatePost")}
+        style={({ pressed }) => [
+          styles.fab,
+          {
+            backgroundColor: AppColors.primary,
+            opacity: pressed ? 0.85 : 1,
+          },
+        ]}
+      >
+        <Feather name="edit-3" size={22} color="#FFFFFF" />
+      </Pressable>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  newPostButton: {
+    width: 120,
+  },
+  list: {
+    paddingBottom: Spacing["4xl"],
+    gap: Spacing.md,
+  },
+  card: {
+    borderRadius: BorderRadius.md,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  avatar: {
+    marginRight: Spacing.md,
+  },
+  headerText: {
+    flex: 1,
+  },
+  meta: {
+    opacity: 0.7,
+  },
+  content: {
+    marginTop: Spacing.sm,
+  },
+  hashtagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: Spacing.sm,
+    gap: 6,
+  },
+  hashtag: {
+    opacity: 0.8,
+  },
+  footerRow: {
+    flexDirection: "row",
+    marginTop: Spacing.md,
+    gap: Spacing.lg,
+  },
+  iconButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  iconText: {
+    opacity: 0.8,
+  },
+  empty: {
+    textAlign: "center",
+    marginTop: Spacing["2xl"],
+  },
+  fab: {
+    position: "absolute",
+    right: Spacing.lg,
+    bottom: Spacing["2xl"],
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
+  },
+});
+
+2️⃣ Create Post Screen → /api/posts/create (with AI hints)
+
+FILE: screens/CreatePostScreen.tsx
+
+This will show AI score + suggested hashtags returned from backend.
+
+import React, { useState } from "react";
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Button } from "@/components/Button";
+import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+type SocialStackParamList = {
+  SocialFeed: undefined;
+  CreatePost: undefined;
+};
+
+type Props = NativeStackScreenProps<SocialStackParamList, "CreatePost">;
+
+export default function CreatePostScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const { token, companyId, user } = useAuth();
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [aiScore, setAiScore] = useState<number | null>(null);
+  const [aiHashtags, setAiHashtags] = useState<string[]>([]);
+  const [aiNotes, setAiNotes] = useState<string | null>(null);
+
+  const handlePost = async () => {
+    if (!content.trim() || !token) return;
+
+    setSubmitting(true);
+    try {
+      const res = await api.post<{
+        id: string;
+        score?: number;
+        hashtags?: string[];
+        category?: string;
+        notes?: string;
+      }>(
+        "/api/posts/create",
+        {
+          content: content.trim(),
+        },
+        { token, companyId }
+      );
+
+      setAiScore(res.score ?? null);
+      setAiHashtags(res.hashtags || []);
+      setAiNotes(res.notes || null);
+
+      Alert.alert("Posted!", "Your post has been shared to the feed.", [
+        {
+          text: "OK",
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } catch (e) {
+      console.error("Create post error:", e);
+      Alert.alert("Error", "Failed to create post.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.select({ ios: "padding", android: undefined })}
+    >
+      <ThemedView style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ThemedText type="h2" style={styles.title}>
+            New Post
+          </ThemedText>
+          <ThemedText type="small" style={styles.subtitle}>
+            Share wins, scripts, objections, or game for other closers.
+          </ThemedText>
+
+          <View style={styles.inputWrapper}>
+            <TextInput
+              multiline
+              value={content}
+              onChangeText={setContent}
+              placeholder="What did you close today? What lesson did you learn in the field?"
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.input,
+                {
+                  color: theme.text,
+                  borderColor: theme.border,
+                  backgroundColor: theme.backgroundSecondary,
+                },
+              ]}
+            />
+          </View>
+
+          <Button
+            onPress={handlePost}
+            disabled={!content.trim() || submitting}
+            style={styles.postButton}
+          >
+            {submitting ? "Posting..." : "Post to Feed"}
+          </Button>
+
+          {aiScore !== null && (
+            <View style={styles.aiCard}>
+              <ThemedText type="h4" style={styles.aiTitle}>
+                AI Post Insights
+              </ThemedText>
+              <ThemedText type="body" style={styles.aiScore}>
+                Viral Score:{" "}
+                <ThemedText type="h4">{aiScore}/100</ThemedText>
+              </ThemedText>
+
+              {aiHashtags.length ? (
+                <>
+                  <ThemedText type="small" style={styles.aiLabel}>
+                    Suggested Hashtags:
+                  </ThemedText>
+                  <View style={styles.hashtagsRow}>
+                    {aiHashtags.map((tag) => (
+                      <ThemedText
+                        key={tag}
+                        type="caption"
+                        style={styles.hashtag}
+                      >
+                        #{tag}
+                      </ThemedText>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+
+              {aiNotes ? (
+                <>
+                  <ThemedText type="small" style={styles.aiLabel}>
+                    Notes:
+                  </ThemedText>
+                  <ThemedText type="small">{aiNotes}</ThemedText>
+                </>
+              ) : null}
+            </View>
+          )}
+        </ScrollView>
+      </ThemedView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  scroll: {
+    paddingBottom: Spacing["3xl"],
+  },
+  title: {
+    marginBottom: Spacing.xs,
+  },
+  subtitle: {
+    marginBottom: Spacing["2xl"],
+    opacity: 0.8,
+  },
+  inputWrapper: {
+    borderRadius: BorderRadius.md,
+    overflow: "hidden",
+    marginBottom: Spacing.lg,
+  },
+  input: {
+    minHeight: 150,
+    padding: Spacing.lg,
+    textAlignVertical: "top",
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    fontSize: 15,
+  },
+  postButton: {
+    marginBottom: Spacing["2xl"],
+  },
+  aiCard: {
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    backgroundColor: "#111827",
+  },
+  aiTitle: {
+    marginBottom: Spacing.sm,
+    color: "#F9FAFB",
+  },
+  aiScore: {
+    marginBottom: Spacing.sm,
+    color: "#E5E7EB",
+  },
+  aiLabel: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+    color: "#D1D5DB",
+  },
+  hashtagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: Spacing.sm,
+  },
+  hashtag: {
+    color: AppColors.primary,
+  },
+});
+
+3️⃣ Hook into SocialStackNavigator
+
+Open navigation/SocialStackNavigator.tsx and wire these screens in.
+
+Something like:
+
+import React from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import SocialFeedScreen from "@/screens/SocialFeedScreen";
+import CreatePostScreen from "@/screens/CreatePostScreen";
+
+export type SocialStackParamList = {
+  SocialFeed: undefined;
+  CreatePost: undefined;
+};
+
+const Stack = createNativeStackNavigator<SocialStackParamList>();
+
+export default function SocialStackNavigator() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="SocialFeed"
+        component={SocialFeedScreen}
+        options={{ title: "Closer Feed" }}
+      />
+      <Stack.Screen
+        name="CreatePost"
+        component={CreatePostScreen}
+        options={{ title: "New Post" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+
+Your MainTabNavigator is already pointing SocialTab → SocialStackNavigator, so once you add these, the Social tab will be live and wired.

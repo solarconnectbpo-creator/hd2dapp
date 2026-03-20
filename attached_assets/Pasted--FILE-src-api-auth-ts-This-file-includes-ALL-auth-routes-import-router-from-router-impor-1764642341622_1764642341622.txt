@@ -1,0 +1,190 @@
+📁 FILE: src/api/auth.ts
+
+This file includes ALL auth routes.
+
+import router from "../router";
+import { json, badRequest, unauthorized } from "../utils/response";
+import { hashPassword, verifyPassword } from "../utils/crypto";
+import { signJwt } from "../utils/jwt";
+
+// Generate 6-digit 2FA code
+function generate2FACode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Store 2FA codes in KV for TTL
+async function store2FACode(env: Env, email: string, code: string) {
+  await env.HD2D_CACHE.put(`2fa:${email}`, code, { expirationTtl: 300 });
+}
+
+async function get2FACode(env: Env, email: string) {
+  return await env.HD2D_CACHE.get(`2fa:${email}`);
+}
+
+async function delete2FACode(env: Env, email: string) {
+  await env.HD2D_CACHE.delete(`2fa:${email}`);
+}
+
+// ----------------------------
+// REGISTER
+// ----------------------------
+router.post("/api/auth/register", async (req, env) => {
+  const { email, password, name, phone, userType } = await req.json();
+
+  if (!email || !password || !name)
+    return badRequest("Missing fields");
+
+  const passwordHash = await hashPassword(password);
+
+  const id = crypto.randomUUID();
+
+  await env.DB.prepare(
+    `INSERT INTO users (id, email, password_hash, name, phone, user_type) 
+     VALUES (?, ?, ?, ?, ?, ?)`
+  )
+    .bind(id, email.toLowerCase(), passwordHash, name, phone || null, userType)
+    .run();
+
+  // Generate 2FA code
+  const code = generate2FACode();
+  await store2FACode(env, email, code);
+
+  // TODO: send via Twilio or Email Worker
+  console.log("2FA CODE:", code);
+
+  return json({ 
+    success: true, 
+    message: "User registered. 2FA code sent." 
+  });
+});
+
+// ----------------------------
+// LOGIN → requires correct email/password → sends 2FA
+// ----------------------------
+router.post("/api/auth/login", async (req, env) => {
+  const { email, password } = await req.json();
+
+  if (!email || !password) return badRequest("Missing credentials");
+
+  const user = await env.DB.prepare(
+    "SELECT * FROM users WHERE email = ?"
+  )
+    .bind(email.toLowerCase())
+    .first();
+
+  if (!user) return unauthorized("Invalid credentials");
+
+  const valid = await verifyPassword(password, user.password_hash);
+  if (!valid) return unauthorized("Invalid credentials");
+
+  // Generate and store 2FA
+  const code = generate2FACode();
+  await store2FACode(env, email, code);
+
+  // TODO: hook into Twilio or email worker
+  console.log("2FA CODE:", code);
+
+  return json({
+    success: true,
+    requires2FA: true,
+    message: "2FA code sent."
+  });
+});
+
+// ----------------------------
+// VERIFY 2FA → returns JWT token
+// ----------------------------
+router.post("/api/auth/verify-2fa", async (req, env) => {
+  const { email, code } = await req.json();
+
+  const stored = await get2FACode(env, email);
+  if (!stored) return unauthorized("2FA expired");
+
+  if (stored !== code) return unauthorized("Incorrect 2FA code");
+
+  // Delete 2FA code
+  await delete2FACode(env, email);
+
+  // Load user
+  const user = await env.DB.prepare(
+    "SELECT * FROM users WHERE email = ?"
+  ).bind(email.toLowerCase()).first();
+
+  if (!user) return unauthorized("User not found");
+
+  // Issue token
+  const token = await signJwt(
+    { id: user.id, email: user.email, role: user.user_type },
+    env
+  );
+
+  return json({
+    success: true,
+    token,
+    user
+  });
+});
+
+// ----------------------------
+// RESEND 2FA
+// ----------------------------
+router.post("/api/auth/resend-2fa", async (req, env) => {
+  const { email } = await req.json();
+
+  const code = generate2FACode();
+  await store2FACode(env, email, code);
+
+  // TODO: send via SMS or email worker
+  console.log("RESEND 2FA CODE:", code);
+
+  return json({ success: true });
+});
+
+📄 FILE: src/middleware/auth.ts
+
+(Secure routes)
+
+import { verifyJwt } from "../utils/jwt";
+import { unauthorized } from "../utils/response";
+
+export async function requireAuth(req: Request, env: Env) {
+  const auth = req.headers.get("authorization");
+  if (!auth) return null;
+
+  const token = auth.replace("Bearer ", "");
+  const decoded = await verifyJwt(token, env);
+
+  return decoded;
+}
+
+📄 D1 Migration: users table (0001_users.sql)
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT,
+  phone TEXT,
+  user_type TEXT NOT NULL, -- admin | sales_rep | company
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+📄 Frontend Example — Login + 2FA Flow
+export async function login(email: string, pass: string) {
+  const step1 = await fetch("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: pass })
+  }).then(r => r.json());
+
+  if (!step1.requires2FA) throw new Error("Expected 2FA");
+
+  return "2FA_REQUIRED";
+}
+
+export async function verifyCode(email: string, code: string) {
+  const res = await fetch("/api/auth/verify-2fa", {
+    method: "POST",
+    body: JSON.stringify({ email, code })
+  }).then(r => r.json());
+
+  return res;
+}

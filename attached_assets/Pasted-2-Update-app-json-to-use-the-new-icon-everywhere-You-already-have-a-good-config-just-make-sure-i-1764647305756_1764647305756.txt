@@ -1,0 +1,90 @@
+2️⃣ Update app.json to use the new icon everywhere
+
+You already have a good config; just make sure it points to the new file and (optionally) uses it for splash.
+
+{
+  "expo": {
+    "name": "HD2D",
+    "slug": "hardcoredoortodoorclosers",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",          // <-- D2D logo
+    "scheme": "hardcoredoortodoorclosers",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hardcoredoortodoorclosers.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/icon.png"   // <-- D2D logo
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.hardcoredoortodoorclosers.app"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/icon.png"      // <-- browser tab icon
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",   // or "./assets/splash.png"
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "reactCompiler": true
+    }
+  }
+}
+
+
+That will make:
+
+iOS app icon = D2D logo
+
+Android icon + adaptive icon = D2D logo on black
+
+Web favicon = D2D logo
+
+Splash screen = black with white D2D logo in the middle
+
+3️⃣ Use the logo inside the app (login / header)
+
+If you want the same mark on your auth screen or header, drop the asset in like this:
+
+import React from "react";
+import { Image, StyleSheet, View } from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+
+export function HeroLogo() {
+  return (
+    <ThemedView style={styles.container}>
+      <Image
+        source={require("../assets/icon.png")}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  logo: {
+    width: 140,
+    height: 140,
+  },
+});

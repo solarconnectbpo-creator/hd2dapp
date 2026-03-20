@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Hardcore D2D Closers",
+    "slug": "hardcoredoortodoorclosers",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "hardcoredoortodoorclosers",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "description": "Hardcore Door-to-Door Closers - The ultimate platform for sales reps and companies",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hardcoredoortodoorclosers.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.hardcoredoortodoorclosers.app"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 250,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "reactCompiler": true
+    }
+  }
+}

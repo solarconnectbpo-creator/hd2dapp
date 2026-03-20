@@ -1,0 +1,135 @@
+1️⃣ Lead Verification Pipeline (Server-Side Worker)
+
+This runs every time:
+
+A vendor uploads leads
+
+A lead comes from API
+
+A lead is purchased
+
+A lead is delivered
+
+A user manually adds a lead
+
+📁 src/engine/leadVerification.ts
+
+import { runAI } from "../utils/ai";
+import { verifyPhone } from "../utils/phoneVerify";
+import { verifyEmail } from "../utils/emailVerify";
+import { getVendorScore } from "../utils/vendorScore";
+
+export async function verifyLead(env: Env, lead: any, vendorId: string) {
+  // Step 1 — Phone Validation
+  const phoneCheck = await verifyPhone(lead.phone);
+
+  // Step 2 — Email Validation
+  const emailCheck = await verifyEmail(lead.email);
+
+  // Step 3 — Vendor Reputation Score
+  const vendorScore = await getVendorScore(env, vendorId);
+
+  // Step 4 — AI Intent + Fraud Analysis
+  const aiAnalysis = await runAI(env, `
+You are LeadGuardGPT, an AI that validates incoming leads for authenticity, intent, fraud, and quality.
+
+Evaluate:
+- Is the lead real?
+- Is the contact info valid?
+- Does the lead match the product (roofing, solar, HVAC)?
+- Is this likely a recycled lead?
+- Is it a spam or bot-generated record?
+- Is it TCPA safe?
+- Is it high, medium, or low intent?
+- Risk score (0–100)
+- Quality score (0–100)
+- Justification
+
+Return JSON only.
+
+Lead: ${JSON.stringify(lead)}
+PhoneCheck: ${JSON.stringify(phoneCheck)}
+EmailCheck: ${JSON.stringify(emailCheck)}
+VendorScore: ${JSON.stringify(vendorScore)}
+  `);
+
+  let parsed = {};
+  try { parsed = JSON.parse(aiAnalysis); } catch {}
+
+  const result = {
+    ...parsed,
+    phone: phoneCheck,
+    email: emailCheck,
+    vendorScore,
+  };
+
+  // Save to DB
+  await env.DB.prepare(`
+    INSERT INTO lead_verification
+    (id, lead_id, vendor_id, result_json, risk_score, quality_score)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+    .bind(
+      crypto.randomUUID(),
+      lead.id,
+      vendorId,
+      JSON.stringify(result),
+      result.risk_score || 0,
+      result.quality_score || 0
+    )
+    .run();
+
+  return result;
+}
+
+2️⃣ Lead Verification Table
+
+📁 migrations/0012_lead_verification.sql
+
+CREATE TABLE IF NOT EXISTS lead_verification (
+  id TEXT PRIMARY KEY,
+  lead_id TEXT REFERENCES leads(id),
+  vendor_id TEXT REFERENCES companies(id),
+  risk_score INTEGER,
+  quality_score INTEGER,
+  result_json TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+3️⃣ Phone & Email Verification Utilities
+
+This brings Twilio / NumVerify / Kickbox / Clearout-style verification inside HD2D.
+
+📁 src/utils/phoneVerify.ts
+
+export async function verifyPhone(phone: string) {
+  if (!phone) return { valid: false, reason: "missing" };
+
+  const cleaned = phone.replace(/[^0-9]/g, "");
+
+  const isValid =
+    cleaned.length >= 10 &&
+    cleaned.length <= 11 &&
+    !cleaned.startsWith("000");
+
+  return {
+    valid: isValid,
+    cleaned,
+    reason: isValid ? "valid" : "invalid"
+  };
+}
+
+
+📁 src/utils/emailVerify.ts
+
+export function verifyEmail(email: string) {
+  if (!email) return { valid: false, reason: "missing" };
+
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const valid = regex.test(email);
+
+  return {
+    valid,
+    reason: valid ? "valid" : "invalid_format"
+  };
+}

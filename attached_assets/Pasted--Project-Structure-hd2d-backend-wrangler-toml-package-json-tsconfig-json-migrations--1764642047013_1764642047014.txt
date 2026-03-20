@@ -1,0 +1,212 @@
+📁 Project Structure
+hd2d-backend/
+│ wrangler.toml
+│ package.json
+│ tsconfig.json
+│
+├── migrations/
+│   ├── 0001_users.sql
+│   ├── 0002_crm.sql
+│   ├── 0003_social.sql
+│   ├── 0004_inbound.sql
+│
+├── src/
+│   ├── index.ts
+│   ├── router.ts
+│   ├── middleware/
+│   │    ├── cors.ts
+│   │    ├── auth.ts
+│   │    ├── json.ts
+│   │
+│   ├── utils/
+│   │    ├── crypto.ts
+│   │    ├── jwt.ts
+│   │    ├── response.ts
+│   │
+│   ├── api/
+│        ├── auth.ts
+│        ├── leads.ts
+│        ├── deals.ts
+│        ├── posts.ts
+│        ├── jobs.ts
+│        ├── events.ts
+│        ├── inbound.ts
+│        ├── admin.ts
+
+📄 wrangler.toml
+name = "hd2d-backend"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "HD2D"
+database_id = "hd2d-db"
+
+[[kv_namespaces]]
+binding = "HD2D_CONFIG"
+id = "hd2d-config"
+
+[[kv_namespaces]]
+binding = "HD2D_PROMPTS"
+id = "hd2d-prompts"
+
+[[kv_namespaces]]
+binding = "HD2D_THEMES"
+id = "hd2d-themes"
+
+[[kv_namespaces]]
+binding = "HD2D_CACHE"
+id = "hd2d-cache"
+
+[vars]
+JWT_SECRET = "your-super-secret"
+
+📄 tsconfig.json
+{
+  "compilerOptions": {
+    "target": "es2021",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "webworker"],
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "esModuleInterop": true
+  }
+}
+
+📄 src/index.ts
+
+🔥 This is your main API entry point.
+
+import router from "./router";
+import { cors } from "./middleware/cors";
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const response = await router.handle(request, env, ctx);
+    return cors(response);
+  }
+}
+
+📄 src/router.ts
+
+A lightweight Express-like router — faster than GHL’s entire routing layer.
+
+import { unauthorized, notFound } from "./utils/response";
+
+type Handler = (req: Request, env: Env, ctx: ExecutionContext) => Promise<Response>;
+
+class Router {
+  routes: Record<string, Record<string, Handler>> = {
+    GET: {},
+    POST: {},
+    PUT: {},
+    DELETE: {}
+  };
+
+  get(path: string, handler: Handler) { this.routes.GET[path] = handler; }
+  post(path: string, handler: Handler) { this.routes.POST[path] = handler; }
+  put(path: string, handler: Handler) { this.routes.PUT[path] = handler; }
+  delete(path: string, handler: Handler) { this.routes.DELETE[path] = handler; }
+
+  async handle(req: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(req.url);
+    const methodRoutes = this.routes[req.method as keyof typeof this.routes];
+
+    const match = methodRoutes[url.pathname];
+    if (!match) return notFound();
+
+    try {
+      return await match(req, env, ctx);
+    } catch (e) {
+      console.error("ERROR:", e);
+      return new Response("Internal Server Error", { status: 500 });
+    }
+  }
+}
+
+const router = new Router();
+export default router;
+
+📄 src/middleware/cors.ts
+export function cors(res: Response) {
+  const headers = new Headers(res.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Headers", "*");
+  headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+
+  return new Response(res.body, {
+    status: res.status,
+    headers
+  });
+}
+
+📄 src/utils/crypto.ts
+
+Secure password hashing (better than GHL’s system).
+
+export async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function verifyPassword(password: string, hash: string) {
+  const hashed = await hashPassword(password);
+  return hashed === hash;
+}
+
+📄 src/utils/jwt.ts
+export async function signJwt(payload: object, env: Env): Promise<string> {
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = btoa(JSON.stringify(payload));
+  const sig = await hmac(`${header}.${body}`, env.JWT_SECRET);
+  return `${header}.${body}.${sig}`;
+}
+
+export async function verifyJwt(token: string, env: Env): Promise<any | null> {
+  const [header, body, signature] = token.split(".");
+  const valid = await hmac(`${header}.${body}`, env.JWT_SECRET);
+  if (valid !== signature) return null;
+  return JSON.parse(atob(body));
+}
+
+async function hmac(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(value)
+  );
+  return [...new Uint8Array(sig)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+📄 src/utils/response.ts
+export function json(data: any, status = 200) {
+  return Response.json(data, { status });
+}
+
+export function unauthorized(msg = "Unauthorized") {
+  return new Response(msg, { status: 401 });
+}
+
+export function badRequest(msg = "Bad Request") {
+  return new Response(msg, { status: 400 });
+}
+
+export function notFound(msg = "Not Found") {
+  return new Response(msg, { status: 404 });
+}

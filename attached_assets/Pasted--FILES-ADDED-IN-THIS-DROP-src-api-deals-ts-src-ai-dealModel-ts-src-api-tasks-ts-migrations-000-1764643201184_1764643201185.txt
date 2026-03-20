@@ -1,0 +1,253 @@
+📁 FILES ADDED IN THIS DROP
+
+src/api/deals.ts
+
+src/ai/dealModel.ts
+
+src/api/tasks.ts
+
+migrations/0003_deals.sql
+
+📄 D1 Migration (0003_deals.sql)
+
+Enterprise-grade CRM tables.
+
+CREATE TABLE IF NOT EXISTS deals (
+  id TEXT PRIMARY KEY,
+  contact_name TEXT,
+  company TEXT,
+  value REAL,
+  stage TEXT,
+  probability INTEGER,
+  phone TEXT,
+  email TEXT,
+  notes TEXT,
+  assigned_to TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS deal_activity (
+  id TEXT PRIMARY KEY,
+  deal_id TEXT,
+  event TEXT,
+  data TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (deal_id) REFERENCES deals(id)
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id TEXT PRIMARY KEY,
+  deal_id TEXT,
+  title TEXT,
+  due_date TEXT,
+  completed INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+📄 AI MODEL — deal forecasting (src/ai/dealModel.ts)
+
+This is where HD2D becomes stronger than GHL, HubSpot Starter, and Close.com.
+
+import { runAI } from "../utils/ai";
+
+export async function evaluateDeal(env: Env, deal: any) {
+  const prompt = `
+You are an AI sales strategist. Analyze the following deal and return a JSON object with:
+
+- "probability": 0-100 chance the deal will close
+- "stageRecommendation": next best stage
+- "priority": high | medium | low
+- "nextActions": array of recommended steps
+- "summary": one-paragraph summary
+
+Deal:
+${JSON.stringify(deal)}
+`;
+
+  const result = await runAI(env, prompt);
+
+  try {
+    return JSON.parse(result);
+  } catch {
+    return {
+      probability: 50,
+      stageRecommendation: deal.stage,
+      priority: "medium",
+      nextActions: [],
+      summary: "AI evaluation unavailable."
+    };
+  }
+}
+
+📄 API: src/api/deals.ts
+
+🔥 Enterprise-level pipeline logic.
+
+import router from "../router";
+import { json, badRequest, unauthorized } from "../utils/response";
+import { requireAuth } from "../middleware/auth";
+import { evaluateDeal } from "../ai/dealModel";
+
+// ----------------------------
+// GET PIPELINE
+// ----------------------------
+router.get("/api/deals", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const deals = await env.DB.prepare(
+    "SELECT * FROM deals ORDER BY created_at DESC"
+  ).all();
+
+  return json(deals.results);
+});
+
+// ----------------------------
+// CREATE DEAL
+// ----------------------------
+router.post("/api/deals/create", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const body = await req.json();
+  const id = crypto.randomUUID();
+
+  if (!body.contactName || !body.value)
+    return badRequest("Missing fields");
+
+  // AI forecast
+  const ai = await evaluateDeal(env, body);
+
+  await env.DB.prepare(
+    `INSERT INTO deals (
+      id, contact_name, company, value, stage, probability,
+      phone, email, notes, assigned_to
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    id,
+    body.contactName,
+    body.company || "",
+    body.value,
+    body.stage || "new",
+    ai.probability,
+    body.phone || "",
+    body.email || "",
+    ai.summary,
+    user.id
+  ).run();
+
+  return json({
+    id,
+    probability: ai.probability,
+    summary: ai.summary,
+    stageRecommendation: ai.stageRecommendation,
+    nextActions: ai.nextActions
+  });
+});
+
+// ----------------------------
+// GET DEAL BY ID
+// ----------------------------
+router.get("/api/deals/:id", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const id = req.url.split("/").pop();
+
+  const deal = await env.DB.prepare(
+    "SELECT * FROM deals WHERE id = ?"
+  ).bind(id).first();
+
+  if (!deal) return badRequest("Deal not found");
+
+  return json(deal);
+});
+
+// ----------------------------
+// UPDATE DEAL STAGE + AI REEVALUATION
+// ----------------------------
+router.post("/api/deals/update-stage", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const { dealId, stage } = await req.json();
+
+  const deal = await env.DB.prepare(
+    "SELECT * FROM deals WHERE id = ?"
+  ).bind(dealId).first();
+
+  if (!deal) return badRequest("Deal not found");
+
+  deal.stage = stage;
+
+  // AI update
+  const ai = await evaluateDeal(env, deal);
+
+  await env.DB.prepare(
+    "UPDATE deals SET stage = ?, probability = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+  ).bind(stage, ai.probability, dealId).run();
+
+  return json({
+    success: true,
+    probability: ai.probability,
+    recommendation: ai.stageRecommendation,
+    nextActions: ai.nextActions
+  });
+});
+
+// ----------------------------
+// FORECAST SUMMARY (dashboard)
+// ----------------------------
+router.get("/api/deals/forecast", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const deals = await env.DB.prepare(
+    "SELECT * FROM deals"
+  ).all();
+
+  const sum = deals.results.reduce((acc, d) => {
+    acc.total += d.value;
+    acc.weighted += (d.value * d.probability) / 100;
+    return acc;
+  }, { total: 0, weighted: 0 });
+
+  return json({
+    totalPipelineValue: sum.total,
+    expectedRevenue: sum.weighted,
+    deals: deals.results
+  });
+});
+
+📄 Tasks API — src/api/tasks.ts
+import router from "../router";
+import { requireAuth } from "../middleware/auth";
+import { json, unauthorized } from "../utils/response";
+
+router.post("/api/tasks/create", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const { dealId, title, dueDate } = await req.json();
+  const id = crypto.randomUUID();
+
+  await env.DB.prepare(
+    "INSERT INTO tasks (id, deal_id, title, due_date) VALUES (?, ?, ?, ?)"
+  ).bind(id, dealId, title, dueDate).run();
+
+  return json({ success: true, id });
+});
+
+router.get("/api/tasks/:dealId", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const dealId = req.url.split("/").pop();
+
+  const tasks = await env.DB.prepare(
+    "SELECT * FROM tasks WHERE deal_id = ? ORDER BY due_date ASC"
+  ).bind(dealId).all();
+
+  return json(tasks.results);
+});
