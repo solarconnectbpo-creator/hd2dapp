@@ -1,0 +1,272 @@
+🚀 DROP 6 — FULL EVENT ENGINE
+
+Everything below is ready to be pasted into your Cloudflare Worker.
+
+📁 New Files in this Drop
+migrations/0005_events.sql
+src/api/events.ts
+src/ai/eventModel.ts
+src/utils/qr.ts
+src/utils/ics.ts
+
+📄 MIGRATION: migrations/0005_events.sql
+CREATE TABLE IF NOT EXISTS events (
+  id TEXT PRIMARY KEY,
+  title TEXT,
+  description TEXT,
+  cover_url TEXT,
+  location TEXT,
+  date TEXT,
+  start_time TEXT,
+  end_time TEXT,
+  capacity INTEGER,
+  organizer_id TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS event_tickets (
+  id TEXT PRIMARY KEY,
+  event_id TEXT,
+  user_id TEXT,
+  type TEXT, -- free | paid | vip
+  qr_code TEXT,
+  checked_in INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS event_sessions (
+  id TEXT PRIMARY KEY,
+  event_id TEXT,
+  title TEXT,
+  description TEXT,
+  start_time TEXT,
+  end_time TEXT,
+  speaker TEXT
+);
+
+CREATE TABLE IF NOT EXISTS event_rsvp (
+  id TEXT PRIMARY KEY,
+  event_id TEXT,
+  user_id TEXT,
+  status TEXT, -- going | interested | notgoing
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_events_date ON events(date);
+CREATE INDEX idx_tickets_event ON event_tickets(event_id);
+CREATE INDEX idx_rsvp_event ON event_rsvp(event_id);
+
+📄 FILE: src/ai/eventModel.ts
+
+AI that generates event descriptions, tags, and promotion angles.
+
+import { runAI } from "../utils/ai";
+
+export async function generateEventDescription(env: Env, title: string) {
+  const prompt = `
+You are an expert event copywriter for a sales and business community.
+Generate a JSON response with:
+
+- "description": 2-paragraph event description
+- "tags": array of 5 tags
+- "valueProps": array of reasons to attend
+- "audience": target roles (sales reps, business owners, etc.)
+
+Event Title:
+${title}
+`;
+
+  const text = await runAI(env, prompt);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      description: "Event information coming soon.",
+      tags: [],
+      valueProps: [],
+      audience: []
+    };
+  }
+}
+
+📄 FILE: src/utils/qr.ts
+
+QR generator (base64 PNG) using Google's chart API.
+
+export function generateQR(text: string) {
+  const url = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(text)}`;
+  return url; // returns PNG QR code directly
+}
+
+📄 FILE: src/utils/ics.ts
+
+Generates a .ics file content for "Add to Calendar".
+
+export function createICS(event: any) {
+  return `
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:${event.id}
+DTSTAMP:${event.date.replace(/-/g, "")}T${event.start_time.replace(":", "")}00Z
+DTSTART:${event.date.replace(/-/g, "")}T${event.start_time.replace(":", "")}00Z
+DTEND:${event.date.replace(/-/g, "")}T${event.end_time.replace(":", "")}00Z
+SUMMARY:${event.title}
+DESCRIPTION:${event.description}
+LOCATION:${event.location}
+END:VEVENT
+END:VCALENDAR
+  `.trim();
+}
+
+📄 FILE: src/api/events.ts
+
+🔥 The full Eventbrite engine.
+
+import router from "../router";
+import { requireAuth } from "../middleware/auth";
+import { json, unauthorized, badRequest } from "../utils/response";
+import { generateEventDescription } from "../ai/eventModel";
+import { generateQR } from "../utils/qr";
+import { createICS } from "../utils/ics";
+
+// ----------------------------
+// CREATE EVENT (ADMIN)
+// ----------------------------
+router.post("/api/events/create", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user || user.role !== "admin") return unauthorized();
+
+  const body = await req.json();
+
+  const id = crypto.randomUUID();
+
+  // AI generate description if not provided
+  const ai = await generateEventDescription(env, body.title);
+
+  await env.DB.prepare(
+    `INSERT INTO events (id, title, description, cover_url, location, date, start_time, end_time, capacity, organizer_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    id,
+    body.title,
+    body.description || ai.description,
+    body.coverUrl || "",
+    body.location,
+    body.date,
+    body.startTime,
+    body.endTime,
+    body.capacity || 0,
+    user.id
+  ).run();
+
+  return json({
+    id,
+    description: ai.description,
+    tags: ai.tags,
+    valueProps: ai.valueProps
+  });
+});
+
+// ----------------------------
+// LIST EVENTS
+// ----------------------------
+router.get("/api/events", async (req, env) => {
+  const events = await env.DB.prepare(
+    "SELECT * FROM events ORDER BY date ASC"
+  ).all();
+
+  return json(events.results);
+});
+
+// ----------------------------
+// GET EVENT DETAILS
+// ----------------------------
+router.get("/api/events/:id", async (req, env) => {
+  const id = req.url.split("/").pop();
+
+  const event = await env.DB.prepare(
+    "SELECT * FROM events WHERE id = ?"
+  ).bind(id).first();
+
+  if (!event) return badRequest("Event not found");
+  return json(event);
+});
+
+// ----------------------------
+// RSVP
+// ----------------------------
+router.post("/api/events/rsvp", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const { eventId, status } = await req.json();
+  const id = crypto.randomUUID();
+
+  await env.DB.prepare(
+    `INSERT INTO event_rsvp (id, event_id, user_id, status)
+     VALUES (?, ?, ?, ?)`
+  ).bind(id, eventId, user.id, status).run();
+
+  return json({ success: true });
+});
+
+// ----------------------------
+// PURCHASE / CLAIM TICKET
+// ----------------------------
+router.post("/api/events/ticket", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const { eventId, type } = await req.json();
+  const ticketId = crypto.randomUUID();
+
+  const qr = generateQR(ticketId);
+
+  await env.DB.prepare(
+    `INSERT INTO event_tickets (id, event_id, user_id, type, qr_code)
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(ticketId, eventId, user.id, type, qr).run();
+
+  return json({
+    ticketId,
+    qr,
+    type
+  });
+});
+
+// ----------------------------
+// CHECK-IN (scanned)
+// ----------------------------
+router.post("/api/events/checkin", async (req, env) => {
+  const { ticketId } = await req.json();
+
+  await env.DB.prepare(
+    "UPDATE event_tickets SET checked_in = 1 WHERE id = ?"
+  ).bind(ticketId).run();
+
+  return json({ success: true });
+});
+
+// ----------------------------
+// DOWNLOAD CALENDAR INVITE
+// ----------------------------
+router.get("/api/events/:id/calendar", async (req, env) => {
+  const id = req.url.split("/").pop();
+
+  const event = await env.DB.prepare(
+    "SELECT * FROM events WHERE id = ?"
+  ).bind(id).first();
+
+  if (!event) return badRequest("Event not found");
+
+  const ics = createICS(event);
+
+  return new Response(ics, {
+    headers: {
+      "Content-Type": "text/calendar",
+      "Content-Disposition": `attachment; filename="${event.title}.ics"`
+    }
+  });
+});

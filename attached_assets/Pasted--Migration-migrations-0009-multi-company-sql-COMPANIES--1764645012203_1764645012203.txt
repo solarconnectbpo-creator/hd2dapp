@@ -1,0 +1,175 @@
+📁 Migration: migrations/0009_multi_company.sql
+-- COMPANIES -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS companies (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  industry TEXT,
+  logo_url TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- USERS -----------------------------------------------------------
+ALTER TABLE users ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- LEADS -----------------------------------------------------------
+ALTER TABLE leads ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- DEALS -----------------------------------------------------------
+ALTER TABLE deals ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- JOBS ------------------------------------------------------------
+ALTER TABLE jobs ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- EVENTS ----------------------------------------------------------
+ALTER TABLE events ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- POSTS -----------------------------------------------------------
+ALTER TABLE posts ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- COURSES / CERTIFICATIONS (GLOBAL - OPTIONAL PER COMPANY) ------
+ALTER TABLE courses ADD COLUMN company_id TEXT;
+ALTER TABLE certifications ADD COLUMN company_id TEXT;
+
+-- INBOUND AGENTS -------------------------------------------------
+ALTER TABLE inbound_agents ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- WORKFLOWS --------------------------------------------------------
+ALTER TABLE workflows ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- WORKFLOW STEPS ---------------------------------------------------
+-- steps load automatically by workflow_id, nothing changes
+
+-- API KEYS ---------------------------------------------------------
+ALTER TABLE api_keys ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- BILLING ----------------------------------------------------------
+ALTER TABLE billing ADD COLUMN company_id TEXT REFERENCES companies(id);
+
+-- AUDIT LOG --------------------------------------------------------
+ALTER TABLE audit_log ADD COLUMN company_id TEXT;
+
+🌐 API CHANGES — Everything is Company-Scoped
+
+Every endpoint now accepts a header:
+
+x-company-id: <company_id>
+
+
+Middleware:
+
+src/middleware/company.ts
+
+export async function requireCompany(req: Request, env: Env) {
+  const companyId = req.headers.get("x-company-id");
+
+  if (!companyId) {
+    return null;
+  }
+
+  const company = await env.DB.prepare(
+    "SELECT * FROM companies WHERE id = ?"
+  ).bind(companyId).first();
+
+  return company || null;
+}
+
+
+Then modify every API endpoint:
+
+const company = await requireCompany(req, env);
+if (!company) return unauthorized("Invalid company context");
+
+🧠 HOW USERS BELONG TO COMPANIES
+User table now has:
+company_id TEXT
+
+
+When a new user signs up:
+
+signup: user selects or is invited into a company
+
+
+When an admin creates a user:
+
+POST /api/admin/users/create
+{ name, email, role, companyId }
+
+🔑 API KEYS ARE COMPANY-SCOPED
+
+Example usage:
+
+Authorization: Bearer <api_key>
+x-company-id: <company_id>
+
+🧩 WORKFLOWS ARE COMPANY-ISOLATED
+
+Workflow creation:
+
+INSERT INTO workflows (id, name, description, created_by, company_id)
+VALUES (?, ?, ?, ?, ?)
+
+
+Workflow execution:
+
+Dispatcher filters by:
+
+SELECT * FROM workflows WHERE company_id = ? AND active = 1
+
+📞 AI Inbound/Outbound Agents Are Company-Specific
+
+The inbound agents table now includes:
+
+company_id TEXT
+
+
+Filtering:
+
+SELECT * FROM inbound_agents WHERE company_id = ?
+
+
+Each company can have its own:
+
+AI agent scripts
+
+SimpleTalk webhooks
+
+Calling pools
+
+Assigned lead routing
+
+Different pricing bundles
+
+🧩 UI CHANGES — Multi-Tenant Structure
+Company Admin Capabilities
+
+✔ Manage users
+✔ Manage agents
+✔ Manage workflows
+✔ View billing
+✔ Create API keys
+✔ View activity logs
+✔ View analytics
+
+User Capabilities
+
+✔ Limited to company data
+✔ Actions defined by role
+
+🧠 AI FEATURES (Multi-Company Aware)
+WorkflowGPT
+
+“Build me a workflow that reactivates all old leads for MY company.”
+
+Now includes:
+
+{
+  "company_id": "<currentCompanyId>"
+}
+
+AdminGPT
+
+“Find performance issues in Company A only.”
+
+Now includes filtering by:
+
+SELECT * FROM audit_log WHERE company_id = ?

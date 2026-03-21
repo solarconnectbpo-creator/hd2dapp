@@ -1,0 +1,265 @@
+📁 FILES ADDED IN DROP 3
+
+src/api/leads.ts
+
+src/ai/leadModel.ts
+
+D1 migrations: 0002_leads.sql
+
+Utility: src/utils/geo.ts
+
+Utility: src/utils/ai.ts
+
+📄 D1 MIGRATION → leads table (0002_leads.sql)
+CREATE TABLE IF NOT EXISTS leads (
+  id TEXT PRIMARY KEY,
+  contact_name TEXT,
+  phone TEXT,
+  email TEXT,
+  industry TEXT,
+  location TEXT,
+  city TEXT,
+  latitude REAL,
+  longitude REAL,
+  price REAL,
+  quality_score INTEGER,
+  lead_type TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  assigned_to TEXT,
+  status TEXT DEFAULT 'new'
+);
+
+CREATE TABLE IF NOT EXISTS lead_activity (
+  id TEXT PRIMARY KEY,
+  lead_id TEXT,
+  event TEXT,
+  data TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lead_id) REFERENCES leads(id)
+);
+
+📄 FILE: src/utils/geo.ts
+
+Coordinates from address (Cloudflare supports MAPBOX, GOOGLE, or OPENROUTESERVICE).
+
+export async function geocodeAddress(address: string, env: Env) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!data.length) return { lat: null, lon: null };
+
+  return {
+    lat: parseFloat(data[0].lat),
+    lon: parseFloat(data[0].lon)
+  };
+}
+
+📄 FILE: src/utils/ai.ts
+
+Wrapper for AI scoring + summaries.
+
+export async function runAI(env: Env, prompt: string) {
+  const url = "https://api.openai.com/v1/chat/completions";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2
+    })
+  });
+
+  const json = await res.json();
+  return json.choices[0].message.content;
+}
+
+📄 FILE: src/ai/leadModel.ts
+
+🔥 This is your secret weapon:
+AI that produces a structured quality score, qualification summary, objections, and recommended actions.
+
+import { runAI } from "../utils/ai";
+
+export async function analyzeLead(env: Env, lead: any) {
+  const prompt = `
+You are an AI sales analyst. Analyze the following lead and return a JSON object with:
+
+- "score": (0-100 quality)
+- "summary": 1-paragraph qualification summary
+- "predictedObjections": array of objections
+- "recommendedActions": array of steps to close deal
+- "industry": best industry guess
+
+Lead data:
+${JSON.stringify(lead)}
+`;
+
+  const response = await runAI(env, prompt);
+
+  try {
+    return JSON.parse(response);
+  } catch {
+    return {
+      score: 50,
+      summary: "AI summary unavailable.",
+      predictedObjections: [],
+      recommendedActions: [],
+      industry: lead.industry || "unknown"
+    };
+  }
+}
+
+📄 FILE: src/api/leads.ts
+
+🔥 This is the entire AI-powered leads engine.
+
+import router from "../router";
+import { json, badRequest, unauthorized } from "../utils/response";
+import { requireAuth } from "../middleware/auth";
+import { geocodeAddress } from "../utils/geo";
+import { analyzeLead } from "../ai/leadModel";
+
+// ----------------------------
+// GET /api/leads
+// ----------------------------
+router.get("/api/leads", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const leads = await env.DB.prepare(
+    "SELECT * FROM leads ORDER BY created_at DESC"
+  ).all();
+
+  return json(leads.results);
+});
+
+// ----------------------------
+// CREATE LEAD
+// ----------------------------
+router.post("/api/leads/create", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const body = await req.json();
+  const id = crypto.randomUUID();
+
+  if (!body.contactName || !body.phone)
+    return badRequest("Missing contact");
+
+  // Geocode
+  const geo = body.location ? await geocodeAddress(body.location, env) : {};
+
+  // AI analysis
+  const ai = await analyzeLead(env, body);
+
+  await env.DB.prepare(
+    `INSERT INTO leads (
+      id, contact_name, phone, email, industry,
+      location, city, latitude, longitude, price,
+      quality_score, lead_type, notes, assigned_to
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    id,
+    body.contactName,
+    body.phone,
+    body.email || null,
+    ai.industry || body.industry,
+    body.location || null,
+    body.city || null,
+    geo.lat || null,
+    geo.lon || null,
+    body.price || null,
+    ai.score || 50,
+    body.leadType || "local-exclusive",
+    body.notes || ai.summary,
+    null
+  ).run();
+
+  return json({
+    id,
+    score: ai.score,
+    summary: ai.summary,
+    predictedObjections: ai.predictedObjections,
+    recommendedActions: ai.recommendedActions
+  });
+});
+
+// ----------------------------
+// GET LEAD BY ID
+// ----------------------------
+router.get("/api/leads/:id", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const id = req.url.split("/").pop();
+
+  const lead = await env.DB.prepare(
+    "SELECT * FROM leads WHERE id = ?"
+  ).bind(id).first();
+
+  if (!lead) return badRequest("Lead not found");
+  return json(lead);
+});
+
+// ----------------------------
+// ASSIGN LEAD → best rep (AI-assisted)
+// ----------------------------
+router.post("/api/leads/assign", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const { leadId, repId } = await req.json();
+
+  await env.DB.prepare(
+    "UPDATE leads SET assigned_to = ? WHERE id = ?"
+  ).bind(repId, leadId).run();
+
+  return json({ success: true });
+});
+
+// ----------------------------
+// BATCH IMPORT
+// ----------------------------
+router.post("/api/leads/import", async (req, env) => {
+  const user = await requireAuth(req, env);
+  if (!user) return unauthorized();
+
+  const { leads } = await req.json();
+
+  for (const row of leads) {
+    const id = crypto.randomUUID();
+    const geo = row.location ? await geocodeAddress(row.location, env) : {};
+    const ai = await analyzeLead(env, row);
+
+    await env.DB.prepare(
+      `INSERT INTO leads (id, contact_name, phone, email, industry, location, city, latitude,
+       longitude, price, quality_score, lead_type, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        id,
+        row.contactName,
+        row.phone,
+        row.email || "",
+        ai.industry || row.industry,
+        row.location,
+        row.city,
+        geo.lat || null,
+        geo.lon || null,
+        row.price || null,
+        ai.score,
+        row.leadType || "local-exclusive",
+        row.notes || ai.summary
+      )
+      .run();
+  }
+
+  return json({ success: true, count: leads.length });
+});

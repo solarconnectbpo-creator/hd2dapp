@@ -1,0 +1,267 @@
+1️⃣ New DB Tables (Price Optimization + Disputes)
+
+Create a new migration file, e.g. migrations/0013_pricing_disputes.sql:
+
+-- PRICE OPTIMIZATION HISTORY -------------------------------
+CREATE TABLE IF NOT EXISTS vendor_pricing_history (
+  id TEXT PRIMARY KEY,
+  product_id TEXT REFERENCES vendor_products(id),
+  old_price REAL,
+  new_price REAL,
+  reason TEXT,
+  strategy TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- DISPUTES -------------------------------------------------
+CREATE TABLE IF NOT EXISTS vendor_disputes (
+  id TEXT PRIMARY KEY,
+  order_id TEXT REFERENCES vendor_product_orders(id),
+  buyer_id TEXT REFERENCES companies(id),
+  vendor_id TEXT REFERENCES companies(id),
+  lead_id TEXT REFERENCES leads(id),
+  reason TEXT,
+  status TEXT, -- open | under_review | approved_refund | rejected | replaced
+  resolution TEXT,
+  ai_recommendation TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+2️⃣ AI Price Optimization Engine
+src/ai/pricingModel.ts
+
+This looks at performance & suggests a new price per product.
+
+import { runAI } from "../utils/ai";
+
+export async function suggestNewPrice(env: Env, product: any, stats: any) {
+  const prompt = `
+You are PriceOptGPT, an AI that optimizes pricing for lead products.
+
+Given:
+- product details
+- current price
+- conversion stats
+- refund rate
+- dispute rate
+- demand level
+
+Return JSON:
+{
+  "suggestedPrice": number,
+  "strategy": "raise" | "lower" | "keep",
+  "reason": string
+}
+Product:
+${JSON.stringify(product)}
+Stats:
+${JSON.stringify(stats)}
+`;
+
+  const text = await runAI(env, prompt);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      suggestedPrice: product.price,
+      strategy: "keep",
+      reason: "AI parsing error"
+    };
+  }
+}
+
+src/api/pricing.ts
+
+Endpoint to recalc + apply AI pricing per product.
+You can hit this manually OR from a scheduled Cron Worker.
+
+import router from "../router";
+import { json, unauthorized } from "../utils/response";
+import { suggestNewPrice } from "../ai/pricingModel";
+import { requirePermission } from "../middleware/rbac";
+
+router.post("/api/admin/pricing/recalculate", async (req, env) => {
+  const user = await env.auth(req);
+  if (!user) return unauthorized();
+
+  const allowed = await requirePermission(env, user.id, "admin.pricing.manage");
+  if (!allowed) return new Response("Forbidden", { status: 403 });
+
+  const products = await env.DB.prepare(
+    "SELECT * FROM vendor_products WHERE active = 1"
+  ).all();
+
+  const results: any[] = [];
+
+  for (const product of products.results) {
+    // Basic stats: you can expand this later
+    const stats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) AS total_orders,
+        SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+      FROM vendor_product_orders
+      WHERE product_id = ?
+    `)
+      .bind(product.id)
+      .first();
+
+    const ai = await suggestNewPrice(env, product, stats);
+
+    if (ai.suggestedPrice !== product.price) {
+      await env.DB.prepare(
+        "UPDATE vendor_products SET price = ? WHERE id = ?"
+      ).bind(ai.suggestedPrice, product.id).run();
+
+      await env.DB.prepare(
+        `INSERT INTO vendor_pricing_history
+        (id, product_id, old_price, new_price, reason, strategy)
+        VALUES (?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          crypto.randomUUID(),
+          product.id,
+          product.price,
+          ai.suggestedPrice,
+          ai.reason,
+          ai.strategy
+        )
+        .run();
+    }
+
+    results.push({
+      productId: product.id,
+      oldPrice: product.price,
+      newPrice: ai.suggestedPrice,
+      strategy: ai.strategy,
+      reason: ai.reason
+    });
+  }
+
+  return json({ success: true, results });
+});
+
+
+This gives you automatic dynamic pricing for every vendor product.
+
+3️⃣ AI Dispute Resolution System
+src/ai/disputeModel.ts
+import { runAI } from "../utils/ai";
+
+export async function analyzeDispute(env: Env, dispute: any, lead: any, vendor: any) {
+  const prompt = `
+You are DisputeGPT, an AI that resolves disputes between buyers and vendors for purchased leads.
+
+Decide if the dispute should be:
+- approved_refund
+- rejected
+- replacement (send new lead)
+
+Return JSON:
+{
+  "decision": "approved_refund" | "rejected" | "replacement",
+  "reason": string,
+  "vendorImpact": "none" | "warning" | "strike"
+}
+
+Dispute:
+${JSON.stringify(dispute)}
+Lead:
+${JSON.stringify(lead)}
+Vendor:
+${JSON.stringify(vendor)}
+`;
+
+  const text = await runAI(env, prompt);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      decision: "rejected",
+      reason: "AI parsing error",
+      vendorImpact: "none"
+    };
+  }
+}
+
+src/api/disputes.ts
+
+Buyers open disputes; admins can auto-resolve with AI or override.
+
+import router from "../router";
+import { json, unauthorized, badRequest } from "../utils/response";
+import { analyzeDispute } from "../ai/disputeModel";
+import { requirePermission } from "../middleware/rbac";
+
+// BUYER CREATES DISPUTE
+router.post("/api/disputes/create", async (req, env) => {
+  const user = await env.auth(req);
+  if (!user) return unauthorized();
+
+  const { orderId, leadId, vendorId, reason } = await req.json();
+
+  const id = crypto.randomUUID();
+
+  await env.DB.prepare(
+    `INSERT INTO vendor_disputes
+     (id, order_id, buyer_id, vendor_id, lead_id, reason, status)
+     VALUES (?, ?, ?, ?, ?, ?, 'open')`
+  )
+    .bind(id, orderId, user.company_id, vendorId, leadId, reason)
+    .run();
+
+  return json({ success: true, disputeId: id });
+});
+
+// ADMIN / SYSTEM RUNS AI RESOLUTION
+router.post("/api/admin/disputes/resolve", async (req, env) => {
+  const user = await env.auth(req);
+  if (!user) return unauthorized();
+
+  const allowed = await requirePermission(env, user.id, "admin.disputes.manage");
+  if (!allowed) return new Response("Forbidden", { status: 403 });
+
+  const { disputeId } = await req.json();
+
+  const dispute = await env.DB.prepare(
+    "SELECT * FROM vendor_disputes WHERE id = ?"
+  ).bind(disputeId).first();
+
+  if (!dispute) return badRequest("Dispute not found");
+
+  const lead = await env.DB.prepare(
+    "SELECT * FROM leads WHERE id = ?"
+  ).bind(dispute.lead_id).first();
+
+  const vendor = await env.DB.prepare(
+    "SELECT * FROM companies WHERE id = ?"
+  ).bind(dispute.vendor_id).first();
+
+  const ai = await analyzeDispute(env, dispute, lead, vendor);
+
+  let newStatus = "under_review";
+  let resolutionText = ai.reason;
+
+  if (ai.decision === "approved_refund") {
+    newStatus = "approved_refund";
+    // TODO: hook Stripe/processor for refund here
+  } else if (ai.decision === "replacement") {
+    newStatus = "replaced";
+    // TODO: trigger workflow to deliver replacement lead
+  } else if (ai.decision === "rejected") {
+    newStatus = "rejected";
+  }
+
+  await env.DB.prepare(
+    `UPDATE vendor_disputes
+     SET status = ?, resolution = ?, ai_recommendation = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`
+  )
+    .bind(newStatus, resolutionText, JSON.stringify(ai), disputeId)
+    .run();
+
+  return json({ success: true, decision: ai.decision, details: ai });
+});

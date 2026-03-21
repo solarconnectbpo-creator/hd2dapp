@@ -1,0 +1,28 @@
+name = "hd2d-backend"
+main = "src/index.ts"
+compatibility_date = "2024-12-02"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "hd2d"
+database_id = "local-dev"
+
+# KV Namespace for real-time call state
+[[kv_namespaces]]
+binding = "HD2D_CACHE"
+id = "hd2d-cache"
+preview_id = "hd2d-cache-preview"
+
+# Environment variables
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+# Build configuration
+[build]
+command = "npm install"
+watch_paths = ["src/**/*.ts"]

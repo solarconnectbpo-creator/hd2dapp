@@ -1,0 +1,195 @@
+📁 NEW TABLES
+
+migrations/0008_enterprise_admin.sql
+
+-- USERS & ROLES -----------------------------------------------
+CREATE TABLE IF NOT EXISTS roles (
+  id TEXT PRIMARY KEY,
+  name TEXT UNIQUE,
+  description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS user_roles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  role_id TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+
+CREATE TABLE IF NOT EXISTS permissions (
+  id TEXT PRIMARY KEY,
+  key TEXT UNIQUE,
+  description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+  id TEXT PRIMARY KEY,
+  role_id TEXT,
+  permission_id TEXT,
+  FOREIGN KEY (role_id) REFERENCES roles(id),
+  FOREIGN KEY (permission_id) REFERENCES permissions(id)
+);
+
+-- API KEYS -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS api_keys (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  key TEXT,
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- AUDIT LOG ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_log (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  action TEXT,
+  resource TEXT,
+  metadata TEXT,
+  ip TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SYSTEM USAGE METRICS -----------------------------------------
+CREATE TABLE IF NOT EXISTS system_usage (
+  id TEXT PRIMARY KEY,
+  metric TEXT,
+  value REAL,
+  time_bucket TEXT
+);
+
+-- WEBHOOK HEALTH MONITOR ---------------------------------------
+CREATE TABLE IF NOT EXISTS webhook_health (
+  id TEXT PRIMARY KEY,
+  url TEXT,
+  status TEXT,
+  latency_ms INTEGER,
+  last_checked TEXT
+);
+
+-- RATE LIMITING / ABUSE DETECTION ------------------------------
+CREATE TABLE IF NOT EXISTS rate_limits (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  key TEXT,
+  count INTEGER,
+  window_end TEXT
+);
+
+-- BILLING ------------------------------------------------------
+CREATE TABLE IF NOT EXISTS billing (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  plan TEXT,
+  status TEXT,
+  renewal_date TEXT,
+  usage INTEGER DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+🔐 RBAC MIDDLEWARE
+
+src/middleware/rbac.ts
+
+export async function requirePermission(env: Env, userId: string, permissionKey: string) {
+  const result = await env.DB.prepare(
+    `SELECT permissions.key FROM permissions
+     INNER JOIN role_permissions ON role_permissions.permission_id = permissions.id
+     INNER JOIN user_roles ON user_roles.role_id = role_permissions.role_id
+     WHERE user_roles.user_id = ?`
+  ).bind(userId).all();
+
+  const keys = result.results.map(r => r.key);
+
+  return keys.includes(permissionKey);
+}
+
+🧠 AI ASSISTANT FOR ADMIN
+
+src/ai/adminGPT.ts
+
+Handles:
+
+detecting abuse
+
+analyzing API usage
+
+finding anomalies
+
+predicting failures
+
+detecting broken funnels
+
+scanning logs
+
+suggesting improvements
+
+import { runAI } from "../utils/ai";
+
+export async function analyzeSystem(env: Env, logs: any[], metrics: any[]) {
+  const prompt = `
+You are AdminGPT, an AI system monitoring and diagnosing a SaaS platform.
+
+Given logs and metrics, produce:
+- issues detected
+- performance warnings
+- security alerts
+- optimization opportunities
+- workflow bottlenecks
+- webhook failures
+- call center issues
+- CRM issues
+- user onboarding issues
+
+Return JSON only.
+`;
+
+  const text = await runAI(env, prompt + `
+Logs: ${JSON.stringify(logs)}
+Metrics: ${JSON.stringify(metrics)}
+  `);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { issues: [], warnings: [], security: [] };
+  }
+}
+
+🔥 API ENDPOINTS (Enterprise)
+
+src/api/admin.ts
+
+import router from "../router";
+import { json } from "../utils/response";
+import { analyzeSystem } from "../ai/adminGPT";
+import { requirePermission } from "../middleware/rbac";
+
+router.get("/api/admin/overview", async (req, env) => {
+  const user = await env.auth(req);
+  if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const allowed = await requirePermission(env, user.id, "admin.view");
+  if (!allowed) return new Response("Forbidden", { status: 403 });
+
+  const logs = await env.DB.prepare(
+    "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 500"
+  ).all();
+
+  const metrics = await env.DB.prepare(
+    "SELECT * FROM system_usage ORDER BY time_bucket DESC LIMIT 200"
+  ).all();
+
+  const analysis = await analyzeSystem(env, logs.results, metrics.results);
+
+  return json({
+    userCount: await env.DB.prepare("SELECT COUNT(*) AS c FROM users").first("c"),
+    activeWorkflows: await env.DB.prepare("SELECT COUNT(*) AS c FROM workflows WHERE active = 1").first("c"),
+    apiKeys: await env.DB.prepare("SELECT COUNT(*) AS c FROM api_keys").first("c"),
+    webhookStatus: await env.DB.prepare("SELECT * FROM webhook_health").all(),
+    analysis,
+  });
+});

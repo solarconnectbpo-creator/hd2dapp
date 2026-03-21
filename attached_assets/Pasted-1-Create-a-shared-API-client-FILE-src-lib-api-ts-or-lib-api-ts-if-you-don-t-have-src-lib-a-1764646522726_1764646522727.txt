@@ -1,0 +1,772 @@
+1️⃣ Create a shared API client
+
+FILE: src/lib/api.ts (or lib/api.ts if you don’t have src)
+
+// lib/api.ts
+import Constants from "expo-constants";
+
+const API_BASE_URL =
+  // You can set this in app.json -> extra.apiUrl for different envs
+  (Constants.expoConfig?.extra as any)?.apiUrl ||
+  "https://your-cloudflare-worker-url.com";
+
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+export interface ApiOptions {
+  method?: HttpMethod;
+  body?: any;
+  token?: string | null;
+  companyId?: string | null;
+}
+
+async function request<T = any>(
+  path: string,
+  { method = "GET", body, token, companyId }: ApiOptions = {}
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (companyId) headers["x-company-id"] = companyId;
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `API error: ${res.status}`);
+  }
+
+  if (res.status === 204) return {} as T;
+  return (await res.json()) as T;
+}
+
+export const api = {
+  get: <T>(path: string, opts?: Omit<ApiOptions, "method">) =>
+    request<T>(path, { ...opts, method: "GET" }),
+  post: <T>(path: string, body?: any, opts?: Omit<ApiOptions, "method" | "body">) =>
+    request<T>(path, { ...opts, method: "POST", body }),
+  put: <T>(path: string, body?: any, opts?: Omit<ApiOptions, "method" | "body">) =>
+    request<T>(path, { ...opts, method: "PUT", body }),
+  del: <T>(path: string, opts?: Omit<ApiOptions, "method">) =>
+    request<T>(path, { ...opts, method: "DELETE" }),
+};
+
+
+Optional: add in app.json:
+
+"extra": {
+  "apiUrl": "https://your-worker.yourdomain.com"
+}
+
+2️⃣ Upgrade AuthContext to talk to backend
+
+We’ll add:
+
+JWT token
+
+companyId support
+
+real calls to /api/auth/login, /api/auth/signup, /api/auth/verify-2fa
+
+REPLACE your current contexts/AuthContext.tsx with this:
+
+// contexts/AuthContext.tsx
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import { api } from "@/lib/api";
+
+export type UserType = "sales_rep" | "company" | "admin";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  userType: UserType;
+  company?: string;
+  phone?: string;
+  createdAt: string;
+  isAdmin?: boolean;
+  companyId?: string; // <-- important
+}
+
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  companyId: string | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<"2FA" | "OK" | "ERROR">;
+  verify2FA: (email: string, code: string) => Promise<boolean>;
+  signup: (data: SignupData) => Promise<boolean>;
+  logout: () => Promise<void>;
+}
+
+interface SignupData {
+  email: string;
+  password: string;
+  name: string;
+  userType: UserType;
+  company?: string;
+  phone?: string;
+}
+
+// storage keys
+const AUTH_USER_KEY = "auth_user";
+const AUTH_TOKEN_KEY = "auth_token";
+
+async function secureSet(key: string, value: string): Promise<void> {
+  if (Platform.OS === "web") {
+    await AsyncStorage.setItem(key, value);
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+}
+
+async function secureGet(key: string): Promise<string | null> {
+  if (Platform.OS === "web") {
+    return AsyncStorage.getItem(key);
+  } else {
+    return SecureStore.getItemAsync(key);
+  }
+}
+
+async function secureDelete(key: string): Promise<void> {
+  if (Platform.OS === "web") {
+    await AsyncStorage.removeItem(key);
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadSession();
+  }, []);
+
+  const loadSession = async () => {
+    try {
+      const [userData, tokenData] = await Promise.all([
+        secureGet(AUTH_USER_KEY),
+        secureGet(AUTH_TOKEN_KEY),
+      ]);
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
+        setCompanyId(parsed.companyId || null);
+      }
+      if (tokenData) {
+        setToken(tokenData);
+      }
+    } catch (error) {
+      console.error("Error loading auth session:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<"2FA" | "OK" | "ERROR"> => {
+    try {
+      // step 1: /api/auth/login
+      const res = await api.post<{
+        success: boolean;
+        requires2FA?: boolean;
+      }>("/api/auth/login", { email, password });
+
+      if (!res.success) return "ERROR";
+
+      if (res.requires2FA) {
+        return "2FA";
+      }
+
+      // in our backend design, login always requires 2FA,
+      // but we'll keep this hook for future flexibility
+      return "OK";
+    } catch (e) {
+      console.error("Login error:", e);
+      return "ERROR";
+    }
+  };
+
+  const verify2FA = async (email: string, code: string): Promise<boolean> => {
+    try {
+      const res = await api.post<{
+        success: boolean;
+        token: string;
+        user: User;
+      }>("/api/auth/verify-2fa", { email, code });
+
+      if (!res.success) return false;
+
+      setUser(res.user);
+      setToken(res.token);
+      setCompanyId(res.user.companyId || null);
+
+      await Promise.all([
+        secureSet(AUTH_USER_KEY, JSON.stringify(res.user)),
+        secureSet(AUTH_TOKEN_KEY, res.token),
+      ]);
+
+      return true;
+    } catch (e) {
+      console.error("2FA verify error:", e);
+      return false;
+    }
+  };
+
+  const signup = async (data: SignupData): Promise<boolean> => {
+    try {
+      const res = await api.post<{ success: boolean }>(
+        "/api/auth/register",
+        data
+      );
+      return res.success;
+    } catch (e) {
+      console.error("Signup error:", e);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setUser(null);
+      setToken(null);
+      setCompanyId(null);
+      await Promise.all([
+        secureDelete(AUTH_USER_KEY),
+        secureDelete(AUTH_TOKEN_KEY),
+      ]);
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        companyId,
+        isLoading,
+        isAuthenticated: !!user && !!token,
+        login,
+        verify2FA,
+        signup,
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return ctx;
+}
+
+
+On the frontend login screen, you’ll now:
+
+Call login(email, password) → if "2FA", show a 2FA screen
+
+On 2FA screen, call verify2FA(email, code) → then navigate into app
+
+3️⃣ Wire Leads Screen → /api/leads
+
+Assuming you have something like screens/LeadsScreen.tsx that currently imports LEADS from data/mockData.ts — replace that screen with something like this.
+
+FILE: screens/LeadsScreen.tsx
+
+import React, { useEffect, useState, useCallback } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+
+export interface Lead {
+  id: string;
+  contact_name: string;
+  phone: string;
+  email: string;
+  industry: string;
+  location: string;
+  city: string;
+  price: number;
+  quality_score: number;
+  lead_type: string;
+  created_at: string;
+}
+
+export default function LeadsScreen() {
+  const { theme } = useTheme();
+  const { token, companyId } = useAuth();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadLeads = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await api.get<Lead[]>("/api/leads", {
+        token,
+        companyId,
+      });
+      setLeads(data);
+    } catch (e) {
+      console.error("Error loading leads:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, companyId]);
+
+  useEffect(() => {
+    loadLeads();
+  }, [loadLeads]);
+
+  const renderItem = ({ item }: { item: Lead }) => (
+    <Card style={styles.card}>
+      <ThemedText type="h4">{item.contact_name}</ThemedText>
+      <ThemedText type="small" style={styles.sub}>
+        {item.industry} • {item.city} • ${item.price ?? 0}
+      </ThemedText>
+      <ThemedText type="small" style={styles.sub}>
+        {item.phone} • {item.email}
+      </ThemedText>
+      <View style={styles.tags}>
+        <ThemedText type="caption">
+          Type: {item.lead_type || "n/a"}
+        </ThemedText>
+        <ThemedText type="caption">
+          Quality: {item.quality_score ?? 0}/100
+        </ThemedText>
+      </View>
+    </Card>
+  );
+
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.headerRow}>
+        <ThemedText type="h2">Leads</ThemedText>
+        <Button
+          variant="secondary"
+          onPress={loadLeads}
+          style={styles.refreshButton}
+        >
+          Refresh
+        </Button>
+      </View>
+      <FlatList
+        data={leads}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            tintColor={theme.text}
+            refreshing={loading}
+            onRefresh={loadLeads}
+          />
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <ThemedText type="small" style={styles.empty}>
+              No leads yet. Buy from marketplace or create one manually.
+            </ThemedText>
+          ) : null
+        }
+      />
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  refreshButton: {
+    width: 110,
+  },
+  listContent: {
+    paddingBottom: Spacing["3xl"],
+    gap: Spacing.md,
+  },
+  card: {
+    borderRadius: BorderRadius.md,
+  },
+  sub: {
+    marginTop: 4,
+    opacity: 0.8,
+  },
+  tags: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: Spacing.sm,
+  },
+  empty: {
+    textAlign: "center",
+    marginTop: Spacing["2xl"],
+  },
+});
+
+
+Your LeadsStackNavigator should use this as the main screen for the LeadsTab.
+
+4️⃣ Add a Marketplace Screen for Vendor Products
+
+We’ll assume you have endpoints like:
+
+GET /api/marketplace/products
+
+POST /api/marketplace/orders (buyer purchases)
+
+FILE: screens/MarketplaceScreen.tsx
+
+import React, { useEffect, useState, useCallback } from "react";
+import { FlatList, StyleSheet, View, Alert } from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+
+interface VendorProduct {
+  id: string;
+  vendor_id: string;
+  name: string;
+  type: string;
+  vertical: string;
+  description: string;
+  price: number;
+  price_type: string;
+  delivery_method: string;
+}
+
+export default function MarketplaceScreen() {
+  const { token, companyId } = useAuth();
+  const [products, setProducts] = useState<VendorProduct[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState<string | null>(null);
+
+  const loadProducts = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await api.get<VendorProduct[]>("/api/marketplace/products", {
+        token,
+        companyId,
+      });
+      setProducts(res);
+    } catch (e) {
+      console.error("Error loading products:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, companyId]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  const handleBuy = async (productId: string) => {
+    if (!token) return;
+    setPlacingOrder(productId);
+    try {
+      const res = await api.post(
+        "/api/marketplace/orders",
+        {
+          productId,
+          quantity: 1,
+        },
+        { token, companyId }
+      );
+      Alert.alert("Order placed", "Your lead order has been submitted.");
+      console.log("Order response", res);
+    } catch (e) {
+      console.error("Order error:", e);
+      Alert.alert("Error", "Failed to place order.");
+    } finally {
+      setPlacingOrder(null);
+    }
+  };
+
+  const renderItem = ({ item }: { item: VendorProduct }) => (
+    <Card style={styles.card}>
+      <ThemedText type="h4">{item.name}</ThemedText>
+      <ThemedText type="small" style={styles.sub}>
+        {item.vertical} • {item.type}
+      </ThemedText>
+      <ThemedText type="small" style={styles.desc}>
+        {item.description}
+      </ThemedText>
+      <View style={styles.footerRow}>
+        <ThemedText type="body">
+          ${item.price}{" "}
+          <ThemedText type="caption">
+            / {item.price_type.replace("-", " ")}
+          </ThemedText>
+        </ThemedText>
+        <Button
+          onPress={() => handleBuy(item.id)}
+          disabled={placingOrder === item.id}
+          style={styles.buyButton}
+        >
+          {placingOrder === item.id ? "Buying..." : "Buy"}
+        </Button>
+      </View>
+    </Card>
+  );
+
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.headerRow}>
+        <ThemedText type="h2">Lead Marketplace</ThemedText>
+        <Button variant="secondary" onPress={loadProducts} style={styles.refresh}>
+          Refresh
+        </Button>
+      </View>
+      <FlatList
+        data={products}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+      />
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  refresh: {
+    width: 110,
+  },
+  listContent: {
+    paddingBottom: Spacing["3xl"],
+    gap: Spacing.md,
+  },
+  card: {
+    borderRadius: BorderRadius.md,
+  },
+  sub: {
+    opacity: 0.8,
+    marginTop: 4,
+  },
+  desc: {
+    marginTop: Spacing.sm,
+    opacity: 0.9,
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: Spacing.md,
+  },
+  buyButton: {
+    width: 100,
+  },
+});
+
+Add Marketplace into navigation
+
+Inside your LeadsStackNavigator.tsx, add a screen:
+
+// navigation/LeadsStackNavigator.tsx (example)
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import LeadsScreen from "@/screens/LeadsScreen";
+import MarketplaceScreen from "@/screens/MarketplaceScreen";
+
+const Stack = createNativeStackNavigator();
+
+export default function LeadsStackNavigator() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="LeadsHome"
+        component={LeadsScreen}
+        options={{ title: "Leads" }}
+      />
+      <Stack.Screen
+        name="Marketplace"
+        component={MarketplaceScreen}
+        options={{ title: "Marketplace" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+
+Then from your LeadsScreen, you can add a button that navigates to "Marketplace" if you want.
+
+5️⃣ Add Dispute Screen → /api/disputes
+
+Buyers can open disputes from a “My Orders” or “Lead Details” screen.
+Here’s a simple disputes list + create screen.
+
+FILE: screens/DisputesScreen.tsx
+
+import React, { useEffect, useState, useCallback } from "react";
+import { FlatList, StyleSheet, View, Alert } from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+
+interface Dispute {
+  id: string;
+  order_id: string;
+  lead_id: string;
+  vendor_id: string;
+  reason: string;
+  status: string;
+  resolution?: string;
+  created_at: string;
+}
+
+export default function DisputesScreen() {
+  const { token, companyId } = useAuth();
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadDisputes = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      // you'll need a GET /api/disputes endpoint on the backend
+      const res = await api.get<Dispute[]>("/api/disputes", {
+        token,
+        companyId,
+      });
+      setDisputes(res);
+    } catch (e) {
+      console.error("Error loading disputes:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, companyId]);
+
+  useEffect(() => {
+    loadDisputes();
+  }, [loadDisputes]);
+
+  const renderItem = ({ item }: { item: Dispute }) => (
+    <Card style={styles.card}>
+      <ThemedText type="h4">{item.status.toUpperCase()}</ThemedText>
+      <ThemedText type="small" style={styles.sub}>
+        Order: {item.order_id}
+      </ThemedText>
+      <ThemedText type="small" style={styles.sub}>
+        Lead: {item.lead_id}
+      </ThemedText>
+      <ThemedText type="small" style={styles.reason}>
+        Reason: {item.reason}
+      </ThemedText>
+      {item.resolution ? (
+        <ThemedText type="caption" style={styles.resolution}>
+          Resolution: {item.resolution}
+        </ThemedText>
+      ) : null}
+    </Card>
+  );
+
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.headerRow}>
+        <ThemedText type="h2">Disputes</ThemedText>
+        <Button variant="secondary" onPress={loadDisputes} style={styles.refresh}>
+          Refresh
+        </Button>
+      </View>
+      <FlatList
+        data={disputes}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+      />
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  refresh: {
+    width: 110,
+  },
+  listContent: {
+    paddingBottom: Spacing["3xl"],
+    gap: Spacing.md,
+  },
+  card: {
+    borderRadius: BorderRadius.md,
+  },
+  sub: {
+    opacity: 0.8,
+    marginTop: 4,
+  },
+  reason: {
+    marginTop: Spacing.sm,
+  },
+  resolution: {
+    marginTop: Spacing.sm,
+    opacity: 0.8,
+  },
+});

@@ -1,0 +1,244 @@
+🚨 DROP 7 — FULL AI CALL CENTER + SIMPLETALK INTEGRATION
+
+Below is the full system:
+Tables → AI call router → inbound webhook → sync engine → call log → CRM update.
+
+📁 New Files in this Drop
+migrations/0006_calls.sql
+src/api/inbound.ts
+src/ai/callModel.ts
+src/utils/callRouter.ts
+src/utils/callState.ts
+
+📄 MIGRATION: migrations/0006_calls.sql
+CREATE TABLE IF NOT EXISTS inbound_calls (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT,
+  from_number TEXT,
+  to_number TEXT,
+  status TEXT, -- incoming | ringing | connected | ended
+  duration INTEGER,
+  transcript TEXT,
+  summary TEXT,
+  intent TEXT,
+  lead_id TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agents (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  status TEXT, -- online | offline | handling_call
+  skills TEXT,
+  last_active TEXT,
+  webhook_url TEXT
+);
+
+📄 FILE: src/utils/callState.ts
+
+A real-time call state controller using KV.
+
+export async function setCallState(env: Env, callId: string, state: any) {
+  await env.HD2D_CACHE.put(`call:${callId}`, JSON.stringify(state), {
+    expirationTtl: 3600
+  });
+}
+
+export async function getCallState(env: Env, callId: string) {
+  const raw = await env.HD2D_CACHE.get(`call:${callId}`);
+  return raw ? JSON.parse(raw) : null;
+}
+
+📄 FILE: src/utils/callRouter.ts
+
+🔥 Skills-based + AI-based routing.
+
+export async function routeCall(env: Env, fromNumber: string, intent: string) {
+  const agents = await env.DB.prepare(
+    "SELECT * FROM agents WHERE status = 'online'"
+  ).all();
+
+  if (!agents.results.length) return null;
+
+  // 1. Skill match (AI → skill → agent)
+  const skillAgents = agents.results.filter(a =>
+    a.skills?.toLowerCase().includes(intent.toLowerCase())
+  );
+
+  if (skillAgents.length) {
+    return skillAgents[Math.floor(Math.random() * skillAgents.length)];
+  }
+
+  // 2. Default → least recently active
+  return agents.results.sort(
+    (a, b) => new Date(a.last_active).getTime() - new Date(b.last_active).getTime()
+  )[0];
+}
+
+📄 FILE: src/ai/callModel.ts
+
+AI-generated:
+
+intent
+
+recommended agent skill
+
+summary
+
+customer sentiment
+
+import { runAI } from "../utils/ai";
+
+export async function analyzeCall(env: Env, transcript: string) {
+  const prompt = `
+Analyze this call transcript and return JSON:
+
+- "intent": main intent of caller
+- "summary": 2-sentence summary
+- "sentiment": positive | neutral | negative
+- "recommendedNextAction": next step to take
+`;
+
+  const result = await runAI(env, prompt);
+
+  try {
+    return JSON.parse(result);
+  } catch {
+    return {
+      intent: "general",
+      summary: "Summary unavailable.",
+      sentiment: "neutral",
+      recommendedNextAction: "Follow up soon."
+    };
+  }
+}
+
+📄 FILE: src/api/inbound.ts
+
+🔥 THE CORE SIMPLETALK WEBHOOK ENGINE
+
+import router from "../router";
+import { json, unauthorized, badRequest } from "../utils/response";
+import { analyzeCall } from "../ai/callModel";
+import { routeCall } from "../utils/callRouter";
+import { setCallState, getCallState } from "../utils/callState";
+
+// -----------------------------------------------------
+// MAIN WEBHOOK ENTRY POINT FOR SIMPLETALK AI
+// -----------------------------------------------------
+router.post("/webhook/simpletalk/inbound", async (req, env) => {
+  const body = await req.json();
+
+  /*
+    SIMPLETALK EVENT STRUCTURE:
+
+    {
+      "event": "call_started" | "call_connected" | "summary" | "transcript" | "call_ended",
+      "callId": "string",
+      "fromNumber": "+15556667777",
+      "toNumber": "+15559998888",
+      "transcript": "...",
+      "summary": "...",
+      "appointment": { date, time, notes }
+    }
+  */
+
+  const event = body.event;
+  const callId = body.callId;
+
+  let state = await getCallState(env, callId) || {
+    id: callId,
+    from: body.fromNumber,
+    to: body.toNumber,
+    status: "incoming",
+    agentId: null
+  };
+
+  // ----------------------------
+  // CALL STARTED
+  // ----------------------------
+  if (event === "call_started") {
+    // AI classify intent
+    state.intent = "general";
+
+    // Route to best agent
+    const agent = await routeCall(env, body.fromNumber, state.intent);
+    if (agent) {
+      state.agentId = agent.id;
+
+      await env.DB.prepare(
+        "UPDATE agents SET status='handling_call', last_active=CURRENT_TIMESTAMP WHERE id = ?"
+      ).bind(agent.id).run();
+    }
+
+    state.status = "ringing";
+    await setCallState(env, callId, state);
+
+    return json({ action: "ROUTE_CALL", agent });
+  }
+
+  // ----------------------------
+  // CALL CONNECTED
+  // ----------------------------
+  if (event === "call_connected") {
+    state.status = "connected";
+    await setCallState(env, callId, state);
+    return json({ ok: true });
+  }
+
+  // ----------------------------
+  // TRANSCRIPT SLICE RECEIVED
+  // ----------------------------
+  if (event === "transcript") {
+    state.transcript = (state.transcript || "") + "\n" + body.transcript;
+    await setCallState(env, callId, state);
+    return json({ ok: true });
+  }
+
+  // ----------------------------
+  // AI SUMMARY FROM SIMPLETALK
+  // ----------------------------
+  if (event === "summary") {
+    state.summary = body.summary;
+
+    const ai = await analyzeCall(env, state.transcript || "");
+
+    state.intent = ai.intent;
+    state.aiSummary = ai.summary;
+
+    await setCallState(env, callId, state);
+
+    // Save into D1
+    await env.DB.prepare(
+      `INSERT INTO inbound_calls (id, agent_id, from_number, to_number, status, transcript, summary, intent)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        callId,
+        state.agentId,
+        state.from,
+        state.to,
+        "connected",
+        state.transcript || "",
+        ai.summary,
+        ai.intent
+      )
+      .run();
+
+    return json({ ai });
+  }
+
+  // ----------------------------
+  // CALL ENDED
+  // ----------------------------
+  if (event === "call_ended") {
+    state.status = "ended";
+
+    await env.DB.prepare(
+      "UPDATE agents SET status='online' WHERE id = ?"
+    ).bind(state.agentId).run();
+
+    await setCallState(env, callId, state);
+
+    return json({ success: true });
+  }

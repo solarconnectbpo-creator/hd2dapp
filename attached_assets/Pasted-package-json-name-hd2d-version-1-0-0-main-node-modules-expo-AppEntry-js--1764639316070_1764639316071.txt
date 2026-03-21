@@ -1,0 +1,1806 @@
+package.json
+{
+  "name": "hd2d",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.0",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/native-stack": "^6.9.17",
+    "expo": "^51.0.0",
+    "expo-blur": "~13.0.0",
+    "expo-secure-store": "~13.0.0",
+    "expo-status-bar": "~1.12.0",
+    "react": "18.2.0",
+    "react-native": "0.76.0",
+    "react-native-gesture-handler": "~2.16.0",
+    "react-native-keyboard-controller": "^1.13.0",
+    "react-native-reanimated": "~3.10.1",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-screens": "~4.9.0",
+    "@react-native-async-storage/async-storage": "^2.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "typescript": "^5.4.0"
+  },
+  "private": true
+}
+
+tsconfig.json
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "lib": ["dom", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "strict": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"]
+    }
+  },
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js"]
+}
+
+babel.config.js
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ["babel-preset-expo"],
+    plugins: [
+      "react-native-reanimated/plugin",
+      [
+        "module-resolver",
+        {
+          root: ["./"],
+          alias: {
+            "@": "./"
+          }
+        }
+      ]
+    ]
+  };
+};
+
+metro.config.js
+const { getDefaultConfig } = require("expo/metro-config");
+
+/**
+ * Metro configuration for React Native / Expo.
+ */
+const config = getDefaultConfig(__dirname);
+
+module.exports = config;
+
+app.json
+{
+  "expo": {
+    "name": "HD2D",
+    "slug": "hardcoredoortodoorclosers",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icons/icon.png",
+    "scheme": "hardcoredoortodoorclosers",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hardcoredoortodoorclosers.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/icons/icon-foreground.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.hardcoredoortodoorclosers.app"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/icons/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icons/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "reactCompiler": true
+    }
+  }
+}
+
+App.tsx
+import React from "react";
+import { StyleSheet, View, ActivityIndicator } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+
+import MainTabNavigator from "@/navigation/MainTabNavigator";
+import AuthNavigator from "@/navigation/AuthNavigator";
+import AdminNavigator from "@/navigation/AdminNavigator";
+
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { InboundAgentsProvider } from "@/contexts/InboundAgentsContext";
+import { useTheme } from "@/hooks/useTheme";
+import { AppColors } from "@/constants/theme";
+
+function RootNavigator() {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const { theme } = useTheme();
+
+  if (isLoading) {
+    return (
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: theme.backgroundRoot }
+        ]}
+      >
+        <ActivityIndicator size="large" color={AppColors.primary} />
+      </View>
+    );
+  }
+
+  if (isAuthenticated && user?.userType === "admin") {
+    return <AdminNavigator />;
+  }
+
+  return isAuthenticated ? <MainTabNavigator /> : <AuthNavigator />;
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={styles.root}>
+          <KeyboardProvider>
+            <AuthProvider>
+              <InboundAgentsProvider>
+                <NavigationContainer>
+                  <RootNavigator />
+                </NavigationContainer>
+                <StatusBar style="auto" />
+              </InboundAgentsProvider>
+            </AuthProvider>
+          </KeyboardProvider>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
+    </ErrorBoundary>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center"
+  }
+});
+
+constants/
+constants/theme.ts
+import { Platform } from "react-native";
+
+export const AppColors = {
+  primary: "#D4AF37",
+  secondary: "#1A1A1A",
+  accent: "#10B981",
+  error: "#EF4444",
+  warning: "#F97316"
+};
+
+export const Colors = {
+  light: {
+    text: "#1A1A1A",
+    textSecondary: "#6B7280",
+    buttonText: "#FFFFFF",
+    tabIconDefault: "#6B7280",
+    tabIconSelected: AppColors.primary,
+    link: AppColors.primary,
+    backgroundRoot: "#FFFFFF",
+    backgroundDefault: "#F8F9FA",
+    backgroundSecondary: "#F0F1F3",
+    backgroundTertiary: "#E5E7EB",
+    border: "#E5E7EB",
+    cardBackground: "#F8F9FA"
+  },
+  dark: {
+    text: "#FFFFFF",
+    textSecondary: "#9CA3AF",
+    buttonText: "#FFFFFF",
+    tabIconDefault: "#9BA1A6",
+    tabIconSelected: AppColors.primary,
+    link: AppColors.primary,
+    backgroundRoot: "#121212",
+    backgroundDefault: "#1E1E1E",
+    backgroundSecondary: "#2A2A2A",
+    backgroundTertiary: "#353535",
+    border: "#3A3A3A",
+    cardBackground: "#1E1E1E"
+  }
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+  "4xl": 40,
+  "5xl": 48,
+  inputHeight: 48,
+  buttonHeight: 52
+};
+
+export const BorderRadius = {
+  xs: 8,
+  sm: 12,
+  md: 16,
+  lg: 20,
+  xl: 24,
+  "2xl": 32,
+  "3xl": 40,
+  full: 9999
+};
+
+export const Typography = {
+  h1: {
+    fontSize: 32,
+    fontWeight: "700" as const
+  },
+  h2: {
+    fontSize: 24,
+    fontWeight: "600" as const
+  },
+  h3: {
+    fontSize: 20,
+    fontWeight: "600" as const
+  },
+  h4: {
+    fontSize: 17,
+    fontWeight: "600" as const
+  },
+  body: {
+    fontSize: 15,
+    fontWeight: "400" as const
+  },
+  small: {
+    fontSize: 13,
+    fontWeight: "400" as const
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: "400" as const
+  },
+  link: {
+    fontSize: 15,
+    fontWeight: "400" as const
+  }
+};
+
+export const Fonts = Platform.select({
+  ios: {
+    sans: "system-ui",
+    serif: "ui-serif",
+    rounded: "ui-rounded",
+    mono: "ui-monospace"
+  },
+  default: {
+    sans: "normal",
+    serif: "serif",
+    rounded: "normal",
+    mono: "monospace"
+  },
+  web: {
+    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+    rounded:
+      "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace"
+  }
+});
+
+data/
+data/mockData.ts
+
+⚠️ This file is long (600+ lines). I’m including it because your AI agent / Git setup may need all the mock data. If you want me to trim it later, I can.
+
+export interface Lead {
+  id: string;
+  industry: "roofing" | "solar" | "windows" | "hvac" | "siding";
+  location: string;
+  city: string;
+  qualityScore: number;
+  price: number;
+  leadType: "aged" | "local-exclusive" | "appointment" | "live-transfer";
+  contactName: string;
+  phone: string;
+  email: string;
+  notes: string;
+  createdAt: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface Deal {
+  id: string;
+  contactName: string;
+  company: string;
+  value: number;
+  stage:
+    | "new"
+    | "contacted"
+    | "qualified"
+    | "proposal"
+    | "negotiation"
+    | "won"
+    | "lost";
+  daysInStage: number;
+  phone: string;
+  email: string;
+  notes: string;
+  industry: string;
+  createdAt: string;
+}
+
+export interface Post {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: number;
+  content: string;
+  hashtags: string[];
+  likes: number;
+  comments: number;
+  isLiked: boolean;
+  createdAt: string;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: "full-time" | "part-time" | "contract";
+  experienceLevel: "entry" | "mid" | "senior";
+  salary: string;
+  description: string;
+  requirements: string[];
+  postedAt: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  instructor: string;
+  duration: string;
+  price: number;
+  level: "beginner" | "intermediate" | "advanced";
+  description: string;
+  enrolled: boolean;
+  progress: number;
+}
+
+export interface Certification {
+  id: string;
+  name: string;
+  requirements: string;
+  progress: number;
+  earned: boolean;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  type: "conference" | "training" | "networking" | "trade-show";
+  attendees: number;
+  description: string;
+  isRsvped: boolean;
+}
+
+export interface CallCenterAgent {
+  id: string;
+  name: string;
+  status: "active" | "inactive" | "break";
+  callsHandled: number;
+  averageCallDuration: number;
+}
+
+export interface CallCenter {
+  id: string;
+  name: string;
+  agents: CallCenterAgent[];
+  status: "active" | "inactive";
+  monthlyPrice: number;
+  purchasedAt: string;
+}
+
+export const LEADS: Lead[] = [
+  {
+    id: "1",
+    industry: "roofing",
+    location: "Dallas, TX",
+    city: "Dallas",
+    qualityScore: 92,
+    price: 85,
+    leadType: "local-exclusive",
+    contactName: "Mike Johnson",
+    phone: "(214) 555-0123",
+    email: "mike.j@email.com",
+    notes: "Interested in roof replacement, storm damage",
+    createdAt: "2024-01-15",
+    latitude: 32.7767,
+    longitude: -96.797
+  },
+  {
+    id: "2",
+    industry: "solar",
+    location: "Phoenix, AZ",
+    city: "Phoenix",
+    qualityScore: 88,
+    price: 225,
+    leadType: "appointment",
+    contactName: "Sarah Williams",
+    phone: "(602) 555-0456",
+    email: "sarah.w@email.com",
+    notes: "High electricity bills, looking to reduce costs",
+    createdAt: "2024-01-14",
+    latitude: 33.4484,
+    longitude: -112.074
+  },
+  {
+    id: "3",
+    industry: "windows",
+    location: "Denver, CO",
+    city: "Denver",
+    qualityScore: 85,
+    price: 3,
+    leadType: "aged",
+    contactName: "Tom Davis",
+    phone: "(303) 555-0789",
+    email: "tom.d@email.com",
+    notes: "Older windows, energy efficiency concerns",
+    createdAt: "2024-01-13",
+    latitude: 39.7392,
+    longitude: -104.9903
+  },
+  {
+    id: "4",
+    industry: "hvac",
+    location: "Houston, TX",
+    city: "Houston",
+    qualityScore: 78,
+    price: 400,
+    leadType: "live-transfer",
+    contactName: "Lisa Chen",
+    phone: "(713) 555-0321",
+    email: "lisa.c@email.com",
+    notes: "AC unit 15 years old, needs replacement",
+    createdAt: "2024-01-12",
+    latitude: 29.7604,
+    longitude: -95.3698
+  },
+  {
+    id: "5",
+    industry: "siding",
+    location: "Atlanta, GA",
+    city: "Atlanta",
+    qualityScore: 90,
+    price: 65,
+    leadType: "local-exclusive",
+    contactName: "James Brown",
+    phone: "(404) 555-0654",
+    email: "james.b@email.com",
+    notes: "Looking for vinyl siding, full house",
+    createdAt: "2024-01-11",
+    latitude: 33.749,
+    longitude: -84.388
+  },
+  {
+    id: "6",
+    industry: "roofing",
+    location: "Tampa, FL",
+    city: "Tampa",
+    qualityScore: 95,
+    price: 275,
+    leadType: "appointment",
+    contactName: "Emily Roberts",
+    phone: "(813) 555-0987",
+    email: "emily.r@email.com",
+    notes: "Hurricane damage, insurance claim pending",
+    createdAt: "2024-01-10",
+    latitude: 27.9506,
+    longitude: -82.4572
+  }
+];
+
+// ... DEALS, POSTS, JOBS, COURSES, CERTIFICATIONS, EVENTS, STAGES, INDUSTRIES, LEAD_TYPE_LABELS, JOB_POSTING_PACKAGES, CALL_CENTER_PRICING and MOCK_CALL_CENTER as in your original snippet ...
+
+
+For brevity in this message I’ve truncated the bottom half of mockData.ts with a comment. Use your original full mockData.ts content there, or I can resend the full file alone if you want just that.
+
+contexts/
+contexts/AuthContext.tsx
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+
+export type UserType = "sales_rep" | "company" | "admin";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  userType: UserType;
+  company?: string;
+  phone?: string;
+  createdAt: string;
+  isAdmin?: boolean;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  login: (email: string, password: string, userType: UserType) => Promise<boolean>;
+  signup: (data: SignupData) => Promise<boolean>;
+  logout: () => Promise<void>;
+}
+
+interface SignupData {
+  email: string;
+  password: string;
+  name: string;
+  userType: UserType;
+  company?: string;
+  phone?: string;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const AUTH_STORAGE_KEY = "auth_user";
+const USERS_STORAGE_KEY = "registered_users";
+
+async function secureSet(key: string, value: string): Promise<void> {
+  if (Platform.OS === "web") {
+    await AsyncStorage.setItem(key, value);
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+}
+
+async function secureGet(key: string): Promise<string | null> {
+  if (Platform.OS === "web") {
+    return AsyncStorage.getItem(key);
+  } else {
+    return SecureStore.getItemAsync(key);
+  }
+}
+
+async function secureDelete(key: string): Promise<void> {
+  if (Platform.OS === "web") {
+    await AsyncStorage.removeItem(key);
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    initializeDemoAdmin();
+    loadUser();
+  }, []);
+
+  const initializeDemoAdmin = async () => {
+    try {
+      const users = await getRegisteredUsers();
+      const adminKey = "admin@hd2d.com_admin";
+      if (!users[adminKey]) {
+        users[adminKey] = {
+          password: "admin123",
+          user: {
+            id: "admin_001",
+            email: "admin@hd2d.com",
+            name: "HD2D Admin",
+            userType: "admin",
+            isAdmin: true,
+            createdAt: new Date().toISOString()
+          }
+        };
+        await saveRegisteredUsers(users);
+      }
+    } catch (error) {
+      console.error("Error initializing demo admin:", error);
+    }
+  };
+
+  const loadUser = async () => {
+    try {
+      const userData = await secureGet(AUTH_STORAGE_KEY);
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error("Error loading user:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRegisteredUsers = async (): Promise<
+    Record<string, { password: string; user: User }>
+  > => {
+    try {
+      const usersData = await AsyncStorage.getItem(USERS_STORAGE_KEY);
+      return usersData ? JSON.parse(usersData) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveRegisteredUsers = async (
+    users: Record<string, { password: string; user: User }>
+  ) => {
+    await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+  };
+
+  const login = async (
+    email: string,
+    password: string,
+    userType: UserType
+  ): Promise<boolean> => {
+    try {
+      const users = await getRegisteredUsers();
+      const userKey = `${email.toLowerCase()}_${userType}`;
+      const userData = users[userKey];
+      if (!userData) {
+        return false;
+      }
+      if (userData.password !== password) {
+        return false;
+      }
+      await secureSet(AUTH_STORAGE_KEY, JSON.stringify(userData.user));
+      setUser(userData.user);
+      return true;
+    } catch (error) {
+      console.error("Login error:", error);
+      return false;
+    }
+  };
+
+  const signup = async (data: SignupData): Promise<boolean> => {
+    try {
+      const users = await getRegisteredUsers();
+      const userKey = `${data.email.toLowerCase()}_${data.userType}`;
+      if (users[userKey]) {
+        return false;
+      }
+
+      const newUser: User = {
+        id: Date.now().toString(),
+        email: data.email.toLowerCase(),
+        name: data.name,
+        userType: data.userType,
+        company: data.company,
+        phone: data.phone,
+        createdAt: new Date().toISOString()
+      };
+
+      users[userKey] = {
+        password: data.password,
+        user: newUser
+      };
+
+      await saveRegisteredUsers(users);
+      await secureSet(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+      setUser(newUser);
+      return true;
+    } catch (error) {
+      console.error("Signup error:", error);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await secureDelete(AUTH_STORAGE_KEY);
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        login,
+        signup,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
+
+contexts/InboundAgentsContext.tsx
+import React, { createContext, useContext, useState, useCallback } from "react";
+
+export interface InboundAgent {
+  id: string;
+  name: string;
+  status: "online" | "offline" | "handling_call";
+  webhookUrl: string;
+  lastActive: string;
+  handledCalls: number;
+}
+
+export interface InboundCall {
+  id: string;
+  agentId: string;
+  fromNumber: string;
+  toNumber: string;
+  timestamp: string;
+  duration: number;
+  status: "incoming" | "connected" | "ended";
+  transcript?: string;
+}
+
+interface InboundAgentsContextType {
+  agents: InboundAgent[];
+  incomingCalls: InboundCall[];
+  webhookUrl: string;
+  addAgent: (name: string) => void;
+  removeAgent: (agentId: string) => void;
+  updateAgentStatus: (agentId: string, status: InboundAgent["status"]) => void;
+  updateWebhookUrl: (url: string) => void;
+  addIncomingCall: (call: InboundCall) => void;
+  removeIncomingCall: (callId: string) => void;
+  updateCallDuration: (callId: string, duration: number) => void;
+}
+
+const InboundAgentsContext = createContext<
+  InboundAgentsContextType | undefined
+>(undefined);
+
+export const InboundAgentsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children
+}) => {
+  const [agents, setAgents] = useState<InboundAgent[]>([
+    {
+      id: "agent-1",
+      name: "AI Assistant 1",
+      status: "online",
+      webhookUrl: "https://your-domain.com/webhooks/inbound",
+      lastActive: new Date().toISOString(),
+      handledCalls: 0
+    }
+  ]);
+
+  const [incomingCalls, setIncomingCalls] = useState<InboundCall[]>([]);
+  const [webhookUrl, setWebhookUrl] = useState(
+    "https://your-domain.com/webhooks/inbound"
+  );
+
+  const addAgent = useCallback(
+    (name: string) => {
+      const newAgent: InboundAgent = {
+        id: Date.now().toString(),
+        name,
+        status: "offline",
+        webhookUrl,
+        lastActive: new Date().toISOString(),
+        handledCalls: 0
+      };
+      setAgents((prev) => [...prev, newAgent]);
+    },
+    [webhookUrl]
+  );
+
+  const removeAgent = useCallback((agentId: string) => {
+    setAgents((prev) => prev.filter((a) => a.id !== agentId));
+  }, []);
+
+  const updateAgentStatus = useCallback(
+    (agentId: string, status: InboundAgent["status"]) => {
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId
+            ? { ...a, status, lastActive: new Date().toISOString() }
+            : a
+        )
+      );
+    },
+    []
+  );
+
+  const updateWebhookUrl = useCallback((url: string) => {
+    setWebhookUrl(url);
+    setAgents((prev) => prev.map((a) => ({ ...a, webhookUrl: url })));
+  }, []);
+
+  const addIncomingCall = useCallback(
+    (call: InboundCall) => {
+      setIncomingCalls((prev) => [call, ...prev]);
+      if (call.status === "connected") {
+        updateAgentStatus(call.agentId, "handling_call");
+      }
+    },
+    [updateAgentStatus]
+  );
+
+  const removeIncomingCall = useCallback((callId: string) => {
+    setIncomingCalls((prev) => prev.filter((c) => c.id !== callId));
+  }, []);
+
+  const updateCallDuration = useCallback(
+    (callId: string, duration: number) => {
+      setIncomingCalls((prev) =>
+        prev.map((c) => (c.id === callId ? { ...c, duration } : c))
+      );
+    },
+    []
+  );
+
+  return (
+    <InboundAgentsContext.Provider
+      value={{
+        agents,
+        incomingCalls,
+        webhookUrl,
+        addAgent,
+        removeAgent,
+        updateAgentStatus,
+        updateWebhookUrl,
+        addIncomingCall,
+        removeIncomingCall,
+        updateCallDuration
+      }}
+    >
+      {children}
+    </InboundAgentsContext.Provider>
+  );
+};
+
+export const useInboundAgents = () => {
+  const context = useContext(InboundAgentsContext);
+  if (!context) {
+    throw new Error("useInboundAgents must be used within InboundAgentsProvider");
+  }
+  return context;
+};
+
+hooks/
+hooks/useTheme.ts
+import { Colors, AppColors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/useColorScheme";
+
+export function useTheme() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = Colors[colorScheme ?? "light"];
+
+  return {
+    theme,
+    appColors: AppColors,
+    isDark
+  };
+}
+
+hooks/useScreenInsets.ts
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { Spacing } from "@/constants/theme";
+
+export function useScreenInsets() {
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const tabBarHeight = useBottomTabBarHeight();
+
+  return {
+    paddingTop: headerHeight + Spacing.xl,
+    paddingBottom: tabBarHeight + Spacing.xl,
+    scrollInsetBottom: insets.bottom + 16
+  };
+}
+
+hooks/useWebhookProcessor.ts
+import { useCallback, useState } from "react";
+
+export interface WebhookPayload {
+  agentId: string;
+  fromNumber: string;
+  toNumber: string;
+  timestamp: string;
+  callId: string;
+  type: "incoming" | "connected" | "ended";
+  duration?: number;
+  transcript?: string;
+}
+
+export const useWebhookProcessor = (webhookUrl: string) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  const sendWebhook = useCallback(
+    async (payload: WebhookPayload): Promise<boolean> => {
+      if (!webhookUrl || !webhookUrl.startsWith("http")) {
+        setLastError("Invalid webhook URL");
+        return false;
+      }
+
+      setIsProcessing(true);
+      setLastError(null);
+
+      try {
+        const response = await fetch(webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Webhook-Signature": generateSignature(payload)
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Webhook failed: ${response.status}`);
+        }
+
+        return true;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        setLastError(message);
+        return false;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [webhookUrl]
+  );
+
+  const generateSignature = (payload: WebhookPayload): string => {
+    const data = JSON.stringify(payload);
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16).slice(0, 32);
+  };
+
+  return { sendWebhook, isProcessing, lastError };
+};
+
+hooks/useColorScheme.ts
+import { useColorScheme as _useColorScheme } from "react-native";
+
+export function useColorScheme() {
+  return _useColorScheme() ?? "light";
+}
+
+lib/
+lib/api.ts
+const API_BASE_URL = "https://your-cloudflare-worker-url.com";
+
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+async function request<T>(
+  method: HttpMethod,
+  path: string,
+  body?: any,
+  options?: { token?: string; companyId?: string }
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+
+  if (options?.token) {
+    headers["Authorization"] = `Bearer ${options.token}`;
+  }
+  if (options?.companyId) {
+    headers["x-company-id"] = options.companyId;
+  }
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+
+  return res.json();
+}
+
+export const api = {
+  get: <T>(path: string, options?: { token?: string; companyId?: string }) =>
+    request<T>("GET", path, undefined, options),
+  post: <T>(
+    path: string,
+    body?: any,
+    options?: { token?: string; companyId?: string }
+  ) => request<T>("POST", path, body, options),
+  put: <T>(
+    path: string,
+    body?: any,
+    options?: { token?: string; companyId?: string }
+  ) => request<T>("PUT", path, body, options),
+  delete: <T>(
+    path: string,
+    options?: { token?: string; companyId?: string }
+  ) => request<T>("DELETE", path, undefined, options)
+};
+
+components/
+components/Button.tsx
+import React, { ReactNode } from "react";
+import { StyleSheet, Pressable, ViewStyle, StyleProp } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  WithSpringConfig
+} from "react-native-reanimated";
+
+import { ThemedText } from "@/components/ThemedText";
+import { useTheme } from "@/hooks/useTheme";
+import { BorderRadius, Spacing, AppColors } from "@/constants/theme";
+
+interface ButtonProps {
+  onPress?: () => void;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+  variant?: "primary" | "secondary" | "ghost";
+}
+
+const springConfig: WithSpringConfig = {
+  damping: 15,
+  mass: 0.3,
+  stiffness: 150,
+  overshootClamping: true,
+  energyThreshold: 0.001
+};
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function Button({
+  onPress,
+  children,
+  style,
+  disabled = false,
+  variant = "primary"
+}: ButtonProps) {
+  const { theme } = useTheme();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  const handlePressIn = () => {
+    if (!disabled) {
+      scale.value = withSpring(0.98, springConfig);
+    }
+  };
+
+  const handlePressOut = () => {
+    if (!disabled) {
+      scale.value = withSpring(1, springConfig);
+    }
+  };
+
+  const getBackgroundColor = () => {
+    if (variant === "secondary") return "transparent";
+    if (variant === "ghost") return "transparent";
+    return AppColors.primary;
+  };
+
+  const getBorderWidth = () => {
+    if (variant === "secondary") return 1;
+    return 0;
+  };
+
+  const getTextColor = () => {
+    if (variant === "secondary" || variant === "ghost") return AppColors.primary;
+    return "#FFFFFF";
+  };
+
+  return (
+    <AnimatedPressable
+      onPress={disabled ? undefined : onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+      style={[
+        styles.button,
+        {
+          backgroundColor: getBackgroundColor(),
+          borderWidth: getBorderWidth(),
+          borderColor: AppColors.primary,
+          opacity: disabled ? 0.5 : 1
+        },
+        style,
+        animatedStyle
+      ]}
+    >
+      <ThemedText type="body" style={[styles.buttonText, { color: getTextColor() }]}>
+        {children}
+      </ThemedText>
+    </AnimatedPressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    height: Spacing.buttonHeight,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  buttonText: {
+    fontWeight: "600"
+  }
+});
+
+components/Card.tsx
+import React, { ReactNode } from "react";
+import { StyleSheet, Pressable, ViewStyle, StyleProp } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  WithSpringConfig
+} from "react-native-reanimated";
+
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius } from "@/constants/theme";
+
+interface CardProps {
+  children: ReactNode;
+  elevation?: number;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+}
+
+const springConfig: WithSpringConfig = {
+  damping: 15,
+  mass: 0.3,
+  stiffness: 150,
+  overshootClamping: true,
+  energyThreshold: 0.001
+};
+
+const getBackgroundColorForElevation = (elevation: number, theme: any): string => {
+  switch (elevation) {
+    case 1:
+      return theme.backgroundDefault;
+    case 2:
+      return theme.backgroundSecondary;
+    case 3:
+      return theme.backgroundTertiary;
+    default:
+      return theme.backgroundRoot;
+  }
+};
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function Card({
+  children,
+  elevation = 1,
+  onPress,
+  style,
+  disabled
+}: CardProps) {
+  const { theme } = useTheme();
+  const scale = useSharedValue(1);
+  const cardBackgroundColor = getBackgroundColorForElevation(elevation, theme);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  const handlePressIn = () => {
+    if (onPress && !disabled) {
+      scale.value = withSpring(0.98, springConfig);
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, springConfig);
+  };
+
+  return (
+    <AnimatedPressable
+      onPress={disabled ? undefined : onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled || !onPress}
+      style={[
+        styles.card,
+        {
+          backgroundColor: cardBackgroundColor
+        },
+        style,
+        animatedStyle
+      ]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md
+  }
+});
+
+components/ThemedText.tsx
+import { Text, type TextProps } from "react-native";
+import { useTheme } from "@/hooks/useTheme";
+import { Typography } from "@/constants/theme";
+
+export type ThemedTextProps = TextProps & {
+  lightColor?: string;
+  darkColor?: string;
+  type?: "h1" | "h2" | "h3" | "h4" | "body" | "small" | "caption" | "link";
+};
+
+export function ThemedText({
+  style,
+  lightColor,
+  darkColor,
+  type = "body",
+  ...rest
+}: ThemedTextProps) {
+  const { theme, isDark } = useTheme();
+
+  const getColor = () => {
+    if (isDark && darkColor) return darkColor;
+    if (!isDark && lightColor) return lightColor;
+    if (type === "link") return theme.link;
+    return theme.text;
+  };
+
+  const getTypeStyle = () => {
+    switch (type) {
+      case "h1":
+        return Typography.h1;
+      case "h2":
+        return Typography.h2;
+      case "h3":
+        return Typography.h3;
+      case "h4":
+        return Typography.h4;
+      case "body":
+        return Typography.body;
+      case "small":
+        return Typography.small;
+      case "caption":
+        return Typography.caption;
+      case "link":
+        return Typography.link;
+      default:
+        return Typography.body;
+    }
+  };
+
+  return (
+    <Text style={[{ color: getColor() }, getTypeStyle(), style]} {...rest} />
+  );
+}
+
+components/ThemedView.tsx
+import { View, type ViewProps } from "react-native";
+import { useTheme } from "@/hooks/useTheme";
+
+export type ThemedViewProps = ViewProps & {
+  lightColor?: string;
+  darkColor?: string;
+};
+
+export function ThemedView({
+  style,
+  lightColor,
+  darkColor,
+  ...otherProps
+}: ThemedViewProps) {
+  const { theme, isDark } = useTheme();
+
+  const backgroundColor =
+    isDark && darkColor
+      ? darkColor
+      : !isDark && lightColor
+      ? lightColor
+      : theme.backgroundRoot;
+
+  return <View style={[{ backgroundColor }, style]} {...otherProps} />;
+}
+
+components/Avatar.tsx
+import React from "react";
+import { View, StyleSheet, ViewStyle, StyleProp } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { ThemedText } from "@/components/ThemedText";
+
+const AVATAR_COLORS = [
+  "#FF6B35",
+  "#004E89",
+  "#1AA260",
+  "#8B5CF6",
+  "#EC4899",
+  "#F59E0B"
+];
+
+interface AvatarProps {
+  name?: string;
+  index?: number;
+  size?: number;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function Avatar({ name, index = 0, size = 40, style }: AvatarProps) {
+  const backgroundColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
+  const initial = name ? name.charAt(0).toUpperCase() : "";
+  const fontSize = size * 0.4;
+
+  return (
+    <View
+      style={[
+        styles.avatar,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor
+        },
+        style
+      ]}
+    >
+      {name ? (
+        <ThemedText style={[styles.initial, { fontSize }]}>{initial}</ThemedText>
+      ) : (
+        <Feather name="user" size={size * 0.5} color="#FFFFFF" />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  avatar: {
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  initial: {
+    color: "#FFFFFF",
+    fontWeight: "600"
+  }
+});
+
+components/Badge.tsx
+import React from "react";
+import { View, StyleSheet, ViewStyle, StyleProp } from "react-native";
+import { ThemedText } from "@/components/ThemedText";
+import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
+
+interface BadgeProps {
+  label: string;
+  color?: string;
+  textColor?: string;
+  size?: "small" | "medium";
+  style?: StyleProp<ViewStyle>;
+}
+
+export function Badge({
+  label,
+  color = AppColors.primary,
+  textColor = "#FFFFFF",
+  size = "small",
+  style
+}: BadgeProps) {
+  return (
+    <View
+      style={[
+        styles.badge,
+        size === "medium" && styles.badgeMedium,
+        { backgroundColor: color },
+        style
+      ]}
+    >
+      <ThemedText
+        style={[
+          styles.text,
+          size === "medium" && styles.textMedium,
+          { color: textColor }
+        ]}
+      >
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  badge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.xs,
+    alignSelf: "flex-start"
+  },
+  badgeMedium: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs
+  },
+  text: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase"
+  },
+  textMedium: {
+    fontSize: 12
+  }
+});
+
+components/ErrorBoundary.tsx
+import React, { Component, ComponentType, PropsWithChildren } from "react";
+import { ErrorFallback, ErrorFallbackProps } from "@/components/ErrorFallback";
+
+export type ErrorBoundaryProps = PropsWithChildren<{
+  FallbackComponent?: ComponentType<ErrorFallbackProps>;
+  onError?: (error: Error, stackTrace: string) => void;
+}>;
+
+type ErrorBoundaryState = { error: Error | null };
+
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  state: ErrorBoundaryState = { error: null };
+
+  static defaultProps: {
+    FallbackComponent: ComponentType<ErrorFallbackProps>;
+  } = {
+    FallbackComponent: ErrorFallback
+  };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }): void {
+    if (typeof this.props.onError === "function") {
+      this.props.onError(error, info.componentStack);
+    }
+  }
+
+  resetError = (): void => {
+    this.setState({ error: null });
+  };
+
+  render() {
+    const { FallbackComponent } = this.props;
+    return this.state.error && FallbackComponent ? (
+      <FallbackComponent error={this.state.error} resetError={this.resetError} />
+    ) : (
+      this.props.children
+    );
+  }
+}
+
+components/ErrorFallback.tsx
+import React, { useState } from "react";
+import { reloadAppAsync } from "expo";
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  ScrollView,
+  Text,
+  Modal
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius, Fonts, AppColors } from "@/constants/theme";
+
+export type ErrorFallbackProps = {
+  error: Error;
+  resetError: () => void;
+};
+
+export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
+  const { theme } = useTheme();
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleRestart = async () => {
+    try {
+      await reloadAppAsync();
+    } catch (restartError) {
+      console.error("Failed to restart app:", restartError);
+      resetError();
+    }
+  };
+
+  const formatErrorDetails = (): string => {
+    let details = `Error: ${error.message}\n\n`;
+    if (error.stack) {
+      details += `Stack Trace:\n${error.stack}`;
+    }
+    return details;
+  };
+
+  return (
+    <ThemedView style={styles.container}>
+      {__DEV__ ? (
+        <Pressable
+          onPress={() => setIsModalVisible(true)}
+          style={({ pressed }) => [
+            styles.topButton,
+            {
+              backgroundColor: theme.backgroundDefault,
+              opacity: pressed ? 0.8 : 1
+            }
+          ]}
+        >
+          <Feather name="alert-circle" size={20} color={theme.text} />
+        </Pressable>
+      ) : null}
+
+      <View style={styles.content}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: theme.backgroundDefault }
+          ]}
+        >
+          <Feather name="alert-triangle" size={48} color={AppColors.primary} />
+        </View>
+
+        <ThemedText type="h1" style={styles.title}>
+          Oops! Something went wrong
+        </ThemedText>
+        <ThemedText type="body" style={styles.message}>
+          Hardcore Door to Door Closers hit a snag. Tap below to get back in the
+          game.
+        </ThemedText>
+
+        <Pressable
+          onPress={handleRestart}
+          style={({ pressed }) => [
+            styles.button,
+            {
+              backgroundColor: AppColors.primary,
+              opacity: pressed ? 0.9 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }]
+            }
+          ]}
+        >
+          <ThemedText
+            type="body"
+            style={[styles.buttonText, { color: "#FFFFFF" }]}
+          >
+            Get Back to Closing
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      {__DEV__ ? (
+        <Modal
+          visible={isModalVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <ThemedView style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="h2" style={styles.modalTitle}>
+                  Error Details
+                </ThemedText>
+                <Pressable
+                  onPress={() => setIsModalVisible(false)}
+                  style={({ pressed }) => [
+                    styles.closeButton,
+                    { opacity: pressed ? 0.6 : 1 }
+                  ]}
+                >
+                  <Feather name="x" size={24} color={theme.text} />
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.modalScrollView}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator
+              >
+                <View
+                  style={[
+                    styles.errorContainer,
+                    { backgroundColor: theme.backgroundDefault }
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.errorText,
+                      {
+                        color: theme.text,
+                        fontFamily: Fonts?.mono || "monospace"
+                      }
+                    ]}
+                    selectable
+                  >
+                    {formatErrorDetails()}
+                  </Text>
+                </View>
+              </ScrollView>
+            </ThemedView>
+          </View>
+        </Modal>
+      ) : null}
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing["2xl"]
+  },
+  content: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.lg,
+    width: "100%",
+    maxWidth: 600
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: Spacing.md
+  },
+  title: {
+    textAlign: "center"
+  },
+  message: {
+    textAlign: "center",
+    opacity: 0.7
+  },
+  topButton: {
+    position: "absolute",
+    top: Spacing["2xl"] + Spacing.lg,
+    right: Spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10
+  },
+  button: {
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing["2xl"],
+    minWidth: 200,
+    marginTop: Spacing.md
+  },
+  buttonText: {
+    fontWeight: "600",
+    textAlign: "center",
+    fontSize: 16
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end"
+  },
+  modalContainer: {
+    width: "100%",
+    height: "90%",
+    borderTopLeftRadius: BorderRadius.lg,
+    borderTopRightRadius: BorderRadius.lg
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(128, 128, 128, 0.2)"
+  },
+  modalTitle: {
+    fontWeight: "600"
+  },
+  closeButton: {
+    padding: Spacing.xs
+  },
+  modalScrollView: {
+    flex: 1
+  },
+  modalScrollContent: {
+    padding: Spacing.lg
+  },
+  errorContainer: {
+    width: "100%",
+    borderRadius: BorderRadius.md,
+    overflow: "hidden",
+    padding: Spacing.lg
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 18,
+    width: "100%"
+  }
+});

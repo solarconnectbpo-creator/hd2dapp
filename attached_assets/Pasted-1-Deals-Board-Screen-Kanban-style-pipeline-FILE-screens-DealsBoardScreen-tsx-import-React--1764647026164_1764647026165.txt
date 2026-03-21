@@ -1,0 +1,840 @@
+1️⃣ Deals Board Screen (Kanban-style pipeline)
+
+FILE: screens/DealsBoardScreen.tsx
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  FlatList,
+  RefreshControl,
+  Pressable,
+} from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
+import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import { AppColors, Spacing, BorderRadius } from "@/constants/theme";
+import { STAGES } from "@/data/mockData";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+export interface Deal {
+  id: string;
+  contactName: string;
+  company: string;
+  value: number;
+  stage: string;
+  daysInStage: number;
+  phone: string;
+  email: string;
+  notes: string;
+  industry: string;
+  createdAt: string;
+}
+
+export type CRMStackParamList = {
+  DealsBoard: undefined;
+  DealDetail: { dealId: string };
+  CreateDeal: undefined;
+};
+
+type Props = NativeStackScreenProps<CRMStackParamList, "DealsBoard">;
+
+export default function DealsBoardScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const { token, companyId } = useAuth();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [updatingStageId, setUpdatingStageId] = useState<string | null>(null);
+
+  const loadDeals = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await api.get<Deal[]>("/api/deals", { token, companyId });
+      setDeals(data);
+    } catch (e) {
+      console.error("Error loading deals:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, companyId]);
+
+  useEffect(() => {
+    loadDeals();
+  }, [loadDeals]);
+
+  const groupedDeals = useMemo(() => {
+    const groups: Record<string, Deal[]> = {};
+    STAGES.forEach((s) => (groups[s.key] = []));
+    deals.forEach((deal) => {
+      const k = deal.stage || "new";
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(deal);
+    });
+    return groups;
+  }, [deals]);
+
+  const handleMoveStage = async (deal: Deal, newStageKey: string) => {
+    if (!token || deal.stage === newStageKey) return;
+    setUpdatingStageId(deal.id);
+    try {
+      await api.put(
+        `/api/deals/${deal.id}`,
+        { stage: newStageKey },
+        { token, companyId }
+      );
+      setDeals((prev) =>
+        prev.map((d) =>
+          d.id === deal.id ? { ...d, stage: newStageKey, daysInStage: 0 } : d
+        )
+      );
+    } catch (e) {
+      console.error("Update stage error:", e);
+    } finally {
+      setUpdatingStageId(null);
+    }
+  };
+
+  const renderDealCard = (deal: Deal, stageKey: string) => (
+    <Pressable
+      key={deal.id}
+      onPress={() =>
+        navigation.navigate("DealDetail", {
+          dealId: deal.id,
+        })
+      }
+      style={{ marginBottom: Spacing.sm }}
+    >
+      <Card elevation={2} style={styles.dealCard}>
+        <ThemedText type="h4">{deal.contactName}</ThemedText>
+        <ThemedText type="small" style={styles.company}>
+          {deal.company}
+        </ThemedText>
+        <ThemedText type="body" style={styles.value}>
+          ${deal.value.toLocaleString()}
+        </ThemedText>
+        <ThemedText type="caption" style={styles.meta}>
+          {deal.industry} • {deal.phone}
+        </ThemedText>
+        <ThemedText type="caption" style={styles.meta}>
+          {deal.daysInStage} days in stage
+        </ThemedText>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.stageScroll}
+          contentContainerStyle={styles.stageScrollContent}
+        >
+          {STAGES.map((stage) => {
+            const isActive = stage.key === deal.stage;
+            return (
+              <Pressable
+                key={stage.key}
+                onPress={() => handleMoveStage(deal, stage.key)}
+                disabled={updatingStageId === deal.id}
+              >
+                <Badge
+                  label={stage.label}
+                  color={isActive ? stage.color : theme.backgroundSecondary}
+                  textColor={isActive ? "#FFFFFF" : theme.textSecondary}
+                  size="small"
+                  style={[
+                    styles.stageBadge,
+                    updatingStageId === deal.id && { opacity: 0.6 },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </Card>
+    </Pressable>
+  );
+
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.headerRow}>
+        <ThemedText type="h2">Pipeline</ThemedText>
+        <View style={styles.headerButtons}>
+          <Button
+            variant="secondary"
+            onPress={loadDeals}
+            style={styles.headerBtn}
+          >
+            Refresh
+          </Button>
+          <Button
+            onPress={() => navigation.navigate("CreateDeal")}
+            style={styles.headerBtn}
+          >
+            New Deal
+          </Button>
+        </View>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.board}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={loadDeals}
+            tintColor={theme.text}
+          />
+        }
+      >
+        {STAGES.map((stage) => (
+          <View
+            key={stage.key}
+            style={[
+              styles.column,
+              { backgroundColor: theme.backgroundSecondary },
+            ]}
+          >
+            <View style={styles.columnHeader}>
+              <ThemedText type="h4">{stage.label}</ThemedText>
+              <Badge
+                label={String(groupedDeals[stage.key]?.length ?? 0)}
+                color={stage.color}
+              />
+            </View>
+            <FlatList
+              data={groupedDeals[stage.key] || []}
+              keyExtractor={(d) => d.id}
+              renderItem={({ item }) => renderDealCard(item, stage.key)}
+              scrollEnabled={false}
+            />
+          </View>
+        ))}
+      </ScrollView>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  headerBtn: {
+    minWidth: 100,
+  },
+  board: {
+    paddingBottom: Spacing["3xl"],
+    gap: Spacing.md,
+  },
+  column: {
+    width: 260,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+  },
+  columnHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  dealCard: {
+    borderRadius: BorderRadius.md,
+  },
+  company: {
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  value: {
+    marginTop: 4,
+    fontWeight: "600",
+  },
+  meta: {
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  stageScroll: {
+    marginTop: Spacing.sm,
+  },
+  stageScrollContent: {
+    gap: 6,
+    paddingRight: 4,
+  },
+  stageBadge: {
+    marginRight: 4,
+  },
+});
+
+2️⃣ Deal Detail Screen (view + update)
+
+FILE: screens/DealDetailScreen.tsx
+
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  ScrollView,
+  Alert,
+} from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
+import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
+import { STAGES } from "@/data/mockData";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { CRMStackParamList, Deal } from "./DealsBoardScreen";
+
+type Props = NativeStackScreenProps<CRMStackParamList, "DealDetail">;
+
+export default function DealDetailScreen({ route, navigation }: Props) {
+  const { dealId } = route.params;
+  const { theme } = useTheme();
+  const { token, companyId } = useAuth();
+
+  const [deal, setDeal] = useState<Deal | null>(null);
+  const [notes, setNotes] = useState("");
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [updatingStage, setUpdatingStage] = useState(false);
+
+  const loadDeal = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await api.get<Deal>(`/api/deals/${dealId}`, {
+        token,
+        companyId,
+      });
+      setDeal(data);
+      setNotes(data.notes || "");
+      setValue(String(data.value ?? ""));
+    } catch (e) {
+      console.error("Load deal error:", e);
+    }
+  }, [dealId, token, companyId]);
+
+  useEffect(() => {
+    loadDeal();
+  }, [loadDeal]);
+
+  const handleSave = async () => {
+    if (!token || !deal) return;
+    setSaving(true);
+    try {
+      await api.put(
+        `/api/deals/${deal.id}`,
+        {
+          notes,
+          value: Number(value || 0),
+        },
+        { token, companyId }
+      );
+      Alert.alert("Saved", "Deal updated.");
+      loadDeal();
+    } catch (e) {
+      console.error("Save deal error:", e);
+      Alert.alert("Error", "Failed to save deal.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStageChange = async (stageKey: string) => {
+    if (!token || !deal || stageKey === deal.stage) return;
+    setUpdatingStage(true);
+    try {
+      await api.put(
+        `/api/deals/${deal.id}`,
+        { stage: stageKey },
+        { token, companyId }
+      );
+      setDeal((prev) => (prev ? { ...prev, stage: stageKey } : prev));
+    } catch (e) {
+      console.error("Update stage error:", e);
+    } finally {
+      setUpdatingStage(false);
+    }
+  };
+
+  if (!deal) {
+    return (
+      <ThemedView style={styles.loadingContainer}>
+        <ThemedText>Loading deal...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  const currentStage = STAGES.find((s) => s.key === deal.stage);
+
+  return (
+    <ThemedView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <ThemedText type="h2" style={styles.title}>
+          {deal.contactName}
+        </ThemedText>
+        <ThemedText type="body" style={styles.subtitle}>
+          {deal.company} • {deal.industry}
+        </ThemedText>
+
+        <View style={styles.section}>
+          <ThemedText type="small" style={styles.label}>
+            Pipeline Stage
+          </ThemedText>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stageRow}
+          >
+            {STAGES.map((stage) => {
+              const isActive = stage.key === deal.stage;
+              return (
+                <Badge
+                  key={stage.key}
+                  label={stage.label}
+                  color={isActive ? stage.color : theme.backgroundSecondary}
+                  textColor={isActive ? "#FFFFFF" : theme.textSecondary}
+                  size="medium"
+                  style={[
+                    styles.stageBadge,
+                    updatingStage && { opacity: 0.6 },
+                  ]}
+                  // @ts-expect-error Pressable wrapper via onStartShouldSetResponder
+                  onStartShouldSetResponder={() => {
+                    handleStageChange(stage.key);
+                    return true;
+                  }}
+                />
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="small" style={styles.label}>
+            Deal Value
+          </ThemedText>
+          <TextInput
+            value={value}
+            onChangeText={setValue}
+            keyboardType="numeric"
+            style={[
+              styles.input,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="small" style={styles.label}>
+            Contact
+          </ThemedText>
+          <ThemedText type="body">{deal.phone}</ThemedText>
+          <ThemedText type="body">{deal.email}</ThemedText>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="small" style={styles.label}>
+            Notes
+          </ThemedText>
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            style={[
+              styles.textArea,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="Add call notes, objections, follow up plans..."
+            placeholderTextColor={theme.textSecondary}
+          />
+        </View>
+
+        <Button onPress={handleSave} disabled={saving} style={styles.saveBtn}>
+          {saving ? "Saving..." : "Save Deal"}
+        </Button>
+      </ScrollView>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  scroll: {
+    paddingBottom: Spacing["3xl"],
+  },
+  title: {
+    marginBottom: Spacing.xs,
+  },
+  subtitle: {
+    marginBottom: Spacing["2xl"],
+    opacity: 0.8,
+  },
+  section: {
+    marginBottom: Spacing.lg,
+  },
+  label: {
+    marginBottom: Spacing.xs,
+    opacity: 0.8,
+  },
+  stageRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  stageBadge: {
+    marginRight: 6,
+  },
+  input: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 15,
+  },
+  textArea: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    minHeight: 120,
+    textAlignVertical: "top",
+    fontSize: 15,
+  },
+  saveBtn: {
+    marginTop: Spacing.sm,
+  },
+});
+
+
+Note: the Badge here is used as a pseudo-button via onStartShouldSetResponder to avoid rewriting it as a Pressable wrapper. If you prefer, you can wrap Badge in a Pressable instead.
+
+3️⃣ Create Deal Screen (POST /api/deals)
+
+FILE: screens/CreateDealScreen.tsx
+
+import React, { useState } from "react";
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
+import { Button } from "@/components/Button";
+import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { CRMStackParamList } from "./DealsBoardScreen";
+
+type Props = NativeStackScreenProps<CRMStackParamList, "CreateDeal">;
+
+export default function CreateDealScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const { token, companyId } = useAuth();
+
+  const [contactName, setContactName] = useState("");
+  const [company, setCompany] = useState("");
+  const [value, setValue] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [industry, setIndustry] = useState("Roofing");
+  const [saving, setSaving] = useState(false);
+
+  const handleCreate = async () => {
+    if (!token) return;
+    if (!contactName.trim() || !phone.trim()) {
+      Alert.alert("Missing fields", "Contact name and phone are required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post(
+        "/api/deals",
+        {
+          contactName: contactName.trim(),
+          company: company.trim(),
+          value: Number(value || 0),
+          phone: phone.trim(),
+          email: email.trim(),
+          industry,
+        },
+        { token, companyId }
+      );
+      Alert.alert("Created", "New deal added to pipeline.", [
+        {
+          text: "OK",
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } catch (e) {
+      console.error("Create deal error:", e);
+      Alert.alert("Error", "Failed to create deal.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const baseInput = {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 15,
+    marginBottom: Spacing.md,
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.select({ ios: "padding", android: undefined })}
+    >
+      <ThemedView style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ThemedText type="h2" style={styles.title}>
+            New Deal
+          </ThemedText>
+          <ThemedText type="small" style={styles.subtitle}>
+            Create a new opportunity in your pipeline.
+          </ThemedText>
+
+          <ThemedText type="small" style={styles.label}>
+            Contact Name *
+          </ThemedText>
+          <TextInput
+            value={contactName}
+            onChangeText={setContactName}
+            style={[
+              baseInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="John Smith"
+            placeholderTextColor={theme.textSecondary}
+          />
+
+          <ThemedText type="small" style={styles.label}>
+            Company
+          </ThemedText>
+          <TextInput
+            value={company}
+            onChangeText={setCompany}
+            style={[
+              baseInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="Smith Roofing Co."
+            placeholderTextColor={theme.textSecondary}
+          />
+
+          <ThemedText type="small" style={styles.label}>
+            Deal Value
+          </ThemedText>
+          <TextInput
+            value={value}
+            onChangeText={setValue}
+            keyboardType="numeric"
+            style={[
+              baseInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="15000"
+            placeholderTextColor={theme.textSecondary}
+          />
+
+          <ThemedText type="small" style={styles.label}>
+            Phone *
+          </ThemedText>
+          <TextInput
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            style={[
+              baseInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="(555) 123-4567"
+            placeholderTextColor={theme.textSecondary}
+          />
+
+          <ThemedText type="small" style={styles.label}>
+            Email
+          </ThemedText>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            style={[
+              baseInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="john@example.com"
+            placeholderTextColor={theme.textSecondary}
+          />
+
+          <ThemedText type="small" style={styles.label}>
+            Industry
+          </ThemedText>
+          <TextInput
+            value={industry}
+            onChangeText={setIndustry}
+            style={[
+              baseInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+              },
+            ]}
+            placeholder="Roofing / Solar / HVAC"
+            placeholderTextColor={theme.textSecondary}
+          />
+
+          <Button
+            onPress={handleCreate}
+            disabled={saving}
+            style={styles.saveBtn}
+          >
+            {saving ? "Creating..." : "Create Deal"}
+          </Button>
+        </ScrollView>
+      </ThemedView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  scroll: {
+    paddingBottom: Spacing["3xl"],
+  },
+  title: {
+    marginBottom: Spacing.xs,
+  },
+  subtitle: {
+    marginBottom: Spacing["2xl"],
+    opacity: 0.8,
+  },
+  label: {
+    marginBottom: Spacing.xs,
+    opacity: 0.8,
+  },
+  saveBtn: {
+    marginTop: Spacing.md,
+  },
+});
+
+4️⃣ CRM Stack Navigator wiring
+
+If you already have CRMStackNavigator.tsx, you can replace its contents with this pattern (or just merge the screens in):
+
+FILE: navigation/CRMStackNavigator.tsx
+
+import React from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import DealsBoardScreen, {
+  CRMStackParamList,
+} from "@/screens/DealsBoardScreen";
+import DealDetailScreen from "@/screens/DealDetailScreen";
+import CreateDealScreen from "@/screens/CreateDealScreen";
+
+const Stack = createNativeStackNavigator<CRMStackParamList>();
+
+export default function CRMStackNavigator() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="DealsBoard"
+        component={DealsBoardScreen}
+        options={{ title: "Pipeline" }}
+      />
+      <Stack.Screen
+        name="DealDetail"
+        component={DealDetailScreen}
+        options={{ title: "Deal Details" }}
+      />
+      <Stack.Screen
+        name="CreateDeal"
+        component={CreateDealScreen}
+        options={{ title: "New Deal" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+
+Your MainTabNavigator already has:
+
+<Tab.Screen
+  name="CRMTab"
+  component={CRMStackNavigator}
+  options={{
+    title: "CRM",
+    tabBarIcon: ({ color, size }) => (
+      <Feather name="bar-chart-2" size={size} color={color} />
+    ),
+  }}
+/>
