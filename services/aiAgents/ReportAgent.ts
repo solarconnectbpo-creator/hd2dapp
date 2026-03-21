@@ -1,7 +1,2 @@
-// ReportAgent.ts
-
-class ReportAgent {
-    // Main agent logic for orchestrating report generation
-}
-
-export default ReportAgent;
+// ReportAgent.ts code here
+console.log('ReportAgent');

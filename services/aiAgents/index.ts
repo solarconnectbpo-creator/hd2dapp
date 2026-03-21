@@ -1,13 +1,2 @@
-export class ReportAgent {
-    // ReportAgent implementation
-}
-
-export class DataAnalyzerAgent {
-    // DataAnalyzerAgent implementation
-}
-
-export class ReportBuilderAgent {
-    // ReportBuilderAgent implementation
-}
-
-export type AgentType = 'Report' | 'DataAnalyzer' | 'ReportBuilder';
+// index.ts code here
+console.log('Index');
