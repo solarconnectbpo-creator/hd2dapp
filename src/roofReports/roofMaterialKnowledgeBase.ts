@@ -22,7 +22,9 @@ export function structuralLoadLbsPerSqForMaterial(
 ): number {
   const k = String(material ?? "shingle").toLowerCase();
   if (k in MATERIAL_DEAD_LOAD_LBS_PER_SQ) {
-    return MATERIAL_DEAD_LOAD_LBS_PER_SQ[k as keyof typeof MATERIAL_DEAD_LOAD_LBS_PER_SQ];
+    return MATERIAL_DEAD_LOAD_LBS_PER_SQ[
+      k as keyof typeof MATERIAL_DEAD_LOAD_LBS_PER_SQ
+    ];
   }
   return MATERIAL_DEAD_LOAD_LBS_PER_SQ.shingle;
 }
@@ -74,7 +76,9 @@ export function reportAlertsForMaterial(
     );
   }
   if (m === "shingle") {
-    alerts.push("Typical asphalt shingle dead load ~240 lbs/sq (1-layer planning) — compare to tile/slate in Knowledge Base Fig. 3.");
+    alerts.push(
+      "Typical asphalt shingle dead load ~240 lbs/sq (1-layer planning) — compare to tile/slate in Knowledge Base Fig. 3.",
+    );
   }
   return alerts;
 }
@@ -90,13 +94,23 @@ export function knowledgeBaseFigureRefs(
 
   refs.push("Fig. 1 — Gable blueprint: ridge, eave, rake tracing.");
   if (isHipOrValleyComplex(roofFormType) || form.includes("hip")) {
-    refs.push("Fig. 2 — Hip / valley transition: higher cut-up → higher waste vs gable.");
+    refs.push(
+      "Fig. 2 — Hip / valley transition: higher cut-up → higher waste vs gable.",
+    );
   }
   if (["shingle", "tile"].includes(mat)) {
-    refs.push("Fig. 3 — Shingle vs tile dead load (e.g. ~240 vs ~1000 lbs/sq).");
+    refs.push(
+      "Fig. 3 — Shingle vs tile dead load (e.g. ~240 vs ~1000 lbs/sq).",
+    );
   }
-  if (mat === "slate") refs.push("Fig. 4 — Natural slate: steep pitch, specialty install, high waste.");
-  if (mat === "tpo") refs.push("Fig. 5 — TPO membrane: seams, adhesive, low waste % vs steep-slope.");
+  if (mat === "slate")
+    refs.push(
+      "Fig. 4 — Natural slate: steep pitch, specialty install, high waste.",
+    );
+  if (mat === "tpo")
+    refs.push(
+      "Fig. 5 — TPO membrane: seams, adhesive, low waste % vs steep-slope.",
+    );
 
   return refs;
 }

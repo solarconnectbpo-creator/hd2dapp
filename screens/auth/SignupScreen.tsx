@@ -19,7 +19,12 @@ import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import type { AuthStackParamList } from "@/navigation/AuthNavigator";
 
 type SignupScreenProps = {
@@ -89,7 +94,10 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
     if (result?.requires2FA) {
       navigation.navigate("Verify2FA", { email: result.email || email });
     } else if (!result) {
-      Alert.alert("Signup Failed", "An account with this email already exists or there was an error.");
+      Alert.alert(
+        "Signup Failed",
+        "An account with this email already exists or there was an error.",
+      );
     }
   };
 
@@ -102,10 +110,20 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
       keyboardType?: "default" | "email-address" | "phone-pad";
       autoCapitalize?: "none" | "sentences" | "words";
       secureTextEntry?: boolean;
-    } = {}
+    } = {},
   ) => (
-    <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault }]}>
-      <Feather name={icon} size={20} color={theme.textSecondary} style={styles.inputIcon} />
+    <View
+      style={[
+        styles.inputContainer,
+        { backgroundColor: theme.backgroundDefault },
+      ]}
+    >
+      <Feather
+        name={icon}
+        size={20}
+        color={theme.textSecondary}
+        style={styles.inputIcon}
+      />
       <TextInput
         style={[styles.textInput, { color: theme.text }]}
         value={value}
@@ -117,7 +135,10 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
         secureTextEntry={options.secureTextEntry && !showPassword}
       />
       {options.secureTextEntry ? (
-        <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+        <Pressable
+          onPress={() => setShowPassword(!showPassword)}
+          style={styles.eyeButton}
+        >
           <Feather
             name={showPassword ? "eye-off" : "eye"}
             size={20}
@@ -143,7 +164,12 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: accentColor + "20" }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: accentColor + "20" },
+              ]}
+            >
               <Feather
                 name={isSalesRep ? "user-plus" : "briefcase"}
                 size={32}
@@ -153,7 +179,9 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
             <ThemedText type="h2" style={styles.title}>
               {isSalesRep ? "Join as Sales Rep" : "Register Company"}
             </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+            <ThemedText
+              style={[styles.subtitle, { color: theme.textSecondary }]}
+            >
               {isSalesRep
                 ? "Start closing more deals today"
                 : "Connect with top sales talent"}
@@ -165,17 +193,29 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
               <ThemedText style={styles.label}>
                 {isSalesRep ? "Full Name" : "Contact Name"} *
               </ThemedText>
-              {renderInput("user", isSalesRep ? "John Smith" : "Contact person name", name, setName, {
-                autoCapitalize: "words",
-              })}
+              {renderInput(
+                "user",
+                isSalesRep ? "John Smith" : "Contact person name",
+                name,
+                setName,
+                {
+                  autoCapitalize: "words",
+                },
+              )}
             </View>
 
             {!isSalesRep ? (
               <View style={styles.formField}>
                 <ThemedText style={styles.label}>Company Name *</ThemedText>
-                {renderInput("briefcase", "Your company name", company, setCompany, {
-                  autoCapitalize: "words",
-                })}
+                {renderInput(
+                  "briefcase",
+                  "Your company name",
+                  company,
+                  setCompany,
+                  {
+                    autoCapitalize: "words",
+                  },
+                )}
               </View>
             ) : null}
 
@@ -196,27 +236,47 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
 
             {isSalesRep ? (
               <View style={styles.formField}>
-                <ThemedText style={styles.label}>Current Company (Optional)</ThemedText>
-                {renderInput("briefcase", "Where do you work?", company, setCompany, {
-                  autoCapitalize: "words",
-                })}
+                <ThemedText style={styles.label}>
+                  Current Company (Optional)
+                </ThemedText>
+                {renderInput(
+                  "briefcase",
+                  "Where do you work?",
+                  company,
+                  setCompany,
+                  {
+                    autoCapitalize: "words",
+                  },
+                )}
               </View>
             ) : null}
 
             <View style={styles.formField}>
               <ThemedText style={styles.label}>Password *</ThemedText>
-              {renderInput("lock", "At least 6 characters", password, setPassword, {
-                autoCapitalize: "none",
-                secureTextEntry: true,
-              })}
+              {renderInput(
+                "lock",
+                "At least 6 characters",
+                password,
+                setPassword,
+                {
+                  autoCapitalize: "none",
+                  secureTextEntry: true,
+                },
+              )}
             </View>
 
             <View style={styles.formField}>
               <ThemedText style={styles.label}>Confirm Password *</ThemedText>
-              {renderInput("lock", "Confirm your password", confirmPassword, setConfirmPassword, {
-                autoCapitalize: "none",
-                secureTextEntry: true,
-              })}
+              {renderInput(
+                "lock",
+                "Confirm your password",
+                confirmPassword,
+                setConfirmPassword,
+                {
+                  autoCapitalize: "none",
+                  secureTextEntry: true,
+                },
+              )}
             </View>
 
             <Button
@@ -236,7 +296,9 @@ export default function SignupScreen({ navigation, route }: SignupScreenProps) {
             <ThemedText style={{ color: theme.textSecondary }}>
               Already have an account?{" "}
             </ThemedText>
-            <Pressable onPress={() => navigation.navigate("Login", { userType })}>
+            <Pressable
+              onPress={() => navigation.navigate("Login", { userType })}
+            >
               <ThemedText style={{ color: accentColor, fontWeight: "600" }}>
                 Log In
               </ThemedText>

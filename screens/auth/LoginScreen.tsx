@@ -20,7 +20,12 @@ import { Button } from "@/components/Button";
 import { HeroLogo } from "@/components/HeroLogo";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import type { AuthStackParamList } from "@/navigation/AuthNavigator";
 
 type LoginScreenProps = {
@@ -34,9 +39,15 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [selectedUserType, setSelectedUserType] = useState<"company" | "sales_rep" | "admin">(userType || "company");
-  const [email, setEmail] = useState(userType === "admin" ? "admin@hardcoredoortodoorclosers.com" : "");
-  const [password, setPassword] = useState(userType === "admin" ? "AdminTest123!" : "");
+  const [selectedUserType, setSelectedUserType] = useState<
+    "company" | "sales_rep" | "admin"
+  >(userType || "company");
+  const [email, setEmail] = useState(
+    userType === "admin" ? "admin@hardcoredoortodoorclosers.com" : "",
+  );
+  const [password, setPassword] = useState(
+    userType === "admin" ? "AdminTest123!" : "",
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -55,7 +66,10 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
     if (result?.requires2FA) {
       navigation.navigate("Verify2FA", { email: result.email || email });
     } else if (!result) {
-      Alert.alert("Login Failed", "Invalid email or password. Please try again or sign up.");
+      Alert.alert(
+        "Login Failed",
+        "Invalid email or password. Please try again or sign up.",
+      );
     }
   };
 
@@ -83,12 +97,17 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
             <ThemedText type="h2" style={styles.title}>
               {selectedUserType === "admin" ? "Admin Login" : "User Login"}
             </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
-              {selectedUserType === "admin" ? "Sign in to administer the platform" : "Sign in to your account"}
+            <ThemedText
+              style={[styles.subtitle, { color: theme.textSecondary }]}
+            >
+              {selectedUserType === "admin"
+                ? "Sign in to administer the platform"
+                : "Sign in to your account"}
             </ThemedText>
             <Pressable
               onPress={() => {
-                const nextType = selectedUserType === "admin" ? "company" : "admin";
+                const nextType =
+                  selectedUserType === "admin" ? "company" : "admin";
                 setSelectedUserType(nextType);
                 if (nextType === "admin") {
                   setEmail("admin@hardcoredoortodoorclosers.com");
@@ -101,7 +120,9 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
               style={{ marginTop: Spacing.sm }}
             >
               <ThemedText style={{ color: accentColor, fontWeight: "600" }}>
-                {selectedUserType === "admin" ? "Switch to User Login" : "Admin? Tap here"}
+                {selectedUserType === "admin"
+                  ? "Switch to User Login"
+                  : "Admin? Tap here"}
               </ThemedText>
             </Pressable>
           </View>
@@ -109,8 +130,18 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
           <View style={styles.form}>
             <View style={styles.formField}>
               <ThemedText style={styles.label}>Email</ThemedText>
-              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault }]}>
-                <Feather name="mail" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+              <View
+                style={[
+                  styles.inputContainer,
+                  { backgroundColor: theme.backgroundDefault },
+                ]}
+              >
+                <Feather
+                  name="mail"
+                  size={20}
+                  color={theme.textSecondary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={[styles.textInput, { color: theme.text }]}
                   value={email}
@@ -126,8 +157,18 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
 
             <View style={styles.formField}>
               <ThemedText style={styles.label}>Password</ThemedText>
-              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault }]}>
-                <Feather name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+              <View
+                style={[
+                  styles.inputContainer,
+                  { backgroundColor: theme.backgroundDefault },
+                ]}
+              >
+                <Feather
+                  name="lock"
+                  size={20}
+                  color={theme.textSecondary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={[styles.textInput, { color: theme.text }]}
                   value={password}
@@ -137,7 +178,10 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
                   <Feather
                     name={showPassword ? "eye-off" : "eye"}
                     size={20}
@@ -148,7 +192,9 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
             </View>
 
             <Pressable style={styles.forgotPassword}>
-              <ThemedText style={{ color: "#000000", fontWeight: "600" }}>Forgot Password?</ThemedText>
+              <ThemedText style={{ color: "#000000", fontWeight: "600" }}>
+                Forgot Password?
+              </ThemedText>
             </Pressable>
 
             <Button
@@ -156,33 +202,39 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
               disabled={isLoading}
               style={[styles.loginButton, { backgroundColor: "#000000" }]}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                "Log In"
-              )}
+              {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Log In"}
             </Button>
 
             {userType === "admin" && (
-              <ThemedText style={[styles.adminHint, { color: theme.textSecondary }]}>
+              <ThemedText
+                style={[styles.adminHint, { color: theme.textSecondary }]}
+              >
                 Test admin credentials prefilled above.
               </ThemedText>
             )}
           </View>
 
           <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-            <ThemedText style={[styles.dividerText, { color: theme.textSecondary }]}>
+            <View
+              style={[styles.dividerLine, { backgroundColor: theme.border }]}
+            />
+            <ThemedText
+              style={[styles.dividerText, { color: theme.textSecondary }]}
+            >
               or
             </ThemedText>
-            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            <View
+              style={[styles.dividerLine, { backgroundColor: theme.border }]}
+            />
           </View>
 
           <View style={styles.footer}>
             <ThemedText style={{ color: theme.textSecondary }}>
               Don't have an account?{" "}
             </ThemedText>
-            <Pressable onPress={() => navigation.navigate("Signup", { userType })}>
+            <Pressable
+              onPress={() => navigation.navigate("Signup", { userType })}
+            >
               <ThemedText style={{ color: "#000000", fontWeight: "700" }}>
                 Sign Up
               </ThemedText>

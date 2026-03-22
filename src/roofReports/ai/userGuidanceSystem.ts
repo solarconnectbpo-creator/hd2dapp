@@ -36,7 +36,8 @@ export function checkMeasurementQuality(
       id: "missing-estimate",
       type: "warning",
       title: "Incomplete Measurements",
-      message: "Both AI and manual measurements are required for accurate assessment.",
+      message:
+        "Both AI and manual measurements are required for accurate assessment.",
       dismissible: false,
       priority: 8,
     });
@@ -44,7 +45,10 @@ export function checkMeasurementQuality(
   }
 
   const delta = Math.abs(aiEstimate.areaSqFt - userEstimate.areaSqFt);
-  const threshold = Math.max(500, 0.15 * (aiEstimate.areaSqFt + userEstimate.areaSqFt) / 2);
+  const threshold = Math.max(
+    500,
+    (0.15 * (aiEstimate.areaSqFt + userEstimate.areaSqFt)) / 2,
+  );
 
   if (delta > threshold) {
     score -= 30;
@@ -72,7 +76,8 @@ export function checkMeasurementQuality(
 
   if (previousMeasurements && previousMeasurements.length > 0) {
     const avgHistorical =
-      previousMeasurements.reduce((sum, m) => sum + m.areaSqFt, 0) / previousMeasurements.length;
+      previousMeasurements.reduce((sum, m) => sum + m.areaSqFt, 0) /
+      previousMeasurements.length;
     const historicalDelta = Math.abs(userEstimate.areaSqFt - avgHistorical);
 
     if (historicalDelta > avgHistorical * 0.2) {
@@ -113,7 +118,8 @@ export function getPhotoCaptureGuidance(
   complexity?: "simple" | "moderate" | "complex",
 ): GuidanceMessage[] {
   const messages: GuidanceMessage[] = [];
-  const requiredPhotos = complexity === "complex" ? 5 : complexity === "moderate" ? 3 : 2;
+  const requiredPhotos =
+    complexity === "complex" ? 5 : complexity === "moderate" ? 3 : 2;
 
   if (photoCount < requiredPhotos) {
     messages.push({
@@ -132,7 +138,8 @@ export function getPhotoCaptureGuidance(
         id: "hip-roof-guidance",
         type: "suggestion",
         title: "Hip Roof Detected",
-        message: "Hip roofs require photos of all sides. Capture 4+ angles for best results.",
+        message:
+          "Hip roofs require photos of all sides. Capture 4+ angles for best results.",
         dismissible: true,
         priority: 6,
       });
@@ -144,7 +151,8 @@ export function getPhotoCaptureGuidance(
       id: "angle-guidance",
       type: "suggestion",
       title: "Capture Angle Tips",
-      message: "Mix orthogonal (top-down) and oblique (45°) views for comprehensive assessment.",
+      message:
+        "Mix orthogonal (top-down) and oblique (45°) views for comprehensive assessment.",
       dismissible: true,
       priority: 4,
     });
@@ -153,15 +161,22 @@ export function getPhotoCaptureGuidance(
   return messages;
 }
 
-function generateMeasurementRecommendations(score: number, issues: GuidanceMessage[]): string[] {
+function generateMeasurementRecommendations(
+  score: number,
+  issues: GuidanceMessage[],
+): string[] {
   const recommendations: string[] = [];
 
   if (score < 50) {
-    recommendations.push("Poor measurement quality. Request manual field verification.");
+    recommendations.push(
+      "Poor measurement quality. Request manual field verification.",
+    );
   } else if (score < 70) {
     recommendations.push("Review before report export.");
   } else {
-    recommendations.push("Measurement quality is acceptable. Proceed with report.");
+    recommendations.push(
+      "Measurement quality is acceptable. Proceed with report.",
+    );
   }
 
   return [...new Set(recommendations)];
@@ -178,7 +193,8 @@ export function getDamageAssessmentGuidance(
       id: "poor-photo-quality",
       type: "warning",
       title: "Low Photo Quality",
-      message: "Poor photo quality limits AI accuracy. Retake with better lighting/clarity.",
+      message:
+        "Poor photo quality limits AI accuracy. Retake with better lighting/clarity.",
       priority: 7,
       dismissible: true,
     });
@@ -200,7 +216,8 @@ export function getDamageAssessmentGuidance(
       id: "confident-damage",
       type: "success",
       title: "Damage Clearly Visible",
-      message: "High-confidence damage detection. Assessment is reliable for claims.",
+      message:
+        "High-confidence damage detection. Assessment is reliable for claims.",
       priority: 3,
       dismissible: true,
     });

@@ -22,7 +22,9 @@ export default function Cesium3DRoofScreen() {
   useEffect(() => {
     const token = process.env.EXPO_PUBLIC_CESIUM_ION_TOKEN;
     if (!token?.trim()) {
-      setError("Set EXPO_PUBLIC_CESIUM_ION_TOKEN in .env.local (free token at cesium.com/ion).");
+      setError(
+        "Set EXPO_PUBLIC_CESIUM_ION_TOKEN in .env.local (free token at cesium.com/ion).",
+      );
       return;
     }
 
@@ -36,7 +38,9 @@ export default function Cesium3DRoofScreen() {
       const container: HTMLDivElement | null =
         maybeContainer instanceof HTMLElement
           ? (maybeContainer as HTMLDivElement)
-          : (document.getElementById(CESIUM_CONTAINER_ID) as HTMLDivElement | null);
+          : (document.getElementById(
+              CESIUM_CONTAINER_ID,
+            ) as HTMLDivElement | null);
 
       if (!container) {
         return false;
@@ -54,7 +58,9 @@ export default function Cesium3DRoofScreen() {
           });
           destroy = handle.destroy;
           if (!cancelled) {
-            setStatus("Left-click: add points on terrain · Right-click: close polygon (area in m²).");
+            setStatus(
+              "Left-click: add points on terrain · Right-click: close polygon (area in m²).",
+            );
           }
         } catch (e) {
           if (!cancelled) {
@@ -70,7 +76,9 @@ export default function Cesium3DRoofScreen() {
       if (!run()) {
         timer2 = setTimeout(() => {
           if (!cancelled && !run()) {
-            setError("Map container not ready. Go back and open this screen again.");
+            setError(
+              "Map container not ready. Go back and open this screen again.",
+            );
           }
         }, 300);
       }
@@ -90,7 +98,15 @@ export default function Cesium3DRoofScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.banner, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}>
+      <View
+        style={[
+          styles.banner,
+          {
+            borderColor: theme.border,
+            backgroundColor: theme.backgroundSecondary,
+          },
+        ]}
+      >
         {error ? (
           <ThemedText type="small" style={{ color: theme.text }}>
             {error}
@@ -102,11 +118,16 @@ export default function Cesium3DRoofScreen() {
         )}
         {areaM2 != null && Number.isFinite(areaM2) ? (
           <ThemedText type="h4" style={{ marginTop: 8, color: theme.text }}>
-            Geodesic area: {areaM2.toFixed(1)} m² ({(areaM2 * 10.7639104167).toFixed(0)} sq ft)
+            Geodesic area: {areaM2.toFixed(1)} m² (
+            {(areaM2 * 10.7639104167).toFixed(0)} sq ft)
           </ThemedText>
         ) : null}
       </View>
-      <View style={styles.mapWrap} ref={mapContainerRef} nativeID={CESIUM_CONTAINER_ID} />
+      <View
+        style={styles.mapWrap}
+        ref={mapContainerRef}
+        nativeID={CESIUM_CONTAINER_ID}
+      />
     </View>
   );
 }

@@ -15,7 +15,7 @@ export async function dispatchEvent(env: Env, event: any): Promise<void> {
   try {
     // Get all active workflows
     const workflowResult = await env.DB.prepare(
-      "SELECT * FROM workflows WHERE active = 1"
+      "SELECT * FROM workflows WHERE active = 1",
     ).all();
 
     const workflows = workflowResult.results || [];
@@ -23,12 +23,14 @@ export async function dispatchEvent(env: Env, event: any): Promise<void> {
     for (const workflow of workflows) {
       // Get workflow steps in order
       const stepsResult = await env.DB.prepare(
-        "SELECT * FROM workflow_steps WHERE workflow_id = ? ORDER BY step_order ASC"
-      ).bind(workflow.id).all();
+        "SELECT * FROM workflow_steps WHERE workflow_id = ? ORDER BY step_order ASC",
+      )
+        .bind(workflow.id)
+        .all();
 
       const steps = (stepsResult.results || []).map((s: any) => ({
         ...s,
-        config: JSON.parse(s.config || "{}")
+        config: JSON.parse(s.config || "{}"),
       }));
 
       workflow.steps = steps;

@@ -8,7 +8,10 @@ interface GeocodeResult {
   lon: number | null;
 }
 
-export async function geocodeAddress(address: string, env: any): Promise<GeocodeResult> {
+export async function geocodeAddress(
+  address: string,
+  env: any,
+): Promise<GeocodeResult> {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
 
   try {
@@ -21,7 +24,7 @@ export async function geocodeAddress(address: string, env: any): Promise<Geocode
 
     return {
       lat: parseFloat(data[0].lat),
-      lon: parseFloat(data[0].lon)
+      lon: parseFloat(data[0].lon),
     };
   } catch (error) {
     console.error("Geocoding error:", error);

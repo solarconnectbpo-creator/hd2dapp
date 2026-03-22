@@ -7,12 +7,16 @@
 import { handleRoofDamageAi } from "./api/roofDamageAi";
 import { handleRoofPitchAi } from "./api/roofPitchAi";
 import { handleRoofReportLanguageAi } from "./api/roofReportLanguageAi";
+import { handleRoofVisionProxy } from "./api/roofVisionProxy";
 
 interface Env {
   DB: any;
   HD2D_CACHE: any;
   OPENAI_API_KEY?: string;
   SESSION_SECRET?: string;
+  /** Base URL of backend/ml-vision-service (FastAPI). */
+  ROOF_VISION_SERVICE_URL?: string;
+  ROOF_VISION_SERVICE_SECRET?: string;
 }
 
 export default {
@@ -24,7 +28,8 @@ export default {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-company-id",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Authorization, x-company-id",
     };
 
     // Handle preflight
@@ -62,6 +67,8 @@ export default {
         return handleRoofReportLanguageAi(request, env, corsHeaders);
       } else if (path === "/api/ai/roof-pitch") {
         return handleRoofPitchAi(request, env, corsHeaders);
+      } else if (path === "/api/ai/roof-vision") {
+        return handleRoofVisionProxy(request, env, corsHeaders);
       } else if (path.startsWith("/webhook/")) {
         return handleWebhooks(request, env, path, corsHeaders);
       } else if (path === "/" || path === "/api") {
@@ -76,7 +83,7 @@ export default {
           {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -85,19 +92,20 @@ export default {
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     } catch (error) {
       console.error("Request error:", error);
       return new Response(
         JSON.stringify({
           success: false,
-          error: error instanceof Error ? error.message : "Internal server error",
+          error:
+            error instanceof Error ? error.message : "Internal server error",
         }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
   },
@@ -109,124 +117,251 @@ export default {
 };
 
 // Placeholder handlers - route to respective API files
-async function handleAuth(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleAuth(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   if (path === "/api/auth/login" && request.method === "POST") {
-    const { email, password } = await request.json() as any;
-    
-    if (email === "test.company@hardcoredoortodoorclosers.com" && password === "TestCompany123!") {
+    const { email, password } = (await request.json()) as any;
+
+    if (
+      email === "test.company@hardcoredoortodoorclosers.com" &&
+      password === "TestCompany123!"
+    ) {
       return new Response(
         JSON.stringify({
           success: true,
           token: "test-company-token-" + Date.now(),
-          user: { id: "company-1", email, name: "Test Company", user_type: "company" },
+          user: {
+            id: "company-1",
+            email,
+            name: "Test Company",
+            user_type: "company",
+          },
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
-    } else if (email === "test.rep@hardcoredoortodoorclosers.com" && password === "TestRep123!") {
+    } else if (
+      email === "test.rep@hardcoredoortodoorclosers.com" &&
+      password === "TestRep123!"
+    ) {
       return new Response(
         JSON.stringify({
           success: true,
           token: "test-rep-token-" + Date.now(),
-          user: { id: "rep-1", email, name: "Test Rep", user_type: "sales_rep" },
+          user: {
+            id: "rep-1",
+            email,
+            name: "Test Rep",
+            user_type: "sales_rep",
+          },
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
-    } else if (email === "admin@hardcoredoortodoorclosers.com" && password === "AdminTest123!") {
+    } else if (
+      email === "admin@hardcoredoortodoorclosers.com" &&
+      password === "AdminTest123!"
+    ) {
       return new Response(
         JSON.stringify({
           success: true,
           token: "admin-token-" + Date.now(),
           user: { id: "admin-1", email, name: "Admin", user_type: "admin" },
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
-    
+
     return new Response(
       JSON.stringify({ success: false, error: "Invalid credentials" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
-  
+
   return new Response(
     JSON.stringify({ success: false, error: "Auth endpoint not implemented" }),
-    { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 501,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleLeads(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleLeads(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Leads endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleDeals(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleDeals(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Deals endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handlePosts(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handlePosts(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Posts endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleComments(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleComments(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Comments endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleEvents(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleEvents(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Events endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleTasks(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleTasks(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Tasks endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleCalls(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleCalls(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Calls endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleAgents(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleAgents(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Agents endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleWorkflows(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleWorkflows(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: [], message: "Workflows endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleAdmin(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleAdmin(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, data: {}, message: "Admin endpoint" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }
 
-async function handleWebhooks(request: Request, env: Env, path: string, corsHeaders: any): Promise<Response> {
+async function handleWebhooks(
+  request: Request,
+  env: Env,
+  path: string,
+  corsHeaders: any,
+): Promise<Response> {
   return new Response(
     JSON.stringify({ success: true, message: "Webhook received" }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }

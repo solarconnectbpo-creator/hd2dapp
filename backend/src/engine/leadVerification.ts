@@ -8,7 +8,11 @@ import { verifyPhone } from "../utils/phoneVerify";
 import { verifyEmail } from "../utils/emailVerify";
 import { getVendorScore } from "../utils/vendorScore";
 import { determineVerificationStatus } from "../utils/statusDeterminer";
-import type { LeadVerificationStatus, VerificationResult as VerificationResponse, LeadVerificationData } from "../types/verification";
+import type {
+  LeadVerificationStatus,
+  VerificationResult as VerificationResponse,
+  LeadVerificationData,
+} from "../types/verification";
 
 interface Lead {
   id: string;
@@ -43,7 +47,7 @@ interface VerificationResult {
 export async function verifyLead(
   env: Env,
   lead: Lead,
-  vendorId: string
+  vendorId: string,
 ): Promise<VerificationResult> {
   try {
     // Step 1: Phone validation
@@ -98,7 +102,7 @@ ${JSON.stringify(vendorScore)}`;
         recycledLead: false,
         spam: false,
         tcpaSafe: true,
-        justification: "Failed to analyze with AI"
+        justification: "Failed to analyze with AI",
       };
     }
 
@@ -106,27 +110,29 @@ ${JSON.stringify(vendorScore)}`;
       ...aiResult,
       phone: phoneCheck,
       email: emailCheck,
-      vendorScore
+      vendorScore,
     };
 
     // Save verification result to database
     await env.DB.prepare(
       `INSERT INTO lead_verification (id, lead_id, vendor_id, result_json, risk_score, quality_score, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      crypto.randomUUID(),
-      lead.id,
-      vendorId,
-      JSON.stringify(result),
-      result.riskScore || 50,
-      result.qualityScore || 50,
-      new Date().toISOString()
-    ).run();
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        lead.id,
+        vendorId,
+        JSON.stringify(result),
+        result.riskScore || 50,
+        result.qualityScore || 50,
+        new Date().toISOString(),
+      )
+      .run();
 
     // Update lead quality score
-    await env.DB.prepare(
-      "UPDATE leads SET quality_score = ? WHERE id = ?"
-    ).bind(result.qualityScore || 50, lead.id).run();
+    await env.DB.prepare("UPDATE leads SET quality_score = ? WHERE id = ?")
+      .bind(result.qualityScore || 50, lead.id)
+      .run();
 
     return result;
   } catch (error) {
@@ -142,7 +148,7 @@ ${JSON.stringify(vendorScore)}`;
       justification: "Verification failed",
       phone: { valid: false, reason: "error" },
       email: { valid: false, reason: "error" },
-      vendorScore: { score: 0, riskLevel: "high" }
+      vendorScore: { score: 0, riskLevel: "high" },
     };
   }
 }

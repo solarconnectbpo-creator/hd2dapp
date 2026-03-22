@@ -28,7 +28,12 @@ export const US_METAR_REFERENCE_STATIONS: MetarReferenceStation[] = [
   { icao: "KELP", name: "El Paso Intl", lat: 31.8073, lng: -106.3776 },
   { icao: "KDFW", name: "Dallas-Ft Worth", lat: 32.8974, lng: -97.022 },
   { icao: "KDAL", name: "Dallas Love Field", lat: 32.8471, lng: -96.8518 },
-  { icao: "KIAH", name: "Houston Intercontinental", lat: 29.9844, lng: -95.3414 },
+  {
+    icao: "KIAH",
+    name: "Houston Intercontinental",
+    lat: 29.9844,
+    lng: -95.3414,
+  },
   { icao: "KHOU", name: "Houston Hobby", lat: 29.6454, lng: -95.2789 },
   { icao: "KAUS", name: "Austin-Bergstrom", lat: 30.1945, lng: -97.6699 },
   { icao: "KSAT", name: "San Antonio Intl", lat: 29.5337, lng: -98.4698 },

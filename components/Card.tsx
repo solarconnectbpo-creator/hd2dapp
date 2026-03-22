@@ -44,7 +44,13 @@ const getBackgroundColorForElevation = (
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function Card({ children, elevation = 1, onPress, style, disabled }: CardProps) {
+export function Card({
+  children,
+  elevation = 1,
+  onPress,
+  style,
+  disabled,
+}: CardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 

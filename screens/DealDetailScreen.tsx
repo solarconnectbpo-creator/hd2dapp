@@ -1,10 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import {
-  StyleSheet,
-  View,
-  TextInput,
-  Alert,
-} from "react-native";
+import { StyleSheet, View, TextInput, Alert } from "react-native";
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -34,7 +29,7 @@ export default function DealDetailScreen({ route, navigation }: Props) {
   const loadDeal = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const data = await apiClient.getDeal(dealId) as Deal;
+      const data = (await apiClient.getDeal(dealId)) as Deal;
       setDeal(data);
       setNotes(data.notes || "");
       setValue(String(data.value ?? ""));

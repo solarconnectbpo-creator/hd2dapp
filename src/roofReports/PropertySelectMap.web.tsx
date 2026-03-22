@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet, Text, Platform, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Text,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
 
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -35,7 +41,11 @@ const OSM_FALLBACK_STYLE = {
 } as any;
 
 /** ~20 m in degrees (lat/lng rough threshold) — merge CSV lead onto map click when close. */
-function findNearbyLead(lat: number, lng: number, leads: PropertySelection[] | undefined): PropertySelection | null {
+function findNearbyLead(
+  lat: number,
+  lng: number,
+  leads: PropertySelection[] | undefined,
+): PropertySelection | null {
   if (!leads?.length) return null;
   const thresh = 0.00018;
   for (const l of leads) {
@@ -59,7 +69,9 @@ export default function PropertySelectMap({
   const onPropertySelectedRef = useRef(onPropertySelected);
   const focusRequestRef = useRef(focusRequest);
 
-  const [status, setStatus] = useState<string>("Click on a property on the map");
+  const [status, setStatus] = useState<string>(
+    "Click on a property on the map",
+  );
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   onPropertySelectedRef.current = onPropertySelected;
@@ -97,7 +109,9 @@ export default function PropertySelectMap({
         try {
           map = new mapboxgl.Map({
             container: containerEl as HTMLDivElement,
-            style: hasMapboxToken ? "mapbox://styles/mapbox/satellite-streets-v11" : OSM_FALLBACK_STYLE,
+            style: hasMapboxToken
+              ? "mapbox://styles/mapbox/satellite-streets-v11"
+              : OSM_FALLBACK_STYLE,
             center: DEFAULT_CENTER,
             zoom: 10,
           });
@@ -116,15 +130,21 @@ export default function PropertySelectMap({
         map.on("load", () => {
           if (hasMapboxToken) {
             addMicrosoftBuildingFootprintsToMap(map);
-            setStatus("Click on a property on the map (cyan = Microsoft building footprints)");
+            setStatus(
+              "Click on a property on the map (cyan = Microsoft building footprints)",
+            );
           } else {
-            setStatus("Mapbox token missing — using OpenStreetMap fallback. Click a property to select it.");
+            setStatus(
+              "Mapbox token missing — using OpenStreetMap fallback. Click a property to select it.",
+            );
           }
         });
 
         map.on("error", (e) => {
           console.error("Mapbox error:", e);
-          setStatus("Mapbox failed to load. Check token/network in browser console.");
+          setStatus(
+            "Mapbox failed to load. Check token/network in browser console.",
+          );
         });
 
         let requestSeq = 0;
@@ -145,13 +165,16 @@ export default function PropertySelectMap({
             if (seq !== requestSeq) return;
 
             const fallbackAddress = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            const addressLine = rawAddress.trim() ? rawAddress.trim() : fallbackAddress;
+            const addressLine = rawAddress.trim()
+              ? rawAddress.trim()
+              : fallbackAddress;
 
             const leadMatch = findNearbyLead(lat, lng, leadsRef.current);
             const property: PropertySelection = leadMatch
               ? {
                   ...leadMatch,
-                  address: addressLine || leadMatch.address?.trim() || fallbackAddress,
+                  address:
+                    addressLine || leadMatch.address?.trim() || fallbackAddress,
                   lat,
                   lng,
                   clickedAtIso: new Date().toISOString(),
@@ -224,7 +247,9 @@ export default function PropertySelectMap({
         markerRef.current = new mapboxgl.Marker({ color: "#fbbf24" })
           .setLngLat([lng, lat])
           .addTo(map);
-        setStatus("Location from search — tap map to refine or pick a lead marker.");
+        setStatus(
+          "Location from search — tap map to refine or pick a lead marker.",
+        );
       } catch {
         // ignore
       }
@@ -264,7 +289,10 @@ export default function PropertySelectMap({
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
         // Pass full lead (contact, roof_sqft, roof_type) — same shape as CSV import.
-        const selected: PropertySelection = { ...lead, clickedAtIso: new Date().toISOString() };
+        const selected: PropertySelection = {
+          ...lead,
+          clickedAtIso: new Date().toISOString(),
+        };
 
         setStatus(`Selected: ${lead.address}`);
         onPropertySelectedRef.current(selected);

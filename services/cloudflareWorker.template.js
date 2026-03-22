@@ -4,14 +4,14 @@
 export default {
   async fetch(request, env) {
     // Only accept POST requests
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
+    if (request.method !== "POST") {
+      return new Response("Method not allowed", { status: 405 });
     }
 
     // Verify webhook signature
-    const signature = request.headers.get('X-Webhook-Signature');
+    const signature = request.headers.get("X-Webhook-Signature");
     if (!signature) {
-      return new Response('Missing signature', { status: 401 });
+      return new Response("Missing signature", { status: 401 });
     }
 
     try {
@@ -24,7 +24,7 @@ export default {
           payload.callId,
           payload.fromNumber,
           payload.toNumber,
-          payload.transcript || '',
+          payload.transcript || "",
         ],
         doubles: [payload.duration || 0],
       });
@@ -37,18 +37,18 @@ export default {
           ...payload,
           processedAt: new Date().toISOString(),
         }),
-        { expirationTtl: 86400 * 30 } // 30 days
+        { expirationTtl: 86400 * 30 }, // 30 days
       );
 
       // Process based on call type
       switch (payload.type) {
-        case 'incoming':
+        case "incoming":
           await handleIncomingCall(payload, env);
           break;
-        case 'connected':
+        case "connected":
           await handleConnectedCall(payload, env);
           break;
-        case 'ended':
+        case "ended":
           await handleEndedCall(payload, env);
           break;
       }
@@ -61,11 +61,11 @@ export default {
         }),
         {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
+          headers: { "Content-Type": "application/json" },
+        },
       );
     } catch (error) {
-      console.error('Webhook error:', error);
+      console.error("Webhook error:", error);
       return new Response(
         JSON.stringify({
           success: false,
@@ -73,8 +73,8 @@ export default {
         }),
         {
           status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        }
+          headers: { "Content-Type": "application/json" },
+        },
       );
     }
   },
@@ -82,18 +82,18 @@ export default {
 
 async function handleIncomingCall(payload, env) {
   // Called when inbound call arrives
-  console.log('Incoming call:', payload.fromNumber, '→', payload.toNumber);
+  console.log("Incoming call:", payload.fromNumber, "→", payload.toNumber);
   // Add custom logic: notify team, route to correct agent, etc.
 }
 
 async function handleConnectedCall(payload, env) {
   // Called when call connects to agent
-  console.log('Connected call:', payload.callId);
+  console.log("Connected call:", payload.callId);
   // Add custom logic: start recording, track agent availability, etc.
 }
 
 async function handleEndedCall(payload, env) {
   // Called when call ends
-  console.log('Ended call:', payload.callId, 'Duration:', payload.duration);
+  console.log("Ended call:", payload.callId, "Duration:", payload.duration);
   // Add custom logic: save transcript, update metrics, trigger follow-up, etc.
 }

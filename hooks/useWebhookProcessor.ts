@@ -41,14 +41,15 @@ export const useWebhookProcessor = (webhookUrl: string) => {
 
         return true;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         setLastError(message);
         return false;
       } finally {
         setIsProcessing(false);
       }
     },
-    [webhookUrl]
+    [webhookUrl],
   );
 
   const generateSignature = (payload: WebhookPayload): string => {

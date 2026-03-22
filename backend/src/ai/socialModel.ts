@@ -18,7 +18,10 @@ interface Env {
   [key: string]: any;
 }
 
-export async function analyzePostContent(env: Env, content: string): Promise<PostAnalysis> {
+export async function analyzePostContent(
+  env: Env,
+  content: string,
+): Promise<PostAnalysis> {
   const prompt = `
 You are an AI social media strategist for a sales-based professional community.
 
@@ -40,10 +43,21 @@ Return ONLY valid JSON, no markdown formatting.`;
 
     return {
       score: Math.min(Math.max(parsed.score || 50, 0), 100),
-      hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.slice(0, 5) : [],
-      sentiment: (parsed.sentiment || "neutral") as "positive" | "neutral" | "negative",
-      category: (parsed.category || "other") as "advice" | "win" | "question" | "story" | "motivation" | "other",
-      notes: parsed.notes || ""
+      hashtags: Array.isArray(parsed.hashtags)
+        ? parsed.hashtags.slice(0, 5)
+        : [],
+      sentiment: (parsed.sentiment || "neutral") as
+        | "positive"
+        | "neutral"
+        | "negative",
+      category: (parsed.category || "other") as
+        | "advice"
+        | "win"
+        | "question"
+        | "story"
+        | "motivation"
+        | "other",
+      notes: parsed.notes || "",
     };
   } catch (error) {
     console.error("Post analysis error:", error);
@@ -52,7 +66,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       hashtags: [],
       sentiment: "neutral",
       category: "other",
-      notes: ""
+      notes: "",
     };
   }
 }

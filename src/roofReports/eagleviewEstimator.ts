@@ -16,15 +16,23 @@ const MICHIGAN_PRICING = {
     premium: { pricePerSquare: 175.99 },
   },
   underlayment: {
-    synthetic: { pricePerRoll: QUICK_PRICE_ROOF.underlaymentSyntheticPricePerRoll }, // covers 1000 sq ft
+    synthetic: {
+      pricePerRoll: QUICK_PRICE_ROOF.underlaymentSyntheticPricePerRoll,
+    }, // covers 1000 sq ft
     felt: { pricePerRoll: 39.99 }, // covers 200 sq ft
   },
   iceAndWater: {
-    standard: { pricePerRoll: QUICK_PRICE_ROOF.iceAndWaterStandardPricePerRoll }, // 62 linear feet per roll
+    standard: {
+      pricePerRoll: QUICK_PRICE_ROOF.iceAndWaterStandardPricePerRoll,
+    }, // 62 linear feet per roll
   },
   ridgeVent: { standard: { pricePerPiece: 45.99 } }, // 20 lf per piece
   ridgeCap: { standard: { pricePerBundle: 45.99 } }, // bundles for 20 lf * 3
-  starterStrip: { standard: { pricePerBundle: QUICK_PRICE_ROOF.starterStripStandardPricePerBundle } }, // 100 lf per bundle
+  starterStrip: {
+    standard: {
+      pricePerBundle: QUICK_PRICE_ROOF.starterStripStandardPricePerBundle,
+    },
+  }, // 100 lf per bundle
   nails: { standard: { pricePerPound: 3.99 } }, // pounds per square * 1.5
   labor: {
     baseRate: 65.0,
@@ -62,8 +70,10 @@ function clamp(n: number, min: number, max: number) {
 
 function extractMainPolygon(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
   if (!geo) return null;
-  if (geo?.type === "Feature" && geo?.geometry?.type === "Polygon") return geo as GeoJSON.Feature<GeoJSON.Polygon>;
-  if (geo?.type === "Polygon") return { type: "Feature", properties: {}, geometry: geo };
+  if (geo?.type === "Feature" && geo?.geometry?.type === "Polygon")
+    return geo as GeoJSON.Feature<GeoJSON.Polygon>;
+  if (geo?.type === "Polygon")
+    return { type: "Feature", properties: {}, geometry: geo };
   if (geo?.type === "Feature" && geo?.geometry?.type === "MultiPolygon") {
     const mp = geo.geometry.coordinates as GeoJSON.Position[][][];
     let best: GeoJSON.Position[][] | null = null;
@@ -81,7 +91,11 @@ function extractMainPolygon(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
       }
     }
     if (!best) return null;
-    return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: best } };
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Polygon", coordinates: best },
+    };
   }
   if (geo?.type === "MultiPolygon") {
     const mp = geo.coordinates as GeoJSON.Position[][][];
@@ -100,7 +114,11 @@ function extractMainPolygon(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
       }
     }
     if (!best) return null;
-    return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: best } };
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Polygon", coordinates: best },
+    };
   }
   return null;
 }
@@ -122,35 +140,55 @@ function parsePitchRise(pitch?: string): number | undefined {
   if (!m) return undefined;
   const rise = Number(m[1]);
   const run = Number(m[2]);
-  if (!Number.isFinite(rise) || !Number.isFinite(run) || run <= 0) return undefined;
+  if (!Number.isFinite(rise) || !Number.isFinite(run) || run <= 0)
+    return undefined;
   return rise / run; // rise per foot of run
 }
 
-function toNearestTwelveRun(pitch?: string): keyof typeof MICHIGAN_PRICING.labor.factors.pitch | undefined {
+function toNearestTwelveRun(
+  pitch?: string,
+): keyof typeof MICHIGAN_PRICING.labor.factors.pitch | undefined {
   const risePerFoot = parsePitchRise(pitch);
   if (typeof risePerFoot !== "number") return undefined;
   const riseOn12 = risePerFoot * 12;
-  const candidates: Array<keyof typeof MICHIGAN_PRICING.labor.factors.pitch> = ["4:12", "6:12", "8:12", "10:12", "12:12"];
+  const candidates: Array<keyof typeof MICHIGAN_PRICING.labor.factors.pitch> = [
+    "4:12",
+    "6:12",
+    "8:12",
+    "10:12",
+    "12:12",
+  ];
   const targetRise = candidates.map((c) => Number(c.split(":")[0]));
-  const closestIdx = targetRise.reduce((bestIdx, r, idx) => (Math.abs(r - riseOn12) < Math.abs(targetRise[bestIdx] - riseOn12) ? idx : bestIdx), 0);
+  const closestIdx = targetRise.reduce(
+    (bestIdx, r, idx) =>
+      Math.abs(r - riseOn12) < Math.abs(targetRise[bestIdx] - riseOn12)
+        ? idx
+        : bestIdx,
+    0,
+  );
   return candidates[closestIdx];
 }
 
 function complexityFactorFromFacets(facets?: number): number {
-  if (!facets || !Number.isFinite(facets)) return MICHIGAN_PRICING.labor.factors.complexity.simple;
+  if (!facets || !Number.isFinite(facets))
+    return MICHIGAN_PRICING.labor.factors.complexity.simple;
   if (facets <= 8) return MICHIGAN_PRICING.labor.factors.complexity.simple;
   if (facets <= 15) return MICHIGAN_PRICING.labor.factors.complexity.moderate;
   return MICHIGAN_PRICING.labor.factors.complexity.complex;
 }
 
 function storiesFactor(stories?: number): number {
-  if (!stories || !Number.isFinite(stories) || stories < 1) return MICHIGAN_PRICING.labor.factors.stories["1"];
+  if (!stories || !Number.isFinite(stories) || stories < 1)
+    return MICHIGAN_PRICING.labor.factors.stories["1"];
   if (stories === 1) return MICHIGAN_PRICING.labor.factors.stories["1"];
   if (stories === 2) return MICHIGAN_PRICING.labor.factors.stories["2"];
   return MICHIGAN_PRICING.labor.factors.stories[">2"];
 }
 
-function wasteFactorPercentFromFacetsAndPitch(facets?: number, pitchKey?: string): number {
+function wasteFactorPercentFromFacetsAndPitch(
+  facets?: number,
+  pitchKey?: string,
+): number {
   // In the upstream repo this comes from "wasteCalculation.suggested" derived from complexity + pitch.
   // We approximate:
   // - simple gable-like outlines: 10%
@@ -180,7 +218,10 @@ export function calculateEagleViewLikeEstimate(opts: {
   const squares = area / 100;
   const facets = estimateFacetsFromTrace(opts.roofTraceGeoJson);
   const pitchKey = toNearestTwelveRun(opts.predominantPitch);
-  const wasteFactorPercent = wasteFactorPercentFromFacetsAndPitch(facets, pitchKey);
+  const wasteFactorPercent = wasteFactorPercentFromFacetsAndPitch(
+    facets,
+    pitchKey,
+  );
   const totalSquares = squares * (1 + wasteFactorPercent / 100);
 
   // Approximate eaves/ridges/hips lengths from perimeter.
@@ -191,7 +232,8 @@ export function calculateEagleViewLikeEstimate(opts: {
   const totalRidgesHipsFt = perimeterFt > 0 ? perimeterFt / 4 : undefined;
 
   const shingleGrade: MaterialGrade = opts.shingleGrade ?? "architectural";
-  const underlaymentType: UnderlaymentType = opts.underlaymentType ?? "synthetic";
+  const underlaymentType: UnderlaymentType =
+    opts.underlaymentType ?? "synthetic";
   const includePermit = opts.includePermit ?? false;
   const includeDumpster = opts.includeDumpster ?? false;
   const numberOfStories = opts.numberOfStories ?? 1;
@@ -203,40 +245,56 @@ export function calculateEagleViewLikeEstimate(opts: {
   const materials = {
     shingles: {
       quantity: totalSquares,
-      cost: totalSquares * MICHIGAN_PRICING.shingles[shingleGrade].pricePerSquare,
+      cost:
+        totalSquares * MICHIGAN_PRICING.shingles[shingleGrade].pricePerSquare,
     },
     underlayment: {
-      quantity: Math.ceil((totalSquares * 100) / (underlaymentType === "synthetic" ? 1000 : 200)),
+      quantity: Math.ceil(
+        (totalSquares * 100) / (underlaymentType === "synthetic" ? 1000 : 200),
+      ),
       cost:
-        Math.ceil((totalSquares * 100) / (underlaymentType === "synthetic" ? 1000 : 200)) *
-        MICHIGAN_PRICING.underlayment[underlaymentType].pricePerRoll,
+        Math.ceil(
+          (totalSquares * 100) /
+            (underlaymentType === "synthetic" ? 1000 : 200),
+        ) * MICHIGAN_PRICING.underlayment[underlaymentType].pricePerRoll,
     },
     iceAndWater: {
       quantity: totalEavesFt ? Math.ceil(totalEavesFt / 62) : 0,
-      cost: totalEavesFt ? Math.ceil(totalEavesFt / 62) * MICHIGAN_PRICING.iceAndWater.standard.pricePerRoll : 0,
+      cost: totalEavesFt
+        ? Math.ceil(totalEavesFt / 62) *
+          MICHIGAN_PRICING.iceAndWater.standard.pricePerRoll
+        : 0,
     },
     ridgeVent: {
       quantity: totalRidgesHipsFt ? Math.ceil(totalRidgesHipsFt / 20) : 0,
       cost: totalRidgesHipsFt
-        ? Math.ceil(totalRidgesHipsFt / 20) * MICHIGAN_PRICING.ridgeVent.standard.pricePerPiece
+        ? Math.ceil(totalRidgesHipsFt / 20) *
+          MICHIGAN_PRICING.ridgeVent.standard.pricePerPiece
         : 0,
     },
     ridgeCap: {
       quantity: totalRidgesHipsFt ? Math.ceil((totalRidgesHipsFt / 20) * 3) : 0,
       cost: totalRidgesHipsFt
-        ? Math.ceil((totalRidgesHipsFt / 20) * 3) * MICHIGAN_PRICING.ridgeCap.standard.pricePerBundle
+        ? Math.ceil((totalRidgesHipsFt / 20) * 3) *
+          MICHIGAN_PRICING.ridgeCap.standard.pricePerBundle
         : 0,
     },
     starterStrip: {
-      quantity: totalEavesFt && totalRakesFt ? Math.ceil((totalEavesFt + totalRakesFt) / 100) : 0,
+      quantity:
+        totalEavesFt && totalRakesFt
+          ? Math.ceil((totalEavesFt + totalRakesFt) / 100)
+          : 0,
       cost:
         totalEavesFt && totalRakesFt
-          ? Math.ceil((totalEavesFt + totalRakesFt) / 100) * MICHIGAN_PRICING.starterStrip.standard.pricePerBundle
+          ? Math.ceil((totalEavesFt + totalRakesFt) / 100) *
+            MICHIGAN_PRICING.starterStrip.standard.pricePerBundle
           : 0,
     },
     nails: {
       quantity: Math.ceil(totalSquares * 1.5),
-      cost: Math.ceil(totalSquares * 1.5) * MICHIGAN_PRICING.nails.standard.pricePerPound,
+      cost:
+        Math.ceil(totalSquares * 1.5) *
+        MICHIGAN_PRICING.nails.standard.pricePerPound,
     },
     total: 0,
   };
@@ -245,14 +303,19 @@ export function calculateEagleViewLikeEstimate(opts: {
     .filter(([k]) => k !== "total")
     .reduce((sum, [, item]) => sum + (item as any).cost, 0);
 
-  const pitchFactor = pitchKey ? MICHIGAN_PRICING.labor.factors.pitch[pitchKey] : 1.0;
+  const pitchFactor = pitchKey
+    ? MICHIGAN_PRICING.labor.factors.pitch[pitchKey]
+    : 1.0;
   const complexityFactor = complexityFactorFromFacets(facets);
   const storiesFactorValue = storiesFactor(numberOfStories);
 
   const labor = {
     base: MICHIGAN_PRICING.labor.baseRate * squares,
     adjustedRate:
-      MICHIGAN_PRICING.labor.baseRate * pitchFactor * complexityFactor * storiesFactorValue,
+      MICHIGAN_PRICING.labor.baseRate *
+      pitchFactor *
+      complexityFactor *
+      storiesFactorValue,
     total: 0,
   };
   labor.total = labor.adjustedRate * squares;
@@ -260,12 +323,17 @@ export function calculateEagleViewLikeEstimate(opts: {
   const additional: EagleViewEstimateBreakdown["additional"] = {
     overhead: 0,
     profit: 0,
-    ...(includeDumpster ? { dumpster: MICHIGAN_PRICING.additional.dumpsterFee } : {}),
+    ...(includeDumpster
+      ? { dumpster: MICHIGAN_PRICING.additional.dumpsterFee }
+      : {}),
     ...(includePermit ? { permit: MICHIGAN_PRICING.additional.permitFee } : {}),
   };
 
   const subtotal =
-    materials.total + labor.total + (additional.dumpster || 0) + (additional.permit || 0);
+    materials.total +
+    labor.total +
+    (additional.dumpster || 0) +
+    (additional.permit || 0);
   additional.overhead = subtotal * MICHIGAN_PRICING.additional.overhead;
   additional.profit = subtotal * MICHIGAN_PRICING.additional.profit;
 
@@ -283,4 +351,3 @@ export function calculateEagleViewLikeEstimate(opts: {
     totals,
   };
 }
-

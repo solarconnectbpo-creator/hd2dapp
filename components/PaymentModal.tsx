@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Modal, Pressable, Alert, ActivityIndicator, TextInput, Platform } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Modal,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  Platform,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
@@ -43,8 +52,8 @@ export function PaymentModal({
 
     try {
       // Simulate payment processing with a delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       const transactionId = `txn_${Date.now()}`;
       Alert.alert("Success", "Payment processed successfully!");
       onSuccess(transactionId);
@@ -69,17 +78,30 @@ export function PaymentModal({
           </Pressable>
         </View>
 
-        <View style={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}>
+        <View
+          style={[
+            styles.content,
+            { paddingBottom: insets.bottom + Spacing.xl },
+          ]}
+        >
           <Card elevation={1} style={styles.summaryCard}>
             <ThemedText type="h4" style={styles.itemName}>
               {itemName}
             </ThemedText>
-            <ThemedText style={{ color: theme.textSecondary, fontSize: 13, marginTop: Spacing.sm }}>
+            <ThemedText
+              style={{
+                color: theme.textSecondary,
+                fontSize: 13,
+                marginTop: Spacing.sm,
+              }}
+            >
               {description}
             </ThemedText>
             <View style={styles.divider} />
             <View style={styles.amountRow}>
-              <ThemedText style={{ color: theme.textSecondary }}>Total Amount</ThemedText>
+              <ThemedText style={{ color: theme.textSecondary }}>
+                Total Amount
+              </ThemedText>
               <ThemedText type="h2" style={{ color: AppColors.primary }}>
                 ${formattedAmount} {currency.toUpperCase()}
               </ThemedText>
@@ -88,13 +110,27 @@ export function PaymentModal({
 
           <View style={styles.infoBox}>
             <Feather name="info" size={16} color="#3B82F6" />
-            <ThemedText style={{ color: "#3B82F6", fontSize: 12, marginLeft: Spacing.sm, flex: 1 }}>
+            <ThemedText
+              style={{
+                color: "#3B82F6",
+                fontSize: 12,
+                marginLeft: Spacing.sm,
+                flex: 1,
+              }}
+            >
               Test Mode: Use card 4242 4242 4242 4242, any future date & CVC
             </ThemedText>
           </View>
 
           <TextInput
-            style={[styles.cardInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}
+            style={[
+              styles.cardInput,
+              {
+                color: theme.text,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundDefault,
+              },
+            ]}
             placeholder="Card Number (4242 4242 4242 4242)"
             placeholderTextColor={theme.textSecondary}
             value={cardNumber}
@@ -118,8 +154,14 @@ export function PaymentModal({
             )}
           </Button>
 
-          <Pressable onPress={onClose} disabled={isProcessing} style={styles.cancelButton}>
-            <ThemedText style={{ color: theme.textSecondary }}>Cancel</ThemedText>
+          <Pressable
+            onPress={onClose}
+            disabled={isProcessing}
+            style={styles.cancelButton}
+          >
+            <ThemedText style={{ color: theme.textSecondary }}>
+              Cancel
+            </ThemedText>
           </Pressable>
         </View>
       </ThemedView>

@@ -1,9 +1,13 @@
 import * as turf from "@turf/turf";
 
-export function extractLargestPolygonFromTrace(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
+export function extractLargestPolygonFromTrace(
+  geo: any,
+): GeoJSON.Feature<GeoJSON.Polygon> | null {
   if (!geo) return null;
-  if (geo?.type === "Feature" && geo?.geometry?.type === "Polygon") return geo as GeoJSON.Feature<GeoJSON.Polygon>;
-  if (geo?.type === "Polygon") return { type: "Feature", properties: {}, geometry: geo };
+  if (geo?.type === "Feature" && geo?.geometry?.type === "Polygon")
+    return geo as GeoJSON.Feature<GeoJSON.Polygon>;
+  if (geo?.type === "Polygon")
+    return { type: "Feature", properties: {}, geometry: geo };
   if (geo?.type === "Feature" && geo?.geometry?.type === "MultiPolygon") {
     const mp = geo.geometry.coordinates as GeoJSON.Position[][][];
     let best: GeoJSON.Position[][] | null = null;
@@ -21,7 +25,11 @@ export function extractLargestPolygonFromTrace(geo: any): GeoJSON.Feature<GeoJSO
       }
     }
     if (!best) return null;
-    return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: best } };
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Polygon", coordinates: best },
+    };
   }
   return null;
 }
@@ -56,21 +64,43 @@ export type RoofPolygonEdgeMetric = {
   ridgeAlignment: number;
 };
 
-export function parsePitchRiseRun(pitch?: string): { rise: number; run: number } | undefined {
+/**
+ * Parse pitch as rise/run (any positive run), or degrees (e.g. `26.5°`), for geometry math.
+ * Use `parseRoofPitchRise` in roofLogicEngine for “rise on 12” comparisons.
+ */
+export function parsePitchRiseRun(
+  pitch?: string,
+): { rise: number; run: number } | undefined {
   if (!pitch?.trim()) return undefined;
-  const m = pitch.trim().match(/(\d{1,3}(?:\.\d+)?)\s*[/:]\s*(\d{1,3}(?:\.\d+)?)/);
-  if (!m) return undefined;
-  const rise = Number(m[1]);
-  const run = Number(m[2]);
-  if (!Number.isFinite(rise) || !Number.isFinite(run) || run <= 0) return undefined;
-  return { rise, run };
+  const s = pitch.trim();
+  const m = s.match(/(\d{1,3}(?:\.\d+)?)\s*[/:]\s*(\d{1,3}(?:\.\d+)?)/);
+  if (m) {
+    const rise = Number(m[1]);
+    const run = Number(m[2]);
+    if (!Number.isFinite(rise) || !Number.isFinite(run) || run <= 0)
+      return undefined;
+    return { rise, run };
+  }
+  const degM = s.match(/(\d{1,3}(?:\.\d+)?)\s*(?:°|deg)/i);
+  if (degM) {
+    const deg = Number(degM[1]);
+    if (!Number.isFinite(deg) || deg < 0 || deg >= 90) return undefined;
+    const rise = Math.tan((deg * Math.PI) / 180) * 12;
+    return { rise, run: 12 };
+  }
+  return undefined;
 }
 
 function metersPerDegLon(latDeg: number): number {
   return 111_320 * Math.cos((latDeg * Math.PI) / 180);
 }
 
-function toLocalEnuMeters(lon: number, lat: number, originLon: number, originLat: number): { x: number; y: number } {
+function toLocalEnuMeters(
+  lon: number,
+  lat: number,
+  originLon: number,
+  originLat: number,
+): { x: number; y: number } {
   return {
     x: (lon - originLon) * metersPerDegLon(originLat),
     y: (lat - originLat) * 111_320,
@@ -89,7 +119,9 @@ function ridgeUnitFromRing(
 ): { ux: number; uy: number } | null {
   if (openRingLonLat.length < 3) return null;
 
-  const pts = openRingLonLat.map((p) => toLocalEnuMeters(p[0], p[1], originLon, originLat));
+  const pts = openRingLonLat.map((p) =>
+    toLocalEnuMeters(p[0], p[1], originLon, originLat),
+  );
   let mx = 0;
   let my = 0;
   for (const p of pts) {
@@ -146,7 +178,12 @@ function hipSlopeAngleRadFromMainPitch(rise: number, run: number): number {
   return Math.atan(tanHip);
 }
 
-function slopeLfForKind(kind: RoofEdgeKind, planFeet: number, rise: number, run: number): number {
+function slopeLfForKind(
+  kind: RoofEdgeKind,
+  planFeet: number,
+  rise: number,
+  run: number,
+): number {
   const theta = mainPitchAngleRad(rise, run);
   const sec = 1 / Math.cos(theta);
   switch (kind) {
@@ -203,7 +240,9 @@ export function computeRoofPolygonEdgeMetrics(
   cLat /= pts.length;
 
   const ridge = ridgeUnitFromRing(pts, cLon, cLat);
-  const ridgeAxisHeadingDeg = ridge ? ridgeAxisHeadingDegFromUnit(ridge.ux, ridge.uy) : undefined;
+  const ridgeAxisHeadingDeg = ridge
+    ? ridgeAxisHeadingDegFromUnit(ridge.ux, ridge.uy)
+    : undefined;
 
   const pr = parsePitchRiseRun(pitch);
 

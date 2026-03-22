@@ -121,7 +121,9 @@ export function AIAgentsProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <AIAgentsContext.Provider value={value}>{children}</AIAgentsContext.Provider>
+    <AIAgentsContext.Provider value={value}>
+      {children}
+    </AIAgentsContext.Provider>
   );
 }
 

@@ -46,7 +46,8 @@ function parseEnvNumber(value: unknown, fallback: number): number {
 }
 
 function parseEnvInt(value: unknown, fallback: number): number {
-  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "number" && Number.isFinite(value))
+    return Math.trunc(value);
   if (typeof value === "string") {
     const n = Number.parseInt(value, 10);
     if (Number.isFinite(n)) return n;
@@ -63,7 +64,11 @@ function normalizeImageDataUrl(imageData: string): string {
   return `data:image/jpeg;base64,${imageData}`;
 }
 
-async function postOpenAIJson<T>(url: string, body: unknown, apiKey: string): Promise<T> {
+async function postOpenAIJson<T>(
+  url: string,
+  body: unknown,
+  apiKey: string,
+): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -74,7 +79,8 @@ async function postOpenAIJson<T>(url: string, body: unknown, apiKey: string): Pr
   });
   const data = (await res.json()) as T & OpenAIApiErrorBody;
   if (!res.ok) {
-    const msg = data?.error?.message?.trim() || `OpenAI request failed (${res.status})`;
+    const msg =
+      data?.error?.message?.trim() || `OpenAI request failed (${res.status})`;
     throw new Error(msg);
   }
   return data;
@@ -95,16 +101,22 @@ class OpenAIService {
 
   constructor() {
     const extra = getExpoExtra();
-    this.apiKey = extra?.openaiApiKey ?? process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? "";
+    this.apiKey =
+      extra?.openaiApiKey ?? process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? "";
     this.model = extra?.model ?? process.env.EXPO_PUBLIC_MODEL ?? "gpt-4";
     this.temperature = parseEnvNumber(
       extra?.temperature ?? process.env.EXPO_PUBLIC_TEMPERATURE,
       0.7,
     );
-    this.maxTokens = parseEnvInt(extra?.maxTokens ?? process.env.EXPO_PUBLIC_MAX_TOKENS, 2000);
+    this.maxTokens = parseEnvInt(
+      extra?.maxTokens ?? process.env.EXPO_PUBLIC_MAX_TOKENS,
+      2000,
+    );
 
     if (!this.apiKey) {
-      console.error("OpenAI API key not found. Please set EXPO_PUBLIC_OPENAI_API_KEY in .env");
+      console.error(
+        "OpenAI API key not found. Please set EXPO_PUBLIC_OPENAI_API_KEY in .env",
+      );
     }
   }
 
@@ -187,7 +199,10 @@ class OpenAIService {
   /**
    * Analyze roof image and generate report (uses vision-capable message payload).
    */
-  async analyzeRoofImage(imageData: string, context?: string): Promise<OpenAIResponse> {
+  async analyzeRoofImage(
+    imageData: string,
+    context?: string,
+  ): Promise<OpenAIResponse> {
     const systemPrompt = `You are an expert roof inspector AI. Analyze the provided roof image and generate a comprehensive report including:
     1. Overall roof condition assessment (Good/Fair/Poor)
     2. Type of roof material identified
@@ -261,7 +276,10 @@ class OpenAIService {
     }
   }
 
-  async generateRepairPlan(roofCondition: string, issues: string[]): Promise<OpenAIResponse> {
+  async generateRepairPlan(
+    roofCondition: string,
+    issues: string[],
+  ): Promise<OpenAIResponse> {
     const systemPrompt = `You are an expert roof repair specialist. Generate a detailed repair plan based on the roof assessment. Include:
     1. Priority ranking of repairs
     2. Estimated costs (general range)
@@ -276,7 +294,10 @@ class OpenAIService {
     return this.chat(userMessage, systemPrompt);
   }
 
-  async generateMaintenanceSchedule(roofAge: number, roofType: string): Promise<OpenAIResponse> {
+  async generateMaintenanceSchedule(
+    roofAge: number,
+    roofType: string,
+  ): Promise<OpenAIResponse> {
     const systemPrompt = `You are a roof maintenance expert. Create a comprehensive maintenance schedule. Include:
     1. Monthly tasks
     2. Seasonal tasks

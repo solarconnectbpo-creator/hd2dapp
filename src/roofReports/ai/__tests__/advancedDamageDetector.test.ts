@@ -41,7 +41,11 @@ describe("Advanced Damage Detector", () => {
 
     it("should generate recommendations based on severity", () => {
       const result = assessDamageAdvanced(
-        { damageTypes: ["hail", "wind"], severity: 5, notes: "Major storm damage" },
+        {
+          damageTypes: ["hail", "wind"],
+          severity: 5,
+          notes: "Major storm damage",
+        },
         { roofAge: 5, roofType: "shingle" },
       );
       expect(result.recommendations.length).toBeGreaterThan(0);

@@ -57,38 +57,37 @@ export function useRoofReportGeneration() {
   /**
    * Writes the report as a text file: browser download on web, share sheet on native.
    */
-  const exportReportFile = useCallback(async (): Promise<
-    ShareTextFileResult | null
-  > => {
-    if (!report) {
-      setError("No report to export");
-      return null;
-    }
+  const exportReportFile =
+    useCallback(async (): Promise<ShareTextFileResult | null> => {
+      if (!report) {
+        setError("No report to export");
+        return null;
+      }
 
-    setError(null);
-    try {
-      const text = await agent.exportReportPDF(report);
-      const filename = `roof-inspection-${safeFilenamePart(report.id)}.txt`;
-      if (Platform.OS === "web") {
-        const { downloadTextFileWebSync } =
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require("../utils/shareTextFile.web") as typeof import("../utils/shareTextFile.web");
-        const result = downloadTextFileWebSync(filename, text);
-        if (!result.ok) setError(result.error);
+      setError(null);
+      try {
+        const text = await agent.exportReportPDF(report);
+        const filename = `roof-inspection-${safeFilenamePart(report.id)}.txt`;
+        if (Platform.OS === "web") {
+          const { downloadTextFileWebSync } =
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            require("../utils/shareTextFile.web") as typeof import("../utils/shareTextFile.web");
+          const result = downloadTextFileWebSync(filename, text);
+          if (!result.ok) setError(result.error);
+          return result;
+        }
+        const result = await shareTextFile(filename, text);
+        if (!result.ok) {
+          setError(result.error);
+        }
         return result;
+      } catch (err) {
+        const errorMsg =
+          err instanceof Error ? err.message : "Failed to export report";
+        setError(errorMsg);
+        return { ok: false, error: errorMsg };
       }
-      const result = await shareTextFile(filename, text);
-      if (!result.ok) {
-        setError(result.error);
-      }
-      return result;
-    } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to export report";
-      setError(errorMsg);
-      return { ok: false, error: errorMsg };
-    }
-  }, [agent, report]);
+    }, [agent, report]);
 
   const clearReport = useCallback(() => {
     setReport(null);

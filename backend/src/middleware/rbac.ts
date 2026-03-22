@@ -11,7 +11,7 @@ interface Env {
 export async function requirePermission(
   env: Env,
   userId: string,
-  permissionKey: string
+  permissionKey: string,
 ): Promise<boolean> {
   try {
     const result = await env.DB.prepare(
@@ -19,8 +19,10 @@ export async function requirePermission(
        FROM permissions
        INNER JOIN role_permissions ON role_permissions.permission_id = permissions.id
        INNER JOIN user_roles ON user_roles.role_id = role_permissions.role_id
-       WHERE user_roles.user_id = ? AND permissions.key = ?`
-    ).bind(userId, permissionKey).first();
+       WHERE user_roles.user_id = ? AND permissions.key = ?`,
+    )
+      .bind(userId, permissionKey)
+      .first();
 
     return !!result;
   } catch (error) {
@@ -29,15 +31,20 @@ export async function requirePermission(
   }
 }
 
-export async function getUserPermissions(env: Env, userId: string): Promise<string[]> {
+export async function getUserPermissions(
+  env: Env,
+  userId: string,
+): Promise<string[]> {
   try {
     const result = await env.DB.prepare(
       `SELECT DISTINCT permissions.key
        FROM permissions
        INNER JOIN role_permissions ON role_permissions.permission_id = permissions.id
        INNER JOIN user_roles ON user_roles.role_id = role_permissions.role_id
-       WHERE user_roles.user_id = ?`
-    ).bind(userId).all();
+       WHERE user_roles.user_id = ?`,
+    )
+      .bind(userId)
+      .all();
 
     return (result.results || []).map((r: any) => r.key);
   } catch (error) {
@@ -46,14 +53,19 @@ export async function getUserPermissions(env: Env, userId: string): Promise<stri
   }
 }
 
-export async function getUserRoles(env: Env, userId: string): Promise<string[]> {
+export async function getUserRoles(
+  env: Env,
+  userId: string,
+): Promise<string[]> {
   try {
     const result = await env.DB.prepare(
       `SELECT roles.name
        FROM roles
        INNER JOIN user_roles ON user_roles.role_id = roles.id
-       WHERE user_roles.user_id = ?`
-    ).bind(userId).all();
+       WHERE user_roles.user_id = ?`,
+    )
+      .bind(userId)
+      .all();
 
     return (result.results || []).map((r: any) => r.name);
   } catch (error) {
@@ -68,20 +80,22 @@ export async function logAudit(
   action: string,
   resource: string,
   metadata?: any,
-  ip?: string
+  ip?: string,
 ): Promise<void> {
   try {
     await env.DB.prepare(
       `INSERT INTO audit_log (id, user_id, action, resource, metadata, ip)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).bind(
-      crypto.randomUUID(),
-      userId,
-      action,
-      resource,
-      JSON.stringify(metadata),
-      ip || ""
-    ).run();
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        userId,
+        action,
+        resource,
+        JSON.stringify(metadata),
+        ip || "",
+      )
+      .run();
   } catch (error) {
     console.error("Audit logging error:", error);
   }

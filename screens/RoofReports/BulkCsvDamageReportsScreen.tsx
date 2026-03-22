@@ -115,7 +115,9 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
             "Contacts imported",
             warnings.length ? `${baseMsg}\n\nNote: ${warnings[0]}` : baseMsg,
           );
-          setCsvHint(`Loaded ${parsed.length} rows · ${reports.length} reports saved`);
+          setCsvHint(
+            `Loaded ${parsed.length} rows · ${reports.length} reports saved`,
+          );
         } catch (e) {
           console.error(e);
           const msg = e instanceof Error ? e.message : String(e);
@@ -155,8 +157,7 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         {
           companyNameFallback: companyFallback.trim() || undefined,
           createdBy,
-          onProgress: (done, total) =>
-            setGenerationProgress({ done, total }),
+          onProgress: (done, total) => setGenerationProgress({ done, total }),
         },
       );
       setLastGenerated(reports);
@@ -381,10 +382,10 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
             : "Export all as HTML"}
         </Button>
         <ThemedText type="caption" style={styles.helper}>
-          Exports one HTML file per report. On web, your browser may ask to allow
-          multiple downloads. On mobile, the share sheet opens for each file in
-          sequence. Reports stay saved under Roof Reports. Very large jobs (1000+
-          rows) use compact reports and batched saves.
+          Exports one HTML file per report. On web, your browser may ask to
+          allow multiple downloads. On mobile, the share sheet opens for each
+          file in sequence. Reports stay saved under Roof Reports. Very large
+          jobs (1000+ rows) use compact reports and batched saves.
         </ThemedText>
       </Card>
 

@@ -18,7 +18,7 @@ interface Env {
 export async function interpretEvent(
   env: Env,
   event: any,
-  workflowStep: any
+  workflowStep: any,
 ): Promise<InterpreterResponse> {
   const prompt = `
 You are an AI automation interpreter for a sales CRM system.
@@ -43,13 +43,13 @@ Return ONLY valid JSON, no markdown formatting.`;
 
     return {
       shouldRun: parsed.shouldRun === true,
-      reason: parsed.reason || "No reason provided"
+      reason: parsed.reason || "No reason provided",
     };
   } catch (error) {
     console.error("Event interpretation error:", error);
     return {
       shouldRun: false,
-      reason: "AI error"
+      reason: "AI error",
     };
   }
 }

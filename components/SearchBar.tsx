@@ -43,7 +43,10 @@ export function SearchBar({
           placeholderTextColor={theme.textSecondary}
         />
         {value.length > 0 ? (
-          <Pressable onPress={() => onChangeText("")} style={styles.clearButton}>
+          <Pressable
+            onPress={() => onChangeText("")}
+            style={styles.clearButton}
+          >
             <Feather name="x" size={16} color={theme.textSecondary} />
           </Pressable>
         ) : null}

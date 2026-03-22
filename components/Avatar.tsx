@@ -39,7 +39,9 @@ export function Avatar({ name, index = 0, size = 40, style }: AvatarProps) {
       ]}
     >
       {name ? (
-        <ThemedText style={[styles.initial, { fontSize }]}>{initial}</ThemedText>
+        <ThemedText style={[styles.initial, { fontSize }]}>
+          {initial}
+        </ThemedText>
       ) : (
         <Feather name="user" size={size * 0.5} color="#FFFFFF" />
       )}

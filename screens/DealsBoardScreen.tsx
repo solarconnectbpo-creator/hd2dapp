@@ -46,7 +46,7 @@ export default function DealsBoardScreen({ navigation }: Props) {
     if (!isAuthenticated) return;
     setLoading(true);
     try {
-      const data = await apiClient.getDeals() as Deal[];
+      const data = (await apiClient.getDeals()) as Deal[];
       setDeals(data || []);
     } catch (e) {
       console.error("Error loading deals:", e);

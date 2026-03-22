@@ -21,7 +21,8 @@ export function isSupabaseConfigured(): boolean {
   const url = readUrl();
   const key = readAnonKey();
   if (!url || !key) return false;
-  if (url.includes("YOUR_PROJECT_REF") || url.includes("placeholder")) return false;
+  if (url.includes("YOUR_PROJECT_REF") || url.includes("placeholder"))
+    return false;
   if (key === "your-supabase-anon-key" || key.startsWith("sbp_")) return false;
   return true;
 }
@@ -48,7 +49,5 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 /** Default table for CSV leads (override via EXPO_PUBLIC_SUPABASE_LEADS_TABLE). */
 export function getSupabaseLeadsTable(): string {
-  return (
-    process.env.EXPO_PUBLIC_SUPABASE_LEADS_TABLE?.trim() || "roof_leads"
-  );
+  return process.env.EXPO_PUBLIC_SUPABASE_LEADS_TABLE?.trim() || "roof_leads";
 }

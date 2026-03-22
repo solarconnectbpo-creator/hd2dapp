@@ -37,7 +37,13 @@ export interface VendorProduct {
   id: string;
   vendor_id: string;
   name: string;
-  type: "lead" | "appointment" | "live-transfer" | "data-list" | "call-center" | "job-candidate";
+  type:
+    | "lead"
+    | "appointment"
+    | "live-transfer"
+    | "data-list"
+    | "call-center"
+    | "job-candidate";
   vertical: string;
   description: string;
   price: number;

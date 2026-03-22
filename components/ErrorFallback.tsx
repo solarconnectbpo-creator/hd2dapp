@@ -58,16 +58,22 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
       ) : null}
 
       <View style={styles.content}>
-        <View style={[styles.iconContainer, { backgroundColor: theme.backgroundDefault }]}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: theme.backgroundDefault },
+          ]}
+        >
           <Feather name="alert-triangle" size={48} color={AppColors.primary} />
         </View>
-        
+
         <ThemedText type="h1" style={styles.title}>
           Oops! Something went wrong
         </ThemedText>
 
         <ThemedText type="body" style={styles.message}>
-          Hardcore Door to Door Closers hit a snag. Tap below to get back in the game.
+          Hardcore Door to Door Closers hit a snag. Tap below to get back in the
+          game.
         </ThemedText>
 
         <Pressable

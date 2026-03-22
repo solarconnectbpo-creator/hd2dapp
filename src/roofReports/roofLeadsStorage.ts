@@ -22,7 +22,10 @@ export async function loadRoofLeads(): Promise<PropertySelection[]> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   const local = safeParse(raw) as PropertySelection[];
   const merged = await mergeLeadsFromSupabase(local);
-  if (merged.length !== local.length || JSON.stringify(merged) !== JSON.stringify(local)) {
+  if (
+    merged.length !== local.length ||
+    JSON.stringify(merged) !== JSON.stringify(local)
+  ) {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   }
   return merged;
@@ -38,4 +41,3 @@ export async function saveRoofLeads(leads: PropertySelection[]): Promise<void> {
 export async function clearRoofLeads(): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([]));
 }
-

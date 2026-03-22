@@ -54,8 +54,10 @@ export function computeMeasurementValidationSummary(opts: {
   let overallConfidence: "low" | "medium" | "high" = "high";
 
   const bumpOverall = (level: MeasurementAlertLevel) => {
-    if (level === "critical") overallConfidence = minOverall(overallConfidence, "low");
-    else if (level === "warning") overallConfidence = minOverall(overallConfidence, "medium");
+    if (level === "critical")
+      overallConfidence = minOverall(overallConfidence, "low");
+    else if (level === "warning")
+      overallConfidence = minOverall(overallConfidence, "medium");
   };
 
   let areaTraceVsAi: RoofMeasurementValidationSummary["areaTraceVsAi"];
@@ -159,10 +161,16 @@ export function computeMeasurementValidationSummary(opts: {
   let estimateAreaVsTrace: RoofMeasurementValidationSummary["estimateAreaVsTrace"];
   const est = opts.estimate;
   const estArea =
-    est?.roofAreaSqFt != null && Number.isFinite(est.roofAreaSqFt) && est.roofAreaSqFt > 0
+    est?.roofAreaSqFt != null &&
+    Number.isFinite(est.roofAreaSqFt) &&
+    est.roofAreaSqFt > 0
       ? est.roofAreaSqFt
       : undefined;
-  if (typeof traceArea === "number" && traceArea > 0 && typeof estArea === "number") {
+  if (
+    typeof traceArea === "number" &&
+    traceArea > 0 &&
+    typeof estArea === "number"
+  ) {
     const divergencePct = pctDivergence(traceArea, estArea);
     const alertLevel = levelFromDivergencePct(divergencePct);
     estimateAreaVsTrace = {

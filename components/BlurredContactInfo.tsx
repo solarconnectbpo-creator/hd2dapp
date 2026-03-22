@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { ThemedText } from '@/components/ThemedText';
-import { Card } from '@/components/Card';
-import { Button } from '@/components/Button';
-import { Spacing, AppColors, BorderRadius } from '@/constants/theme';
-import { useTheme } from '@/hooks/useTheme';
+import React from "react";
+import { View, StyleSheet, Pressable } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { ThemedText } from "@/components/ThemedText";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { Spacing, AppColors, BorderRadius } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
 
 interface BlurredContactInfoProps {
   phone: string;
@@ -29,13 +29,13 @@ export function BlurredContactInfo({
       <View style={styles.contactContainer}>
         <View style={styles.contactItem}>
           <Feather name="phone" size={16} color={AppColors.accent} />
-          <ThemedText style={{ marginLeft: Spacing.sm, fontWeight: '500' }}>
+          <ThemedText style={{ marginLeft: Spacing.sm, fontWeight: "500" }}>
             {phone}
           </ThemedText>
         </View>
         <View style={styles.contactItem}>
           <Feather name="mail" size={16} color={AppColors.accent} />
-          <ThemedText style={{ marginLeft: Spacing.sm, fontWeight: '500' }}>
+          <ThemedText style={{ marginLeft: Spacing.sm, fontWeight: "500" }}>
             {email}
           </ThemedText>
         </View>
@@ -44,11 +44,22 @@ export function BlurredContactInfo({
   }
 
   return (
-    <Card elevation={1} style={[styles.blurredCard, { backgroundColor: theme.backgroundSecondary }]}>
+    <Card
+      elevation={1}
+      style={[
+        styles.blurredCard,
+        { backgroundColor: theme.backgroundSecondary },
+      ]}
+    >
       <View style={styles.blurredContent}>
         <View style={styles.blurredRow}>
           <Feather name="phone" size={16} color={theme.textSecondary} />
-          <View style={[styles.blurBox, { backgroundColor: AppColors.primary + '30' }]}>
+          <View
+            style={[
+              styles.blurBox,
+              { backgroundColor: AppColors.primary + "30" },
+            ]}
+          >
             <ThemedText style={{ color: theme.textSecondary, opacity: 0.3 }}>
               {phone}
             </ThemedText>
@@ -56,7 +67,12 @@ export function BlurredContactInfo({
         </View>
         <View style={styles.blurredRow}>
           <Feather name="mail" size={16} color={theme.textSecondary} />
-          <View style={[styles.blurBox, { backgroundColor: AppColors.primary + '30' }]}>
+          <View
+            style={[
+              styles.blurBox,
+              { backgroundColor: AppColors.primary + "30" },
+            ]}
+          >
             <ThemedText style={{ color: theme.textSecondary, opacity: 0.3 }}>
               {email}
             </ThemedText>
@@ -65,10 +81,24 @@ export function BlurredContactInfo({
       </View>
       <View style={styles.lockSection}>
         <Feather name="lock" size={18} color={AppColors.error} />
-        <ThemedText type="h4" style={{ marginTop: Spacing.md, marginBottom: Spacing.sm, textAlign: 'center' }}>
+        <ThemedText
+          type="h4"
+          style={{
+            marginTop: Spacing.md,
+            marginBottom: Spacing.sm,
+            textAlign: "center",
+          }}
+        >
           Contact Info Locked
         </ThemedText>
-        <ThemedText style={{ color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.lg, fontSize: 12 }}>
+        <ThemedText
+          style={{
+            color: theme.textSecondary,
+            textAlign: "center",
+            marginBottom: Spacing.lg,
+            fontSize: 12,
+          }}
+        >
           Purchase this lead to unlock contact details
         </ThemedText>
       </View>
@@ -76,7 +106,7 @@ export function BlurredContactInfo({
         onPress={onPurchase}
         style={[styles.purchaseButton, { backgroundColor: AppColors.accent }]}
       >
-        <ThemedText type="h4" style={{ color: '#FFFFFF', textAlign: 'center' }}>
+        <ThemedText type="h4" style={{ color: "#FFFFFF", textAlign: "center" }}>
           Unlock for ${price}
         </ThemedText>
       </Button>
@@ -90,8 +120,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   blurredCard: {
     padding: Spacing.lg,
@@ -102,8 +132,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   blurredRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.md,
   },
   blurBox: {
@@ -112,10 +142,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.sm,
     height: 24,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   lockSection: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: Spacing.lg,
   },
   purchaseButton: {

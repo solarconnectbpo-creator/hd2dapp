@@ -34,9 +34,7 @@ function optFiniteNumber(v: unknown): number | null {
   return null;
 }
 
-function normalizeAiConfidence(
-  raw: unknown,
-): "low" | "medium" | "high" | null {
+function normalizeAiConfidence(raw: unknown): "low" | "medium" | "high" | null {
   if (raw === null || raw === undefined) return null;
   const s = String(raw).toLowerCase();
   if (s === "high" || s === "medium" || s === "low") return s;
@@ -56,10 +54,13 @@ export async function handleRoofPitchAi(
   corsHeaders: Record<string, string>,
 ): Promise<Response> {
   if (request.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
   if (!env.OPENAI_API_KEY?.trim()) {
@@ -68,7 +69,10 @@ export async function handleRoofPitchAi(
         success: false,
         error: "OPENAI_API_KEY is not configured on the server",
       }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -76,28 +80,45 @@ export async function handleRoofPitchAi(
   try {
     body = (await request.json()) as RoofPitchAiBody;
   } catch {
-    return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid JSON body" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
-  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
-  const b64 = typeof body.imageBase64 === "string" ? body.imageBase64.trim() : "";
+  const imageUrl =
+    typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+  const b64 =
+    typeof body.imageBase64 === "string" ? body.imageBase64.trim() : "";
   const mimeType =
-    typeof body.mimeType === "string" && body.mimeType.trim() ? body.mimeType.trim() : "image/jpeg";
+    typeof body.mimeType === "string" && body.mimeType.trim()
+      ? body.mimeType.trim()
+      : "image/jpeg";
 
   if (!imageUrl && !b64) {
     return new Response(
-      JSON.stringify({ success: false, error: "Provide imageUrl or imageBase64" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        success: false,
+        error: "Provide imageUrl or imageBase64",
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
   if (b64.length > 6_000_000) {
     return new Response(
-      JSON.stringify({ success: false, error: "imageBase64 too large (max ~4.5MB encoded)" }),
-      { status: 413,
+      JSON.stringify({
+        success: false,
+        error: "imageBase64 too large (max ~4.5MB encoded)",
+      }),
+      {
+        status: 413,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
@@ -175,7 +196,10 @@ ${context ? `\nContext from user: ${context}` : ""}`,
         error: `OpenAI error ${res.status}`,
         detail: errText.slice(0, 500),
       }),
-      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -190,27 +214,39 @@ ${context ? `\nContext from user: ${context}` : ""}`,
       JSON.stringify({
         success: false,
         error: "Could not estimate pitch from this image",
-        rationale: typeof parsed.rationale === "string" ? parsed.rationale : undefined,
+        rationale:
+          typeof parsed.rationale === "string" ? parsed.rationale : undefined,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
   const estimatePitch = normalizePitch(estimatePitchRaw);
   const confidenceRaw = String(parsed.confidence || "low").toLowerCase();
   const confidence =
-    confidenceRaw === "high" || confidenceRaw === "medium" || confidenceRaw === "low"
+    confidenceRaw === "high" ||
+    confidenceRaw === "medium" ||
+    confidenceRaw === "low"
       ? confidenceRaw
       : "low";
 
   const areaRaw = optFiniteNumber(parsed.estimateRoofAreaSqFt);
   const perimRaw = optFiniteNumber(parsed.estimateRoofPerimeterFt);
   const estimateRoofAreaSqFt =
-    areaRaw !== null && areaRaw > 0 && areaRaw < 1_000_000 ? Math.round(areaRaw) : null;
+    areaRaw !== null && areaRaw > 0 && areaRaw < 1_000_000
+      ? Math.round(areaRaw)
+      : null;
   const estimateRoofPerimeterFt =
-    perimRaw !== null && perimRaw > 0 && perimRaw < 1_000_000 ? Math.round(perimRaw) : null;
+    perimRaw !== null && perimRaw > 0 && perimRaw < 1_000_000
+      ? Math.round(perimRaw)
+      : null;
 
-  let measurementConfidence = normalizeAiConfidence(parsed.measurementConfidence);
+  let measurementConfidence = normalizeAiConfidence(
+    parsed.measurementConfidence,
+  );
   if (estimateRoofAreaSqFt === null && estimateRoofPerimeterFt === null) {
     measurementConfidence = null;
   } else if (measurementConfidence === null) {
@@ -228,7 +264,11 @@ ${context ? `\nContext from user: ${context}` : ""}`,
       data: {
         estimatePitch,
         confidence,
-        rationale: (typeof parsed.rationale === "string" ? parsed.rationale : "").trim() || "Visual estimate from image.",
+        rationale:
+          (typeof parsed.rationale === "string"
+            ? parsed.rationale
+            : ""
+          ).trim() || "Visual estimate from image.",
         model: "gpt-4o-mini",
         estimateRoofAreaSqFt,
         estimateRoofPerimeterFt,
@@ -236,6 +276,9 @@ ${context ? `\nContext from user: ${context}` : ""}`,
         measurementRationale: measurementRationale || undefined,
       },
     }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }

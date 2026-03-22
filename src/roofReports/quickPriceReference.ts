@@ -36,4 +36,3 @@ export const QUICK_PRICE_NON_ROOF = {
   // "Fanfold Foam Insulation Board – 3/8\"" (SF): replace + tax
   fanfoldReplaceWithTax: 0.74 + 0.04,
 } as const;
-

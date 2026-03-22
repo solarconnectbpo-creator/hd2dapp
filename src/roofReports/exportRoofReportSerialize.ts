@@ -7,6 +7,8 @@ export function safeExportFilenamePart(id: string): string {
 }
 
 /** Same payload as `exportRoofReportToJson` writes (pretty-printed). */
-export function serializeRoofReportToJsonPretty(report: DamageRoofReport): string {
+export function serializeRoofReportToJsonPretty(
+  report: DamageRoofReport,
+): string {
   return JSON.stringify(report, null, 2);
 }

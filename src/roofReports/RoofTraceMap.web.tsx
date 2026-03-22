@@ -363,221 +363,232 @@ export default function RoofTraceMap({
         });
         mapRef.current = map;
 
-    const updateFromDraw = () => {
-      try {
-        const drawInst = drawRef.current;
-        if (!drawInst) return;
-        const all = drawInst.getAll();
-        const feature = getLargestPolyLikeFeature(all.features ?? []);
+        const updateFromDraw = () => {
+          try {
+            const drawInst = drawRef.current;
+            if (!drawInst) return;
+            const all = drawInst.getAll();
+            const feature = getLargestPolyLikeFeature(all.features ?? []);
 
-        const mapInstance = mapRef.current;
-        if (mapInstance) {
-          syncPatchedRoofGeoJson(mapInstance, feature ?? null);
-          updateMapPaintForMaterial(mapInstance, traceMaterialTypeRef.current);
-        }
+            const mapInstance = mapRef.current;
+            if (mapInstance) {
+              syncPatchedRoofGeoJson(mapInstance, feature ?? null);
+              updateMapPaintForMaterial(
+                mapInstance,
+                traceMaterialTypeRef.current,
+              );
+            }
 
-        if (!feature) {
-          traceGenerationRef.current += 1;
-          onTraceChangeRef.current(null);
-          lastMetricsRef.current = null;
-          setStatus("Draw your roof polygon");
-          return;
-        }
+            if (!feature) {
+              traceGenerationRef.current += 1;
+              onTraceChangeRef.current(null);
+              lastMetricsRef.current = null;
+              setStatus("Draw your roof polygon");
+              return;
+            }
 
-        let areaSqFt: number | undefined;
-        let perimeterFt: number | undefined;
+            let areaSqFt: number | undefined;
+            let perimeterFt: number | undefined;
 
-        try {
-          areaSqFt = turf.area(feature) * 10.7639104167;
-        } catch {
-          // ignore
-        }
+            try {
+              areaSqFt = turf.area(feature) * 10.7639104167;
+            } catch {
+              // ignore
+            }
 
-        try {
-          const line = turf.polygonToLine(feature);
-          perimeterFt =
-            turf.length(line, { units: "kilometers" }) * 3280.839895;
-        } catch {
-          // ignore
-        }
+            try {
+              const line = turf.polygonToLine(feature);
+              perimeterFt =
+                turf.length(line, { units: "kilometers" }) * 3280.839895;
+            } catch {
+              // ignore
+            }
 
-        const roundedArea =
-          areaSqFt && Number.isFinite(areaSqFt)
-            ? Math.round(areaSqFt)
-            : undefined;
-        const roundedPerimeter =
-          perimeterFt && Number.isFinite(perimeterFt)
-            ? Math.round(perimeterFt)
-            : undefined;
-        const nextFingerprint = {
-          roofAreaSqFt: roundedArea,
-          roofPerimeterFt: roundedPerimeter,
-          hasGeoJson: true,
-        };
-        const prev = lastMetricsRef.current;
-        const changed =
-          !prev ||
-          prev.roofAreaSqFt !== nextFingerprint.roofAreaSqFt ||
-          prev.roofPerimeterFt !== nextFingerprint.roofPerimeterFt ||
-          prev.hasGeoJson !== nextFingerprint.hasGeoJson;
+            const roundedArea =
+              areaSqFt && Number.isFinite(areaSqFt)
+                ? Math.round(areaSqFt)
+                : undefined;
+            const roundedPerimeter =
+              perimeterFt && Number.isFinite(perimeterFt)
+                ? Math.round(perimeterFt)
+                : undefined;
+            const nextFingerprint = {
+              roofAreaSqFt: roundedArea,
+              roofPerimeterFt: roundedPerimeter,
+              hasGeoJson: true,
+            };
+            const prev = lastMetricsRef.current;
+            const changed =
+              !prev ||
+              prev.roofAreaSqFt !== nextFingerprint.roofAreaSqFt ||
+              prev.roofPerimeterFt !== nextFingerprint.roofPerimeterFt ||
+              prev.hasGeoJson !== nextFingerprint.hasGeoJson;
 
-        if (changed) {
-          const gen = ++traceGenerationRef.current;
-          onTraceChangeRef.current({
-            roofAreaSqFt: areaSqFt,
-            roofPerimeterFt: perimeterFt,
-            geoJson: feature,
-            roofTracePoints3D: undefined,
-            avgTerrainElevationM: undefined,
-            terrainPitchEstimate: undefined,
-          });
-          lastMetricsRef.current = nextFingerprint;
+            if (changed) {
+              const gen = ++traceGenerationRef.current;
+              onTraceChangeRef.current({
+                roofAreaSqFt: areaSqFt,
+                roofPerimeterFt: perimeterFt,
+                geoJson: feature,
+                roofTracePoints3D: undefined,
+                avgTerrainElevationM: undefined,
+                terrainPitchEstimate: undefined,
+              });
+              lastMetricsRef.current = nextFingerprint;
 
-          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN as
-            | string
-            | undefined;
-          const map = mapRef.current;
-          if (token && map && feature.geometry?.type === "Polygon") {
-            setStatus("Roof traced — sampling terrain…");
-            void (async () => {
-              try {
-                const t3 = await enhanceRoofTraceWith3D(
-                  feature as GeoJSON.Feature<GeoJSON.Polygon>,
-                  token,
-                  map,
-                );
-                if (gen !== traceGenerationRef.current || !t3) return;
-                onTraceChangeRef.current({
-                  roofAreaSqFt: areaSqFt,
-                  roofPerimeterFt: perimeterFt,
-                  geoJson: feature,
-                  roofTracePoints3D: t3.points3D,
-                  avgTerrainElevationM: t3.avgElevationM,
-                  terrainPitchEstimate: t3.estimatedPitch,
-                });
-              } catch (e) {
-                console.warn("enhanceRoofTraceWith3D:", e);
-              } finally {
-                if (gen === traceGenerationRef.current) {
-                  setStatus("Roof traced. Measurements updated.");
-                }
+              const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN as
+                | string
+                | undefined;
+              const map = mapRef.current;
+              if (token && map && feature.geometry?.type === "Polygon") {
+                setStatus("Roof traced — sampling terrain…");
+                void (async () => {
+                  try {
+                    const t3 = await enhanceRoofTraceWith3D(
+                      feature as GeoJSON.Feature<GeoJSON.Polygon>,
+                      token,
+                      map,
+                    );
+                    if (gen !== traceGenerationRef.current || !t3) return;
+                    onTraceChangeRef.current({
+                      roofAreaSqFt: areaSqFt,
+                      roofPerimeterFt: perimeterFt,
+                      geoJson: feature,
+                      roofTracePoints3D: t3.points3D,
+                      avgTerrainElevationM: t3.avgElevationM,
+                      terrainPitchEstimate: t3.estimatedPitch,
+                    });
+                  } catch (e) {
+                    console.warn("enhanceRoofTraceWith3D:", e);
+                  } finally {
+                    if (gen === traceGenerationRef.current) {
+                      setStatus("Roof traced. Measurements updated.");
+                    }
+                  }
+                })();
+              } else {
+                setStatus("Roof traced. Measurements updated.");
               }
-            })();
-          } else {
-            setStatus("Roof traced. Measurements updated.");
+            } else {
+              setStatus("Roof traced. Measurements updated.");
+            }
+          } catch (e) {
+            console.error("updateFromDraw failed:", e);
+            setStatus("Trace found but metrics failed to compute.");
           }
-        } else {
-          setStatus("Roof traced. Measurements updated.");
-        }
-      } catch (e) {
-        console.error("updateFromDraw failed:", e);
-        setStatus("Trace found but metrics failed to compute.");
-      }
-    };
+        };
 
-    updateFromDrawRef.current = updateFromDraw;
+        updateFromDrawRef.current = updateFromDraw;
 
-    map.on("load", () => {
-      if (hasMapboxToken) {
-        addMicrosoftBuildingFootprintsToMap(map);
-      }
+        map.on("load", () => {
+          if (hasMapboxToken) {
+            addMicrosoftBuildingFootprintsToMap(map);
+          }
 
-      const mat0 = traceMaterialTypeRef.current ?? "shingle";
-      const theme0 = getMaterialTheme(mat0);
-      const emptyFc: GeoJSON.FeatureCollection = {
-        type: "FeatureCollection",
-        features: [],
-      };
-      map.addSource(PATCHED_ROOF_SOURCE_ID, { type: "geojson", data: emptyFc });
-      map.addLayer({
-        id: PATCHED_ROOF_LAYER_ID,
-        type: "fill",
-        source: PATCHED_ROOF_SOURCE_ID,
-        paint: {
-          "fill-color": theme0.color,
-          "fill-opacity": theme0.opacity,
-        },
-      });
-
-      const draw = new MapboxDraw({
-        displayControlsDefault: false,
-        controls: { polygon: true, trash: true },
-        styles: buildPolygonDrawStyles(
-          traceMaterialTypeRef.current ?? "shingle",
-        ) as any,
-      });
-      drawRef.current = draw;
-      appliedTraceMaterialRef.current = String(
-        traceMaterialTypeRef.current ?? "shingle",
-      ).toLowerCase();
-
-      map.addControl(draw, "top-left");
-
-      try {
-        map.addSource("terrain", {
-          type: "raster-dem",
-          url: "mapbox://mapbox.terrain-rgb",
-          tileSize: 512,
-          maxzoom: 14,
-        });
-        map.setTerrain({ source: "terrain", exaggeration: 1.2 });
-
-        map.addLayer({
-          id: "sky",
-          type: "sky",
-          paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun-intensity": 10,
-          },
-        });
-      } catch {
-        // optional
-      }
-
-      map.on("draw.create", updateFromDraw);
-      map.on("draw.update", updateFromDraw);
-      map.on("draw.delete", updateFromDraw);
-
-      if (!hasMapboxToken) {
-        setStatus(
-          "Mapbox token missing — using OpenStreetMap fallback. Draw roof polygon manually.",
-        );
-      }
-
-      updateFromDraw();
-
-      runFlyToPropertyRef.current = (m, lng, lat) => {
-        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
-        try {
-          m.flyTo({
-            center: [lng, lat],
-            zoom: 19,
-            pitch: 45,
-            bearing: 0,
-            duration: 1000,
+          const mat0 = traceMaterialTypeRef.current ?? "shingle";
+          const theme0 = getMaterialTheme(mat0);
+          const emptyFc: GeoJSON.FeatureCollection = {
+            type: "FeatureCollection",
+            features: [],
+          };
+          map.addSource(PATCHED_ROOF_SOURCE_ID, {
+            type: "geojson",
+            data: emptyFc,
           });
-          centerMarkerRef.current?.remove();
-          centerMarkerRef.current = new mapboxgl.Marker({ color: "#22c55e" })
-            .setLngLat([lng, lat])
-            .addTo(m);
-          setStatus(
-            "Locating property — auto-trace runs when the map settles.",
-          );
-          m.once("moveend", () => {
-            m.once("idle", () => {
-              window.setTimeout(() => tryAutoTraceFootprint(lng, lat, 0), 520);
+          map.addLayer({
+            id: PATCHED_ROOF_LAYER_ID,
+            type: "fill",
+            source: PATCHED_ROOF_SOURCE_ID,
+            paint: {
+              "fill-color": theme0.color,
+              "fill-opacity": theme0.opacity,
+            },
+          });
+
+          const draw = new MapboxDraw({
+            displayControlsDefault: false,
+            controls: { polygon: true, trash: true },
+            styles: buildPolygonDrawStyles(
+              traceMaterialTypeRef.current ?? "shingle",
+            ) as any,
+          });
+          drawRef.current = draw;
+          appliedTraceMaterialRef.current = String(
+            traceMaterialTypeRef.current ?? "shingle",
+          ).toLowerCase();
+
+          map.addControl(draw, "top-left");
+
+          try {
+            map.addSource("terrain", {
+              type: "raster-dem",
+              url: "mapbox://mapbox.terrain-rgb",
+              tileSize: 512,
+              maxzoom: 14,
             });
-          });
-        } catch (e) {
-          console.error("RoofTraceMap flyTo failed:", e);
-        }
-      };
+            map.setTerrain({ source: "terrain", exaggeration: 1.2 });
 
-      const ic = initialCenterRef.current;
-      if (ic && Number.isFinite(ic.lat) && Number.isFinite(ic.lng)) {
-        runFlyToPropertyRef.current(map, ic.lng, ic.lat);
-      }
-    });
+            map.addLayer({
+              id: "sky",
+              type: "sky",
+              paint: {
+                "sky-type": "atmosphere",
+                "sky-atmosphere-sun-intensity": 10,
+              },
+            });
+          } catch {
+            // optional
+          }
+
+          map.on("draw.create", updateFromDraw);
+          map.on("draw.update", updateFromDraw);
+          map.on("draw.delete", updateFromDraw);
+
+          if (!hasMapboxToken) {
+            setStatus(
+              "Mapbox token missing — using OpenStreetMap fallback. Draw roof polygon manually.",
+            );
+          }
+
+          updateFromDraw();
+
+          runFlyToPropertyRef.current = (m, lng, lat) => {
+            if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+            try {
+              m.flyTo({
+                center: [lng, lat],
+                zoom: 19,
+                pitch: 45,
+                bearing: 0,
+                duration: 1000,
+              });
+              centerMarkerRef.current?.remove();
+              centerMarkerRef.current = new mapboxgl.Marker({
+                color: "#22c55e",
+              })
+                .setLngLat([lng, lat])
+                .addTo(m);
+              setStatus(
+                "Locating property — auto-trace runs when the map settles.",
+              );
+              m.once("moveend", () => {
+                m.once("idle", () => {
+                  window.setTimeout(
+                    () => tryAutoTraceFootprint(lng, lat, 0),
+                    520,
+                  );
+                });
+              });
+            } catch (e) {
+              console.error("RoofTraceMap flyTo failed:", e);
+            }
+          };
+
+          const ic = initialCenterRef.current;
+          if (ic && Number.isFinite(ic.lat) && Number.isFinite(ic.lng)) {
+            runFlyToPropertyRef.current(map, ic.lng, ic.lat);
+          }
+        });
 
         cleanupMap = () => {
           try {

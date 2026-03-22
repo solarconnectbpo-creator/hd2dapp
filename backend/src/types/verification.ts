@@ -2,11 +2,11 @@
  * Lead Verification Types
  */
 
-export type LeadVerificationStatus = 
-  | "APPROVED" 
-  | "SOFT-APPROVED" 
-  | "MANUAL_REVIEW" 
-  | "REJECTED" 
+export type LeadVerificationStatus =
+  | "APPROVED"
+  | "SOFT-APPROVED"
+  | "MANUAL_REVIEW"
+  | "REJECTED"
   | "VENDOR_FRAUD_FLAGGED";
 
 export interface VerificationResult {

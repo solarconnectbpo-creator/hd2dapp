@@ -23,4 +23,6 @@
  * See https://github.com/CesiumGS/cesium/blob/main/LICENSE.md for full licensing details.
  */
 
-import{a}from"./chunk-CMB3O7X2.js";import"./chunk-VIMSDF2W.js";export{a as default};
+import { a } from "./chunk-CMB3O7X2.js";
+import "./chunk-VIMSDF2W.js";
+export { a as default };

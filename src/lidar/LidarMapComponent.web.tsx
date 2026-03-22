@@ -21,15 +21,26 @@ export const LidarMapComponent: React.FC<LidarMapComponentProps> = () => (
   <View style={styles.box}>
     <Text style={styles.title}>LiDAR map picker</Text>
     <Text style={styles.body}>
-      This control uses <Text style={styles.mono}>react-native-maps</Text>, which targets iOS and Android. On web,
-      use your existing Mapbox flows (e.g. roof trace / property maps) or run the app on a device.
+      This control uses <Text style={styles.mono}>react-native-maps</Text>,
+      which targets iOS and Android. On web, use your existing Mapbox flows
+      (e.g. roof trace / property maps) or run the app on a device.
     </Text>
   </View>
 );
 
 const styles = StyleSheet.create({
-  box: { flex: 1, padding: 24, justifyContent: "center", backgroundColor: "#f8fafc" },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 12, color: "#0f172a" },
+  box: {
+    flex: 1,
+    padding: 24,
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#0f172a",
+  },
   body: { fontSize: 14, lineHeight: 22, color: "#475569" },
   mono: { fontFamily: "monospace", color: "#0f172a" },
 });

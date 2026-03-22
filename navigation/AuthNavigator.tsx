@@ -50,7 +50,10 @@ export default function AuthNavigator() {
         name="Login"
         component={LoginScreen}
         options={({ route }) => ({
-          title: route.params.userType === "sales_rep" ? "Sales Rep Login" : "Company Login",
+          title:
+            route.params.userType === "sales_rep"
+              ? "Sales Rep Login"
+              : "Company Login",
           headerBackTitle: "Back",
         })}
       />
@@ -58,7 +61,10 @@ export default function AuthNavigator() {
         name="Signup"
         component={SignupScreen}
         options={({ route }) => ({
-          title: route.params.userType === "sales_rep" ? "Sales Rep Sign Up" : "Company Sign Up",
+          title:
+            route.params.userType === "sales_rep"
+              ? "Sales Rep Sign Up"
+              : "Company Sign Up",
           headerBackTitle: "Back",
         })}
       />

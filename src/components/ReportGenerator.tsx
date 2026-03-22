@@ -8,7 +8,8 @@ import { useAIAgents } from "@/src/contexts/AIAgentsContext";
 import ProgressTracker from "@/src/components/ProgressTracker";
 
 export default function ReportGenerator() {
-  const { generate, isGenerating, progress, error, resetOutput } = useAIAgents();
+  const { generate, isGenerating, progress, error, resetOutput } =
+    useAIAgents();
 
   return (
     <View style={styles.wrap}>

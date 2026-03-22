@@ -10,7 +10,11 @@ interface Env {
   [key: string]: any;
 }
 
-export async function executeAction(env: Env, config: any, event: any): Promise<void> {
+export async function executeAction(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const actionType = config.type || "log";
 
   try {
@@ -72,11 +76,15 @@ async function handleSendSMS(env: Env, config: any, event: any): Promise<void> {
   await fetch(env.SMS_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to, message })
+    body: JSON.stringify({ to, message }),
   });
 }
 
-async function handleSendEmail(env: Env, config: any, event: any): Promise<void> {
+async function handleSendEmail(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const to = config.to || event.email;
   const subject = config.subject;
   const html = config.html;
@@ -89,44 +97,60 @@ async function handleSendEmail(env: Env, config: any, event: any): Promise<void>
   await fetch(env.EMAIL_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to, subject, html })
+    body: JSON.stringify({ to, subject, html }),
   });
 }
 
-async function handleUpdateLead(env: Env, config: any, event: any): Promise<void> {
+async function handleUpdateLead(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const leadId = config.leadId || event.leadId;
   const status = config.status;
 
   if (!leadId) return;
 
-  await env.DB.prepare(
-    "UPDATE leads SET status = ? WHERE id = ?"
-  ).bind(status, leadId).run();
+  await env.DB.prepare("UPDATE leads SET status = ? WHERE id = ?")
+    .bind(status, leadId)
+    .run();
 }
 
-async function handleUpdateDeal(env: Env, config: any, event: any): Promise<void> {
+async function handleUpdateDeal(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const dealId = config.dealId || event.dealId;
   const stage = config.stage;
 
   if (!dealId) return;
 
-  await env.DB.prepare(
-    "UPDATE deals SET stage = ? WHERE id = ?"
-  ).bind(stage, dealId).run();
+  await env.DB.prepare("UPDATE deals SET stage = ? WHERE id = ?")
+    .bind(stage, dealId)
+    .run();
 }
 
-async function handleAssignAgent(env: Env, config: any, event: any): Promise<void> {
+async function handleAssignAgent(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const leadId = config.leadId || event.leadId;
   const agentId = config.agentId;
 
   if (!leadId || !agentId) return;
 
-  await env.DB.prepare(
-    "UPDATE leads SET assigned_to = ? WHERE id = ?"
-  ).bind(agentId, leadId).run();
+  await env.DB.prepare("UPDATE leads SET assigned_to = ? WHERE id = ?")
+    .bind(agentId, leadId)
+    .run();
 }
 
-async function handleSimpleTalkCall(env: Env, config: any, event: any): Promise<void> {
+async function handleSimpleTalkCall(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const webhookUrl = config.webhookUrl;
   const number = config.number || event.phone;
 
@@ -140,12 +164,16 @@ async function handleSimpleTalkCall(env: Env, config: any, event: any): Promise<
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "start_call",
-      number
-    })
+      number,
+    }),
   });
 }
 
-async function handleCreateTask(env: Env, config: any, event: any): Promise<void> {
+async function handleCreateTask(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const dealId = config.dealId || event.dealId;
   const title = config.title;
   const due = config.due;
@@ -153,17 +181,25 @@ async function handleCreateTask(env: Env, config: any, event: any): Promise<void
   if (!dealId || !title) return;
 
   await env.DB.prepare(
-    "INSERT INTO tasks (id, deal_id, title, due_date) VALUES (?, ?, ?, ?)"
-  ).bind(crypto.randomUUID(), dealId, title, due || null).run();
+    "INSERT INTO tasks (id, deal_id, title, due_date) VALUES (?, ?, ?, ?)",
+  )
+    .bind(crypto.randomUUID(), dealId, title, due || null)
+    .run();
 }
 
-async function handleCreatePost(env: Env, config: any, event: any): Promise<void> {
+async function handleCreatePost(
+  env: Env,
+  config: any,
+  event: any,
+): Promise<void> {
   const userId = config.userId || event.userId;
   const content = config.content;
 
   if (!userId || !content) return;
 
   await env.DB.prepare(
-    "INSERT INTO posts (id, user_id, content) VALUES (?, ?, ?)"
-  ).bind(crypto.randomUUID(), userId, content).run();
+    "INSERT INTO posts (id, user_id, content) VALUES (?, ?, ?)",
+  )
+    .bind(crypto.randomUUID(), userId, content)
+    .run();
 }

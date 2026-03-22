@@ -13,7 +13,8 @@ export default function Cesium3DRoofScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ThemedText type="body" style={{ color: theme.textSecondary }}>
-        The Cesium 3D roof trace demo runs in the web build only (WebGL + Cesium ion).
+        The Cesium 3D roof trace demo runs in the web build only (WebGL + Cesium
+        ion).
       </ThemedText>
     </View>
   );

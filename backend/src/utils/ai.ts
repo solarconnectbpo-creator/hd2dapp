@@ -15,13 +15,13 @@ export async function runAI(env: Env, prompt: string): Promise<string> {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.2
-    })
+      temperature: 0.2,
+    }),
   });
 
   if (!res.ok) {

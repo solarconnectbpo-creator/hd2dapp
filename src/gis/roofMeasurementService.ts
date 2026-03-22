@@ -50,7 +50,9 @@ export class RoofMeasurementService {
     const skylinePentrationArea = totalArea * 0.03;
 
     const sqMetersPerSquare = 9.29;
-    const materialRequirementsShingles = Math.ceil(totalArea / sqMetersPerSquare);
+    const materialRequirementsShingles = Math.ceil(
+      totalArea / sqMetersPerSquare,
+    );
 
     const tilesPerMeter = 14;
     const materialRequirementsTile = Math.ceil(totalArea * tilesPerMeter);
@@ -94,7 +96,9 @@ export class RoofMeasurementService {
     const bbox = building.bbox;
     const length = (bbox.maxLat - bbox.minLat) * 111000;
     const width =
-      (bbox.maxLon - bbox.minLon) * 111000 * Math.cos((building.centerPoint[1] * Math.PI) / 180);
+      (bbox.maxLon - bbox.minLon) *
+      111000 *
+      Math.cos((building.centerPoint[1] * Math.PI) / 180);
     return 2 * (length + width);
   }
 
@@ -110,17 +114,23 @@ export class RoofMeasurementService {
     return dragCoefficients[shape] ?? 0.8;
   }
 
-  private static calculateSolarPotential(area: number, direction: number, pitch: number): number {
+  private static calculateSolarPotential(
+    area: number,
+    direction: number,
+    pitch: number,
+  ): number {
     const baseIrradiance = 4.5;
 
     const directionAngle = Math.abs(direction - 180);
-    const directionEfficiency = Math.max(0, 1 - directionAngle / 180) * 0.9 + 0.1;
+    const directionEfficiency =
+      Math.max(0, 1 - directionAngle / 180) * 0.9 + 0.1;
 
     const optimalPitch = 35;
     const pitchDifference = Math.abs(pitch - optimalPitch);
     const pitchEfficiency = Math.max(0.5, 1 - pitchDifference / 90);
 
-    const dailyPotential = area * baseIrradiance * directionEfficiency * pitchEfficiency;
+    const dailyPotential =
+      area * baseIrradiance * directionEfficiency * pitchEfficiency;
     const annualPotential = dailyPotential * 365;
 
     return Math.round(annualPotential);
@@ -145,7 +155,8 @@ export class RoofMeasurementService {
     };
 
     const roofingMaterial =
-      (measurements.materialRequirementsShingles ?? 1) * (costPerSquare[materialType] ?? 75);
+      (measurements.materialRequirementsShingles ?? 1) *
+      (costPerSquare[materialType] ?? 75);
 
     const underlayment = roofingMaterial * 0.12;
     const fasteners = roofingMaterial * 0.06;
@@ -182,7 +193,8 @@ export class RoofMeasurementService {
 
     const totalArea = Math.max(measurements.totalArea, 1e-6);
     const dormer = measurements.dormerArea ?? 0;
-    const complexityMultiplier = 1 + measurements.layersNeeded * 0.1 + (dormer * 0.2) / totalArea;
+    const complexityMultiplier =
+      1 + measurements.layersNeeded * 0.1 + (dormer * 0.2) / totalArea;
 
     const adjustedDays = Math.ceil(days * complexityMultiplier);
     const weeksAtStandardCrew = Math.ceil(adjustedDays / 5);

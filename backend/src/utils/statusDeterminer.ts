@@ -3,7 +3,10 @@
  * Determines verification status based on verification data
  */
 
-import type { LeadVerificationStatus, VerificationResult } from "../types/verification";
+import type {
+  LeadVerificationStatus,
+  VerificationResult,
+} from "../types/verification";
 
 interface VerificationData {
   isReal?: boolean;
@@ -19,7 +22,9 @@ interface VerificationData {
   vendorScore?: any;
 }
 
-export function determineVerificationStatus(data: VerificationData): VerificationResult {
+export function determineVerificationStatus(
+  data: VerificationData,
+): VerificationResult {
   const riskScore = data.riskScore || 50;
   const qualityScore = data.qualityScore || 50;
   const isReal = data.isReal !== false;
@@ -37,13 +42,19 @@ export function determineVerificationStatus(data: VerificationData): Verificatio
   // Vendor fraud check
   if (spam || recycledLead || vendorScore < 20) {
     status = "VENDOR_FRAUD_FLAGGED";
-    reason = "Vendor fraud indicators detected (spam/recycled/low vendor score)";
+    reason =
+      "Vendor fraud indicators detected (spam/recycled/low vendor score)";
     actions.push("alert_compliance", "block_vendor", "manual_review");
     return { status, risk: riskScore, quality: 0, reason, actions };
   }
 
   // Rejected cases
-  if (!isReal || (!phoneValid && !emailValid) || riskScore > 85 || qualityScore < 20) {
+  if (
+    !isReal ||
+    (!phoneValid && !emailValid) ||
+    riskScore > 85 ||
+    qualityScore < 20
+  ) {
     status = "REJECTED";
     reason = data.justification || "Lead failed verification checks";
     actions.push("discard_lead", "log_rejection");
@@ -53,7 +64,8 @@ export function determineVerificationStatus(data: VerificationData): Verificatio
   // Manual review needed
   if (riskScore > 60 || qualityScore < 40 || !tcpaSafe) {
     status = "MANUAL_REVIEW";
-    reason = "Lead requires manual review due to moderate risk or compliance concerns";
+    reason =
+      "Lead requires manual review due to moderate risk or compliance concerns";
     actions.push("route_to_compliance", "notify_admin", "hold_delivery");
     return { status, risk: riskScore, quality: qualityScore, reason, actions };
   }
@@ -62,7 +74,12 @@ export function determineVerificationStatus(data: VerificationData): Verificatio
   if (riskScore > 40 || qualityScore < 65) {
     status = "SOFT-APPROVED";
     reason = "Lead verified but has some risk factors - use with caution";
-    actions.push("deliver_to_buyer", "start_workflow_crm", "notify_sales", "flag_for_review");
+    actions.push(
+      "deliver_to_buyer",
+      "start_workflow_crm",
+      "notify_sales",
+      "flag_for_review",
+    );
     return { status, risk: riskScore, quality: qualityScore, reason, actions };
   }
 

@@ -67,7 +67,8 @@ export function Button({
   };
 
   const getTextColor = () => {
-    if (variant === "secondary" || variant === "ghost") return AppColors.primary;
+    if (variant === "secondary" || variant === "ghost")
+      return AppColors.primary;
     return "#FFFFFF";
   };
 

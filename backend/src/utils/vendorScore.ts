@@ -15,7 +15,10 @@ interface Env {
   [key: string]: any;
 }
 
-export async function getVendorScore(env: Env, vendorId: string): Promise<VendorScore> {
+export async function getVendorScore(
+  env: Env,
+  vendorId: string,
+): Promise<VendorScore> {
   try {
     // Get vendor's lead verification stats
     const stats = await env.DB.prepare(
@@ -24,8 +27,10 @@ export async function getVendorScore(env: Env, vendorId: string): Promise<Vendor
         AVG(quality_score) as avgQuality,
         AVG(risk_score) as avgRisk
        FROM lead_verification 
-       WHERE vendor_id = ?`
-    ).bind(vendorId).first();
+       WHERE vendor_id = ?`,
+    )
+      .bind(vendorId)
+      .first();
 
     const totalLeads = stats?.totalLeads || 0;
     const avgQuality = stats?.avgQuality || 50;
@@ -36,7 +41,7 @@ export async function getVendorScore(env: Env, vendorId: string): Promise<Vendor
 
     if (totalLeads > 0) {
       // Quality increases score
-      score = (avgQuality * 0.7) + ((100 - avgRisk) * 0.3);
+      score = avgQuality * 0.7 + (100 - avgRisk) * 0.3;
     }
 
     // Determine risk level
@@ -48,7 +53,7 @@ export async function getVendorScore(env: Env, vendorId: string): Promise<Vendor
       score: Math.round(score),
       totalLeads,
       avgQuality: Math.round(avgQuality),
-      riskLevel
+      riskLevel,
     };
   } catch (error) {
     console.error("Vendor score error:", error);
@@ -56,7 +61,7 @@ export async function getVendorScore(env: Env, vendorId: string): Promise<Vendor
       score: 50,
       totalLeads: 0,
       avgQuality: 50,
-      riskLevel: "medium"
+      riskLevel: "medium",
     };
   }
 }

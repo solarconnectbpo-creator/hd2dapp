@@ -3,7 +3,10 @@
  */
 
 export type ArcGISFeatureQueryResult = {
-  features?: Array<{ attributes?: Record<string, unknown>; geometry?: unknown }>;
+  features?: Array<{
+    attributes?: Record<string, unknown>;
+    geometry?: unknown;
+  }>;
   error?: { message?: string; code?: number };
 };
 

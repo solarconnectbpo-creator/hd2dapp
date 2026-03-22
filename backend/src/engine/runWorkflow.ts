@@ -22,7 +22,11 @@ interface Workflow {
   steps: WorkflowStep[];
 }
 
-export async function runWorkflow(env: Env, workflow: Workflow, event: any): Promise<void> {
+export async function runWorkflow(
+  env: Env,
+  workflow: Workflow,
+  event: any,
+): Promise<void> {
   try {
     for (const step of workflow.steps || []) {
       // Interpret event for this step
@@ -46,26 +50,30 @@ export async function runWorkflow(env: Env, workflow: Workflow, event: any): Pro
       // Log workflow execution
       await env.DB.prepare(
         `INSERT INTO workflow_logs (id, workflow_id, event, data, status)
-         VALUES (?, ?, ?, ?, ?)`
-      ).bind(
-        crypto.randomUUID(),
-        workflow.id,
-        step.type,
-        JSON.stringify(step.config),
-        "completed"
-      ).run();
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          crypto.randomUUID(),
+          workflow.id,
+          step.type,
+          JSON.stringify(step.config),
+          "completed",
+        )
+        .run();
     }
   } catch (error) {
     console.error("Workflow execution error:", error);
     await env.DB.prepare(
       `INSERT INTO workflow_logs (id, workflow_id, event, data, status)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(
-      crypto.randomUUID(),
-      workflow.id,
-      "error",
-      JSON.stringify(error),
-      "failed"
-    ).run();
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        workflow.id,
+        "error",
+        JSON.stringify(error),
+        "failed",
+      )
+      .run();
   }
 }

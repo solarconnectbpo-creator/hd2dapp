@@ -29,66 +29,69 @@ export async function getAdminOverview(req: Request, env: Env, user: User) {
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // Get logs
     const logsResult = await env.DB.prepare(
-      "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 500"
+      "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 500",
     ).all();
 
     // Get metrics
     const metricsResult = await env.DB.prepare(
-      "SELECT * FROM system_usage ORDER BY time_bucket DESC LIMIT 200"
+      "SELECT * FROM system_usage ORDER BY time_bucket DESC LIMIT 200",
     ).all();
 
     // Get user count
     const userCountResult = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM users"
+      "SELECT COUNT(*) AS count FROM users",
     ).first();
 
     // Get active workflows
     const workflowsResult = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM workflows WHERE active = 1"
+      "SELECT COUNT(*) AS count FROM workflows WHERE active = 1",
     ).first();
 
     // Get API keys count
     const apiKeysResult = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM api_keys WHERE active = 1"
+      "SELECT COUNT(*) AS count FROM api_keys WHERE active = 1",
     ).first();
 
     // Get webhook status
     const webhooksResult = await env.DB.prepare(
-      "SELECT * FROM webhook_health ORDER BY last_checked DESC LIMIT 20"
+      "SELECT * FROM webhook_health ORDER BY last_checked DESC LIMIT 20",
     ).all();
 
     // Analyze system
     const analysis = await analyzeSystem(
       env,
       logsResult.results || [],
-      metricsResult.results || []
+      metricsResult.results || [],
     );
 
     // Log audit
     await logAudit(env, user.id, "admin_view_overview", "admin_dashboard");
 
-    return new Response(JSON.stringify({
-      userCount: userCountResult?.count || 0,
-      activeWorkflows: workflowsResult?.count || 0,
-      activeApiKeys: apiKeysResult?.count || 0,
-      webhookStatus: webhooksResult.results || [],
-      recentLogs: (logsResult.results || []).slice(0, 10),
-      analysis
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({
+        userCount: userCountResult?.count || 0,
+        activeWorkflows: workflowsResult?.count || 0,
+        activeApiKeys: apiKeysResult?.count || 0,
+        webhookStatus: webhooksResult.results || [],
+        recentLogs: (logsResult.results || []).slice(0, 10),
+        analysis,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     console.error("Admin overview error:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch overview" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -103,23 +106,23 @@ export async function listUsers(req: Request, env: Env, user: User) {
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     const users = await env.DB.prepare(
-      "SELECT id, email, created_at FROM users ORDER BY created_at DESC"
+      "SELECT id, email, created_at FROM users ORDER BY created_at DESC",
     ).all();
 
     return new Response(JSON.stringify(users.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("List users error:", error);
     return new Response(JSON.stringify({ error: "Failed to list users" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -134,24 +137,27 @@ export async function getAuditLogs(req: Request, env: Env, user: User) {
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     const logs = await env.DB.prepare(
-      "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 1000"
+      "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 1000",
     ).all();
 
     return new Response(JSON.stringify(logs.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Get audit logs error:", error);
-    return new Response(JSON.stringify({ error: "Failed to fetch audit logs" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch audit logs" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }
 
@@ -165,30 +171,36 @@ export async function getSystemHealth(req: Request, env: Env, user: User) {
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     const metrics = await env.DB.prepare(
-      "SELECT * FROM system_usage ORDER BY time_bucket DESC LIMIT 100"
+      "SELECT * FROM system_usage ORDER BY time_bucket DESC LIMIT 100",
     ).all();
 
     const webhooks = await env.DB.prepare(
-      "SELECT * FROM webhook_health ORDER BY last_checked DESC"
+      "SELECT * FROM webhook_health ORDER BY last_checked DESC",
     ).all();
 
-    return new Response(JSON.stringify({
-      metrics: metrics.results || [],
-      webhookHealth: webhooks.results || []
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({
+        metrics: metrics.results || [],
+        webhookHealth: webhooks.results || [],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     console.error("Get system health error:", error);
-    return new Response(JSON.stringify({ error: "Failed to fetch system health" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch system health" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

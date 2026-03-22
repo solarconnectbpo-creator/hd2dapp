@@ -47,7 +47,9 @@ export const LidarMapComponent: React.FC<LidarMapComponentProps> = ({
     calculateMeasurements,
   } = useLidarMeasurement();
 
-  const handleMapPress = (event: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => {
+  const handleMapPress = (event: {
+    nativeEvent: { coordinate: { latitude: number; longitude: number } };
+  }) => {
     if (!isDrawing) return;
     const { coordinate } = event.nativeEvent;
     const point: Point3D = {
@@ -96,12 +98,20 @@ export const LidarMapComponent: React.FC<LidarMapComponentProps> = ({
       </MapView>
 
       <View style={styles.controlPanel}>
-        <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.scrollView}
+          keyboardShouldPersistTaps="handled"
+        >
           <TouchableOpacity
-            style={[styles.button, isDrawing ? styles.buttonActive : styles.buttonInactive]}
+            style={[
+              styles.button,
+              isDrawing ? styles.buttonActive : styles.buttonInactive,
+            ]}
             onPress={() => setIsDrawing(!isDrawing)}
           >
-            <Text style={styles.buttonText}>{isDrawing ? "Stop drawing" : "Start drawing"}</Text>
+            <Text style={styles.buttonText}>
+              {isDrawing ? "Stop drawing" : "Start drawing"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -112,32 +122,45 @@ export const LidarMapComponent: React.FC<LidarMapComponentProps> = ({
             <Text style={styles.buttonText}>Calculate measurement</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.button, styles.buttonClear]} onPress={clearPoints}>
+          <TouchableOpacity
+            style={[styles.button, styles.buttonClear]}
+            onPress={clearPoints}
+          >
             <Text style={styles.buttonText}>Clear</Text>
           </TouchableOpacity>
 
           <Text style={styles.hint}>
-            Tap the map while drawing is on. x/y are lat/lng; area/volume math assumes planar X/Y unless you use
-            projected coordinates.
+            Tap the map while drawing is on. x/y are lat/lng; area/volume math
+            assumes planar X/Y unless you use projected coordinates.
           </Text>
 
           {measurements ? (
             <View style={styles.resultsContainer}>
               <Text style={styles.resultsTitle}>Results</Text>
               {measurements.distance !== undefined ? (
-                <Text style={styles.resultText}>Distance: {measurements.distance.toFixed(4)} (XY+Z units)</Text>
+                <Text style={styles.resultText}>
+                  Distance: {measurements.distance.toFixed(4)} (XY+Z units)
+                </Text>
               ) : null}
               {measurements.angle !== undefined ? (
-                <Text style={styles.resultText}>Angle: {measurements.angle.toFixed(2)}°</Text>
+                <Text style={styles.resultText}>
+                  Angle: {measurements.angle.toFixed(2)}°
+                </Text>
               ) : null}
               {measurements.area !== undefined ? (
-                <Text style={styles.resultText}>Area (planar XY): {measurements.area.toFixed(6)}</Text>
+                <Text style={styles.resultText}>
+                  Area (planar XY): {measurements.area.toFixed(6)}
+                </Text>
               ) : null}
               {measurements.volume !== undefined ? (
-                <Text style={styles.resultText}>Volume (fan est.): {measurements.volume.toFixed(6)}</Text>
+                <Text style={styles.resultText}>
+                  Volume (fan est.): {measurements.volume.toFixed(6)}
+                </Text>
               ) : null}
               {measurements.elevationChange !== undefined ? (
-                <Text style={styles.resultText}>|ΔZ|: {measurements.elevationChange.toFixed(4)}</Text>
+                <Text style={styles.resultText}>
+                  |ΔZ|: {measurements.elevationChange.toFixed(4)}
+                </Text>
               ) : null}
             </View>
           ) : null}
@@ -191,7 +214,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
   },
-  resultsTitle: { fontSize: 14, fontWeight: "bold", marginBottom: 8, color: "#333" },
+  resultsTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#333",
+  },
   resultText: { fontSize: 12, color: "#666", marginVertical: 3 },
   infoContainer: {
     backgroundColor: "#e3f2fd",

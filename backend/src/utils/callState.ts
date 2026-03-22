@@ -21,10 +21,14 @@ interface Env {
   [key: string]: any;
 }
 
-export async function setCallState(env: Env, callId: string, state: CallState): Promise<void> {
+export async function setCallState(
+  env: Env,
+  callId: string,
+  state: CallState,
+): Promise<void> {
   try {
     await env.HD2D_CACHE.put(`call:${callId}`, JSON.stringify(state), {
-      expirationTtl: 3600
+      expirationTtl: 3600,
     });
   } catch (error) {
     console.error("Error setting call state:", error);
@@ -32,7 +36,10 @@ export async function setCallState(env: Env, callId: string, state: CallState): 
   }
 }
 
-export async function getCallState(env: Env, callId: string): Promise<CallState | null> {
+export async function getCallState(
+  env: Env,
+  callId: string,
+): Promise<CallState | null> {
   try {
     const raw = await env.HD2D_CACHE.get(`call:${callId}`);
     return raw ? JSON.parse(raw) : null;

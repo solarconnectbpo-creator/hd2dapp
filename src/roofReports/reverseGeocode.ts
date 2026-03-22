@@ -1,11 +1,14 @@
-export async function reverseGeocodeNominatim(lat: number, lng: number): Promise<string> {
+export async function reverseGeocodeNominatim(
+  lat: number,
+  lng: number,
+): Promise<string> {
   try {
     // Public endpoint; may occasionally rate-limit. Falls back to lat/lng if it fails.
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
       String(lat),
     )}&lon=${encodeURIComponent(String(lng))}&zoom=18&addressdetails=1`;
 
-    const res = await fetch(url, { headers: { "Accept": "application/json" } });
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`Reverse geocode failed: ${res.status}`);
 
     const data = (await res.json()) as any;
@@ -73,7 +76,9 @@ export type NominatimSearchHit = {
  * Forward geocode (address search). Nominatim requires a valid User-Agent.
  * Prefer US results for property lookup.
  */
-export async function forwardGeocodeNominatim(query: string): Promise<NominatimSearchHit[]> {
+export async function forwardGeocodeNominatim(
+  query: string,
+): Promise<NominatimSearchHit[]> {
   const q = query.trim();
   if (q.length < 3) return [];
 
@@ -100,7 +105,10 @@ export async function forwardGeocodeNominatim(query: string): Promise<NominatimS
         return {
           lat,
           lng,
-          displayName: typeof d?.display_name === "string" ? d.display_name : `${lat}, ${lng}`,
+          displayName:
+            typeof d?.display_name === "string"
+              ? d.display_name
+              : `${lat}, ${lng}`,
         } as NominatimSearchHit;
       })
       .filter(Boolean) as NominatimSearchHit[];
@@ -108,4 +116,3 @@ export async function forwardGeocodeNominatim(query: string): Promise<NominatimS
     return [];
   }
 }
-

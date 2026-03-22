@@ -29,6 +29,6 @@ export function verifyPhone(phone: string): PhoneVerification {
   return {
     valid,
     cleaned,
-    reason: valid ? "valid" : "invalid"
+    reason: valid ? "valid" : "invalid",
   };
 }

@@ -16,7 +16,7 @@ export const QUICK_PRICE_ROOF = {
 
   // "Roofing Felt – Synthetic Underlayment" (SQ)
   // replace $45.53 + tax $2.20. Estimator synthetic underlayment roll covers 1000 sq ft (10 SQ).
-  underlaymentSyntheticPricePerRoll: (45.53 + 2.20) * 10,
+  underlaymentSyntheticPricePerRoll: (45.53 + 2.2) * 10,
 
   // "Ice & Water Barrier (standard)" (SF)
   // replace $1.54 + tax $0.05. Estimator uses 62 linear feet per roll.
@@ -41,4 +41,3 @@ export const QUICK_PRICE_ROOF = {
   // "Taxes, Insurance, Permits & Fees ★PENDING" (EA)
   additionalPermitFee: 296.0,
 } as const;
-

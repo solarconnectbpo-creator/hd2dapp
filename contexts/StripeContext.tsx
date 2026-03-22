@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 import { Platform } from "react-native";
 
 interface StripeContextType {
@@ -20,9 +26,12 @@ export function StripeContextProvider({ children }: { children: ReactNode }) {
     if (Platform.OS !== "web") {
       try {
         const { initStripe } = require("@stripe/stripe-react-native");
-        const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+        const publishableKey =
+          process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
         if (publishableKey && initStripe) {
-          initStripe({ publishableKey, urlScheme: "hd2d" }).then(() => setStripeReady(true));
+          initStripe({ publishableKey, urlScheme: "hd2d" }).then(() =>
+            setStripeReady(true),
+          );
         }
       } catch (e) {
         console.warn("Stripe not available on this platform");
@@ -34,7 +43,14 @@ export function StripeContextProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <StripeContext.Provider value={{ isProcessing, setIsProcessing, lastTransaction, setLastTransaction }}>
+    <StripeContext.Provider
+      value={{
+        isProcessing,
+        setIsProcessing,
+        lastTransaction,
+        setLastTransaction,
+      }}
+    >
       {stripeReady && children}
     </StripeContext.Provider>
   );

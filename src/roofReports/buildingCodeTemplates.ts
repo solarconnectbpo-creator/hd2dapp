@@ -182,7 +182,12 @@ function formatCountyLabel(county?: string): string | undefined {
 function jurisdictionLabel(p: BuildingCodeLocationInput): string | undefined {
   const cc = (p.countryCode ?? "").toLowerCase();
   if (cc && cc !== "us") {
-    const parts = [p.city, formatCountyLabel(p.county), p.stateName, p.countryCode]
+    const parts = [
+      p.city,
+      formatCountyLabel(p.county),
+      p.stateName,
+      p.countryCode,
+    ]
       .filter(Boolean)
       .map(String);
     return parts.length ? parts.join(", ") : undefined;

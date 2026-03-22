@@ -27,7 +27,9 @@ describe("User Guidance System", () => {
         { areaSqFt: 1600 },
       );
       expect(result.score).toBeLessThan(100);
-      expect(result.issues.some((i) => i.id === "measurement-variance")).toBe(true);
+      expect(result.issues.some((i) => i.id === "measurement-variance")).toBe(
+        true,
+      );
     });
 
     it("should warn about low AI confidence", () => {
@@ -35,7 +37,9 @@ describe("User Guidance System", () => {
         { areaSqFt: 1000, confidence: 0.5 },
         { areaSqFt: 1000 },
       );
-      expect(result.issues.some((i) => i.id === "low-ai-confidence")).toBe(true);
+      expect(result.issues.some((i) => i.id === "low-ai-confidence")).toBe(
+        true,
+      );
     });
 
     it("should mark as acceptable when measurements align", () => {
@@ -53,7 +57,9 @@ describe("User Guidance System", () => {
         { areaSqFt: 1000 },
         [{ areaSqFt: 2000 }, { areaSqFt: 1900 }],
       );
-      expect(result.issues.some((i) => i.id === "historical-variance")).toBe(true);
+      expect(result.issues.some((i) => i.id === "historical-variance")).toBe(
+        true,
+      );
     });
   });
 

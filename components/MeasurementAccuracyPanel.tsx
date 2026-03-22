@@ -6,7 +6,9 @@ import { ThemedText } from "@/components/ThemedText";
 import { BorderRadius, Spacing } from "@/constants/theme";
 import type { RoofMeasurementValidationSummary } from "@/src/roofReports/roofReportTypes";
 
-function confidenceColor(c: RoofMeasurementValidationSummary["overallConfidence"]): string {
+function confidenceColor(
+  c: RoofMeasurementValidationSummary["overallConfidence"],
+): string {
   if (c === "high") return "#22c55e";
   if (c === "medium") return "#f59e0b";
   return "#ef4444";
@@ -62,8 +64,8 @@ export function MeasurementAccuracyPanel({
         </View>
       ) : (
         <ThemedText type="caption" style={[styles.subtitle, { marginTop: 6 }]}>
-          Trace, AI, and estimate figures are within expected tolerance (or only one source
-          is present).
+          Trace, AI, and estimate figures are within expected tolerance (or only
+          one source is present).
         </ThemedText>
       )}
     </View>

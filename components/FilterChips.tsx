@@ -15,7 +15,11 @@ interface FilterChipsProps {
   onSelect: (key: string | null) => void;
 }
 
-export function FilterChips({ options, selectedKey, onSelect }: FilterChipsProps) {
+export function FilterChips({
+  options,
+  selectedKey,
+  onSelect,
+}: FilterChipsProps) {
   const { theme } = useTheme();
 
   return (
@@ -30,7 +34,9 @@ export function FilterChips({ options, selectedKey, onSelect }: FilterChipsProps
           styles.chip,
           {
             backgroundColor:
-              selectedKey === null ? AppColors.primary : theme.backgroundDefault,
+              selectedKey === null
+                ? AppColors.primary
+                : theme.backgroundDefault,
           },
         ]}
       >

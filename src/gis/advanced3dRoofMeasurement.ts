@@ -67,7 +67,14 @@ export class Advanced3DRoofMeasurement {
 
       if (plane.pointIndices.length >= minPointsPerPlane) {
         const vertices = this.convexHull3D(
-          plane.pointIndices.map((idx) => [pointCloud[idx].x, pointCloud[idx].y, pointCloud[idx].z] as [number, number, number]),
+          plane.pointIndices.map(
+            (idx) =>
+              [pointCloud[idx].x, pointCloud[idx].y, pointCloud[idx].z] as [
+                number,
+                number,
+                number,
+              ],
+          ),
         );
 
         if (vertices.length >= 3) {
@@ -102,7 +109,10 @@ export class Advanced3DRoofMeasurement {
     normal: [number, number, number];
     pointIndices: number[];
   } | null {
-    const availableIndices = Array.from({ length: pointCloud.length }, (_, i) => i).filter((i) => !usedPoints.has(i));
+    const availableIndices = Array.from(
+      { length: pointCloud.length },
+      (_, i) => i,
+    ).filter((i) => !usedPoints.has(i));
 
     if (availableIndices.length < 3) return null;
 
@@ -121,7 +131,9 @@ export class Advanced3DRoofMeasurement {
       const v1 = [p2.x - p1.x, p2.y - p1.y, p2.z - p1.z];
       const v2 = [p3.x - p1.x, p3.y - p1.y, p3.z - p1.z];
       const normal = this.crossProduct(v1, v2);
-      const normalLength = Math.sqrt(normal[0] ** 2 + normal[1] ** 2 + normal[2] ** 2);
+      const normalLength = Math.sqrt(
+        normal[0] ** 2 + normal[1] ** 2 + normal[2] ** 2,
+      );
 
       if (normalLength < 0.001) continue;
 
@@ -135,7 +147,9 @@ export class Advanced3DRoofMeasurement {
       for (const idx of availableIndices) {
         const point = pointCloud[idx];
         const distance = Math.abs(
-          normalUnit[0] * (point.x - p1.x) + normalUnit[1] * (point.y - p1.y) + normalUnit[2] * (point.z - p1.z),
+          normalUnit[0] * (point.x - p1.x) +
+            normalUnit[1] * (point.y - p1.y) +
+            normalUnit[2] * (point.z - p1.z),
         );
 
         if (distance < distanceThreshold) {
@@ -155,7 +169,9 @@ export class Advanced3DRoofMeasurement {
     return bestPlane;
   }
 
-  private static convexHull3D(points: Array<[number, number, number]>): Array<[number, number, number]> {
+  private static convexHull3D(
+    points: Array<[number, number, number]>,
+  ): Array<[number, number, number]> {
     if (points.length <= 3) return points;
 
     const center = this.centroid(points);
@@ -164,7 +180,11 @@ export class Advanced3DRoofMeasurement {
     let p1 = points[0];
 
     for (const point of points) {
-      const dist = Math.hypot(point[0] - center[0], point[1] - center[1], point[2] - center[2]);
+      const dist = Math.hypot(
+        point[0] - center[0],
+        point[1] - center[1],
+        point[2] - center[2],
+      );
       if (dist > maxDist) {
         maxDist = dist;
         p1 = point;
@@ -182,7 +202,9 @@ export class Advanced3DRoofMeasurement {
     return [p1, ...sorted.slice(0, Math.min(10, sorted.length))];
   }
 
-  private static centroid(points: Array<[number, number, number]>): [number, number, number] {
+  private static centroid(
+    points: Array<[number, number, number]>,
+  ): [number, number, number] {
     if (points.length === 0) return [0, 0, 0];
     let x = 0;
     let y = 0;
@@ -197,7 +219,11 @@ export class Advanced3DRoofMeasurement {
   }
 
   private static crossProduct(a: number[], b: number[]): number[] {
-    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    return [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0],
+    ];
   }
 
   private static randomSample<T>(arr: T[], size: number): T[] {
@@ -232,7 +258,9 @@ export class Advanced3DRoofMeasurement {
     return Math.round(direction);
   }
 
-  private static calculatePolygonArea(vertices: Array<[number, number, number]>): number {
+  private static calculatePolygonArea(
+    vertices: Array<[number, number, number]>,
+  ): number {
     if (vertices.length < 3) return 0;
 
     let area = 0;
@@ -246,7 +274,9 @@ export class Advanced3DRoofMeasurement {
     return area;
   }
 
-  private static calculatePerimeter(vertices: Array<[number, number, number]>): number {
+  private static calculatePerimeter(
+    vertices: Array<[number, number, number]>,
+  ): number {
     let perimeter = 0;
     for (let i = 0; i < vertices.length; i++) {
       const v1 = vertices[i];
@@ -292,7 +322,9 @@ export class Advanced3DRoofMeasurement {
     }, 0);
 
     const allVertices = planes.flatMap((p) => p.vertices);
-    const centerPoint = this.centroid(allVertices as Array<[number, number, number]>);
+    const centerPoint = this.centroid(
+      allVertices as Array<[number, number, number]>,
+    );
 
     const bbox = this.calculateBBox(allVertices);
 
@@ -314,7 +346,9 @@ export class Advanced3DRoofMeasurement {
     };
   }
 
-  private static detectRidges(planes: RoofPlane[]): RoofGeometryModel["ridges"] {
+  private static detectRidges(
+    planes: RoofPlane[],
+  ): RoofGeometryModel["ridges"] {
     const ridges: RoofGeometryModel["ridges"] = [];
 
     for (let i = 0; i < planes.length; i++) {
@@ -324,7 +358,11 @@ export class Advanced3DRoofMeasurement {
 
         for (const v1 of plane1.vertices) {
           for (const v2 of plane2.vertices) {
-            const dist = Math.hypot(v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2]);
+            const dist = Math.hypot(
+              v2[0] - v1[0],
+              v2[1] - v1[1],
+              v2[2] - v1[2],
+            );
 
             if (dist < 0.1) {
               const dotProduct =
@@ -349,7 +387,9 @@ export class Advanced3DRoofMeasurement {
     return ridges;
   }
 
-  private static detectValleys(planes: RoofPlane[]): RoofGeometryModel["valleys"] {
+  private static detectValleys(
+    planes: RoofPlane[],
+  ): RoofGeometryModel["valleys"] {
     const valleys: RoofGeometryModel["valleys"] = [];
 
     for (let i = 0; i < planes.length; i++) {
@@ -412,9 +452,11 @@ export class Advanced3DRoofMeasurement {
     complexity += Math.min(1, planes.length / 10);
 
     const pitches = planes.map((p) => p.pitch);
-    const avgPitch = pitches.reduce((a, b) => a + b, 0) / Math.max(pitches.length, 1);
+    const avgPitch =
+      pitches.reduce((a, b) => a + b, 0) / Math.max(pitches.length, 1);
     const pitchVariance =
-      pitches.reduce((sum, p) => sum + (p - avgPitch) ** 2, 0) / Math.max(pitches.length, 1);
+      pitches.reduce((sum, p) => sum + (p - avgPitch) ** 2, 0) /
+      Math.max(pitches.length, 1);
     complexity += Math.min(1, pitchVariance / 100);
 
     const directions = planes.map((p) => p.direction);

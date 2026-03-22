@@ -1,5 +1,16 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Modal, FlatList, Switch, TextInput, Platform } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  Modal,
+  FlatList,
+  Switch,
+  TextInput,
+  Platform,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
@@ -67,20 +78,70 @@ export default function AdminScreen() {
   const [jobSalary, setJobSalary] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [users, setUsers] = useState<AdminUser[]>([
-    { id: "1", name: "John Doe", email: "john@hd2d.com", role: "Sales Rep", status: "active" },
-    { id: "2", name: "Jane Smith", email: "jane@hd2d.com", role: "Sales Rep", status: "active" },
-    { id: "3", name: "Mike Johnson", email: "mike@hd2d.com", role: "Company Owner", status: "inactive" },
-    { id: "4", name: "Sarah Williams", email: "sarah@hd2d.com", role: "Sales Rep", status: "active" },
+    {
+      id: "1",
+      name: "John Doe",
+      email: "john@hd2d.com",
+      role: "Sales Rep",
+      status: "active",
+    },
+    {
+      id: "2",
+      name: "Jane Smith",
+      email: "jane@hd2d.com",
+      role: "Sales Rep",
+      status: "active",
+    },
+    {
+      id: "3",
+      name: "Mike Johnson",
+      email: "mike@hd2d.com",
+      role: "Company Owner",
+      status: "inactive",
+    },
+    {
+      id: "4",
+      name: "Sarah Williams",
+      email: "sarah@hd2d.com",
+      role: "Sales Rep",
+      status: "active",
+    },
   ]);
 
   const [courses, setCourses] = useState<AdminCourse[]>([
-    { id: "1", title: "D2D Mastery Certification", instructor: "Mike Reynolds", price: 497, duration: "8 weeks", level: "beginner" },
-    { id: "2", title: "Roofing Sales Accelerator", instructor: "Sarah Martinez", price: 997, duration: "10 weeks", level: "intermediate" },
+    {
+      id: "1",
+      title: "D2D Mastery Certification",
+      instructor: "Mike Reynolds",
+      price: 497,
+      duration: "8 weeks",
+      level: "beginner",
+    },
+    {
+      id: "2",
+      title: "Roofing Sales Accelerator",
+      instructor: "Sarah Martinez",
+      price: 997,
+      duration: "10 weeks",
+      level: "intermediate",
+    },
   ]);
 
   const [jobs, setJobs] = useState([
-    { id: "1", title: "Senior Closer", location: "Remote", salary: "$120k OTE", description: "Drive enterprise deals and mentor reps." },
-    { id: "2", title: "Field Sales Rep", location: "Dallas, TX", salary: "$80k OTE", description: "Local territory coverage for home services." },
+    {
+      id: "1",
+      title: "Senior Closer",
+      location: "Remote",
+      salary: "$120k OTE",
+      description: "Drive enterprise deals and mentor reps.",
+    },
+    {
+      id: "2",
+      title: "Field Sales Rep",
+      location: "Dallas, TX",
+      salary: "$80k OTE",
+      description: "Local territory coverage for home services.",
+    },
   ]);
 
   const [platformSettings, setPlatformSettings] = useState({
@@ -109,14 +170,21 @@ export default function AdminScreen() {
   };
 
   const toggleUserStatus = (userId: string) => {
-    setUsers(users.map(u =>
-      u.id === userId ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u
-    ));
+    setUsers(
+      users.map((u) =>
+        u.id === userId
+          ? { ...u, status: u.status === "active" ? "inactive" : "active" }
+          : u,
+      ),
+    );
   };
 
   const handleAddJob = () => {
     if (!jobTitle.trim() || !jobLocation.trim() || !jobSalary.trim()) {
-      Alert.alert("Missing fields", "Please enter job title, location, and salary.");
+      Alert.alert(
+        "Missing fields",
+        "Please enter job title, location, and salary.",
+      );
       return;
     }
     const newJob = {
@@ -152,7 +220,9 @@ export default function AdminScreen() {
     <ThemedView style={styles.container}>
       <View style={[styles.header, { paddingTop }]}>
         <ThemedText type="h2">Admin Dashboard</ThemedText>
-        <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+        <ThemedText
+          style={{ color: theme.textSecondary, marginTop: Spacing.sm }}
+        >
           Welcome, {user?.name}
         </ThemedText>
       </View>
@@ -164,7 +234,12 @@ export default function AdminScreen() {
         <View style={styles.statsGrid}>
           {adminStats.map((stat, index) => (
             <Card key={index} elevation={1} style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: AppColors.primary + "20" }]}>
+              <View
+                style={[
+                  styles.statIcon,
+                  { backgroundColor: AppColors.primary + "20" },
+                ]}
+              >
                 <Feather name={stat.icon} size={24} color={AppColors.primary} />
               </View>
               <ThemedText type="h3" style={styles.statValue}>
@@ -182,8 +257,13 @@ export default function AdminScreen() {
         </ThemedText>
 
         <Card elevation={1} style={styles.adminCard}>
-          <Pressable style={styles.adminOption} onPress={() => setShowUsersModal(true)}>
-            <View style={[styles.adminIcon, { backgroundColor: "#3B82F6" + "20" }]}>
+          <Pressable
+            style={styles.adminOption}
+            onPress={() => setShowUsersModal(true)}
+          >
+            <View
+              style={[styles.adminIcon, { backgroundColor: "#3B82F6" + "20" }]}
+            >
               <Feather name="users" size={24} color="#3B82F6" />
             </View>
             <View style={{ flex: 1 }}>
@@ -192,13 +272,22 @@ export default function AdminScreen() {
                 View and manage all users
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={theme.textSecondary}
+            />
           </Pressable>
         </Card>
 
         <Card elevation={1} style={styles.adminCard}>
-          <Pressable style={styles.adminOption} onPress={() => setShowAnalyticsModal(true)}>
-            <View style={[styles.adminIcon, { backgroundColor: "#10B981" + "20" }]}>
+          <Pressable
+            style={styles.adminOption}
+            onPress={() => setShowAnalyticsModal(true)}
+          >
+            <View
+              style={[styles.adminIcon, { backgroundColor: "#10B981" + "20" }]}
+            >
               <Feather name="trending-up" size={24} color="#10B981" />
             </View>
             <View style={{ flex: 1 }}>
@@ -207,13 +296,22 @@ export default function AdminScreen() {
                 View platform metrics and reports
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={theme.textSecondary}
+            />
           </Pressable>
         </Card>
 
         <Card elevation={1} style={styles.adminCard}>
-          <Pressable style={styles.adminOption} onPress={() => setShowSettingsModal(true)}>
-            <View style={[styles.adminIcon, { backgroundColor: "#F59E0B" + "20" }]}>
+          <Pressable
+            style={styles.adminOption}
+            onPress={() => setShowSettingsModal(true)}
+          >
+            <View
+              style={[styles.adminIcon, { backgroundColor: "#F59E0B" + "20" }]}
+            >
               <Feather name="settings" size={24} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
@@ -222,13 +320,22 @@ export default function AdminScreen() {
                 Configure platform features
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={theme.textSecondary}
+            />
           </Pressable>
         </Card>
 
         <Card elevation={1} style={styles.adminCard}>
-          <Pressable style={styles.adminOption} onPress={() => setShowCoursesModal(true)}>
-            <View style={[styles.adminIcon, { backgroundColor: "#8B5CF6" + "20" }]}>
+          <Pressable
+            style={styles.adminOption}
+            onPress={() => setShowCoursesModal(true)}
+          >
+            <View
+              style={[styles.adminIcon, { backgroundColor: "#8B5CF6" + "20" }]}
+            >
               <Feather name="book" size={24} color="#8B5CF6" />
             </View>
             <View style={{ flex: 1 }}>
@@ -237,13 +344,22 @@ export default function AdminScreen() {
                 Add and manage training courses
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={theme.textSecondary}
+            />
           </Pressable>
         </Card>
 
         <Card elevation={1} style={styles.adminCard}>
-          <Pressable style={styles.adminOption} onPress={() => setShowJobsModal(true)}>
-            <View style={[styles.adminIcon, { backgroundColor: "#0EA5E9" + "20" }]}>
+          <Pressable
+            style={styles.adminOption}
+            onPress={() => setShowJobsModal(true)}
+          >
+            <View
+              style={[styles.adminIcon, { backgroundColor: "#0EA5E9" + "20" }]}
+            >
               <Feather name="briefcase" size={24} color="#0EA5E9" />
             </View>
             <View style={{ flex: 1 }}>
@@ -252,16 +368,17 @@ export default function AdminScreen() {
                 Add and manage jobs for users
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={theme.textSecondary}
+            />
           </Pressable>
         </Card>
 
         <Button
           onPress={handleLogout}
-          style={[
-            styles.logoutButton,
-            { backgroundColor: AppColors.error },
-          ]}
+          style={[styles.logoutButton, { backgroundColor: AppColors.error }]}
         >
           Logout
         </Button>
@@ -270,7 +387,12 @@ export default function AdminScreen() {
       {/* Users Management Modal */}
       <Modal visible={showUsersModal} animationType="slide" transparent>
         <ThemedView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, { paddingTop: insets.top + Spacing.lg }]}>
+          <View
+            style={[
+              styles.modalHeader,
+              { paddingTop: insets.top + Spacing.lg },
+            ]}
+          >
             <ThemedText type="h3">Manage Users</ThemedText>
             <Pressable onPress={() => setShowUsersModal(false)}>
               <Feather name="x" size={24} color={theme.text} />
@@ -285,10 +407,18 @@ export default function AdminScreen() {
                 <View style={styles.userRow}>
                   <View style={{ flex: 1 }}>
                     <ThemedText type="h4">{item.name}</ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    <ThemedText
+                      style={{ color: theme.textSecondary, fontSize: 12 }}
+                    >
                       {item.email}
                     </ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                        marginTop: Spacing.xs,
+                      }}
+                    >
                       {item.role}
                     </ThemedText>
                   </View>
@@ -306,7 +436,12 @@ export default function AdminScreen() {
       {/* Analytics Modal */}
       <Modal visible={showAnalyticsModal} animationType="slide" transparent>
         <ThemedView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, { paddingTop: insets.top + Spacing.lg }]}>
+          <View
+            style={[
+              styles.modalHeader,
+              { paddingTop: insets.top + Spacing.lg },
+            ]}
+          >
             <ThemedText type="h3">Platform Analytics</ThemedText>
             <Pressable onPress={() => setShowAnalyticsModal(false)}>
               <Feather name="x" size={24} color={theme.text} />
@@ -320,7 +455,9 @@ export default function AdminScreen() {
               <Card elevation={1} style={styles.analyticsCard}>
                 <View style={styles.analyticsRow}>
                   <View style={{ flex: 1 }}>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 13 }}>
+                    <ThemedText
+                      style={{ color: theme.textSecondary, fontSize: 13 }}
+                    >
                       {item.label}
                     </ThemedText>
                     <ThemedText type="h2" style={{ marginTop: Spacing.sm }}>
@@ -328,8 +465,14 @@ export default function AdminScreen() {
                     </ThemedText>
                   </View>
                   <View style={styles.changeIndicator}>
-                    <Feather name="trending-up" size={20} color={AppColors.accent} />
-                    <ThemedText style={{ color: AppColors.accent, fontWeight: "600" }}>
+                    <Feather
+                      name="trending-up"
+                      size={20}
+                      color={AppColors.accent}
+                    />
+                    <ThemedText
+                      style={{ color: AppColors.accent, fontWeight: "600" }}
+                    >
                       +{item.change}%
                     </ThemedText>
                   </View>
@@ -343,7 +486,12 @@ export default function AdminScreen() {
       {/* Settings Modal */}
       <Modal visible={showSettingsModal} animationType="slide" transparent>
         <ThemedView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, { paddingTop: insets.top + Spacing.lg }]}>
+          <View
+            style={[
+              styles.modalHeader,
+              { paddingTop: insets.top + Spacing.lg },
+            ]}
+          >
             <ThemedText type="h3">Platform Settings</ThemedText>
             <Pressable onPress={() => setShowSettingsModal(false)}>
               <Feather name="x" size={24} color={theme.text} />
@@ -359,7 +507,10 @@ export default function AdminScreen() {
                   <Switch
                     value={value}
                     onValueChange={(newValue) =>
-                      setPlatformSettings((prev) => ({ ...prev, [key]: newValue }))
+                      setPlatformSettings((prev) => ({
+                        ...prev,
+                        [key]: newValue,
+                      }))
                     }
                   />
                 </View>
@@ -372,7 +523,12 @@ export default function AdminScreen() {
       {/* Courses Modal */}
       <Modal visible={showCoursesModal} animationType="slide" transparent>
         <ThemedView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, { paddingTop: insets.top + Spacing.lg }]}>
+          <View
+            style={[
+              styles.modalHeader,
+              { paddingTop: insets.top + Spacing.lg },
+            ]}
+          >
             <ThemedText type="h3">Manage Courses</ThemedText>
             <Pressable onPress={() => setShowCoursesModal(false)}>
               <Feather name="x" size={24} color={theme.text} />
@@ -385,14 +541,20 @@ export default function AdminScreen() {
             ListHeaderComponent={
               <View style={styles.formContainer}>
                 <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.input,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   placeholder="Course Title"
                   placeholderTextColor={theme.textSecondary}
                   value={courseTitle}
                   onChangeText={setCourseTitle}
                 />
                 <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.input,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   placeholder="Course Price"
                   placeholderTextColor={theme.textSecondary}
                   value={coursePrice}
@@ -402,14 +564,17 @@ export default function AdminScreen() {
                 <Button
                   onPress={() => {
                     if (courseTitle && coursePrice) {
-                      setCourses([...courses, {
-                        id: (courses.length + 1).toString(),
-                        title: courseTitle,
-                        instructor: "Admin",
-                        price: parseInt(coursePrice),
-                        duration: "8 weeks",
-                        level: "beginner"
-                      }]);
+                      setCourses([
+                        ...courses,
+                        {
+                          id: (courses.length + 1).toString(),
+                          title: courseTitle,
+                          instructor: "Admin",
+                          price: parseInt(coursePrice),
+                          duration: "8 weeks",
+                          level: "beginner",
+                        },
+                      ]);
                       setCourseTitle("");
                       setCoursePrice("");
                     }
@@ -424,14 +589,26 @@ export default function AdminScreen() {
                 <View style={styles.itemContent}>
                   <View style={{ flex: 1 }}>
                     <ThemedText type="h4">{item.title}</ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    <ThemedText
+                      style={{ color: theme.textSecondary, fontSize: 12 }}
+                    >
                       {item.instructor}
                     </ThemedText>
-                    <ThemedText type="h3" style={{ marginTop: Spacing.sm, color: AppColors.primary }}>
+                    <ThemedText
+                      type="h3"
+                      style={{
+                        marginTop: Spacing.sm,
+                        color: AppColors.primary,
+                      }}
+                    >
                       ${item.price}
                     </ThemedText>
                   </View>
-                  <Pressable onPress={() => setCourses(courses.filter(c => c.id !== item.id))}>
+                  <Pressable
+                    onPress={() =>
+                      setCourses(courses.filter((c) => c.id !== item.id))
+                    }
+                  >
                     <Feather name="trash-2" size={20} color={AppColors.error} />
                   </Pressable>
                 </View>
@@ -444,7 +621,12 @@ export default function AdminScreen() {
       {/* Jobs Modal */}
       <Modal visible={showJobsModal} animationType="slide" transparent>
         <ThemedView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, { paddingTop: insets.top + Spacing.lg }]}>
+          <View
+            style={[
+              styles.modalHeader,
+              { paddingTop: insets.top + Spacing.lg },
+            ]}
+          >
             <ThemedText type="h3">Manage Job Postings</ThemedText>
             <Pressable onPress={() => setShowJobsModal(false)}>
               <Feather name="x" size={24} color={theme.text} />
@@ -457,28 +639,40 @@ export default function AdminScreen() {
             ListHeaderComponent={
               <View style={styles.formContainer}>
                 <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.input,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   placeholder="Job Title"
                   placeholderTextColor={theme.textSecondary}
                   value={jobTitle}
                   onChangeText={setJobTitle}
                 />
                 <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.input,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   placeholder="Location"
                   placeholderTextColor={theme.textSecondary}
                   value={jobLocation}
                   onChangeText={setJobLocation}
                 />
                 <TextInput
-                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.input,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   placeholder="Salary (e.g., $100k OTE)"
                   placeholderTextColor={theme.textSecondary}
                   value={jobSalary}
                   onChangeText={setJobSalary}
                 />
                 <TextInput
-                  style={[styles.textArea, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.textArea,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   placeholder="Description"
                   placeholderTextColor={theme.textSecondary}
                   value={jobDescription}
@@ -494,17 +688,39 @@ export default function AdminScreen() {
                 <View style={styles.itemContent}>
                   <View style={{ flex: 1 }}>
                     <ThemedText type="h4">{item.title}</ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                        marginTop: Spacing.xs,
+                      }}
+                    >
                       {item.location}
                     </ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                        marginTop: Spacing.xs,
+                      }}
+                    >
                       {item.salary}
                     </ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                        marginTop: Spacing.xs,
+                      }}
+                    >
                       {item.description}
                     </ThemedText>
                   </View>
-                  <Pressable onPress={() => setJobs(jobs.filter((j) => j.id !== item.id))}>
+                  <Pressable
+                    onPress={() =>
+                      setJobs(jobs.filter((j) => j.id !== item.id))
+                    }
+                  >
                     <Feather name="trash-2" size={20} color={AppColors.error} />
                   </Pressable>
                 </View>

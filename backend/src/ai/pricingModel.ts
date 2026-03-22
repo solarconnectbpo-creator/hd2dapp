@@ -35,7 +35,7 @@ interface PricingRecommendation {
 export async function suggestNewPrice(
   env: Env,
   product: Product,
-  stats: Stats
+  stats: Stats,
 ): Promise<PricingRecommendation> {
   try {
     const prompt = `
@@ -69,14 +69,14 @@ Return ONLY valid JSON, no markdown.`;
     return {
       suggestedPrice: parsed.suggestedPrice || product.price,
       strategy: parsed.strategy || "keep",
-      reason: parsed.reason || "No change recommended"
+      reason: parsed.reason || "No change recommended",
     };
   } catch (error) {
     console.error("Pricing model error:", error);
     return {
       suggestedPrice: product.price,
       strategy: "keep",
-      reason: "AI parsing error"
+      reason: "AI parsing error",
     };
   }
 }

@@ -1330,7 +1330,10 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
             <ThemedText
               key={`metar-${i}`}
               type="caption"
-              style={[styles.mutedValue, { marginTop: i ? 4 : 0, lineHeight: 18 }]}
+              style={[
+                styles.mutedValue,
+                { marginTop: i ? 4 : 0, lineHeight: 18 },
+              ]}
             >
               {line}
             </ThemedText>
@@ -1344,7 +1347,10 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           <ThemedText type="h4" style={styles.sectionTitle}>
             Field QA checklist
           </ThemedText>
-          <ThemedText type="caption" style={[styles.mutedValue, { marginBottom: 10 }]}>
+          <ThemedText
+            type="caption"
+            style={[styles.mutedValue, { marginBottom: 10 }]}
+          >
             Completed {fieldQaCompletionCount(report.fieldQaChecklist)} /{" "}
             {FIELD_QA_ITEMS.length}
           </ThemedText>
@@ -1693,7 +1699,10 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
         <ThemedText type="h4" style={styles.sectionTitle}>
           Export
         </ThemedText>
-        <ThemedText type="caption" style={[styles.mutedValue, { marginBottom: 10 }]}>
+        <ThemedText
+          type="caption"
+          style={[styles.mutedValue, { marginBottom: 10 }]}
+        >
           Roof inspection report and cost estimate export together — choose HTML
           to print or save as PDF, or JSON for data backup.
         </ThemedText>
@@ -1736,7 +1745,10 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           <Pressable
             style={[
               styles.exportModalCard,
-              { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+              {
+                backgroundColor: theme.backgroundSecondary,
+                borderColor: theme.border,
+              },
             ]}
             onPress={(e) => e.stopPropagation()}
           >
@@ -1752,7 +1764,10 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
                   HTML includes the printable report and cost estimate. JSON is
                   raw data for backup or tools.
                 </ThemedText>
-                <Button onPress={runExportHtml} style={styles.exportModalButton}>
+                <Button
+                  onPress={runExportHtml}
+                  style={styles.exportModalButton}
+                >
                   HTML (print / PDF)
                 </Button>
                 <View style={{ height: 10 }} />
@@ -1777,13 +1792,21 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
                 <ThemedText type="h4" style={{ marginBottom: 8 }}>
                   Exporting…
                 </ThemedText>
-                <ThemedText type="caption" style={{ marginBottom: 12, lineHeight: 20 }}>
+                <ThemedText
+                  type="caption"
+                  style={{ marginBottom: 12, lineHeight: 20 }}
+                >
                   {exportPhase || "Working…"}{" "}
                   <ThemedText type="caption" style={{ fontWeight: "700" }}>
                     {Math.round(exportProgressPct)}%
                   </ThemedText>
                 </ThemedText>
-                <View style={[styles.exportProgressTrack, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.exportProgressTrack,
+                    { backgroundColor: theme.border },
+                  ]}
+                >
                   <View
                     style={[
                       styles.exportProgressFill,

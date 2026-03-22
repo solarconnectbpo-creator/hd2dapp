@@ -102,10 +102,13 @@ export async function handleRoofDamageAi(
   corsHeaders: Record<string, string>,
 ): Promise<Response> {
   if (request.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
   if (!env.OPENAI_API_KEY?.trim()) {
@@ -114,7 +117,10 @@ export async function handleRoofDamageAi(
         success: false,
         error: "OPENAI_API_KEY is not configured on the server",
       }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -122,28 +128,47 @@ export async function handleRoofDamageAi(
   try {
     body = (await request.json()) as RoofDamageAiBody;
   } catch {
-    return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid JSON body" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
-  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
-  const b64 = typeof body.imageBase64 === "string" ? body.imageBase64.trim() : "";
+  const imageUrl =
+    typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+  const b64 =
+    typeof body.imageBase64 === "string" ? body.imageBase64.trim() : "";
   const mimeType =
-    typeof body.mimeType === "string" && body.mimeType.trim() ? body.mimeType.trim() : "image/jpeg";
+    typeof body.mimeType === "string" && body.mimeType.trim()
+      ? body.mimeType.trim()
+      : "image/jpeg";
 
   if (!imageUrl && !b64) {
     return new Response(
-      JSON.stringify({ success: false, error: "Provide imageUrl or imageBase64" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        success: false,
+        error: "Provide imageUrl or imageBase64",
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
   if (b64.length > 6_000_000) {
     return new Response(
-      JSON.stringify({ success: false, error: "imageBase64 too large (max ~4.5MB encoded)" }),
-      { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        success: false,
+        error: "imageBase64 too large (max ~4.5MB encoded)",
+      }),
+      {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -222,7 +247,10 @@ ${context ? `\nContext: ${context}` : ""}`,
         error: `OpenAI error ${res.status}`,
         detail: errText.slice(0, 500),
       }),
-      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -234,7 +262,9 @@ ${context ? `\nContext: ${context}` : ""}`,
 
   const damageTypes = normalizeDamageTypes(parsed.damageTypes);
   const severity = clampSeverity(parsed.severity);
-  const recommendedAction = normalizeRecommendedAction(parsed.recommendedAction);
+  const recommendedAction = normalizeRecommendedAction(
+    parsed.recommendedAction,
+  );
   const notes = optString(parsed.notes, 1200);
   const summary = optString(parsed.summary, 400);
 
@@ -250,6 +280,9 @@ ${context ? `\nContext: ${context}` : ""}`,
         model: "gpt-4o-mini",
       },
     }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }

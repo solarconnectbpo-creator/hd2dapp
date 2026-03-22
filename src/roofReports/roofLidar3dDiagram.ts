@@ -20,18 +20,25 @@ function esc(s: string): string {
 }
 
 /** Isometric-ish 3D extrusion + point cloud styling from traced footprint + optional pitch metadata. */
-export function buildRoofLidar3dPolygonDiagramSvgDataUrl(input: RoofLidar3dDiagramInput): string | undefined {
+export function buildRoofLidar3dPolygonDiagramSvgDataUrl(
+  input: RoofLidar3dDiagramInput,
+): string | undefined {
   const poly = extractLargestPolygonFromTrace(input.roofTraceGeoJson);
   if (!poly) return undefined;
 
-  const metrics = computeRoofPolygonEdgeMetrics(input.roofTraceGeoJson, input.roofPitch);
+  const metrics = computeRoofPolygonEdgeMetrics(
+    input.roofTraceGeoJson,
+    input.roofPitch,
+  );
   if (!metrics?.edges.length) return undefined;
 
   const ring = poly.geometry.coordinates?.[0] ?? [];
   if (ring.length < 4) return undefined;
 
   const openRing =
-    ring.length > 3 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+    ring.length > 3 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1]
       ? ring.slice(0, -1)
       : ring;
   if (openRing.length < 3) return undefined;
@@ -115,7 +122,8 @@ export function buildRoofLidar3dPolygonDiagramSvgDataUrl(input: RoofLidar3dDiagr
     const abbr = m ? roofEdgeKindAbbrev(m.kind) : "";
     let txt = `E${i + 1} ${abbr}`;
     if (p !== undefined) txt += ` ${p.toFixed(1)}' pl`;
-    if (s !== undefined && input.roofPitch?.trim()) txt += `/${s.toFixed(1)}' ln`;
+    if (s !== undefined && input.roofPitch?.trim())
+      txt += `/${s.toFixed(1)}' ln`;
     edgeDim.push(
       `<text x="${(midX + nx).toFixed(1)}" y="${(midY + ny).toFixed(1)}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">${esc(txt)}</text>`,
     );
@@ -123,8 +131,12 @@ export function buildRoofLidar3dPolygonDiagramSvgDataUrl(input: RoofLidar3dDiagr
 
   const sumPlan = metrics.perimeterPlanFt;
   const sumSlope =
-    input.roofPitch?.trim() && metrics.edges.some((e) => e.slopeFeetApprox != null)
-      ? metrics.edges.reduce((acc, e) => acc + (e.slopeFeetApprox ?? e.planFeet), 0)
+    input.roofPitch?.trim() &&
+    metrics.edges.some((e) => e.slopeFeetApprox != null)
+      ? metrics.edges.reduce(
+          (acc, e) => acc + (e.slopeFeetApprox ?? e.planFeet),
+          0,
+        )
       : undefined;
 
   const roofType = input.roofType?.trim();
@@ -152,7 +164,9 @@ export function buildRoofLidar3dPolygonDiagramSvgDataUrl(input: RoofLidar3dDiagr
 
 <text x="48" y="64" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" fill="#0c4a6e">LiDAR-style 3D roof outline</text>
 <text x="48" y="92" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">${esc(
-    roofType ? `Roof: ${roofType}` : "Traced footprint extruded for takeoff visualization",
+    roofType
+      ? `Roof: ${roofType}`
+      : "Traced footprint extruded for takeoff visualization",
   )}</text>
 <text x="48" y="114" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#64748b">Axonometric projection from map trace (not raw aerial LiDAR). LF = geodesic feet on WGS84.</text>
 

@@ -32,7 +32,8 @@ function esc(s: string): string {
 }
 
 function areaSqToSquares(areaSqFt?: number): number | undefined {
-  if (!areaSqFt || !Number.isFinite(areaSqFt) || areaSqFt <= 0) return undefined;
+  if (!areaSqFt || !Number.isFinite(areaSqFt) || areaSqFt <= 0)
+    return undefined;
   return areaSqFt / 100;
 }
 
@@ -41,10 +42,15 @@ function mercatorWorldSize(zoom: number): number {
 }
 
 /** Mapbox/Web Mercator world coordinates (same family as Mapbox GL). */
-function lngLatToWorld(lng: number, lat: number, worldSize: number): { x: number; y: number } {
+function lngLatToWorld(
+  lng: number,
+  lat: number,
+  worldSize: number,
+): { x: number; y: number } {
   const x = ((lng + 180) / 360) * worldSize;
   const sinLat = Math.sin((lat * Math.PI) / 180);
-  const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * worldSize;
+  const y =
+    (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * worldSize;
   return { x, y };
 }
 
@@ -81,7 +87,10 @@ function expandBboxGeographic(
   return [minLng - padX, minLat - padY, maxLng + padX, maxLat + padY];
 }
 
-function mercatorBoundsOfBbox(bbox: [number, number, number, number], worldSize: number) {
+function mercatorBoundsOfBbox(
+  bbox: [number, number, number, number],
+  worldSize: number,
+) {
   const [w, s, e, n] = bbox;
   const corners = [
     lngLatToWorld(w, s, worldSize),
@@ -217,7 +226,9 @@ function edgeStrokeColor(
   return C.eaveRidgeParallel;
 }
 
-export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | undefined {
+export function buildRoofDiagramSvgDataUrl(
+  input: RoofDiagramInput,
+): string | undefined {
   const area = input.roofAreaSqFt;
   const perimeter = input.roofPerimeterFt;
   const squares = areaSqToSquares(area);
@@ -230,7 +241,10 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
   const drawH = h - FOOTER_H;
 
   const poly = extractLargestPolygonFromTrace(input.roofTraceGeoJson);
-  const edgeMetrics = computeRoofPolygonEdgeMetrics(input.roofTraceGeoJson, input.roofPitch);
+  const edgeMetrics = computeRoofPolygonEdgeMetrics(
+    input.roofTraceGeoJson,
+    input.roofPitch,
+  );
 
   const useSatellite =
     !!input.satelliteImageUrl?.trim() &&
@@ -257,22 +271,40 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
       const ring = poly.geometry.coordinates?.[0] ?? [];
       if (ring.length >= 3) {
         openRingLonLat =
-          ring.length > 3 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+          ring.length > 3 &&
+          ring[0][0] === ring[ring.length - 1][0] &&
+          ring[0][1] === ring[ring.length - 1][1]
             ? ring.slice(0, -1)
             : ring.slice();
         vertsEnu = ringToEnu(openRingLonLat);
 
         const envToken =
-          typeof process !== "undefined" ? ((process as { env?: { EXPO_PUBLIC_MAPBOX_TOKEN?: string } }).env?.EXPO_PUBLIC_MAPBOX_TOKEN as string | undefined) : undefined;
-        const mapboxToken = extractMapboxTokenFromUrl(input.satelliteImageUrl ?? "") ?? envToken;
+          typeof process !== "undefined"
+            ? ((process as { env?: { EXPO_PUBLIC_MAPBOX_TOKEN?: string } }).env
+                ?.EXPO_PUBLIC_MAPBOX_TOKEN as string | undefined)
+            : undefined;
+        const mapboxToken =
+          extractMapboxTokenFromUrl(input.satelliteImageUrl ?? "") ?? envToken;
 
         if (useSatellite && mapboxToken) {
           const rawBbox = turf.bbox(poly) as [number, number, number, number];
           padBboxProject = expandBboxGeographic(rawBbox, 0.08);
-          satelliteDisplayUrl = buildMapboxStaticBboxUrl(padBboxProject, w, drawH, mapboxToken);
+          satelliteDisplayUrl = buildMapboxStaticBboxUrl(
+            padBboxProject,
+            w,
+            drawH,
+            mapboxToken,
+          );
           satelliteImageHeight = drawH;
           verts = openRingLonLat.map((p) =>
-            lngLatToPixelBboxFit(p[0], p[1], padBboxProject!, w, drawH, bboxFitMarginPx),
+            lngLatToPixelBboxFit(
+              p[0],
+              p[1],
+              padBboxProject!,
+              w,
+              drawH,
+              bboxFitMarginPx,
+            ),
           );
         } else if (useSatellite) {
           satelliteImageHeight = drawH;
@@ -295,7 +327,9 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
         }
 
         const closedForPoly = [...verts, verts[0]];
-        points = closedForPoly.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+        points = closedForPoly
+          .map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`)
+          .join(" ");
       }
     } catch {
       // ignore
@@ -337,7 +371,11 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
       let label = "";
       if (plan !== undefined && Number.isFinite(plan)) {
         label = `${plan.toFixed(1)}'`;
-        if (slope !== undefined && Number.isFinite(slope) && input.roofPitch?.trim()) {
+        if (
+          slope !== undefined &&
+          Number.isFinite(slope) &&
+          input.roofPitch?.trim()
+        ) {
           label += ` · ${slope.toFixed(1)}'`;
         }
       } else {
@@ -356,7 +394,12 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
 
   /** Optional ridge axis line (orange dashed) — PCA from metrics (satellite view only). */
   let ridgeOverlay = "";
-  if (useSatellite && verts.length >= 3 && edgeMetrics?.ridgeAxisHeadingDeg !== undefined && poly) {
+  if (
+    useSatellite &&
+    verts.length >= 3 &&
+    edgeMetrics?.ridgeAxisHeadingDeg !== undefined &&
+    poly
+  ) {
     try {
       const [minX, minY, maxX, maxY] = turf.bbox(poly);
       const cLon = (minX + maxX) / 2;
@@ -364,7 +407,10 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
       const heading = (edgeMetrics.ridgeAxisHeadingDeg * Math.PI) / 180;
       const spanM =
         Math.max(
-          Math.hypot((maxX - minX) * metersPerDegLon(cLat), (maxY - minY) * 111_320),
+          Math.hypot(
+            (maxX - minX) * metersPerDegLon(cLat),
+            (maxY - minY) * 111_320,
+          ),
           8,
         ) * 0.45;
       const east = Math.sin(heading);
@@ -374,11 +420,41 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
       let p0: { x: number; y: number };
       let p1: { x: number; y: number };
       if (padBboxProject) {
-        p0 = lngLatToPixelBboxFit(cLon - dLon, cLat - dLat, padBboxProject, w, drawH, bboxFitMarginPx);
-        p1 = lngLatToPixelBboxFit(cLon + dLon, cLat + dLat, padBboxProject, w, drawH, bboxFitMarginPx);
+        p0 = lngLatToPixelBboxFit(
+          cLon - dLon,
+          cLat - dLat,
+          padBboxProject,
+          w,
+          drawH,
+          bboxFitMarginPx,
+        );
+        p1 = lngLatToPixelBboxFit(
+          cLon + dLon,
+          cLat + dLat,
+          padBboxProject,
+          w,
+          drawH,
+          bboxFitMarginPx,
+        );
       } else {
-        p0 = lngLatToSvgPixel(cLon - dLon, cLat - dLat, centerLng, centerLat, zoom, w, drawH);
-        p1 = lngLatToSvgPixel(cLon + dLon, cLat + dLat, centerLng, centerLat, zoom, w, drawH);
+        p0 = lngLatToSvgPixel(
+          cLon - dLon,
+          cLat - dLat,
+          centerLng,
+          centerLat,
+          zoom,
+          w,
+          drawH,
+        );
+        p1 = lngLatToSvgPixel(
+          cLon + dLon,
+          cLat + dLat,
+          centerLng,
+          centerLat,
+          zoom,
+          w,
+          drawH,
+        );
       }
       ridgeOverlay = `<line x1="${p0.x.toFixed(2)}" y1="${p0.y.toFixed(2)}" x2="${p1.x.toFixed(2)}" y2="${p1.y.toFixed(2)}" stroke="${C.ridgeLine}" stroke-width="3" stroke-dasharray="10 7" stroke-opacity="0.95" />`;
     } catch {
@@ -401,14 +477,20 @@ export function buildRoofDiagramSvgDataUrl(input: RoofDiagramInput): string | un
     areaCallout = `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800" fill="${C.label}" stroke="${C.labelStroke}" stroke-width="0.6">${esc(areaStr)}</text>`;
   }
 
-  const metricArea = area && Number.isFinite(area) ? `${Math.round(area).toLocaleString()} sq ft` : "Not traced";
+  const metricArea =
+    area && Number.isFinite(area)
+      ? `${Math.round(area).toLocaleString()} sq ft`
+      : "Not traced";
   const metricPerim =
     perimeter && Number.isFinite(perimeter)
       ? `${Math.round(perimeter).toLocaleString()} ft`
       : edgeMetrics && Number.isFinite(edgeMetrics.perimeterPlanFt)
         ? `${Math.round(edgeMetrics.perimeterPlanFt).toLocaleString()} ft`
         : "Not traced";
-  const metricSquares = squares && Number.isFinite(squares) ? `${squares.toFixed(2)} squares` : "N/A";
+  const metricSquares =
+    squares && Number.isFinite(squares)
+      ? `${squares.toFixed(2)} squares`
+      : "N/A";
 
   const legend = `<g transform="translate(${w - 280}, ${satelliteImageHeight - 118})">
 <rect x="0" y="0" width="260" height="96" rx="8" fill="rgba(15,23,42,0.72)" stroke="rgba(255,255,255,0.2)"/>

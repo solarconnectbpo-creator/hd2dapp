@@ -20,7 +20,12 @@ import { Button } from "@/components/Button";
 import { FloatingActionButton } from "@/components/FloatingActionButton";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenInsets } from "@/hooks/useScreenInsets";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import { JOBS, JOB_POSTING_PACKAGES, Job } from "@/data/mockData";
 
 const JOB_TYPE_COLORS: Record<string, string> = {
@@ -39,7 +44,9 @@ export default function JobsScreen() {
   const { theme, isDark } = useTheme();
   const { paddingTop, paddingBottom } = useScreenInsets();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedExperience, setSelectedExperience] = useState<string | null>(null);
+  const [selectedExperience, setSelectedExperience] = useState<string | null>(
+    null,
+  );
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
@@ -68,12 +75,16 @@ export default function JobsScreen() {
             setCoverLetter("");
           },
         },
-      ]
+      ],
     );
   };
 
   const renderJob = ({ item }: { item: Job }) => (
-    <Card elevation={1} onPress={() => setSelectedJob(item)} style={styles.jobCard}>
+    <Card
+      elevation={1}
+      onPress={() => setSelectedJob(item)}
+      style={styles.jobCard}
+    >
       <View style={styles.jobHeader}>
         <View style={styles.companyLogo}>
           <Feather name="briefcase" size={24} color={theme.textSecondary} />
@@ -82,7 +93,9 @@ export default function JobsScreen() {
           <ThemedText type="h4" numberOfLines={1}>
             {item.title}
           </ThemedText>
-          <ThemedText style={[styles.companyName, { color: theme.textSecondary }]}>
+          <ThemedText
+            style={[styles.companyName, { color: theme.textSecondary }]}
+          >
             {item.company}
           </ThemedText>
         </View>
@@ -90,7 +103,9 @@ export default function JobsScreen() {
       <View style={styles.jobMeta}>
         <View style={styles.locationRow}>
           <Feather name="map-pin" size={14} color={theme.textSecondary} />
-          <ThemedText style={[styles.locationText, { color: theme.textSecondary }]}>
+          <ThemedText
+            style={[styles.locationText, { color: theme.textSecondary }]}
+          >
             {item.location}
           </ThemedText>
         </View>
@@ -157,12 +172,26 @@ export default function JobsScreen() {
             </View>
             <ScrollView style={styles.modalBody}>
               {JOB_POSTING_PACKAGES.map((pkg) => (
-                <Card key={pkg.id} elevation={1} style={[styles.jobCard, { marginBottom: Spacing.md }]}>
+                <Card
+                  key={pkg.id}
+                  elevation={1}
+                  style={[styles.jobCard, { marginBottom: Spacing.md }]}
+                >
                   <ThemedText type="h4">{pkg.name}</ThemedText>
-                  <ThemedText type="h2" style={{ color: AppColors.primary, marginVertical: Spacing.md }}>
+                  <ThemedText
+                    type="h2"
+                    style={{
+                      color: AppColors.primary,
+                      marginVertical: Spacing.md,
+                    }}
+                  >
                     ${pkg.price}
                   </ThemedText>
-                  <Button onPress={() => Alert.alert("Purchase", `${pkg.name} for $${pkg.price}`)}>
+                  <Button
+                    onPress={() =>
+                      Alert.alert("Purchase", `${pkg.name} for $${pkg.price}`)
+                    }
+                  >
                     Choose Package
                   </Button>
                 </Card>
@@ -190,32 +219,66 @@ export default function JobsScreen() {
               <ScrollView style={styles.modalBody}>
                 <View style={styles.jobDetailHeader}>
                   <View style={styles.companyLogoLarge}>
-                    <Feather name="briefcase" size={32} color={theme.textSecondary} />
+                    <Feather
+                      name="briefcase"
+                      size={32}
+                      color={theme.textSecondary}
+                    />
                   </View>
                   <ThemedText type="h2" style={styles.jobTitle}>
                     {selectedJob.title}
                   </ThemedText>
-                  <ThemedText style={[styles.companyName, { color: theme.textSecondary }]}>
+                  <ThemedText
+                    style={[styles.companyName, { color: theme.textSecondary }]}
+                  >
                     {selectedJob.company}
                   </ThemedText>
                 </View>
 
                 <View style={styles.jobDetailMeta}>
                   <View style={styles.metaItem}>
-                    <Feather name="map-pin" size={16} color={theme.textSecondary} />
-                    <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+                    <Feather
+                      name="map-pin"
+                      size={16}
+                      color={theme.textSecondary}
+                    />
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        marginLeft: Spacing.sm,
+                      }}
+                    >
                       {selectedJob.location}
                     </ThemedText>
                   </View>
                   <View style={styles.metaItem}>
-                    <Feather name="clock" size={16} color={theme.textSecondary} />
-                    <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+                    <Feather
+                      name="clock"
+                      size={16}
+                      color={theme.textSecondary}
+                    />
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        marginLeft: Spacing.sm,
+                      }}
+                    >
                       {selectedJob.type.replace("-", " ")}
                     </ThemedText>
                   </View>
                   <View style={styles.metaItem}>
-                    <Feather name="dollar-sign" size={16} color={AppColors.accent} />
-                    <ThemedText style={{ color: AppColors.accent, marginLeft: Spacing.sm, fontWeight: "600" }}>
+                    <Feather
+                      name="dollar-sign"
+                      size={16}
+                      color={AppColors.accent}
+                    />
+                    <ThemedText
+                      style={{
+                        color: AppColors.accent,
+                        marginLeft: Spacing.sm,
+                        fontWeight: "600",
+                      }}
+                    >
                       {selectedJob.salary}
                     </ThemedText>
                   </View>
@@ -236,15 +299,27 @@ export default function JobsScreen() {
                   </ThemedText>
                   {selectedJob.requirements.map((req, index) => (
                     <View key={index} style={styles.requirementItem}>
-                      <Feather name="check" size={16} color={AppColors.accent} />
-                      <ThemedText style={[styles.requirementText, { color: theme.textSecondary }]}>
+                      <Feather
+                        name="check"
+                        size={16}
+                        color={AppColors.accent}
+                      />
+                      <ThemedText
+                        style={[
+                          styles.requirementText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
                         {req}
                       </ThemedText>
                     </View>
                   ))}
                 </View>
 
-                <Button onPress={() => setShowApplyModal(true)} style={styles.applyButton}>
+                <Button
+                  onPress={() => setShowApplyModal(true)}
+                  style={styles.applyButton}
+                >
                   Apply Now
                 </Button>
               </ScrollView>
@@ -267,11 +342,16 @@ export default function JobsScreen() {
                 <Feather name="x" size={24} color={theme.text} />
               </Pressable>
             </View>
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+            >
               <ThemedText type="h4" style={styles.applyTitle}>
                 {selectedJob?.title}
               </ThemedText>
-              <ThemedText style={[styles.applyCompany, { color: theme.textSecondary }]}>
+              <ThemedText
+                style={[styles.applyCompany, { color: theme.textSecondary }]}
+              >
                 {selectedJob?.company}
               </ThemedText>
 
@@ -282,7 +362,10 @@ export default function JobsScreen() {
                 <TextInput
                   style={[
                     styles.coverLetterInput,
-                    { backgroundColor: theme.backgroundDefault, color: theme.text },
+                    {
+                      backgroundColor: theme.backgroundDefault,
+                      color: theme.text,
+                    },
                   ]}
                   value={coverLetter}
                   onChangeText={setCoverLetter}
@@ -294,10 +377,15 @@ export default function JobsScreen() {
               </View>
 
               <Pressable
-                style={[styles.uploadButton, { backgroundColor: theme.backgroundDefault }]}
+                style={[
+                  styles.uploadButton,
+                  { backgroundColor: theme.backgroundDefault },
+                ]}
               >
                 <Feather name="upload" size={20} color={theme.textSecondary} />
-                <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+                <ThemedText
+                  style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}
+                >
                   Upload Resume (Optional)
                 </ThemedText>
               </Pressable>

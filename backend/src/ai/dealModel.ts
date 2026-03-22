@@ -42,7 +42,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       stageRecommendation: parsed.stageRecommendation || deal.stage || "new",
       priority: (parsed.priority || "medium") as "high" | "medium" | "low",
       nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions : [],
-      summary: parsed.summary || "Deal analysis unavailable."
+      summary: parsed.summary || "Deal analysis unavailable.",
     };
   } catch (error) {
     console.error("Deal evaluation error:", error);
@@ -51,7 +51,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       stageRecommendation: deal.stage || "new",
       priority: "medium",
       nextActions: [],
-      summary: "AI evaluation unavailable. Deal will be reviewed manually."
+      summary: "AI evaluation unavailable. Deal will be reviewed manually.",
     };
   }
 }

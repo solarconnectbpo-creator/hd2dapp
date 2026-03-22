@@ -21,7 +21,10 @@ interface Env {
   [key: string]: any;
 }
 
-export async function buildWorkflow(env: Env, input: string): Promise<WorkflowBlueprint> {
+export async function buildWorkflow(
+  env: Env,
+  input: string,
+): Promise<WorkflowBlueprint> {
   const prompt = `
 You are WorkflowGPT, an AI that builds automated workflows for CRM, sales, call centers, and marketing automation.
 
@@ -46,14 +49,14 @@ Return ONLY valid JSON, no markdown formatting.`;
     return {
       name: parsed.name || "Untitled Workflow",
       description: parsed.description || "",
-      steps: Array.isArray(parsed.steps) ? parsed.steps : []
+      steps: Array.isArray(parsed.steps) ? parsed.steps : [],
     };
   } catch (error) {
     console.error("Workflow build error:", error);
     return {
       name: "Untitled Workflow",
       description: "",
-      steps: []
+      steps: [],
     };
   }
 }

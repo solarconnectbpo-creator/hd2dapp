@@ -21,7 +21,12 @@ import { Button } from "@/components/Button";
 import { FloatingActionButton } from "@/components/FloatingActionButton";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenInsets } from "@/hooks/useScreenInsets";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import { DEALS, STAGES, Deal } from "@/data/mockData";
 import { usePurchasedLeads } from "@/contexts/PurchasedLeadsContext";
 import { BlurredContactInfo } from "@/components/BlurredContactInfo";
@@ -59,15 +64,16 @@ export default function CRMScreen() {
   const handleMoveStage = (deal: Deal, direction: "forward" | "back") => {
     const stageKeys = STAGES.map((s) => s.key);
     const currentIndex = stageKeys.indexOf(deal.stage);
-    let newIndex = direction === "forward" ? currentIndex + 1 : currentIndex - 1;
-    
+    let newIndex =
+      direction === "forward" ? currentIndex + 1 : currentIndex - 1;
+
     if (newIndex < 0 || newIndex >= stageKeys.length) return;
-    
+
     const newStage = stageKeys[newIndex] as Deal["stage"];
     setDeals((prev) =>
       prev.map((d) =>
-        d.id === deal.id ? { ...d, stage: newStage, daysInStage: 0 } : d
-      )
+        d.id === deal.id ? { ...d, stage: newStage, daysInStage: 0 } : d,
+      ),
     );
     setSelectedDeal(null);
   };
@@ -92,12 +98,22 @@ export default function CRMScreen() {
     };
     setDeals((prev) => [deal, ...prev]);
     setShowAddModal(false);
-    setNewDeal({ contactName: "", company: "", value: "", phone: "", email: "", notes: "" });
+    setNewDeal({
+      contactName: "",
+      company: "",
+      value: "",
+      phone: "",
+      email: "",
+      notes: "",
+    });
   };
 
   const handleCall = (phoneNumber: string) => {
     if (!phoneNumber) {
-      Alert.alert("No Phone Number", "Please add a phone number to make a call");
+      Alert.alert(
+        "No Phone Number",
+        "Please add a phone number to make a call",
+      );
       return;
     }
     Linking.openURL(`tel:${phoneNumber}`);
@@ -105,7 +121,10 @@ export default function CRMScreen() {
 
   const handleSendMessage = async (phoneNumber: string) => {
     if (!phoneNumber) {
-      Alert.alert("No Phone Number", "Please add a phone number to send a message");
+      Alert.alert(
+        "No Phone Number",
+        "Please add a phone number to send a message",
+      );
       return;
     }
     if (!messageText.trim()) {
@@ -120,7 +139,10 @@ export default function CRMScreen() {
 
   const handlePurchaseLead = (leadId: string) => {
     addPurchasedLead(leadId);
-    Alert.alert("Success", "Lead contact info unlocked! You can now view phone and email.");
+    Alert.alert(
+      "Success",
+      "Lead contact info unlocked! You can now view phone and email.",
+    );
     setShowPurchaseModal(false);
   };
 
@@ -134,7 +156,10 @@ export default function CRMScreen() {
       <ThemedText type="h4" numberOfLines={1}>
         {deal.contactName}
       </ThemedText>
-      <ThemedText style={[styles.companyText, { color: theme.textSecondary }]} numberOfLines={1}>
+      <ThemedText
+        style={[styles.companyText, { color: theme.textSecondary }]}
+        numberOfLines={1}
+      >
         {deal.company}
       </ThemedText>
       <View style={styles.dealFooter}>
@@ -148,7 +173,11 @@ export default function CRMScreen() {
     </Card>
   );
 
-  const renderStageColumn = (stage: { key: string; label: string; color: string }) => {
+  const renderStageColumn = (stage: {
+    key: string;
+    label: string;
+    color: string;
+  }) => {
     const stageDeals = getDealsByStage(stage.key);
     const total = getStageTotal(stage.key);
 
@@ -156,17 +185,28 @@ export default function CRMScreen() {
       <View key={stage.key} style={styles.stageColumn}>
         <View style={styles.stageHeader}>
           <View style={styles.stageTitleRow}>
-            <View style={[styles.stageIndicator, { backgroundColor: stage.color }]} />
+            <View
+              style={[styles.stageIndicator, { backgroundColor: stage.color }]}
+            />
             <ThemedText type="h4" numberOfLines={1} style={styles.stageTitle}>
               {stage.label}
             </ThemedText>
-            <Badge label={stageDeals.length.toString()} color={theme.backgroundSecondary} textColor={theme.text} />
+            <Badge
+              label={stageDeals.length.toString()}
+              color={theme.backgroundSecondary}
+              textColor={theme.text}
+            />
           </View>
-          <ThemedText style={[styles.stageTotal, { color: theme.textSecondary }]}>
+          <ThemedText
+            style={[styles.stageTotal, { color: theme.textSecondary }]}
+          >
             ${total.toLocaleString()}
           </ThemedText>
         </View>
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.stageContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.stageContent}
+        >
           {stageDeals.map(renderDealCard)}
         </ScrollView>
       </View>
@@ -181,13 +221,28 @@ export default function CRMScreen() {
   return (
     <ThemedView style={styles.container}>
       {/* Call Center Banner */}
-      <View style={{ paddingHorizontal: Spacing.lg, paddingTop, paddingBottom: Spacing.sm }}>
+      <View
+        style={{
+          paddingHorizontal: Spacing.lg,
+          paddingTop,
+          paddingBottom: Spacing.sm,
+        }}
+      >
         <Card
           elevation={1}
           onPress={() => navigation.navigate("CallCenter")}
-          style={[styles.callCenterBanner, { backgroundColor: AppColors.primary + "15" }]}
+          style={[
+            styles.callCenterBanner,
+            { backgroundColor: AppColors.primary + "15" },
+          ]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
             <View style={{ flex: 1 }}>
               <ThemedText type="h4" style={{ marginBottom: Spacing.xs }}>
                 Call Center
@@ -228,20 +283,32 @@ export default function CRMScreen() {
             {selectedDeal ? (
               <ScrollView style={styles.modalBody}>
                 <ThemedText type="h2">{selectedDeal.contactName}</ThemedText>
-                <ThemedText style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
+                <ThemedText
+                  style={{
+                    color: theme.textSecondary,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
                   {selectedDeal.company}
                 </ThemedText>
-                
+
                 <View style={styles.valueSection}>
-                  <ThemedText style={{ color: theme.textSecondary }}>Deal Value</ThemedText>
+                  <ThemedText style={{ color: theme.textSecondary }}>
+                    Deal Value
+                  </ThemedText>
                   <ThemedText type="h1" style={{ color: AppColors.accent }}>
                     ${selectedDeal.value.toLocaleString()}
                   </ThemedText>
                 </View>
 
                 <Badge
-                  label={STAGES.find((s) => s.key === selectedDeal.stage)?.label || ""}
-                  color={STAGES.find((s) => s.key === selectedDeal.stage)?.color}
+                  label={
+                    STAGES.find((s) => s.key === selectedDeal.stage)?.label ||
+                    ""
+                  }
+                  color={
+                    STAGES.find((s) => s.key === selectedDeal.stage)?.color
+                  }
                   size="medium"
                   style={styles.stageBadge}
                 />
@@ -259,7 +326,12 @@ export default function CRMScreen() {
 
                 <View style={styles.detailRow}>
                   <Feather name="tag" size={16} color={theme.textSecondary} />
-                  <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+                  <ThemedText
+                    style={{
+                      color: theme.textSecondary,
+                      marginLeft: Spacing.sm,
+                    }}
+                  >
                     {selectedDeal.industry}
                   </ThemedText>
                 </View>
@@ -267,7 +339,12 @@ export default function CRMScreen() {
                 {selectedDeal.notes ? (
                   <View style={styles.notesSection}>
                     <ThemedText type="h4">Notes</ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+                    <ThemedText
+                      style={{
+                        color: theme.textSecondary,
+                        marginTop: Spacing.sm,
+                      }}
+                    >
                       {selectedDeal.notes}
                     </ThemedText>
                   </View>
@@ -276,21 +353,40 @@ export default function CRMScreen() {
                 <View style={styles.communicationButtons}>
                   <Pressable
                     onPress={() => handleCall(selectedDeal.phone)}
-                    style={[styles.iconButton, { backgroundColor: AppColors.primary + "20" }]}
+                    style={[
+                      styles.iconButton,
+                      { backgroundColor: AppColors.primary + "20" },
+                    ]}
                   >
                     <Feather name="phone" size={20} color={AppColors.primary} />
                   </Pressable>
                   <Pressable
                     onPress={() => setShowMessenger(true)}
-                    style={[styles.iconButton, { backgroundColor: AppColors.accent + "20" }]}
+                    style={[
+                      styles.iconButton,
+                      { backgroundColor: AppColors.accent + "20" },
+                    ]}
                   >
-                    <Feather name="message-square" size={20} color={AppColors.accent} />
+                    <Feather
+                      name="message-square"
+                      size={20}
+                      color={AppColors.accent}
+                    />
                   </Pressable>
                   <Pressable
-                    onPress={() => Linking.openURL(`mailto:${selectedDeal.email}`)}
-                    style={[styles.iconButton, { backgroundColor: theme.textSecondary + "20" }]}
+                    onPress={() =>
+                      Linking.openURL(`mailto:${selectedDeal.email}`)
+                    }
+                    style={[
+                      styles.iconButton,
+                      { backgroundColor: theme.textSecondary + "20" },
+                    ]}
                   >
-                    <Feather name="mail" size={20} color={theme.textSecondary} />
+                    <Feather
+                      name="mail"
+                      size={20}
+                      color={theme.textSecondary}
+                    />
                   </Pressable>
                 </View>
 
@@ -298,12 +394,16 @@ export default function CRMScreen() {
                   {selectedDeal.stage !== "new" ? (
                     <Button
                       onPress={() => handleMoveStage(selectedDeal, "back")}
-                      style={[styles.stageButton, { backgroundColor: theme.backgroundSecondary }]}
+                      style={[
+                        styles.stageButton,
+                        { backgroundColor: theme.backgroundSecondary },
+                      ]}
                     >
                       Move Back
                     </Button>
                   ) : null}
-                  {selectedDeal.stage !== "won" && selectedDeal.stage !== "lost" ? (
+                  {selectedDeal.stage !== "won" &&
+                  selectedDeal.stage !== "lost" ? (
                     <Button
                       onPress={() => handleMoveStage(selectedDeal, "forward")}
                       style={styles.stageButton}
@@ -332,8 +432,13 @@ export default function CRMScreen() {
                 <Feather name="x" size={24} color={theme.text} />
               </Pressable>
             </View>
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
-              <ThemedText type="small" style={styles.label}>To: {selectedDeal?.phone}</ThemedText>
+            <ScrollView
+              style={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+            >
+              <ThemedText type="small" style={styles.label}>
+                To: {selectedDeal?.phone}
+              </ThemedText>
               <View style={styles.formField}>
                 <TextInput
                   style={[inputStyle, styles.messageInput]}
@@ -345,7 +450,7 @@ export default function CRMScreen() {
                   numberOfLines={4}
                 />
               </View>
-              <Button 
+              <Button
                 onPress={() => handleSendMessage(selectedDeal?.phone || "")}
                 style={styles.submitButton}
               >
@@ -374,11 +479,25 @@ export default function CRMScreen() {
               <ThemedText type="h4" style={{ marginBottom: Spacing.md }}>
                 {selectedDeal?.contactName}
               </ThemedText>
-              <ThemedText style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
-                Unlock the contact information for this lead to make calls and send messages.
+              <ThemedText
+                style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}
+              >
+                Unlock the contact information for this lead to make calls and
+                send messages.
               </ThemedText>
-              <Card elevation={1} style={[styles.priceCard, { backgroundColor: AppColors.primary + "15" }]}>
-                <ThemedText style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+              <Card
+                elevation={1}
+                style={[
+                  styles.priceCard,
+                  { backgroundColor: AppColors.primary + "15" },
+                ]}
+              >
+                <ThemedText
+                  style={{
+                    color: theme.textSecondary,
+                    marginBottom: Spacing.sm,
+                  }}
+                >
                   Unlock Price
                 </ThemedText>
                 <ThemedText type="h1" style={{ color: AppColors.primary }}>
@@ -397,7 +516,10 @@ export default function CRMScreen() {
               </Button>
               <Button
                 onPress={() => setShowPurchaseModal(false)}
-                style={[styles.submitButton, { backgroundColor: theme.backgroundSecondary }]}
+                style={[
+                  styles.submitButton,
+                  { backgroundColor: theme.backgroundSecondary },
+                ]}
               >
                 Cancel
               </Button>
@@ -420,55 +542,78 @@ export default function CRMScreen() {
                 <Feather name="x" size={24} color={theme.text} />
               </Pressable>
             </View>
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.formField}>
-                <ThemedText type="small" style={styles.label}>Contact Name *</ThemedText>
+                <ThemedText type="small" style={styles.label}>
+                  Contact Name *
+                </ThemedText>
                 <TextInput
                   style={inputStyle}
                   value={newDeal.contactName}
-                  onChangeText={(text) => setNewDeal((prev) => ({ ...prev, contactName: text }))}
+                  onChangeText={(text) =>
+                    setNewDeal((prev) => ({ ...prev, contactName: text }))
+                  }
                   placeholder="Enter contact name"
                   placeholderTextColor={theme.textSecondary}
                 />
               </View>
               <View style={styles.formField}>
-                <ThemedText type="small" style={styles.label}>Company</ThemedText>
+                <ThemedText type="small" style={styles.label}>
+                  Company
+                </ThemedText>
                 <TextInput
                   style={inputStyle}
                   value={newDeal.company}
-                  onChangeText={(text) => setNewDeal((prev) => ({ ...prev, company: text }))}
+                  onChangeText={(text) =>
+                    setNewDeal((prev) => ({ ...prev, company: text }))
+                  }
                   placeholder="Enter company name"
                   placeholderTextColor={theme.textSecondary}
                 />
               </View>
               <View style={styles.formField}>
-                <ThemedText type="small" style={styles.label}>Deal Value ($) *</ThemedText>
+                <ThemedText type="small" style={styles.label}>
+                  Deal Value ($) *
+                </ThemedText>
                 <TextInput
                   style={inputStyle}
                   value={newDeal.value}
-                  onChangeText={(text) => setNewDeal((prev) => ({ ...prev, value: text }))}
+                  onChangeText={(text) =>
+                    setNewDeal((prev) => ({ ...prev, value: text }))
+                  }
                   placeholder="Enter deal value"
                   placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
                 />
               </View>
               <View style={styles.formField}>
-                <ThemedText type="small" style={styles.label}>Phone</ThemedText>
+                <ThemedText type="small" style={styles.label}>
+                  Phone
+                </ThemedText>
                 <TextInput
                   style={inputStyle}
                   value={newDeal.phone}
-                  onChangeText={(text) => setNewDeal((prev) => ({ ...prev, phone: text }))}
+                  onChangeText={(text) =>
+                    setNewDeal((prev) => ({ ...prev, phone: text }))
+                  }
                   placeholder="Enter phone number"
                   placeholderTextColor={theme.textSecondary}
                   keyboardType="phone-pad"
                 />
               </View>
               <View style={styles.formField}>
-                <ThemedText type="small" style={styles.label}>Email</ThemedText>
+                <ThemedText type="small" style={styles.label}>
+                  Email
+                </ThemedText>
                 <TextInput
                   style={inputStyle}
                   value={newDeal.email}
-                  onChangeText={(text) => setNewDeal((prev) => ({ ...prev, email: text }))}
+                  onChangeText={(text) =>
+                    setNewDeal((prev) => ({ ...prev, email: text }))
+                  }
                   placeholder="Enter email"
                   placeholderTextColor={theme.textSecondary}
                   keyboardType="email-address"
@@ -476,11 +621,15 @@ export default function CRMScreen() {
                 />
               </View>
               <View style={styles.formField}>
-                <ThemedText type="small" style={styles.label}>Notes</ThemedText>
+                <ThemedText type="small" style={styles.label}>
+                  Notes
+                </ThemedText>
                 <TextInput
                   style={[inputStyle, styles.notesInput]}
                   value={newDeal.notes}
-                  onChangeText={(text) => setNewDeal((prev) => ({ ...prev, notes: text }))}
+                  onChangeText={(text) =>
+                    setNewDeal((prev) => ({ ...prev, notes: text }))
+                  }
                   placeholder="Add notes..."
                   placeholderTextColor={theme.textSecondary}
                   multiline

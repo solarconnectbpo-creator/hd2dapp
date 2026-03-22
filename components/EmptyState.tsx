@@ -17,7 +17,10 @@ export function EmptyState({ icon, title, message }: EmptyStateProps) {
   return (
     <View style={styles.container}>
       <View
-        style={[styles.iconContainer, { backgroundColor: theme.backgroundDefault }]}
+        style={[
+          styles.iconContainer,
+          { backgroundColor: theme.backgroundDefault },
+        ]}
       >
         <Feather name={icon} size={40} color={theme.textSecondary} />
       </View>

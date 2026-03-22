@@ -36,12 +36,12 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
     const callId = event.callId;
 
     // Get or create call state
-    let state = await getCallState(env, callId) || {
+    let state = (await getCallState(env, callId)) || {
       id: callId,
       from: event.fromNumber,
       to: event.toNumber,
       status: "incoming",
-      agentId: null
+      agentId: null,
     };
 
     // ===== CALL STARTED =====
@@ -55,8 +55,10 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
 
         // Update agent status
         await env.DB.prepare(
-          "UPDATE agents SET status = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?"
-        ).bind("handling_call", agent.id).run();
+          "UPDATE agents SET status = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?",
+        )
+          .bind("handling_call", agent.id)
+          .run();
       }
 
       state.status = "ringing";
@@ -64,7 +66,7 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
 
       return new Response(JSON.stringify({ action: "ROUTE_CALL", agent }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -75,18 +77,19 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
 
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // ===== TRANSCRIPT SLICE RECEIVED =====
     if (event.event === "transcript") {
-      state.transcript = (state.transcript || "") + "\n" + (event.transcript || "");
+      state.transcript =
+        (state.transcript || "") + "\n" + (event.transcript || "");
       await setCallState(env, callId, state);
 
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -106,25 +109,30 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
       // Insert into database
       await env.DB.prepare(
         `INSERT INTO inbound_calls (id, agent_id, from_number, to_number, status, transcript, summary, intent)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        callId,
-        state.agentId || null,
-        state.from,
-        state.to,
-        "connected",
-        state.transcript || "",
-        ai.summary,
-        ai.intent
-      ).run();
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          callId,
+          state.agentId || null,
+          state.from,
+          state.to,
+          "connected",
+          state.transcript || "",
+          ai.summary,
+          ai.intent,
+        )
+        .run();
 
-      return new Response(JSON.stringify({ 
-        ai,
-        nextAction: ai.recommendedNextAction
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          ai,
+          nextAction: ai.recommendedNextAction,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // ===== CALL ENDED =====
@@ -133,34 +141,37 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
 
       // Mark agent as available again
       if (state.agentId) {
-        await env.DB.prepare(
-          "UPDATE agents SET status = ? WHERE id = ?"
-        ).bind("online", state.agentId).run();
+        await env.DB.prepare("UPDATE agents SET status = ? WHERE id = ?")
+          .bind("online", state.agentId)
+          .run();
       }
 
       // Update call record with final status
-      await env.DB.prepare(
-        "UPDATE inbound_calls SET status = ? WHERE id = ?"
-      ).bind("ended", callId).run();
+      await env.DB.prepare("UPDATE inbound_calls SET status = ? WHERE id = ?")
+        .bind("ended", callId)
+        .run();
 
       await setCallState(env, callId, state);
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify({ error: "Unknown event type" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("SimpleTalk webhook error:", error);
-    return new Response(JSON.stringify({ error: "Webhook processing failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: "Webhook processing failed" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }
 
@@ -171,25 +182,27 @@ export async function handleSimpleTalkWebhook(req: Request, env: Env) {
 export async function getCall(req: Request, env: Env, callId: string) {
   try {
     const call = await env.DB.prepare(
-      "SELECT * FROM inbound_calls WHERE id = ?"
-    ).bind(callId).first();
+      "SELECT * FROM inbound_calls WHERE id = ?",
+    )
+      .bind(callId)
+      .first();
 
     if (!call) {
       return new Response(JSON.stringify({ error: "Call not found" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify(call), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Get call error:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch call" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -201,18 +214,18 @@ export async function getCall(req: Request, env: Env, callId: string) {
 export async function listCalls(req: Request, env: Env) {
   try {
     const calls = await env.DB.prepare(
-      "SELECT * FROM inbound_calls ORDER BY created_at DESC LIMIT 100"
+      "SELECT * FROM inbound_calls ORDER BY created_at DESC LIMIT 100",
     ).all();
 
     return new Response(JSON.stringify(calls.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("List calls error:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch calls" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -229,37 +242,41 @@ export async function registerAgent(req: Request, env: Env) {
     if (!id || !name) {
       return new Response(JSON.stringify({ error: "Missing id or name" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // Check if agent exists
-    const existing = await env.DB.prepare(
-      "SELECT * FROM agents WHERE id = ?"
-    ).bind(id).first();
+    const existing = await env.DB.prepare("SELECT * FROM agents WHERE id = ?")
+      .bind(id)
+      .first();
 
     if (existing) {
       // Update existing agent
       await env.DB.prepare(
-        `UPDATE agents SET name = ?, skills = ?, webhook_url = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?`
-      ).bind(name, skills || "", webhookUrl || "", id).run();
+        `UPDATE agents SET name = ?, skills = ?, webhook_url = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?`,
+      )
+        .bind(name, skills || "", webhookUrl || "", id)
+        .run();
     } else {
       // Insert new agent
       await env.DB.prepare(
         `INSERT INTO agents (id, name, status, skills, webhook_url, last_active)
-         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-      ).bind(id, name, "online", skills || "", webhookUrl || "").run();
+         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      )
+        .bind(id, name, "online", skills || "", webhookUrl || "")
+        .run();
     }
 
     return new Response(JSON.stringify({ success: true, agentId: id }), {
       status: 201,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Register agent error:", error);
     return new Response(JSON.stringify({ error: "Failed to register agent" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -271,18 +288,18 @@ export async function registerAgent(req: Request, env: Env) {
 export async function listAgents(req: Request, env: Env) {
   try {
     const agents = await env.DB.prepare(
-      "SELECT id, name, status, skills, last_active FROM agents ORDER BY last_active DESC"
+      "SELECT id, name, status, skills, last_active FROM agents ORDER BY last_active DESC",
     ).all();
 
     return new Response(JSON.stringify(agents.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("List agents error:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch agents" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }

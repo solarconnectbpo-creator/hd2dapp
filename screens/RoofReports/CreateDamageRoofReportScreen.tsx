@@ -53,7 +53,10 @@ import {
   isEstimateDisplaySafe,
 } from "@/src/roofReports/roofEstimateValidate";
 import { buildScheduleInspectionBlock } from "@/src/roofReports/scheduleInspectionBlock";
-import { getInspectionEmail, getInspectionPhone } from "@/src/roofReports/inspectionContact";
+import {
+  getInspectionEmail,
+  getInspectionPhone,
+} from "@/src/roofReports/inspectionContact";
 import { reverseGeocodeNominatimDetailed } from "@/src/roofReports/reverseGeocode";
 import {
   filterIrcChecksForRoofType,
@@ -105,7 +108,9 @@ import { calculateEagleViewLikeEstimate } from "@/src/roofReports/eagleviewEstim
 import { calculateLowSlopeMaterialEstimate } from "@/src/roofReports/lowSlopeEstimator";
 import type { RoofSystemCategory } from "@/src/roofReports/roofSystemScope";
 import { QUICK_PRICE_NON_ROOF } from "@/src/roofReports/quickPriceReference";
-import { apiClient } from "@/services/api";
+import { apiClient, getApiBaseUrl } from "@/services/api";
+import { inferRoofVision } from "@/services/roofVisionInference";
+import { mergeGptWithVisionDamage } from "@/services/roofVisionMerge";
 import DataSourceConfig from "@/src/components/DataSourceConfig";
 import ReportGenerator from "@/src/components/ReportGenerator";
 import ReportViewer from "@/src/components/ReportViewer";
@@ -495,22 +500,14 @@ export default function CreateDamageRoofReportScreen({
         {
           companyName: companyName.trim() || undefined,
           property,
-          estimate: estimate
-            ? sanitizeRoofDamageEstimate(estimate)
-            : undefined,
+          estimate: estimate ? sanitizeRoofDamageEstimate(estimate) : undefined,
           homeownerName: homeownerName.trim() || undefined,
         },
         {
           aiClientMessage: inspectionAiMessage.trim() || undefined,
         },
       ),
-    [
-      companyName,
-      property,
-      estimate,
-      homeownerName,
-      inspectionAiMessage,
-    ],
+    [companyName, property, estimate, homeownerName, inspectionAiMessage],
   );
 
   useEffect(() => {
@@ -719,8 +716,10 @@ export default function CreateDamageRoofReportScreen({
       measurements: roofMeasurementsHaveContent(measurements)
         ? {
             ...measurements,
-            measurementValidationSummary:
-              computeMeasurementValidationSummary({ measurements, estimate }),
+            measurementValidationSummary: computeMeasurementValidationSummary({
+              measurements,
+              estimate,
+            }),
           }
         : undefined,
       buildingCode: effectiveBuildingCode,
@@ -752,16 +751,12 @@ export default function CreateDamageRoofReportScreen({
       roofLidar3dDiagramSource: roofLidar3dDiagramImageUrl
         ? "LiDAR-style 3D projection from trace + pitch (axonometric; LF geodesic)"
         : undefined,
-      estimate: estimate
-        ? sanitizeRoofDamageEstimate(estimate)
-        : undefined,
+      estimate: estimate ? sanitizeRoofDamageEstimate(estimate) : undefined,
       scheduleInspection: buildScheduleInspectionBlock(
         {
           companyName: companyName.trim() || undefined,
           property,
-          estimate: estimate
-            ? sanitizeRoofDamageEstimate(estimate)
-            : undefined,
+          estimate: estimate ? sanitizeRoofDamageEstimate(estimate) : undefined,
           homeownerName: homeownerName.trim() || undefined,
         },
         {
@@ -1629,9 +1624,20 @@ export default function CreateDamageRoofReportScreen({
 
     setDamageAiLoading(true);
     try {
-      const result = (await apiClient.estimateRoofDamageFromImage(
-        payload,
-      )) as {
+      const visionPromise = payload.imageBase64
+        ? inferRoofVision(
+            getApiBaseUrl(),
+            payload.imageBase64,
+            payload.mimeType ?? "image/jpeg",
+          )
+        : Promise.resolve(null);
+
+      const [visionOutcome, result] = await Promise.all([
+        visionPromise.catch(() => null),
+        apiClient.estimateRoofDamageFromImage(payload),
+      ]);
+
+      const typed = result as {
         success?: boolean;
         data?: {
           damageTypes: DamageType[];
@@ -1642,14 +1648,18 @@ export default function CreateDamageRoofReportScreen({
         };
         error?: string;
       };
-      if (!result.success || !result.data) {
+      if (!typed.success || !typed.data) {
         Alert.alert(
           "AI damage draft",
-          result.error || "Could not analyze this image. Try a closer roof photo.",
+          typed.error ||
+            "Could not analyze this image. Try a closer roof photo.",
         );
         return;
       }
-      const d = result.data;
+      let d = typed.data;
+      if (visionOutcome && !visionOutcome.error) {
+        d = mergeGptWithVisionDamage(d, visionOutcome);
+      }
       setDamageTypes(d.damageTypes.length ? d.damageTypes : ["Hail"]);
       setSeverity(d.severity);
       setRecommendedAction(d.recommendedAction);
@@ -1667,7 +1677,10 @@ export default function CreateDamageRoofReportScreen({
         if (idx === -1) {
           return trimmed ? `${trimmed}\n\n---\n${block}` : block;
         }
-        const before = trimmed.slice(0, idx).replace(/\n+---\s*$/g, "").trim();
+        const before = trimmed
+          .slice(0, idx)
+          .replace(/\n+---\s*$/g, "")
+          .trim();
         return before ? `${before}\n\n---\n${block}` : block;
       });
       Alert.alert(
@@ -1950,10 +1963,13 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.helperText}>
-            Saves this report and opens preview — export HTML or JSON there. IRC/IBC
-            references appear on preview and export.
+            Saves this report and opens preview — export HTML or JSON there.
+            IRC/IBC references appear on preview and export.
           </ThemedText>
-          <Button onPress={() => void previewAndExport()} style={styles.autoButton}>
+          <Button
+            onPress={() => void previewAndExport()}
+            style={styles.autoButton}
+          >
             Finish & export report
           </Button>
 
@@ -2090,7 +2106,8 @@ export default function CreateDamageRoofReportScreen({
             </View>
             <ThemedText type="caption" style={styles.helperText}>
               Data source → run analyzer / builder draft (same as the old AI
-              agents screen). Optional; does not replace your damage report fields.
+              agents screen). Optional; does not replace your damage report
+              fields.
             </ThemedText>
           </Pressable>
           {showAiPipeline ? (
@@ -2383,8 +2400,8 @@ export default function CreateDamageRoofReportScreen({
                 lineHeight: 18,
               }}
             >
-              Roof type text and material selector disagree — verify on site before
-              ordering.
+              Roof type text and material selector disagree — verify on site
+              before ordering.
             </ThemedText>
           ) : null}
 
@@ -2496,10 +2513,13 @@ export default function CreateDamageRoofReportScreen({
             type="caption"
             style={[styles.helperText, { marginTop: 8 }]}
           >
-            Drafts damage types, severity, and recommended action from your first
-            photo in the Photos section (or satellite if no photo). Requires
-            backend <ThemedText type="small">OPENAI_API_KEY</ThemedText>.
-            Advisory only — verify on site.
+            Drafts damage types, severity, and recommended action from your
+            first photo in the Photos section (or satellite if no photo).
+            With an uploaded photo, also calls{" "}
+            <ThemedText type="small">/api/ai/roof-vision</ThemedText> (CNN
+            service when configured on the Worker). Requires backend{" "}
+            <ThemedText type="small">OPENAI_API_KEY</ThemedText>. Advisory only
+            — verify on site.
           </ThemedText>
         </Card>
 
@@ -2513,12 +2533,20 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.helperText}>
-            Nearest US reference station to the pin — airport observation, not rooftop
-            wind. On web, data loads from NOAA weather.gov (CORS-friendly); native
-            may use Aviation Weather Center first. Used for storm context and damage-risk scoring.
+            Nearest US reference station to the pin — airport observation, not
+            rooftop wind. On web, data loads from NOAA weather.gov
+            (CORS-friendly); native may use Aviation Weather Center first. Used
+            for storm context and damage-risk scoring.
           </ThemedText>
           {metarLoading ? (
-            <View style={{ marginTop: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View
+              style={{
+                marginTop: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <ActivityIndicator color={AppColors.primary} />
               <ThemedText type="caption">Loading METAR…</ThemedText>
             </View>
@@ -2529,7 +2557,9 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           ) : null}
           {metarWeather ? (
-            <View style={[styles.metarSnapshotBox, { borderColor: theme.border }]}>
+            <View
+              style={[styles.metarSnapshotBox, { borderColor: theme.border }]}
+            >
               <ThemedText type="small" style={{ fontWeight: "700" }}>
                 {metarWeather.stationIcao}
                 {metarWeather.distanceMilesApprox != null
@@ -2543,7 +2573,10 @@ export default function CreateDamageRoofReportScreen({
               ))}
             </View>
           ) : !metarLoading ? (
-            <ThemedText type="caption" style={[styles.helperText, { marginTop: 8 }]}>
+            <ThemedText
+              type="caption"
+              style={[styles.helperText, { marginTop: 8 }]}
+            >
               No snapshot loaded.
             </ThemedText>
           ) : null}
@@ -2551,7 +2584,11 @@ export default function CreateDamageRoofReportScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              if (!Number.isFinite(property.lat) || !Number.isFinite(property.lng)) return;
+              if (
+                !Number.isFinite(property.lat) ||
+                !Number.isFinite(property.lng)
+              )
+                return;
               setMetarLoading(true);
               setMetarError(null);
               void fetchMetarSnapshotForLatLng(property.lat, property.lng)
@@ -2588,8 +2625,9 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.helperText}>
-            Optional — tap items you completed on site. Shown on preview & HTML export (
-            {fieldQaCompletionCount(fieldQaChecklist)}/{FIELD_QA_ITEMS.length}).
+            Optional — tap items you completed on site. Shown on preview & HTML
+            export ({fieldQaCompletionCount(fieldQaChecklist)}/
+            {FIELD_QA_ITEMS.length}).
           </ThemedText>
           <View style={{ marginTop: 10, gap: 8 }}>
             {FIELD_QA_ITEMS.map((it) => {
@@ -2617,7 +2655,10 @@ export default function CreateDamageRoofReportScreen({
                     size={20}
                     color={on ? "#22c55e" : theme.textSecondary}
                   />
-                  <ThemedText type="caption" style={{ flex: 1, marginLeft: 10, lineHeight: 18 }}>
+                  <ThemedText
+                    type="caption"
+                    style={{ flex: 1, marginLeft: 10, lineHeight: 18 }}
+                  >
                     {it.label}
                   </ThemedText>
                 </Pressable>
@@ -2639,8 +2680,8 @@ export default function CreateDamageRoofReportScreen({
           <ThemedText type="caption" style={styles.helperText}>
             Enter roof area (or use traced/lead area above). The dollar range
             updates as you change inputs. Repair vs replace follows Recommended
-            Action when set; otherwise severity and damage types. Export includes
-            this estimate when present.
+            Action when set; otherwise severity and damage types. Export
+            includes this estimate when present.
           </ThemedText>
 
           <View style={{ height: 10 }} />
@@ -2741,13 +2782,22 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.helperText}>
-            Shown on preview & export. Set EXPO_PUBLIC_INSPECTION_PHONE / EMAIL in
-            env for contact lines.
+            Shown on preview & export. Set EXPO_PUBLIC_INSPECTION_PHONE / EMAIL
+            in env for contact lines.
           </ThemedText>
           {inspectionAiLoading ? (
-            <View style={{ marginTop: 10, flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={{
+                marginTop: 10,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
               <ActivityIndicator color={AppColors.primary} />
-              <ThemedText type="caption" style={[styles.helperText, { marginLeft: 8 }]}>
+              <ThemedText
+                type="caption"
+                style={[styles.helperText, { marginLeft: 8 }]}
+              >
                 Polishing invitation text…
               </ThemedText>
             </View>
@@ -2755,20 +2805,33 @@ export default function CreateDamageRoofReportScreen({
           <ThemedText type="small" style={{ marginTop: 12, fontWeight: "700" }}>
             {scheduleInspectionPreview.headline}
           </ThemedText>
-          <ThemedText type="caption" style={[styles.helperText, { marginTop: 8, lineHeight: 20 }]}>
+          <ThemedText
+            type="caption"
+            style={[styles.helperText, { marginTop: 8, lineHeight: 20 }]}
+          >
             {scheduleInspectionPreview.body}
           </ThemedText>
           {scheduleInspectionPreview.phone ? (
-            <ThemedText type="caption" style={[styles.helperText, { marginTop: 8 }]}>
+            <ThemedText
+              type="caption"
+              style={[styles.helperText, { marginTop: 8 }]}
+            >
               Phone: {scheduleInspectionPreview.phone}
             </ThemedText>
           ) : (
-            <ThemedText type="caption" style={[styles.helperText, { marginTop: 8, opacity: 0.85 }]}>
-              Phone: add EXPO_PUBLIC_INSPECTION_PHONE to show a number here and in exports.
+            <ThemedText
+              type="caption"
+              style={[styles.helperText, { marginTop: 8, opacity: 0.85 }]}
+            >
+              Phone: add EXPO_PUBLIC_INSPECTION_PHONE to show a number here and
+              in exports.
             </ThemedText>
           )}
           {scheduleInspectionPreview.email ? (
-            <ThemedText type="caption" style={[styles.helperText, { marginTop: 4 }]}>
+            <ThemedText
+              type="caption"
+              style={[styles.helperText, { marginTop: 4 }]}
+            >
               Email: {scheduleInspectionPreview.email}
             </ThemedText>
           ) : null}
@@ -3220,7 +3283,9 @@ export default function CreateDamageRoofReportScreen({
             ) : null}
             {measurementValidationSummary ? (
               <View style={{ marginTop: 14 }}>
-                <MeasurementAccuracyPanel summary={measurementValidationSummary} />
+                <MeasurementAccuracyPanel
+                  summary={measurementValidationSummary}
+                />
               </View>
             ) : null}
           </View>

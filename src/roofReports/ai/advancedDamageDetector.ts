@@ -63,7 +63,11 @@ export function assessDamageAdvanced(
   );
 
   const totalSeverity = calculateAggregateSeverity(damageTypes);
-  const riskFactors = identifyRiskFactors(damageTypes, imageMetadata, weatherContext);
+  const riskFactors = identifyRiskFactors(
+    damageTypes,
+    imageMetadata,
+    weatherContext,
+  );
 
   return {
     damageDetected: damageTypes.length > 0,
@@ -72,7 +76,11 @@ export function assessDamageAdvanced(
     patternAnalysis: analyzePattern(damageTypes),
     weatherContext,
     riskFactors,
-    recommendations: generateRecommendations(damageTypes, totalSeverity, riskFactors),
+    recommendations: generateRecommendations(
+      damageTypes,
+      totalSeverity,
+      riskFactors,
+    ),
     overallConfidence: Math.min(
       ...damageTypes.map((d) => d.confidence),
       getImageQualityConfidence(imageMetadata.imageQuality),
@@ -82,7 +90,12 @@ export function assessDamageAdvanced(
 
 function classifyDamageTypes(
   detectedLabels: string[],
-  metadata: { roofAge?: number; roofType?: string; imageQuality?: string; angle?: string },
+  metadata: {
+    roofAge?: number;
+    roofType?: string;
+    imageQuality?: string;
+    angle?: string;
+  },
   weather?: WeatherContext,
 ): DetectedDamageType[] {
   const classified: DetectedDamageType[] = [];
@@ -102,7 +115,8 @@ function classifyDamageTypes(
 
   for (const label of detectedLabels) {
     const normalized = label.toLowerCase();
-    const mappedLabel = damageTypeMap[normalized] || ("unknown" as DamageTypeLabel);
+    const mappedLabel =
+      damageTypeMap[normalized] || ("unknown" as DamageTypeLabel);
 
     const damageConfig = getDamageConfig(mappedLabel, metadata, weather);
 
@@ -120,7 +134,12 @@ function classifyDamageTypes(
 
 function getDamageConfig(
   label: DamageTypeLabel,
-  metadata: { roofAge?: number; roofType?: string; imageQuality?: string; angle?: string },
+  metadata: {
+    roofAge?: number;
+    roofType?: string;
+    imageQuality?: string;
+    angle?: string;
+  },
   weather?: WeatherContext,
 ): {
   baseConfidence: number;
@@ -188,21 +207,29 @@ function getDamageConfig(
 
   const config = configs[label] || configs.unknown;
   return {
-    baseConfidence: Math.min(0.95, config.baseConfidence + (config.weatherBoost || 0)),
+    baseConfidence: Math.min(
+      0.95,
+      config.baseConfidence + (config.weatherBoost || 0),
+    ),
     baseSeverity: config.baseSeverity,
     description: config.description,
     count: config.count,
   };
 }
 
-export function calculateAggregateSeverity(damageTypes: DetectedDamageType[]): number {
+export function calculateAggregateSeverity(
+  damageTypes: DetectedDamageType[],
+): number {
   if (!damageTypes.length) return 1;
 
   const weightedSum = damageTypes.reduce((sum, dt) => {
     return sum + dt.severity * dt.confidence;
   }, 0);
 
-  const totalConfidence = damageTypes.reduce((sum, dt) => sum + dt.confidence, 0);
+  const totalConfidence = damageTypes.reduce(
+    (sum, dt) => sum + dt.confidence,
+    0,
+  );
   const avg = totalConfidence > 0 ? weightedSum / totalConfidence : 1;
 
   return Math.min(5, Math.ceil(avg));
@@ -235,19 +262,27 @@ function identifyRiskFactors(
   const factors: string[] = [];
 
   if (metadata.roofAge && metadata.roofAge > 15) {
-    factors.push("Roof age exceeds recommended lifespan (20 years). Replacement may be due.");
+    factors.push(
+      "Roof age exceeds recommended lifespan (20 years). Replacement may be due.",
+    );
   }
 
   if (damageTypes.some((d) => d.severity >= 4)) {
-    factors.push("High-severity damage present. Claims investigation recommended.");
+    factors.push(
+      "High-severity damage present. Claims investigation recommended.",
+    );
   }
 
   if (weather?.hailSwathProbability && weather.hailSwathProbability > 0.7) {
-    factors.push("Property in high-probability hail zone. Future storm risk elevated.");
+    factors.push(
+      "Property in high-probability hail zone. Future storm risk elevated.",
+    );
   }
 
   if (damageTypes.length > 2) {
-    factors.push("Multiple damage mechanisms. Comprehensive inspection warranted.");
+    factors.push(
+      "Multiple damage mechanisms. Comprehensive inspection warranted.",
+    );
   }
 
   return factors;
@@ -261,16 +296,26 @@ function generateRecommendations(
   const recommendations: string[] = [];
 
   if (totalSeverity >= 4) {
-    recommendations.push("URGENT: Schedule immediate professional roof inspection.");
-    recommendations.push("Contact insurance provider for damage claim evaluation.");
+    recommendations.push(
+      "URGENT: Schedule immediate professional roof inspection.",
+    );
+    recommendations.push(
+      "Contact insurance provider for damage claim evaluation.",
+    );
   } else if (totalSeverity >= 3) {
-    recommendations.push("Schedule professional roof inspection within 30 days.");
+    recommendations.push(
+      "Schedule professional roof inspection within 30 days.",
+    );
   } else {
-    recommendations.push("Monitor roof condition. Routine maintenance recommended.");
+    recommendations.push(
+      "Monitor roof condition. Routine maintenance recommended.",
+    );
   }
 
   if (damageTypes.some((d) => d.label === "penetrations")) {
-    recommendations.push("Inspect roof penetrations (vents, pipes) for water tightness.");
+    recommendations.push(
+      "Inspect roof penetrations (vents, pipes) for water tightness.",
+    );
   }
 
   if (riskFactors.length > 0) {

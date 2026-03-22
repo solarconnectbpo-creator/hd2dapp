@@ -87,11 +87,16 @@ export async function generateFeedbackSummary(): Promise<FeedbackSummary> {
       correctionRate: 0,
       accuracyTrend: "stable",
       topMistakes: [],
-      confidenceCalibration: { aiConfidenceVsActualAccuracy: 0, overconfident: false },
+      confidenceCalibration: {
+        aiConfidenceVsActualAccuracy: 0,
+        overconfident: false,
+      },
     };
   }
 
-  const corrected = feedback.filter((f) => f.userCorrection.value !== f.aiPrediction.value);
+  const corrected = feedback.filter(
+    (f) => f.userCorrection.value !== f.aiPrediction.value,
+  );
   const correctionRate = corrected.length / feedback.length;
 
   const mistakeFreq: Record<string, number> = {};
@@ -106,14 +111,21 @@ export async function generateFeedbackSummary(): Promise<FeedbackSummary> {
     .slice(0, 5);
 
   const verifiedFeedback = feedback.filter((f) => f.subsequentValidation);
-  const confidenceCalibration = calculateConfidenceCalibration(verifiedFeedback);
+  const confidenceCalibration =
+    calculateConfidenceCalibration(verifiedFeedback);
 
   const recent = feedback.slice(0, Math.min(100, feedback.length));
-  const recentCorrected = recent.filter((f) => f.userCorrection.value !== f.aiPrediction.value);
+  const recentCorrected = recent.filter(
+    (f) => f.userCorrection.value !== f.aiPrediction.value,
+  );
   const recentRate = recentCorrected.length / recent.length;
 
   const accuracyTrend =
-    recentRate < correctionRate ? "improving" : recentRate > correctionRate ? "declining" : "stable";
+    recentRate < correctionRate
+      ? "improving"
+      : recentRate > correctionRate
+        ? "declining"
+        : "stable";
 
   return {
     totalFeedbackItems: feedback.length,
@@ -140,18 +152,26 @@ function calculateConfidenceCalibration(
   const meanAcc = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
 
   const numerator = verifiedFeedback.reduce(
-    (sum, _, i) => sum + (confidences[i] - meanConf) * (accuracies[i] - meanAcc),
+    (sum, _, i) =>
+      sum + (confidences[i] - meanConf) * (accuracies[i] - meanAcc),
     0,
   );
 
   const denomConf = Math.sqrt(
-    verifiedFeedback.reduce((sum, _, i) => sum + Math.pow(confidences[i] - meanConf, 2), 0),
+    verifiedFeedback.reduce(
+      (sum, _, i) => sum + Math.pow(confidences[i] - meanConf, 2),
+      0,
+    ),
   );
   const denomAcc = Math.sqrt(
-    verifiedFeedback.reduce((sum, _, i) => sum + Math.pow(accuracies[i] - meanAcc, 2), 0),
+    verifiedFeedback.reduce(
+      (sum, _, i) => sum + Math.pow(accuracies[i] - meanAcc, 2),
+      0,
+    ),
   );
 
-  const correlation = denomConf * denomAcc > 0 ? numerator / (denomConf * denomAcc) : 0;
+  const correlation =
+    denomConf * denomAcc > 0 ? numerator / (denomConf * denomAcc) : 0;
 
   return {
     aiConfidenceVsActualAccuracy: correlation,

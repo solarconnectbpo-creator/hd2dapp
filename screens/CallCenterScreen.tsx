@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Modal, Alert, TextInput } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Modal,
+  Alert,
+  TextInput,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -8,7 +16,12 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenInsets } from "@/hooks/useScreenInsets";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import { MOCK_CALL_CENTER, CALL_CENTER_PRICING } from "@/data/mockData";
 
 export default function CallCenterScreen() {
@@ -42,7 +55,9 @@ export default function CallCenterScreen() {
 
   const totalCost = callCenter.monthlyPrice;
   const agentCost = (index: number) =>
-    index === 0 ? CALL_CENTER_PRICING.firstAgent : CALL_CENTER_PRICING.additionalAgent;
+    index === 0
+      ? CALL_CENTER_PRICING.firstAgent
+      : CALL_CENTER_PRICING.additionalAgent;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -69,7 +84,9 @@ export default function CallCenterScreen() {
         {/* Header */}
         <View style={styles.header}>
           <ThemedText type="h2">Call Center</ThemedText>
-          <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+          <ThemedText
+            style={{ color: theme.textSecondary, marginTop: Spacing.sm }}
+          >
             Manage your sales team
           </ThemedText>
         </View>
@@ -78,25 +95,48 @@ export default function CallCenterScreen() {
         <Card elevation={1} style={styles.pricingCard}>
           <View style={styles.pricingHeader}>
             <ThemedText type="h4">Monthly Cost</ThemedText>
-            <Badge label={callCenter.status === "active" ? "Active" : "Inactive"} />
+            <Badge
+              label={callCenter.status === "active" ? "Active" : "Inactive"}
+            />
           </View>
-          <ThemedText type="h1" style={[styles.totalPrice, { color: AppColors.primary }]}>
+          <ThemedText
+            type="h1"
+            style={[styles.totalPrice, { color: AppColors.primary }]}
+          >
             ${totalCost.toLocaleString()}
           </ThemedText>
-          <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
-            {callCenter.agents.length} agent{callCenter.agents.length !== 1 ? "s" : ""} ({CALL_CENTER_PRICING.firstAgent} + {callCenter.agents.length > 1 ? `${callCenter.agents.length - 1} × ${CALL_CENTER_PRICING.additionalAgent}` : "0"})
+          <ThemedText
+            style={{ color: theme.textSecondary, marginTop: Spacing.sm }}
+          >
+            {callCenter.agents.length} agent
+            {callCenter.agents.length !== 1 ? "s" : ""} (
+            {CALL_CENTER_PRICING.firstAgent} +{" "}
+            {callCenter.agents.length > 1
+              ? `${callCenter.agents.length - 1} × ${CALL_CENTER_PRICING.additionalAgent}`
+              : "0"}
+            )
           </ThemedText>
 
           <View style={styles.pricingBreakdown}>
             <View style={styles.breakdownItem}>
-              <ThemedText style={{ color: theme.textSecondary }}>1st Agent</ThemedText>
-              <ThemedText type="h4">${CALL_CENTER_PRICING.firstAgent}</ThemedText>
+              <ThemedText style={{ color: theme.textSecondary }}>
+                1st Agent
+              </ThemedText>
+              <ThemedText type="h4">
+                ${CALL_CENTER_PRICING.firstAgent}
+              </ThemedText>
             </View>
             {callCenter.agents.length > 1 && (
               <View style={styles.breakdownItem}>
-                <ThemedText style={{ color: theme.textSecondary }}>Additional ({callCenter.agents.length - 1})</ThemedText>
+                <ThemedText style={{ color: theme.textSecondary }}>
+                  Additional ({callCenter.agents.length - 1})
+                </ThemedText>
                 <ThemedText type="h4">
-                  ${((callCenter.agents.length - 1) * CALL_CENTER_PRICING.additionalAgent).toLocaleString()}
+                  $
+                  {(
+                    (callCenter.agents.length - 1) *
+                    CALL_CENTER_PRICING.additionalAgent
+                  ).toLocaleString()}
                 </ThemedText>
               </View>
             )}
@@ -113,13 +153,31 @@ export default function CallCenterScreen() {
             <View style={styles.agentHeader}>
               <View style={{ flex: 1 }}>
                 <ThemedText type="h4">{agent.name}</ThemedText>
-                <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                <ThemedText
+                  style={{ color: theme.textSecondary, fontSize: 12 }}
+                >
                   Agent {index + 1}
                 </ThemedText>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(agent.status) + "20" }]}>
-                <Feather name="circle" size={12} color={getStatusColor(agent.status)} />
-                <ThemedText style={{ marginLeft: 6, fontSize: 12, color: getStatusColor(agent.status), fontWeight: "600" }}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(agent.status) + "20" },
+                ]}
+              >
+                <Feather
+                  name="circle"
+                  size={12}
+                  color={getStatusColor(agent.status)}
+                />
+                <ThemedText
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 12,
+                    color: getStatusColor(agent.status),
+                    fontWeight: "600",
+                  }}
+                >
                   {agent.status}
                 </ThemedText>
               </View>
@@ -128,19 +186,33 @@ export default function CallCenterScreen() {
               <View style={styles.statItem}>
                 <Feather name="phone" size={16} color={theme.textSecondary} />
                 <View style={{ marginLeft: Spacing.sm }}>
-                  <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>Calls Today</ThemedText>
+                  <ThemedText
+                    style={{ color: theme.textSecondary, fontSize: 12 }}
+                  >
+                    Calls Today
+                  </ThemedText>
                   <ThemedText type="h4">{agent.callsHandled}</ThemedText>
                 </View>
               </View>
               <View style={styles.statItem}>
                 <Feather name="clock" size={16} color={theme.textSecondary} />
                 <View style={{ marginLeft: Spacing.sm }}>
-                  <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>Avg Duration</ThemedText>
-                  <ThemedText type="h4">{agent.averageCallDuration}m</ThemedText>
+                  <ThemedText
+                    style={{ color: theme.textSecondary, fontSize: 12 }}
+                  >
+                    Avg Duration
+                  </ThemedText>
+                  <ThemedText type="h4">
+                    {agent.averageCallDuration}m
+                  </ThemedText>
                 </View>
               </View>
               <View style={styles.statItem}>
-                <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>Cost</ThemedText>
+                <ThemedText
+                  style={{ color: theme.textSecondary, fontSize: 12 }}
+                >
+                  Cost
+                </ThemedText>
                 <ThemedText type="h4">${agentCost(index)}</ThemedText>
               </View>
             </View>
@@ -153,7 +225,13 @@ export default function CallCenterScreen() {
           style={styles.addButton}
         >
           <Feather name="plus" size={18} color="white" />
-          <ThemedText style={{ color: "white", marginLeft: Spacing.sm, fontWeight: "600" }}>
+          <ThemedText
+            style={{
+              color: "white",
+              marginLeft: Spacing.sm,
+              fontWeight: "600",
+            }}
+          >
             Add Agent
           </ThemedText>
         </Button>
@@ -175,7 +253,9 @@ export default function CallCenterScreen() {
               </Pressable>
             </View>
             <View style={styles.modalBody}>
-              <ThemedText type="small" style={styles.label}>Agent Name</ThemedText>
+              <ThemedText type="small" style={styles.label}>
+                Agent Name
+              </ThemedText>
               <TextInput
                 style={inputStyle}
                 value={agentName}
@@ -184,12 +264,33 @@ export default function CallCenterScreen() {
                 placeholderTextColor={theme.textSecondary}
               />
 
-              <Card elevation={1} style={[styles.costPreview, { borderLeftColor: AppColors.primary, borderLeftWidth: 4 }]}>
-                <ThemedText style={{ color: theme.textSecondary }}>New Monthly Cost</ThemedText>
-                <ThemedText type="h2" style={{ color: AppColors.primary, marginTop: Spacing.sm }}>
-                  ${(callCenter.monthlyPrice + CALL_CENTER_PRICING.additionalAgent).toLocaleString()}
+              <Card
+                elevation={1}
+                style={[
+                  styles.costPreview,
+                  { borderLeftColor: AppColors.primary, borderLeftWidth: 4 },
+                ]}
+              >
+                <ThemedText style={{ color: theme.textSecondary }}>
+                  New Monthly Cost
                 </ThemedText>
-                <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.sm, fontSize: 12 }}>
+                <ThemedText
+                  type="h2"
+                  style={{ color: AppColors.primary, marginTop: Spacing.sm }}
+                >
+                  $
+                  {(
+                    callCenter.monthlyPrice +
+                    CALL_CENTER_PRICING.additionalAgent
+                  ).toLocaleString()}
+                </ThemedText>
+                <ThemedText
+                  style={{
+                    color: theme.textSecondary,
+                    marginTop: Spacing.sm,
+                    fontSize: 12,
+                  }}
+                >
                   +${CALL_CENTER_PRICING.additionalAgent}/month
                 </ThemedText>
               </Card>

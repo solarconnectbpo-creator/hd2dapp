@@ -48,7 +48,9 @@ export default function MeasurementQualityBadge({
       </View>
       {showDetails && (
         <View style={styles.details}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            {label}
+          </Text>
           <Text style={[styles.quality, { color }]}>{qualityLabel}</Text>
         </View>
       )}

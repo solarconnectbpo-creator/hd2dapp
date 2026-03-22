@@ -44,7 +44,8 @@ export const NOAA_NWS_LSR_MAPSERVER =
   "https://mapservices.weather.noaa.gov/vector/rest/services/obs/nws_local_storm_reports/MapServer";
 
 /** IEM — Local Storm Reports GeoJSON (states, hours, bbox). */
-export const IEM_LSR_GEOJSON = "https://mesonet.agron.iastate.edu/geojson/lsr.geojson";
+export const IEM_LSR_GEOJSON =
+  "https://mesonet.agron.iastate.edu/geojson/lsr.geojson";
 
 /** SPC — Day 1 convective outlook (latest GeoJSON). */
 export const SPC_DAY1_OUTLOOK_GEOJSON =

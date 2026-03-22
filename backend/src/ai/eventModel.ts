@@ -17,7 +17,10 @@ interface Env {
   [key: string]: any;
 }
 
-export async function generateEventDescription(env: Env, title: string): Promise<EventDescription> {
+export async function generateEventDescription(
+  env: Env,
+  title: string,
+): Promise<EventDescription> {
   const prompt = `
 You are an expert event copywriter for a sales and business community.
 Generate a JSON response with:
@@ -40,7 +43,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       description: parsed.description || "Event information coming soon.",
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
       valueProps: Array.isArray(parsed.valueProps) ? parsed.valueProps : [],
-      audience: Array.isArray(parsed.audience) ? parsed.audience : []
+      audience: Array.isArray(parsed.audience) ? parsed.audience : [],
     };
   } catch (error) {
     console.error("Event description generation error:", error);
@@ -48,7 +51,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       description: "Event information coming soon.",
       tags: [],
       valueProps: [],
-      audience: []
+      audience: [],
     };
   }
 }

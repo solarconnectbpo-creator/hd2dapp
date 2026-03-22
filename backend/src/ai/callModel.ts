@@ -17,7 +17,10 @@ interface Env {
   [key: string]: any;
 }
 
-export async function analyzeCall(env: Env, transcript: string): Promise<CallAnalysis> {
+export async function analyzeCall(
+  env: Env,
+  transcript: string,
+): Promise<CallAnalysis> {
   const prompt = `
 You are an AI customer service analyst for a door-to-door sales company. Analyze this call transcript and return ONLY a JSON object with:
 
@@ -38,8 +41,11 @@ Return ONLY valid JSON, no markdown formatting.`;
     return {
       intent: parsed.intent || "general",
       summary: parsed.summary || "Summary unavailable.",
-      sentiment: (parsed.sentiment || "neutral") as "positive" | "neutral" | "negative",
-      recommendedNextAction: parsed.recommendedNextAction || "Follow up soon."
+      sentiment: (parsed.sentiment || "neutral") as
+        | "positive"
+        | "neutral"
+        | "negative",
+      recommendedNextAction: parsed.recommendedNextAction || "Follow up soon.",
     };
   } catch (error) {
     console.error("Call analysis error:", error);
@@ -47,7 +53,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       intent: "general",
       summary: "Summary unavailable. Manual review recommended.",
       sentiment: "neutral",
-      recommendedNextAction: "Follow up soon."
+      recommendedNextAction: "Follow up soon.",
     };
   }
 }

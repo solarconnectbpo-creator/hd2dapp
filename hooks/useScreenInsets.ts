@@ -10,7 +10,8 @@ const DEFAULT_HEADER_HEIGHT = 56;
 
 export function useScreenInsets() {
   const insets = useSafeAreaInsets();
-  const headerHeight = React.useContext(HeaderHeightContext) ?? DEFAULT_HEADER_HEIGHT;
+  const headerHeight =
+    React.useContext(HeaderHeightContext) ?? DEFAULT_HEADER_HEIGHT;
   const tabBarHeight = React.useContext(BottomTabBarHeightContext) ?? 0;
 
   return {

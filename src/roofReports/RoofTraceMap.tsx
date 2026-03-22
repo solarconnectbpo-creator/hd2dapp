@@ -40,7 +40,8 @@ export default function RoofTraceMap({
     <View style={styles.container}>
       <Text style={styles.title}>Roof tracing (web only)</Text>
       <Text style={styles.body}>
-        Rooftop measurements are populated automatically when you trace a roof polygon on the web build.
+        Rooftop measurements are populated automatically when you trace a roof
+        polygon on the web build.
       </Text>
       <Text
         style={styles.link}
@@ -55,9 +56,13 @@ export default function RoofTraceMap({
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "#334155" },
+  container: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
   title: { fontSize: 15, fontWeight: "700", marginBottom: 6 },
   body: { fontSize: 13, color: "#64748b", lineHeight: 18 },
   link: { marginTop: 10, color: "#2563EB", fontWeight: "700" },
 });
-

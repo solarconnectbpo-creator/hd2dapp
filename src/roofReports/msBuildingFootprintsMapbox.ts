@@ -12,8 +12,10 @@ import type mapboxgl from "mapbox-gl";
  */
 
 export const MS_BUILDING_FOOTPRINTS_SOURCE_ID = "microsoft-building-footprints";
-export const MS_BUILDING_FOOTPRINTS_FILL_LAYER_ID = "microsoft-building-footprints-fill";
-export const MS_BUILDING_FOOTPRINTS_LINE_LAYER_ID = "microsoft-building-footprints-line";
+export const MS_BUILDING_FOOTPRINTS_FILL_LAYER_ID =
+  "microsoft-building-footprints-fill";
+export const MS_BUILDING_FOOTPRINTS_LINE_LAYER_ID =
+  "microsoft-building-footprints-line";
 
 /** ArcGIS VectorTileServer; template uses `{z}/{y}/{x}` per service metadata. */
 export const MS_BUILDING_FOOTPRINTS_TILES_URL =

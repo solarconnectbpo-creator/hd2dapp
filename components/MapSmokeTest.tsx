@@ -10,7 +10,9 @@ export default function MapSmokeTest() {
   if (Platform.OS === "web") {
     return (
       <View style={styles.container}>
-        <Text style={styles.webNote}>MapView is not supported in this web build. Run on iOS or Android.</Text>
+        <Text style={styles.webNote}>
+          MapView is not supported in this web build. Run on iOS or Android.
+        </Text>
       </View>
     );
   }

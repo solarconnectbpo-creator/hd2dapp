@@ -7,10 +7,17 @@
 import * as turf from "@turf/turf";
 
 import type { MetarWeatherSnapshot } from "./roofReportTypes";
+import { parsePitchRiseRun } from "./roofPolygonMetrics";
 
 export type RoofMaterialType = "shingle" | "tile" | "slate" | "tpo" | string;
 
-export type RoofGeometrySegmentType = "eave" | "ridge" | "hip" | "rake" | "valley" | string;
+export type RoofGeometrySegmentType =
+  | "eave"
+  | "ridge"
+  | "hip"
+  | "rake"
+  | "valley"
+  | string;
 
 export type RoofGeometry = {
   segments?: Array<{ type: RoofGeometrySegmentType }>;
@@ -35,13 +42,11 @@ export type DamageRiskResult = {
   actionPlan: string[];
 };
 
+/** Rise per 12\" horizontal (x:12 convention), normalized from any rise/run or from degrees. */
 function pitchRiseFromRiseRun(pitch?: string): number | undefined {
-  if (!pitch) return undefined;
-  const s = pitch.trim();
-  const m = s.match(/(\d{1,3}(?:\.\d+)?)\s*[/:]\s*(\d{1,3}(?:\.\d+)?)/);
-  if (!m) return undefined;
-  const rise = Number(m[1]);
-  return Number.isFinite(rise) ? rise : undefined;
+  const pr = parsePitchRiseRun(pitch);
+  if (!pr) return undefined;
+  return (pr.rise / pr.run) * 12;
 }
 
 function classifyRoofType(
@@ -49,13 +54,17 @@ function classifyRoofType(
   pitchRise: number | undefined,
   roofFormHint?: string,
 ): string {
-  const p = typeof pitchRise === "number" && Number.isFinite(pitchRise) ? pitchRise : undefined;
+  const p =
+    typeof pitchRise === "number" && Number.isFinite(pitchRise)
+      ? pitchRise
+      : undefined;
   if (typeof p === "number" && p <= 2) return "Flat / Low Slope";
 
   const hint = roofFormHint?.toLowerCase() ?? "";
   if (hint.includes("hip")) return "Hip Roof";
   if (hint.includes("gable")) return "Gable Roof";
-  if (hint.includes("flat") || hint.includes("low slope")) return "Flat / Low Slope";
+  if (hint.includes("flat") || hint.includes("low slope"))
+    return "Flat / Low Slope";
 
   let roofType = "Gable Roof";
   const segments = geometry?.segments ?? [];
@@ -95,7 +104,7 @@ export function classifyRoofAndMaterials(
   const m = String(materialType).toLowerCase();
 
   // Material-specific logic (based on your snippet).
-  let wasteFactor = 1.10;
+  let wasteFactor = 1.1;
   let unit = "Bundles";
   let notes: string | undefined;
   let extras: string[] | undefined;
@@ -105,8 +114,7 @@ export function classifyRoofAndMaterials(
       // Knowledge base: ~10% simple gable planes vs ~15% hip/valley cut-up (Fig. 1–2).
       {
         const hipOrComplex =
-          roofType === "Hip Roof" ||
-          /complex|valley|hip/i.test(roofType);
+          roofType === "Hip Roof" || /complex|valley|hip/i.test(roofType);
         wasteFactor = hipOrComplex ? 1.15 : 1.1;
       }
       unit = "Bundles";
@@ -128,7 +136,11 @@ export function classifyRoofAndMaterials(
       unit = "Tiles/Pallets";
       notes =
         "Batten layout + structural load: verify deck and framing for tile weight.";
-      extras = ["Battens / direct deck (system-dependent)", "Bird stop", "Eave closures"];
+      extras = [
+        "Battens / direct deck (system-dependent)",
+        "Bird stop",
+        "Eave closures",
+      ];
       break;
 
     case "slate":
@@ -154,11 +166,13 @@ export function classifyRoofAndMaterials(
       break;
 
     default:
-      wasteFactor = 1.10;
+      wasteFactor = 1.1;
       unit = "Bundles";
   }
 
-  const wastePct = Number.isFinite(wasteFactor) ? Math.max(0, Math.round((wasteFactor - 1) * 100)) : undefined;
+  const wastePct = Number.isFinite(wasteFactor)
+    ? Math.max(0, Math.round((wasteFactor - 1) * 100))
+    : undefined;
 
   return {
     roofType,
@@ -178,8 +192,10 @@ export function parseRoofPitchRise(pitch?: string): number | undefined {
 
 function extractMainPolygon(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
   if (!geo) return null;
-  if (geo?.type === "Feature" && geo?.geometry?.type === "Polygon") return geo as GeoJSON.Feature<GeoJSON.Polygon>;
-  if (geo?.type === "Polygon") return { type: "Feature", properties: {}, geometry: geo };
+  if (geo?.type === "Feature" && geo?.geometry?.type === "Polygon")
+    return geo as GeoJSON.Feature<GeoJSON.Polygon>;
+  if (geo?.type === "Polygon")
+    return { type: "Feature", properties: {}, geometry: geo };
   if (geo?.type === "Feature" && geo?.geometry?.type === "MultiPolygon") {
     const mp = geo.geometry.coordinates as GeoJSON.Position[][][];
     let best: GeoJSON.Position[][] | null = null;
@@ -197,7 +213,11 @@ function extractMainPolygon(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
       }
     }
     if (!best) return null;
-    return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: best } };
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Polygon", coordinates: best },
+    };
   }
   if (geo?.type === "MultiPolygon") {
     const mp = geo.coordinates as GeoJSON.Position[][][];
@@ -216,7 +236,11 @@ function extractMainPolygon(geo: any): GeoJSON.Feature<GeoJSON.Polygon> | null {
       }
     }
     if (!best) return null;
-    return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: best } };
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Polygon", coordinates: best },
+    };
   }
   return null;
 }
@@ -235,9 +259,13 @@ function uniqueVertexCountFromTrace(roofTraceGeoJson: any): number | undefined {
  * Roof form (gable/hip/flat) derived from outline vertices + pitch.
  * This is "best-effort" given we only store a 2D traced footprint polygon.
  */
-export function classifyRoofFormFromTrace(opts: { roofTraceGeoJson?: any; roofPitch?: string }): string | undefined {
+export function classifyRoofFormFromTrace(opts: {
+  roofTraceGeoJson?: any;
+  roofPitch?: string;
+}): string | undefined {
   const rise = pitchRiseFromRiseRun(opts.roofPitch);
-  if (typeof rise === "number" && Number.isFinite(rise) && rise <= 2) return "Flat / Low Slope";
+  if (typeof rise === "number" && Number.isFinite(rise) && rise <= 2)
+    return "Flat / Low Slope";
 
   const uniquePts = uniqueVertexCountFromTrace(opts.roofTraceGeoJson);
   if (!uniquePts) return "Gable Roof"; // fallback when we have pitch but no trace
@@ -281,14 +309,24 @@ export function computeAiDamageRisk(opts: {
   const sev = Number.isFinite(opts.severity) ? opts.severity : 3;
   const severityFactor = clamp(sev / 5, 0, 1); // 0..1
 
-  const hasHail = opts.damageTypes.some((d) => String(d).toLowerCase() === "hail");
-  const hasWind = opts.damageTypes.some((d) => String(d).toLowerCase() === "wind");
-  const hasLeaks = opts.damageTypes.some((d) => String(d).toLowerCase() === "leaks");
-  const hasStructural = opts.damageTypes.some((d) => String(d).toLowerCase() === "structural");
+  const hasHail = opts.damageTypes.some(
+    (d) => String(d).toLowerCase() === "hail",
+  );
+  const hasWind = opts.damageTypes.some(
+    (d) => String(d).toLowerCase() === "wind",
+  );
+  const hasLeaks = opts.damageTypes.some(
+    (d) => String(d).toLowerCase() === "leaks",
+  );
+  const hasStructural = opts.damageTypes.some(
+    (d) => String(d).toLowerCase() === "structural",
+  );
   const hasMissingShingles = opts.damageTypes.some(
     (d) => String(d).toLowerCase() === "missing shingles",
   );
-  const hasFlashing = opts.damageTypes.some((d) => String(d).toLowerCase() === "flashing");
+  const hasFlashing = opts.damageTypes.some(
+    (d) => String(d).toLowerCase() === "flashing",
+  );
   const damageTypeCount = opts.damageTypes.length;
 
   const material = String(opts.roofMaterialType).toLowerCase();
@@ -307,7 +345,8 @@ export function computeAiDamageRisk(opts: {
 
   const pitchRise = opts.pitchRise;
   // Low-slope roofs tend to have different failure modes; slight bump if very low-slope.
-  const lowSlopeAdj = typeof pitchRise === "number" && pitchRise <= 2 ? 1.05 : 1.0;
+  const lowSlopeAdj =
+    typeof pitchRise === "number" && pitchRise <= 2 ? 1.05 : 1.0;
 
   // Roof age contribution (if missing, we use a neutral prior around 10 years).
   const ageYears = typeof roofAge === "number" ? clamp(roofAge, 0, 50) : 10;
@@ -340,23 +379,31 @@ export function computeAiDamageRisk(opts: {
 
   // Build score: 0..100
   const scoreRaw = 15 + ageFactor * 18 + weather * 65;
-  const score = Math.round(clamp(scoreRaw * materialRiskAdj * lowSlopeAdj, 0, 100));
+  const score = Math.round(
+    clamp(scoreRaw * materialRiskAdj * lowSlopeAdj, 0, 100),
+  );
 
-  const level: DamageRiskLevel = score >= 70 ? "High" : score >= 40 ? "Medium" : "Low";
+  const level: DamageRiskLevel =
+    score >= 70 ? "High" : score >= 40 ? "Medium" : "Low";
 
   const factors: string[] = [];
   factors.push(`Severity: ${sev}/5`);
-  if (typeof roofAge === "number") factors.push(`Roof age: ${Math.round(ageYears)} year(s)`);
+  if (typeof roofAge === "number")
+    factors.push(`Roof age: ${Math.round(ageYears)} year(s)`);
   factors.push(`Material: ${String(opts.roofMaterialType)}`);
   if (hasHail) factors.push("Hail damage selected");
   if (hasWind) factors.push("Wind damage selected");
   if (hasLeaks) factors.push("Leak-related damage selected");
   if (hasStructural) factors.push("Structural damage selected");
-  if (hasMissingShingles) factors.push("Missing shingles / blow-off pattern noted");
+  if (hasMissingShingles)
+    factors.push("Missing shingles / blow-off pattern noted");
   if (hasFlashing) factors.push("Flashing-related damage selected");
-  if (hasHail && hasWind) factors.push("Combined hail + wind selection (multi-mode event)");
-  if (damageTypeCount >= 3) factors.push(`Multiple damage modes selected (${damageTypeCount})`);
-  if (typeof pitchRise === "number") factors.push(`Pitch: rise=${pitchRise} (rise/run)`);
+  if (hasHail && hasWind)
+    factors.push("Combined hail + wind selection (multi-mode event)");
+  if (damageTypeCount >= 3)
+    factors.push(`Multiple damage modes selected (${damageTypeCount})`);
+  if (typeof pitchRise === "number")
+    factors.push(`Pitch: rise=${pitchRise} (rise/run)`);
   if (mw) {
     factors.push(`METAR ${mw.stationIcao} @ ${mw.fetchedAtIso.slice(0, 16)}`);
     if (typeof mw.windGustKt === "number" || typeof mw.windSpdKt === "number") {
@@ -368,17 +415,30 @@ export function computeAiDamageRisk(opts: {
 
   const actionPlan: string[] = [];
   if (level === "High") {
-    actionPlan.push("Prioritize inspection and document impacts thoroughly (photos + measurements).");
-    actionPlan.push("Confirm underlayment/edge details and check penetrations/flashings for failure patterns.");
-    actionPlan.push("Flag potential full-scope replacement areas based on damage severity and roof system.");
+    actionPlan.push(
+      "Prioritize inspection and document impacts thoroughly (photos + measurements).",
+    );
+    actionPlan.push(
+      "Confirm underlayment/edge details and check penetrations/flashings for failure patterns.",
+    );
+    actionPlan.push(
+      "Flag potential full-scope replacement areas based on damage severity and roof system.",
+    );
   } else if (level === "Medium") {
-    actionPlan.push("Target likely affected zones (eaves, valleys, transitions) and verify extent with closeups.");
-    actionPlan.push("Perform system checks for uplift/water entry paths and note any localized repair candidates.");
+    actionPlan.push(
+      "Target likely affected zones (eaves, valleys, transitions) and verify extent with closeups.",
+    );
+    actionPlan.push(
+      "Perform system checks for uplift/water entry paths and note any localized repair candidates.",
+    );
   } else {
-    actionPlan.push("Conduct a spot-check inspection and document condition; recommend maintenance-focused repairs if needed.");
-    actionPlan.push("Verify for any early indicators (loose components, flashing issues) before planning replacement.");
+    actionPlan.push(
+      "Conduct a spot-check inspection and document condition; recommend maintenance-focused repairs if needed.",
+    );
+    actionPlan.push(
+      "Verify for any early indicators (loose components, flashing issues) before planning replacement.",
+    );
   }
 
   return { score, level, factors, actionPlan };
 }
-

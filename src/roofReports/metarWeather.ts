@@ -27,13 +27,18 @@ export interface NearestMetarStation {
 }
 
 /** Pick nearest reference METAR station to the property (US-centric list). */
-export function findNearestMetarStation(lat: number, lng: number): NearestMetarStation | null {
+export function findNearestMetarStation(
+  lat: number,
+  lng: number,
+): NearestMetarStation | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (!US_METAR_REFERENCE_STATIONS.length) return null;
 
   const from = turf.point([lng, lat]);
   const fc = turf.featureCollection(
-    US_METAR_REFERENCE_STATIONS.map((s) => turf.point([s.lng, s.lat], { icao: s.icao, name: s.name })),
+    US_METAR_REFERENCE_STATIONS.map((s) =>
+      turf.point([s.lng, s.lat], { icao: s.icao, name: s.name }),
+    ),
   );
   const nearest = turf.nearestPoint(from, fc);
   const distMi = turf.distance(from, nearest, { units: "miles" });
@@ -45,7 +50,10 @@ export function findNearestMetarStation(lat: number, lng: number): NearestMetarS
 }
 
 function normalizeIcao(raw: string): string {
-  return raw.trim().toUpperCase().replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, "");
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, "");
 }
 
 /** US stations often typed as 3 letters (e.g. DFW) — prepend K when appropriate. */
@@ -84,7 +92,12 @@ function extractStormIndicators(raw: string): string[] {
     if (!out.includes(s)) out.push(s);
   };
 
-  if (/\bVCTS\b/.test(u) || /\bTSRA\b/.test(u) || /\b-TSRA\b/.test(u) || /\b\+TSRA\b/.test(u)) {
+  if (
+    /\bVCTS\b/.test(u) ||
+    /\bTSRA\b/.test(u) ||
+    /\b-TSRA\b/.test(u) ||
+    /\b\+TSRA\b/.test(u)
+  ) {
     add("Thunderstorm / TS precipitation in observation");
   }
   if (/\bTSTM\b/.test(u)) add("Thunderstorm (TSTM) in remarks");
@@ -103,7 +116,11 @@ function extractStormIndicators(raw: string): string[] {
   return out;
 }
 
-function buildHumanSummary(row: AwcMetarRow, raw: string, stationLabel: string): string[] {
+function buildHumanSummary(
+  row: AwcMetarRow,
+  raw: string,
+  stationLabel: string,
+): string[] {
   const lines: string[] = [];
   lines.push(`Station: ${stationLabel}`);
   if (row.reportTime) lines.push(`Observation time (UTC): ${row.reportTime}`);
@@ -115,28 +132,37 @@ function buildHumanSummary(row: AwcMetarRow, raw: string, stationLabel: string):
     lines.push(`Dew point: ${row.dewp.toFixed(1)}°C`);
   }
   const wdir = row.wdir;
-  const dirStr = wdir === "VRB" || wdir === undefined ? String(wdir ?? "—") : `${wdir}°`;
+  const dirStr =
+    wdir === "VRB" || wdir === undefined ? String(wdir ?? "—") : `${wdir}°`;
   if (typeof row.wspd === "number") {
     const gust = typeof row.wgst === "number" ? ` gusting ${row.wgst} kt` : "";
     lines.push(`Wind: ${dirStr} at ${row.wspd} kt${gust}`);
   }
-  if (row.visib !== undefined && row.visib !== null) lines.push(`Visibility: ${String(row.visib)}`);
+  if (row.visib !== undefined && row.visib !== null)
+    lines.push(`Visibility: ${String(row.visib)}`);
   if (row.fltCat) lines.push(`Flight category: ${row.fltCat}`);
   if (row.cover) lines.push(`Sky cover (summary): ${row.cover}`);
   if (Array.isArray(row.clouds) && row.clouds.length) {
     const bits = row.clouds
-      .map((c) => [c.cover, c.base != null ? `${c.base} ft` : ""].filter(Boolean).join(" "))
+      .map((c) =>
+        [c.cover, c.base != null ? `${c.base} ft` : ""]
+          .filter(Boolean)
+          .join(" "),
+      )
       .filter(Boolean);
     if (bits.length) lines.push(`Cloud layers: ${bits.join("; ")}`);
   }
-  if (typeof row.altim === "number") lines.push(`Altimeter (decoded): ~${row.altim} hPa class value from AWC`);
+  if (typeof row.altim === "number")
+    lines.push(`Altimeter (decoded): ~${row.altim} hPa class value from AWC`);
 
   const storm = extractStormIndicators(raw);
   if (storm.length) {
     lines.push("Storm / significant weather indicators:");
     storm.forEach((s) => lines.push(`  • ${s}`));
   } else {
-    lines.push("Storm indicators: none flagged from this METAR (still review raw text).");
+    lines.push(
+      "Storm indicators: none flagged from this METAR (still review raw text).",
+    );
   }
 
   lines.push(`Raw METAR: ${raw.trim()}`);
@@ -209,7 +235,8 @@ async function fetchMetarFromNoaa(
       : undefined;
 
   const visMi =
-    typeof p.visibility?.value === "number" && Number.isFinite(p.visibility.value)
+    typeof p.visibility?.value === "number" &&
+    Number.isFinite(p.visibility.value)
       ? `${Math.round((p.visibility.value / 1609.34) * 10) / 10} mi`
       : undefined;
 
@@ -252,9 +279,15 @@ async function fetchMetarFromNoaa(
       nearest?.icao === p.stationId ? nearest.distanceMilesApprox : undefined,
     rawMetar: rawFromApi || synthRaw,
     summaryLines,
-    tempC: typeof p.temperature?.value === "number" ? p.temperature.value : undefined,
+    tempC:
+      typeof p.temperature?.value === "number"
+        ? p.temperature.value
+        : undefined,
     dewpC: typeof p.dewpoint?.value === "number" ? p.dewpoint.value : undefined,
-    windDir: typeof p.windDirection?.value === "number" ? p.windDirection.value : undefined,
+    windDir:
+      typeof p.windDirection?.value === "number"
+        ? p.windDirection.value
+        : undefined,
     windSpdKt: wspdKt,
     windGustKt: wgstKt,
     visibility: visMi,
@@ -276,12 +309,16 @@ async function fetchMetarFromAwc(
 
   const data = (await res.json()) as AwcMetarRow[];
   if (!Array.isArray(data) || data.length === 0 || !data[0]?.rawOb) {
-    throw new Error(`No METAR returned for ${icao}. Station may be inactive or ID incorrect.`);
+    throw new Error(
+      `No METAR returned for ${icao}. Station may be inactive or ID incorrect.`,
+    );
   }
 
   const row = data[0];
   const raw = String(row.rawOb);
-  const stationLabel = [row.icaoId || icao, row.name].filter(Boolean).join(" — ");
+  const stationLabel = [row.icaoId || icao, row.name]
+    .filter(Boolean)
+    .join(" — ");
   const summaryLines = buildHumanSummary(row, raw, stationLabel);
 
   return {
@@ -296,10 +333,18 @@ async function fetchMetarFromAwc(
     summaryLines,
     tempC: typeof row.temp === "number" ? row.temp : undefined,
     dewpC: typeof row.dewp === "number" ? row.dewp : undefined,
-    windDir: row.wdir === "VRB" ? undefined : typeof row.wdir === "number" ? row.wdir : undefined,
+    windDir:
+      row.wdir === "VRB"
+        ? undefined
+        : typeof row.wdir === "number"
+          ? row.wdir
+          : undefined,
     windSpdKt: typeof row.wspd === "number" ? row.wspd : undefined,
     windGustKt: typeof row.wgst === "number" ? row.wgst : undefined,
-    visibility: row.visib !== undefined && row.visib !== null ? String(row.visib) : undefined,
+    visibility:
+      row.visib !== undefined && row.visib !== null
+        ? String(row.visib)
+        : undefined,
     flightCategory: row.fltCat,
     cloudsSummary: row.cover,
     stormIndicators: extractStormIndicators(raw),

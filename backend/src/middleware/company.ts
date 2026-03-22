@@ -20,7 +20,10 @@ interface Company {
  * Get company from request header
  * Returns null if no company_id header provided
  */
-export async function requireCompany(req: Request, env: Env): Promise<Company | null> {
+export async function requireCompany(
+  req: Request,
+  env: Env,
+): Promise<Company | null> {
   try {
     const companyId = req.headers.get("x-company-id");
 
@@ -28,9 +31,9 @@ export async function requireCompany(req: Request, env: Env): Promise<Company | 
       return null;
     }
 
-    const company = await env.DB.prepare(
-      "SELECT * FROM companies WHERE id = ?"
-    ).bind(companyId).first();
+    const company = await env.DB.prepare("SELECT * FROM companies WHERE id = ?")
+      .bind(companyId)
+      .first();
 
     return company || null;
   } catch (error) {
@@ -45,12 +48,14 @@ export async function requireCompany(req: Request, env: Env): Promise<Company | 
 export async function verifyUserInCompany(
   env: Env,
   userId: string,
-  companyId: string
+  companyId: string,
 ): Promise<boolean> {
   try {
     const result = await env.DB.prepare(
-      "SELECT id FROM users WHERE id = ? AND company_id = ?"
-    ).bind(userId, companyId).first();
+      "SELECT id FROM users WHERE id = ? AND company_id = ?",
+    )
+      .bind(userId, companyId)
+      .first();
 
     return !!result;
   } catch (error) {
@@ -66,18 +71,20 @@ export async function createCompany(
   env: Env,
   name: string,
   industry?: string,
-  logoUrl?: string
+  logoUrl?: string,
 ): Promise<Company> {
   const id = crypto.randomUUID();
 
   await env.DB.prepare(
-    "INSERT INTO companies (id, name, industry, logo_url) VALUES (?, ?, ?, ?)"
-  ).bind(id, name, industry || null, logoUrl || null).run();
+    "INSERT INTO companies (id, name, industry, logo_url) VALUES (?, ?, ?, ?)",
+  )
+    .bind(id, name, industry || null, logoUrl || null)
+    .run();
 
   return {
     id,
     name,
     industry,
-    logo_url: logoUrl
+    logo_url: logoUrl,
   };
 }

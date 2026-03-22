@@ -36,7 +36,9 @@ export class ReportAgent {
     return sections;
   }
 
-  async summarizeAsync(ctx: ReportAgentContext): Promise<AgentResponse<ReportAgentSection[]>> {
+  async summarizeAsync(
+    ctx: ReportAgentContext,
+  ): Promise<AgentResponse<ReportAgentSection[]>> {
     try {
       return { status: "success", data: this.buildExecutiveSummary(ctx) };
     } catch (e) {

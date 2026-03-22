@@ -26,7 +26,8 @@ export function FloatingActionButton({
   style,
 }: FloatingActionButtonProps) {
   const scale = useSharedValue(1);
-  const tabBarHeight = React.useContext(BottomTabBarHeightContext) ?? DEFAULT_TAB_BAR;
+  const tabBarHeight =
+    React.useContext(BottomTabBarHeightContext) ?? DEFAULT_TAB_BAR;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

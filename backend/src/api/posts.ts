@@ -29,7 +29,7 @@ export async function createPost(req: Request, env: Env, user: User) {
     if (!content || content.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Missing content" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -42,24 +42,29 @@ export async function createPost(req: Request, env: Env, user: User) {
     // Insert post
     await env.DB.prepare(
       `INSERT INTO posts (id, user_id, content, media_url, hashtags)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(id, user.id, content, mediaUrl || "", hashtags).run();
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(id, user.id, content, mediaUrl || "", hashtags)
+      .run();
 
-    return new Response(JSON.stringify({
-      id,
-      score: ai.score,
-      hashtags: ai.hashtags,
-      category: ai.category,
-      notes: ai.notes
-    }), {
-      status: 201,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({
+        id,
+        score: ai.score,
+        hashtags: ai.hashtags,
+        category: ai.category,
+        notes: ai.notes,
+      }),
+      {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     console.error("Create post error:", error);
     return new Response(JSON.stringify({ error: "Failed to create post" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -78,18 +83,18 @@ export async function getFeed(req: Request, env: Env, user: User) {
       FROM posts p
       ORDER BY datetime(p.created_at) DESC
       LIMIT 50
-      `
+      `,
     ).all();
 
     return new Response(JSON.stringify(posts.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Get feed error:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch feed" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -106,25 +111,27 @@ export async function likePost(req: Request, env: Env, user: User) {
     if (!postId) {
       return new Response(JSON.stringify({ error: "Missing postId" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // Insert engagement
     await env.DB.prepare(
       `INSERT INTO post_engagement (id, post_id, user_id, type)
-       VALUES (?, ?, ?, 'like')`
-    ).bind(crypto.randomUUID(), postId, user.id).run();
+       VALUES (?, ?, ?, 'like')`,
+    )
+      .bind(crypto.randomUUID(), postId, user.id)
+      .run();
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Like post error:", error);
     return new Response(JSON.stringify({ error: "Failed to like post" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -146,18 +153,21 @@ export async function getTrendingPosts(req: Request, env: Env, user: User) {
       FROM posts p
       ORDER BY score DESC, p.created_at DESC
       LIMIT 25
-      `
+      `,
     ).all();
 
     return new Response(JSON.stringify(posts.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Get trending posts error:", error);
-    return new Response(JSON.stringify({ error: "Failed to fetch trending posts" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch trending posts" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

@@ -75,19 +75,22 @@ const CATEGORY_LABEL: Record<RoofSystemCategory, string> = {
   unknown: "Roof system (unspecified)",
 };
 
-function componentsForCategory(cat: RoofSystemCategory): RoofMaterialComponent[] {
+function componentsForCategory(
+  cat: RoofSystemCategory,
+): RoofMaterialComponent[] {
   switch (cat) {
     case "asphalt-shingle":
       return [
         {
           name: "Roof deck",
-          purpose: "Structural substrate; must be sound, dry, and properly nailed.",
+          purpose:
+            "Structural substrate; must be sound, dry, and properly nailed.",
         },
         {
           name: "Ice & water barrier",
           purpose:
             "Self-adhered membrane at eaves, valleys, penetrations, and vertical walls per code.",
-          notes: "Often 24\"+ at eaves in northern climates.",
+          notes: 'Often 24"+ at eaves in northern climates.',
         },
         {
           name: "Underlayment",
@@ -104,11 +107,13 @@ function componentsForCategory(cat: RoofSystemCategory): RoofMaterialComponent[]
         },
         {
           name: "Field shingles",
-          purpose: "Primary weather surface; courses staggered per manufacturer.",
+          purpose:
+            "Primary weather surface; courses staggered per manufacturer.",
         },
         {
           name: "Hip / ridge cap",
-          purpose: "Finished caps at hips/ridge; ventilation-compatible where used.",
+          purpose:
+            "Finished caps at hips/ridge; ventilation-compatible where used.",
         },
         {
           name: "Ridge vent / intake",
@@ -125,75 +130,164 @@ function componentsForCategory(cat: RoofSystemCategory): RoofMaterialComponent[]
         },
         {
           name: "Fasteners",
-          purpose: "Roofing nails per manufacturer — length for deck thickness.",
+          purpose:
+            "Roofing nails per manufacturer — length for deck thickness.",
         },
       ];
     case "metal":
       return [
-        { name: "Deck / substrate", purpose: "Must meet deflection and fastener pull-out." },
-        { name: "Underlayment / slip sheet", purpose: "Often synthetic; reduces abrasion and moisture." },
-        { name: "Metal panels", purpose: "Primary weather surface — standing seam, R-panel, etc." },
-        { name: "Clips / concealed fasteners", purpose: "Thermal movement and wind uplift (system-dependent)." },
-        { name: "Ridge / eave trim", purpose: "Closures and wind-driven rain protection." },
-        { name: "Sealants & butyl tape", purpose: "Seams, transitions, and penetrations." },
-        { name: "Flashings", purpose: "Headwall, sidewall, valley, and penetration metal." },
+        {
+          name: "Deck / substrate",
+          purpose: "Must meet deflection and fastener pull-out.",
+        },
+        {
+          name: "Underlayment / slip sheet",
+          purpose: "Often synthetic; reduces abrasion and moisture.",
+        },
+        {
+          name: "Metal panels",
+          purpose: "Primary weather surface — standing seam, R-panel, etc.",
+        },
+        {
+          name: "Clips / concealed fasteners",
+          purpose: "Thermal movement and wind uplift (system-dependent).",
+        },
+        {
+          name: "Ridge / eave trim",
+          purpose: "Closures and wind-driven rain protection.",
+        },
+        {
+          name: "Sealants & butyl tape",
+          purpose: "Seams, transitions, and penetrations.",
+        },
+        {
+          name: "Flashings",
+          purpose: "Headwall, sidewall, valley, and penetration metal.",
+        },
       ];
     case "tile":
       return [
         { name: "Deck", purpose: "Structurally rated for tile dead load." },
-        { name: "Underlayment", purpose: "Secondary barrier — often 2-ply in high wind." },
-        { name: "Battens / direct deck", purpose: "Attachment per profile and regional practice." },
+        {
+          name: "Underlayment",
+          purpose: "Secondary barrier — often 2-ply in high wind.",
+        },
+        {
+          name: "Battens / direct deck",
+          purpose: "Attachment per profile and regional practice.",
+        },
         { name: "Field tile", purpose: "Primary cover — clay or concrete." },
         { name: "Bird stop / eave closure", purpose: "Blocks entry at eaves." },
-        { name: "Hip / ridge caps", purpose: "Finish and secure ridge/hip lines." },
-        { name: "Fasteners", purpose: "Corrosion-resistant; torque per manufacturer." },
+        {
+          name: "Hip / ridge caps",
+          purpose: "Finish and secure ridge/hip lines.",
+        },
+        {
+          name: "Fasteners",
+          purpose: "Corrosion-resistant; torque per manufacturer.",
+        },
         { name: "Flashings", purpose: "Valleys, walls, penetrations." },
       ];
     case "slate":
       return [
-        { name: "Deck / strapping", purpose: "Support layout and fastener pattern." },
-        { name: "Underlayment", purpose: "Often required under slate for ice/water management." },
-        { name: "Slate field", purpose: "Natural slate courses with proper headlap." },
-        { name: "Fasteners", purpose: "Copper or stainless nails — never mixed metals casually." },
-        { name: "Flashings", purpose: "Valleys, walls, penetrations — often metal." },
+        {
+          name: "Deck / strapping",
+          purpose: "Support layout and fastener pattern.",
+        },
+        {
+          name: "Underlayment",
+          purpose: "Often required under slate for ice/water management.",
+        },
+        {
+          name: "Slate field",
+          purpose: "Natural slate courses with proper headlap.",
+        },
+        {
+          name: "Fasteners",
+          purpose: "Copper or stainless nails — never mixed metals casually.",
+        },
+        {
+          name: "Flashings",
+          purpose: "Valleys, walls, penetrations — often metal.",
+        },
       ];
     case "tpo":
     case "epdm":
     case "pvc":
       return [
-        { name: "Deck / insulation", purpose: "Flat substrate; tapered insulation for drainage when designed." },
-        { name: "Vapor / retarder layers", purpose: "Per climate and building science (when specified)." },
+        {
+          name: "Deck / insulation",
+          purpose:
+            "Flat substrate; tapered insulation for drainage when designed.",
+        },
+        {
+          name: "Vapor / retarder layers",
+          purpose: "Per climate and building science (when specified).",
+        },
         { name: "Membrane", purpose: "Primary waterproofing layer." },
         {
           name: "Seams",
           purpose: "Heat-welded, taped, or adhered per product line.",
           notes: "Critical QC point for leaks.",
         },
-        { name: "Mechanical fasteners / plates", purpose: "When mechanically attached system." },
-        { name: "Flashings & terminations", purpose: "Walls, edges, drains, penetrations." },
-        { name: "Walk pads / protection", purpose: "HVAC access routes on membrane (when required)." },
+        {
+          name: "Mechanical fasteners / plates",
+          purpose: "When mechanically attached system.",
+        },
+        {
+          name: "Flashings & terminations",
+          purpose: "Walls, edges, drains, penetrations.",
+        },
+        {
+          name: "Walk pads / protection",
+          purpose: "HVAC access routes on membrane (when required).",
+        },
       ];
     case "modified-bitumen":
       return [
         { name: "Deck / insulation", purpose: "Stable, dry substrate." },
         { name: "Base sheet / ply", purpose: "Part of multi-ply system." },
-        { name: "Cap sheet", purpose: "Weather surface — torch, cold adhesive, or self-adhered." },
-        { name: "Flashings", purpose: "Details at walls, drains, penetrations." },
+        {
+          name: "Cap sheet",
+          purpose: "Weather surface — torch, cold adhesive, or self-adhered.",
+        },
+        {
+          name: "Flashings",
+          purpose: "Details at walls, drains, penetrations.",
+        },
       ];
     case "coating":
       return [
-        { name: "Surface prep", purpose: "Clean, repair, and prime substrate." },
-        { name: "Base / build coats", purpose: "Achieve specified dry-film thickness." },
+        {
+          name: "Surface prep",
+          purpose: "Clean, repair, and prime substrate.",
+        },
+        {
+          name: "Base / build coats",
+          purpose: "Achieve specified dry-film thickness.",
+        },
         { name: "Top coat", purpose: "UV and weathering layer." },
-        { name: "Fabric reinforcement", purpose: "At seams and details when specified." },
+        {
+          name: "Fabric reinforcement",
+          purpose: "At seams and details when specified.",
+        },
       ];
     case "built-up":
     case "flat-generic":
       return [
         { name: "Structural deck", purpose: "Slope and drainage as designed." },
-        { name: "Insulation", purpose: "Thermal and sometimes compressive (roofing assembly)." },
-        { name: "Membrane / surfacing", purpose: "Primary waterproofing (system-specific)." },
-        { name: "Flashings & drains", purpose: "Waterproof transitions and drainage." },
+        {
+          name: "Insulation",
+          purpose: "Thermal and sometimes compressive (roofing assembly).",
+        },
+        {
+          name: "Membrane / surfacing",
+          purpose: "Primary waterproofing (system-specific).",
+        },
+        {
+          name: "Flashings & drains",
+          purpose: "Waterproof transitions and drainage.",
+        },
       ];
     default:
       return [
@@ -201,10 +295,18 @@ function componentsForCategory(cat: RoofSystemCategory): RoofMaterialComponent[]
           name: "Primary roof covering",
           purpose: "Verify manufacturer system and compatible components.",
         },
-        { name: "Underlayment / barrier", purpose: "Secondary protection per jurisdiction." },
-        { name: "Flashings & penetrations", purpose: "Critical leak paths — document all." },
-        { name: "Ventilation",
-          purpose: "Attic/exhaust strategy where steep-slope; drainage where low-slope.",
+        {
+          name: "Underlayment / barrier",
+          purpose: "Secondary protection per jurisdiction.",
+        },
+        {
+          name: "Flashings & penetrations",
+          purpose: "Critical leak paths — document all.",
+        },
+        {
+          name: "Ventilation",
+          purpose:
+            "Attic/exhaust strategy where steep-slope; drainage where low-slope.",
         },
       ];
   }
@@ -220,7 +322,9 @@ export function analyzeRoofMaterialSystem(opts: {
   roofFormType?: string;
   pitchRise?: number;
 }): RoofMaterialSystemAnalysis {
-  const fromRoofType = classifyRoofSystem(opts.roofTypeRaw?.trim() || undefined);
+  const fromRoofType = classifyRoofSystem(
+    opts.roofTypeRaw?.trim() || undefined,
+  );
   const fromMaterial = mapMaterialTypeToCategory(opts.roofMaterialType);
 
   let resolvedCategory: RoofSystemCategory = fromRoofType.category;
@@ -232,7 +336,11 @@ export function analyzeRoofMaterialSystem(opts: {
   } else if (fromMaterial !== "unknown") {
     const typeRank = categoryRank(fromRoofType.category);
     const matRank = categoryRank(fromMaterial);
-    if (typeRank !== matRank && typeRank !== "unknown" && matRank !== "unknown") {
+    if (
+      typeRank !== matRank &&
+      typeRank !== "unknown" &&
+      matRank !== "unknown"
+    ) {
       agreement = "conflict";
       resolvedCategory = fromRoofType.category;
     } else {
@@ -243,7 +351,9 @@ export function analyzeRoofMaterialSystem(opts: {
   }
 
   const lowSlope =
-    typeof opts.pitchRise === "number" && Number.isFinite(opts.pitchRise) && opts.pitchRise <= 2;
+    typeof opts.pitchRise === "number" &&
+    Number.isFinite(opts.pitchRise) &&
+    opts.pitchRise <= 2;
 
   const layeringNotes: string[] = [];
   const accuracyNotes: string[] = [];
@@ -259,13 +369,23 @@ export function analyzeRoofMaterialSystem(opts: {
     );
   }
   if (opts.roofFormType) {
-    layeringNotes.push(`Roof form context: ${opts.roofFormType} (affects waste, hips, and accessory quantities).`);
+    layeringNotes.push(
+      `Roof form context: ${opts.roofFormType} (affects waste, hips, and accessory quantities).`,
+    );
   }
 
-  const structuralLoadLbsPerSq = structuralLoadLbsPerSqForMaterial(opts.roofMaterialType);
+  const structuralLoadLbsPerSq = structuralLoadLbsPerSqForMaterial(
+    opts.roofMaterialType,
+  );
   const reportAlerts = reportAlertsForMaterial(opts.roofMaterialType);
-  const geometryWasteNote = geometryWasteNarrative(opts.roofMaterialType, opts.roofFormType);
-  const kbRefs = knowledgeBaseFigureRefs(opts.roofMaterialType, opts.roofFormType);
+  const geometryWasteNote = geometryWasteNarrative(
+    opts.roofMaterialType,
+    opts.roofFormType,
+  );
+  const kbRefs = knowledgeBaseFigureRefs(
+    opts.roofMaterialType,
+    opts.roofFormType,
+  );
 
   accuracyNotes.push(
     "Component list is a standard industry template for the resolved system — field-verify manufacturer, warranty, and code for your jurisdiction.",

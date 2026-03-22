@@ -20,12 +20,12 @@ interface Env {
 export async function routeCall(
   env: Env,
   fromNumber: string,
-  intent: string
+  intent: string,
 ): Promise<Agent | null> {
   try {
     // Get all online agents
     const result = await env.DB.prepare(
-      "SELECT * FROM agents WHERE status = 'online' OR status = 'available'"
+      "SELECT * FROM agents WHERE status = 'online' OR status = 'available'",
     ).all();
 
     const agents = result.results || [];
@@ -36,8 +36,9 @@ export async function routeCall(
     }
 
     // 1. Try skill-based matching
-    const skillAgents = agents.filter((a: Agent) =>
-      a.skills && a.skills.toLowerCase().includes(intent.toLowerCase())
+    const skillAgents = agents.filter(
+      (a: Agent) =>
+        a.skills && a.skills.toLowerCase().includes(intent.toLowerCase()),
     );
 
     if (skillAgents.length > 0) {
@@ -59,11 +60,14 @@ export async function routeCall(
   }
 }
 
-export async function getAgent(env: Env, agentId: string): Promise<Agent | null> {
+export async function getAgent(
+  env: Env,
+  agentId: string,
+): Promise<Agent | null> {
   try {
-    const agent = await env.DB.prepare(
-      "SELECT * FROM agents WHERE id = ?"
-    ).bind(agentId).first();
+    const agent = await env.DB.prepare("SELECT * FROM agents WHERE id = ?")
+      .bind(agentId)
+      .first();
 
     return agent || null;
   } catch (error) {

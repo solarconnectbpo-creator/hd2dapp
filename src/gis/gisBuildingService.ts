@@ -72,7 +72,10 @@ function normalizeRoofShape(tag?: string): BuildingFootprint["roofShape"] {
 export class GISBuildingService {
   private overpassUrl = "https://overpass-api.de/api/interpreter";
   private mapboxToken?: string;
-  private cacheMap: Map<string, { data: BuildingFootprint[]; timestamp: number }> = new Map();
+  private cacheMap: Map<
+    string,
+    { data: BuildingFootprint[]; timestamp: number }
+  > = new Map();
   private readonly CACHE_DURATION = 604800000;
 
   constructor(mapboxToken?: string) {
@@ -117,7 +120,10 @@ export class GISBuildingService {
     }
   }
 
-  async getBuildingByAddress(address: string, _jurisdiction = "USA"): Promise<BuildingFootprint | null> {
+  async getBuildingByAddress(
+    address: string,
+    _jurisdiction = "USA",
+  ): Promise<BuildingFootprint | null> {
     void _jurisdiction;
     try {
       const coords = await this.geocodeAddress(address);
@@ -151,7 +157,12 @@ export class GISBuildingService {
     }
   }
 
-  private buildOverpassQuery(minLat: number, minLon: number, maxLat: number, maxLon: number): string {
+  private buildOverpassQuery(
+    minLat: number,
+    minLon: number,
+    maxLat: number,
+    maxLon: number,
+  ): string {
     const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
     return `
 [out:json][timeout:60];
@@ -201,7 +212,9 @@ out geom;
     return buildings;
   }
 
-  private extractCoordinates(geometry: Array<{ lon: number; lat: number }> | undefined): Array<[number, number]> {
+  private extractCoordinates(
+    geometry: Array<{ lon: number; lat: number }> | undefined,
+  ): Array<[number, number]> {
     if (!geometry?.length) return [];
     return geometry.map((point) => [point.lon, point.lat]);
   }
@@ -245,7 +258,9 @@ out geom;
     return match ? parseInt(match[1], 10) : undefined;
   }
 
-  private calculateCenterPoint(coords: Array<[number, number]>): [number, number] {
+  private calculateCenterPoint(
+    coords: Array<[number, number]>,
+  ): [number, number] {
     let sumLon = 0;
     let sumLat = 0;
     for (const [lon, lat] of coords) {
@@ -292,21 +307,41 @@ out geom;
     return perimeter;
   }
 
-  private haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  private haversineDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
     const R = 6371000;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
 
-  async calculateRoofGeometry(building: BuildingFootprint): Promise<RoofGeometry> {
+  async calculateRoofGeometry(
+    building: BuildingFootprint,
+  ): Promise<RoofGeometry> {
     const bbox = building.bbox;
-    const length = this.haversineDistance(bbox.minLat, bbox.minLon, bbox.maxLat, bbox.minLon);
-    const width = this.haversineDistance(bbox.minLat, bbox.minLon, bbox.minLat, bbox.maxLon);
+    const length = this.haversineDistance(
+      bbox.minLat,
+      bbox.minLon,
+      bbox.maxLat,
+      bbox.minLon,
+    );
+    const width = this.haversineDistance(
+      bbox.minLat,
+      bbox.minLon,
+      bbox.minLat,
+      bbox.maxLon,
+    );
 
     const estimatedPitch = this.estimateRoofPitch(building);
     const ridgeLength = Math.max(length, width);
@@ -361,7 +396,10 @@ out geom;
     return Math.min(1, score);
   }
 
-  async getAerialImagery(building: BuildingFootprint, zoom = 18): Promise<AerialImageryData | null> {
+  async getAerialImagery(
+    building: BuildingFootprint,
+    zoom = 18,
+  ): Promise<AerialImageryData | null> {
     if (!this.mapboxToken) {
       console.warn("Mapbox token not configured");
       return null;
@@ -434,7 +472,8 @@ out geom;
           const shadowLength = Math.sqrt(shadowDensity * img.width);
 
           const sunAngleRad = (sunAngle * Math.PI) / 180;
-          const estimatedHeight = Math.tan(sunAngleRad) * (shadowLength / pixelsPerMeter);
+          const estimatedHeight =
+            Math.tan(sunAngleRad) * (shadowLength / pixelsPerMeter);
 
           resolve({
             shadowLength,
@@ -452,13 +491,17 @@ out geom;
     }
   }
 
-  private async geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
+  private async geocodeAddress(
+    address: string,
+  ): Promise<{ lat: number; lon: number } | null> {
     try {
       if (this.mapboxToken) {
         const response = await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${this.mapboxToken}`,
         );
-        const data = (await response.json()) as { features?: Array<{ center?: [number, number] }> };
+        const data = (await response.json()) as {
+          features?: Array<{ center?: [number, number] }>;
+        };
         const c = data.features?.[0]?.center;
         if (c && c.length >= 2) {
           const [lon, lat] = c;
@@ -477,7 +520,9 @@ out geom;
     }
   }
 
-  async getEnhancedBuildingData(building: BuildingFootprint): Promise<BuildingWithImagery> {
+  async getEnhancedBuildingData(
+    building: BuildingFootprint,
+  ): Promise<BuildingWithImagery> {
     const [roofGeometry, aerialImagery] = await Promise.all([
       this.calculateRoofGeometry(building),
       this.getAerialImagery(building),
@@ -485,7 +530,11 @@ out geom;
 
     let shadowAnalysis: BuildingWithImagery["shadowAnalysis"];
     if (aerialImagery) {
-      const shadow = await this.analyzeShadows(aerialImagery.imageUrl, 45, 1 / aerialImagery.resolution);
+      const shadow = await this.analyzeShadows(
+        aerialImagery.imageUrl,
+        45,
+        1 / aerialImagery.resolution,
+      );
       if (shadow) {
         shadowAnalysis = {
           sunAngle: 45,

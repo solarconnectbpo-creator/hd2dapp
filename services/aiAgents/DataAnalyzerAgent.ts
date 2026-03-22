@@ -27,7 +27,9 @@ export interface AnalysisResult {
 export default class DataAnalyzerAgent {
   private dataSources = new Map<string, DataSource>();
 
-  async analyzeData(source: DataSource): Promise<AgentResponse<AnalysisResult>> {
+  async analyzeData(
+    source: DataSource,
+  ): Promise<AgentResponse<AnalysisResult>> {
     try {
       const rawData = await this.fetchData(source);
       const analysis = await this.performAnalysis(rawData);

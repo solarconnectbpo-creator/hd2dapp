@@ -102,8 +102,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
   const [stlIntel, setStlIntel] = useState<StlIntelBundle | null>(null);
   const [stlIntelLoading, setStlIntelLoading] = useState(false);
   const [stlIntelError, setStlIntelError] = useState<string | null>(null);
-  const [stlIntelOutsideMissouri, setStlIntelOutsideMissouri] =
-    useState(false);
+  const [stlIntelOutsideMissouri, setStlIntelOutsideMissouri] = useState(false);
   const tabBarHeight = React.useContext(BottomTabBarHeightContext) ?? 70;
 
   const identifyRoofType = (p: PropertySelection): PropertySelection => {
@@ -554,9 +553,9 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
                 Import Properties (CSV)
               </ThemedText>
               <ThemedText type="caption" style={styles.topOverlayHint}>
-                CSV headers: lat/lng + optional address, name/homeowner, company,
-                email, phone, roof_sqft, roof_type. Each row gets an AI damage
-                report saved under Roof Reports. Map needs Mapbox token.
+                CSV headers: lat/lng + optional address, name/homeowner,
+                company, email, phone, roof_sqft, roof_type. Each row gets an AI
+                damage report saved under Roof Reports. Map needs Mapbox token.
               </ThemedText>
               {Platform.OS === "web" ? (
                 <ThemedText type="caption" style={styles.topOverlayHint}>
@@ -778,8 +777,9 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
             </ThemedText>
             {stlIntelOutsideMissouri ? (
               <ThemedText type="caption" style={styles.stlHint}>
-                Selection is outside Missouri — St. Louis city GIS fetch skipped.
-                You can still open the STL tools screen with these coordinates.
+                Selection is outside Missouri — St. Louis city GIS fetch
+                skipped. You can still open the STL tools screen with these
+                coordinates.
               </ThemedText>
             ) : null}
             {stlIntelLoading ? (

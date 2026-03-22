@@ -11,13 +11,15 @@ export interface PropertySelectMapProps {
 }
 
 // Non-web fallback. Mapbox GL setup is currently implemented for web only.
-export default function PropertySelectMap({ onPropertySelected }: PropertySelectMapProps) {
+export default function PropertySelectMap({
+  onPropertySelected,
+}: PropertySelectMapProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Property Map (Web only)</Text>
       <Text style={styles.body}>
-        Mapbox GL is not enabled for native builds in this demo. Select a property on the web build,
-        or export by editing after selection.
+        Mapbox GL is not enabled for native builds in this demo. Select a
+        property on the web build, or export by editing after selection.
       </Text>
       {/* Small helper so users can still proceed on non-web while testing */}
       <Text
@@ -38,9 +40,13 @@ export default function PropertySelectMap({ onPropertySelected }: PropertySelect
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 16 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
   title: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
   body: { fontSize: 13, color: "#555", textAlign: "center", marginBottom: 12 },
   link: { color: "#2563EB", fontWeight: "700", textAlign: "center" },
 });
-

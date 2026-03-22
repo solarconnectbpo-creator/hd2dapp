@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Platform,
-  StyleSheet,
-  TextInput,
-  View,
-  Pressable,
-} from "react-native";
+import { Platform, StyleSheet, TextInput, View, Pressable } from "react-native";
 
 import { Card } from "@/components/Card";
 import { ThemedText } from "@/components/ThemedText";
@@ -39,8 +33,8 @@ export default function DataSourceConfig() {
         Data source
       </ThemedText>
       <ThemedText type="caption" style={styles.hint}>
-        Static mode feeds sample numbers into the analyzer. API mode fetches JSON
-        (array) from a URL (CORS must allow your origin on web).
+        Static mode feeds sample numbers into the analyzer. API mode fetches
+        JSON (array) from a URL (CORS must allow your origin on web).
       </ThemedText>
 
       <View style={styles.chips}>
@@ -54,7 +48,9 @@ export default function DataSourceConfig() {
                 styles.chip,
                 {
                   borderColor: on ? theme.tabIconSelected : theme.border,
-                  backgroundColor: on ? theme.backgroundTertiary : theme.backgroundSecondary,
+                  backgroundColor: on
+                    ? theme.backgroundTertiary
+                    : theme.backgroundSecondary,
                 },
               ]}
             >

@@ -5,6 +5,10 @@
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8787";
 
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -61,13 +65,19 @@ class ApiClient {
 
     if (!response.ok) {
       const d = data as { message?: string; error?: string };
-      throw new Error(d?.message || d?.error || `API Error: ${response.status}`);
+      throw new Error(
+        d?.message || d?.error || `API Error: ${response.status}`,
+      );
     }
 
     return data;
   }
 
-  private async makeRequest(url: string, method: string = "GET", body?: any): Promise<Response> {
+  private async makeRequest(
+    url: string,
+    method: string = "GET",
+    body?: any,
+  ): Promise<Response> {
     try {
       const response = await fetch(url, {
         method,
@@ -81,15 +91,25 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async register(email: string, password: string, name: string, userType: string, phone?: string) {
+  async register(
+    email: string,
+    password: string,
+    name: string,
+    userType: string,
+    phone?: string,
+  ) {
     try {
-      const response = await this.makeRequest(`${this.baseUrl}/api/auth/register`, "POST", {
-        email,
-        password,
-        name,
-        userType,
-        phone,
-      });
+      const response = await this.makeRequest(
+        `${this.baseUrl}/api/auth/register`,
+        "POST",
+        {
+          email,
+          password,
+          name,
+          userType,
+          phone,
+        },
+      );
       return this.handleResponse(response);
     } catch (error) {
       // Fallback: local registration for development
@@ -101,28 +121,40 @@ class ApiClient {
   }
 
   async login(email: string, password: string) {
-    const response = await this.makeRequest(`${this.baseUrl}/api/auth/login`, "POST", {
-      email,
-      password,
-    });
+    const response = await this.makeRequest(
+      `${this.baseUrl}/api/auth/login`,
+      "POST",
+      {
+        email,
+        password,
+      },
+    );
     return this.handleResponse(response);
   }
 
   async verify2FA(email: string, code: string): Promise<AuthResponse> {
     // Development test code: 123456
     const testCode = "123456";
-    
+
     try {
-      const response = await this.makeRequest(`${this.baseUrl}/api/auth/verify-2fa`, "POST", {
-        email,
-        code,
-      });
+      const response = await this.makeRequest(
+        `${this.baseUrl}/api/auth/verify-2fa`,
+        "POST",
+        {
+          email,
+          code,
+        },
+      );
       const result: any = await this.handleResponse(response);
       if (!result.user) {
         const lowerEmail = email.toLowerCase();
         const isAdmin = lowerEmail.includes("admin");
         const isCompany = lowerEmail.includes("company");
-        const userType = isAdmin ? "admin" : isCompany ? "company" : "sales_rep";
+        const userType = isAdmin
+          ? "admin"
+          : isCompany
+            ? "company"
+            : "sales_rep";
         result.user = {
           id: "dev-user-" + Date.now(),
           email,
@@ -137,7 +169,11 @@ class ApiClient {
         const lowerEmail = email.toLowerCase();
         const isAdmin = lowerEmail.includes("admin");
         const isCompany = lowerEmail.includes("company");
-        const userType = isAdmin ? "admin" : isCompany ? "company" : "sales_rep";
+        const userType = isAdmin
+          ? "admin"
+          : isCompany
+            ? "company"
+            : "sales_rep";
 
         return {
           token: "dev-token-" + Date.now(),
@@ -155,9 +191,13 @@ class ApiClient {
 
   async resend2FA(email: string) {
     try {
-      const response = await this.makeRequest(`${this.baseUrl}/api/auth/resend-2fa`, "POST", {
-        email,
-      });
+      const response = await this.makeRequest(
+        `${this.baseUrl}/api/auth/resend-2fa`,
+        "POST",
+        {
+          email,
+        },
+      );
       return this.handleResponse(response);
     } catch (error) {
       // Fallback: allow resend
@@ -337,7 +377,11 @@ class ApiClient {
     mimeType?: string;
     context?: string;
   }) {
-    const response = await this.makeRequest(`${this.baseUrl}/api/ai/roof-pitch`, "POST", payload);
+    const response = await this.makeRequest(
+      `${this.baseUrl}/api/ai/roof-pitch`,
+      "POST",
+      payload,
+    );
     return this.handleResponse(response);
   }
 

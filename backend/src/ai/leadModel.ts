@@ -40,9 +40,13 @@ Return ONLY valid JSON, no markdown formatting.`;
     return {
       score: parsed.score || 50,
       summary: parsed.summary || "Lead analysis unavailable",
-      predictedObjections: Array.isArray(parsed.predictedObjections) ? parsed.predictedObjections : [],
-      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
-      industry: parsed.industry || lead.industry || "unknown"
+      predictedObjections: Array.isArray(parsed.predictedObjections)
+        ? parsed.predictedObjections
+        : [],
+      recommendedActions: Array.isArray(parsed.recommendedActions)
+        ? parsed.recommendedActions
+        : [],
+      industry: parsed.industry || lead.industry || "unknown",
     };
   } catch (error) {
     console.error("Lead analysis error:", error);
@@ -51,7 +55,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       summary: "AI summary unavailable. Lead will be reviewed manually.",
       predictedObjections: [],
       recommendedActions: [],
-      industry: lead.industry || "unknown"
+      industry: lead.industry || "unknown",
     };
   }
 }

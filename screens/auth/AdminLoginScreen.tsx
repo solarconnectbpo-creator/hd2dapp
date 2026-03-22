@@ -19,14 +19,21 @@ import { Button } from "@/components/Button";
 import { HeroLogo } from "@/components/HeroLogo";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import type { AuthStackParamList } from "@/navigation/AuthNavigator";
 
 type AdminLoginScreenProps = {
   navigation: NativeStackNavigationProp<AuthStackParamList>;
 };
 
-export default function AdminLoginScreen({ navigation }: AdminLoginScreenProps) {
+export default function AdminLoginScreen({
+  navigation,
+}: AdminLoginScreenProps) {
   const { theme } = useTheme();
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
@@ -70,13 +77,20 @@ export default function AdminLoginScreen({ navigation }: AdminLoginScreenProps) 
           <HeroLogo />
 
           <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: "#8B5CF6" + "20" }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: "#8B5CF6" + "20" },
+              ]}
+            >
               <Feather name="lock" size={32} color="#8B5CF6" />
             </View>
             <ThemedText type="h2" style={styles.title}>
               Admin Login
             </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+            <ThemedText
+              style={[styles.subtitle, { color: theme.textSecondary }]}
+            >
               Access the HD2D administration panel
             </ThemedText>
           </View>
@@ -84,8 +98,18 @@ export default function AdminLoginScreen({ navigation }: AdminLoginScreenProps) 
           <View style={styles.form}>
             <View style={styles.formField}>
               <ThemedText style={styles.label}>Admin Email</ThemedText>
-              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault }]}>
-                <Feather name="mail" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+              <View
+                style={[
+                  styles.inputContainer,
+                  { backgroundColor: theme.backgroundDefault },
+                ]}
+              >
+                <Feather
+                  name="mail"
+                  size={20}
+                  color={theme.textSecondary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={[styles.textInput, { color: theme.text }]}
                   value={email}
@@ -101,8 +125,18 @@ export default function AdminLoginScreen({ navigation }: AdminLoginScreenProps) 
 
             <View style={styles.formField}>
               <ThemedText style={styles.label}>Password</ThemedText>
-              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault }]}>
-                <Feather name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+              <View
+                style={[
+                  styles.inputContainer,
+                  { backgroundColor: theme.backgroundDefault },
+                ]}
+              >
+                <Feather
+                  name="lock"
+                  size={20}
+                  color={theme.textSecondary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={[styles.textInput, { color: theme.text }]}
                   value={password}
@@ -112,7 +146,10 @@ export default function AdminLoginScreen({ navigation }: AdminLoginScreenProps) 
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
                   <Feather
                     name={showPassword ? "eye-off" : "eye"}
                     size={20}
@@ -127,11 +164,16 @@ export default function AdminLoginScreen({ navigation }: AdminLoginScreenProps) 
               disabled={isLoading}
               style={[styles.loginButton, { backgroundColor: "#8B5CF6" }]}
             >
-              {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Log In as Admin"}
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                "Log In as Admin"
+              )}
             </Button>
 
             <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>
-              Demo: Use email: admin@hardcoredoortodoorclosers.com, password: AdminTest123!
+              Demo: Use email: admin@hardcoredoortodoorclosers.com, password:
+              AdminTest123!
             </ThemedText>
           </View>
         </ScrollView>

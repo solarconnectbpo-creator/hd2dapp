@@ -130,8 +130,7 @@ export default function StLouisDataSourcesScreen({ route }: Props) {
         spcDay1FeatureCount: geoJsonFeatureCount(spc),
         nwsAlertsSample: nws,
         spcDay1Sample: spc,
-        note:
-          "IEM response can be large; counts shown. Full IEM GeoJSON omitted here.",
+        note: "IEM response can be large; counts shown. Full IEM GeoJSON omitted here.",
       };
       setWxJson(JSON.stringify(summary, null, 2));
     } catch (e) {
@@ -149,9 +148,9 @@ export default function StLouisDataSourcesScreen({ route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <ThemedText type="body" style={styles.lead}>
-          Public St. Louis GIS layers (maps8 / assessor) and regional storm
-          data (IEM, NWS, SPC). Esri World Imagery is a tile URL for map
-          basemaps — add as a raster source in your map style.
+          Public St. Louis GIS layers (maps8 / assessor) and regional storm data
+          (IEM, NWS, SPC). Esri World Imagery is a tile URL for map basemaps —
+          add as a raster source in your map style.
         </ThemedText>
 
         <ThemedText type="small" style={styles.label}>
@@ -206,7 +205,10 @@ export default function StLouisDataSourcesScreen({ route }: Props) {
         </View>
 
         {busy ? (
-          <ActivityIndicator color={AppColors.primary} style={{ marginTop: 8 }} />
+          <ActivityIndicator
+            color={AppColors.primary}
+            style={{ marginTop: 8 }}
+          />
         ) : null}
 
         {error ? (
@@ -237,7 +239,10 @@ export default function StLouisDataSourcesScreen({ route }: Props) {
           </>
         ) : null}
 
-        <ThemedText type="small" style={[styles.sectionTitle, { marginTop: 18 }]}>
+        <ThemedText
+          type="small"
+          style={[styles.sectionTitle, { marginTop: 18 }]}
+        >
           Source catalog
         </ThemedText>
         {ST_LOUIS_DATA_SOURCE_CATALOG.map((s) => (
@@ -259,7 +264,10 @@ export default function StLouisDataSourcesScreen({ route }: Props) {
           </View>
         ))}
 
-        <ThemedText type="small" style={[styles.sectionTitle, { marginTop: 12 }]}>
+        <ThemedText
+          type="small"
+          style={[styles.sectionTitle, { marginTop: 12 }]}
+        >
           Reference endpoints (not in catalog rows)
         </ThemedText>
         <ThemedText type="caption" style={styles.endpoint}>

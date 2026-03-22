@@ -1,6 +1,9 @@
 import type { FieldQaChecklistState } from "./fieldQaChecklist";
 
-export type { FieldQaChecklistId, FieldQaChecklistState } from "./fieldQaChecklist";
+export type {
+  FieldQaChecklistId,
+  FieldQaChecklistState,
+} from "./fieldQaChecklist";
 
 export type DamageType =
   | "Hail"

@@ -17,7 +17,12 @@ import { PaymentModal } from "@/components/PaymentModal";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenInsets } from "@/hooks/useScreenInsets";
 import { Spacing, BorderRadius, AppColors } from "@/constants/theme";
-import { COURSES, CERTIFICATIONS, Course, Certification } from "@/data/mockData";
+import {
+  COURSES,
+  CERTIFICATIONS,
+  Course,
+  Certification,
+} from "@/data/mockData";
 
 const LEVEL_COLORS: Record<string, string> = {
   beginner: AppColors.accent,
@@ -46,7 +51,9 @@ export default function CoursesScreen() {
   const handlePaymentSuccess = (transactionId: string) => {
     if (selectedCourse) {
       setCourses((prev) =>
-        prev.map((c) => (c.id === selectedCourse.id ? { ...c, enrolled: true } : c))
+        prev.map((c) =>
+          c.id === selectedCourse.id ? { ...c, enrolled: true } : c,
+        ),
       );
     }
     setSelectedCourse(null);
@@ -85,14 +92,21 @@ export default function CoursesScreen() {
       style={styles.courseCard}
     >
       <View style={styles.courseHeader}>
-        <View style={[styles.courseThumbnail, { backgroundColor: theme.backgroundSecondary }]}>
+        <View
+          style={[
+            styles.courseThumbnail,
+            { backgroundColor: theme.backgroundSecondary },
+          ]}
+        >
           <Feather name="play-circle" size={24} color={theme.textSecondary} />
         </View>
         <View style={styles.courseInfo}>
           <ThemedText type="h4" numberOfLines={1}>
             {course.title}
           </ThemedText>
-          <ThemedText style={[styles.instructor, { color: theme.textSecondary }]}>
+          <ThemedText
+            style={[styles.instructor, { color: theme.textSecondary }]}
+          >
             {course.instructor}
           </ThemedText>
         </View>
@@ -104,12 +118,19 @@ export default function CoursesScreen() {
         </ThemedText>
         {course.enrolled ? (
           <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { backgroundColor: theme.backgroundSecondary }]}>
+            <View
+              style={[
+                styles.progressBar,
+                { backgroundColor: theme.backgroundSecondary },
+              ]}
+            >
               <View
                 style={[styles.progressFill, { width: `${course.progress}%` }]}
               />
             </View>
-            <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
+            <ThemedText
+              style={[styles.progressText, { color: theme.textSecondary }]}
+            >
               {course.progress}%
             </ThemedText>
           </View>
@@ -153,10 +174,19 @@ export default function CoursesScreen() {
       </View>
       {!cert.earned ? (
         <View style={styles.certProgress}>
-          <View style={[styles.progressBar, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.progressFill, { width: `${cert.progress}%` }]} />
+          <View
+            style={[
+              styles.progressBar,
+              { backgroundColor: theme.backgroundSecondary },
+            ]}
+          >
+            <View
+              style={[styles.progressFill, { width: `${cert.progress}%` }]}
+            />
           </View>
-          <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
+          <ThemedText
+            style={[styles.progressText, { color: theme.textSecondary }]}
+          >
             {cert.progress}%
           </ThemedText>
         </View>
@@ -199,13 +229,27 @@ export default function CoursesScreen() {
             </View>
             {selectedCourse ? (
               <ScrollView style={styles.modalBody}>
-                <View style={[styles.modalThumbnail, { backgroundColor: theme.backgroundSecondary }]}>
-                  <Feather name="play-circle" size={48} color={theme.textSecondary} />
+                <View
+                  style={[
+                    styles.modalThumbnail,
+                    { backgroundColor: theme.backgroundSecondary },
+                  ]}
+                >
+                  <Feather
+                    name="play-circle"
+                    size={48}
+                    color={theme.textSecondary}
+                  />
                 </View>
                 <ThemedText type="h2" style={styles.modalTitle}>
                   {selectedCourse.title}
                 </ThemedText>
-                <ThemedText style={[styles.modalInstructor, { color: theme.textSecondary }]}>
+                <ThemedText
+                  style={[
+                    styles.modalInstructor,
+                    { color: theme.textSecondary },
+                  ]}
+                >
                   by {selectedCourse.instructor}
                 </ThemedText>
                 <View style={styles.modalMeta}>
@@ -215,34 +259,62 @@ export default function CoursesScreen() {
                     size="medium"
                   />
                   <View style={styles.durationContainer}>
-                    <Feather name="clock" size={14} color={theme.textSecondary} />
-                    <ThemedText style={{ color: theme.textSecondary, marginLeft: 4 }}>
+                    <Feather
+                      name="clock"
+                      size={14}
+                      color={theme.textSecondary}
+                    />
+                    <ThemedText
+                      style={{ color: theme.textSecondary, marginLeft: 4 }}
+                    >
                       {selectedCourse.duration}
                     </ThemedText>
                   </View>
                 </View>
                 <View style={styles.modalSection}>
                   <ThemedText type="h4">Description</ThemedText>
-                  <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+                  <ThemedText
+                    style={{
+                      color: theme.textSecondary,
+                      marginTop: Spacing.sm,
+                    }}
+                  >
                     {selectedCourse.description}
                   </ThemedText>
                 </View>
                 {selectedCourse.enrolled ? (
                   <View style={styles.enrolledSection}>
-                    <ThemedText style={{ color: theme.textSecondary }}>Your Progress</ThemedText>
-                    <View style={[styles.progressBarLarge, { backgroundColor: theme.backgroundSecondary }]}>
+                    <ThemedText style={{ color: theme.textSecondary }}>
+                      Your Progress
+                    </ThemedText>
+                    <View
+                      style={[
+                        styles.progressBarLarge,
+                        { backgroundColor: theme.backgroundSecondary },
+                      ]}
+                    >
                       <View
-                        style={[styles.progressFill, { width: `${selectedCourse.progress}%` }]}
+                        style={[
+                          styles.progressFill,
+                          { width: `${selectedCourse.progress}%` },
+                        ]}
                       />
                     </View>
-                    <ThemedText type="h3">{selectedCourse.progress}% Complete</ThemedText>
-                    <Button onPress={() => setSelectedCourse(null)} style={styles.continueButton}>
+                    <ThemedText type="h3">
+                      {selectedCourse.progress}% Complete
+                    </ThemedText>
+                    <Button
+                      onPress={() => setSelectedCourse(null)}
+                      style={styles.continueButton}
+                    >
                       Continue Learning
                     </Button>
                   </View>
                 ) : (
                   <View style={styles.priceSection}>
-                    <ThemedText style={{ color: theme.textSecondary }}>Course Price</ThemedText>
+                    <ThemedText style={{ color: theme.textSecondary }}>
+                      Course Price
+                    </ThemedText>
                     <ThemedText type="h1" style={{ color: AppColors.primary }}>
                       ${selectedCourse.price}
                     </ThemedText>

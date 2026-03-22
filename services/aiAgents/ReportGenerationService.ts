@@ -21,11 +21,9 @@ export class ReportGenerationService {
     const analysis = analyzed.status === "success" ? analyzed.data : null;
     if (analyzed.status === "error") {
       return {
-        draft: this.builder.buildDraft(
-          [],
-          null,
-          { address: opts.report.property?.address },
-        ),
+        draft: this.builder.buildDraft([], null, {
+          address: opts.report.property?.address,
+        }),
         analysisError: analyzed.error,
       };
     }

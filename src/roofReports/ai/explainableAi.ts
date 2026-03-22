@@ -45,19 +45,23 @@ export function explainPitchPrediction(
       factor: "Moderate visual indicators",
       impact: "medium",
       value: `${(confidence * 100).toFixed(0)}% confidence`,
-      explanation: "Some roof features visible but image angle or lighting limits precision.",
+      explanation:
+        "Some roof features visible but image angle or lighting limits precision.",
     });
   } else {
     factors.push({
       factor: "Limited visual indicators",
       impact: "low",
       value: `${(confidence * 100).toFixed(0)}% confidence`,
-      explanation: "Roof pitch difficult to determine from image. Manual verification recommended.",
+      explanation:
+        "Roof pitch difficult to determine from image. Manual verification recommended.",
     });
   }
 
   const qualityScore =
-    { high: 0.9, medium: 0.6, low: 0.3 }[imageQuality.toLowerCase() as string] || 0.6;
+    { high: 0.9, medium: 0.6, low: 0.3 }[
+      imageQuality.toLowerCase() as string
+    ] || 0.6;
   factors.push({
     factor: "Photo quality",
     impact: qualityScore > 0.7 ? "high" : qualityScore > 0.4 ? "medium" : "low",
@@ -90,10 +94,19 @@ export function explainPitchPrediction(
       "Image angle affects measured pitch accuracy (±2-5%).",
       "Shadows and obstructions can reduce precision.",
     ],
-    disclaimer: "This is an AI-assisted estimate. Physical field measurement is the gold standard.",
+    disclaimer:
+      "This is an AI-assisted estimate. Physical field measurement is the gold standard.",
     userActions: [
-      { label: "Accept Estimate", action: "accept", description: "Use AI estimate in report." },
-      { label: "Manual Override", action: "override", description: "Enter your own measurement." },
+      {
+        label: "Accept Estimate",
+        action: "accept",
+        description: "Use AI estimate in report.",
+      },
+      {
+        label: "Manual Override",
+        action: "override",
+        description: "Enter your own measurement.",
+      },
       {
         label: "Request Field Verification",
         action: "verify",
@@ -172,7 +185,11 @@ export function explainDamageAssessment(
         action: "more-photos",
         description: "Capture more angles for better accuracy.",
       },
-      { label: "Schedule Site Visit", action: "schedule-visit", description: "Arrange professional inspection." },
+      {
+        label: "Schedule Site Visit",
+        action: "schedule-visit",
+        description: "Arrange professional inspection.",
+      },
     ],
   };
 }
@@ -185,7 +202,12 @@ export function explainMeasurementFusion(
   const factors: ExplanationFactor[] = [];
 
   sources.forEach((source) => {
-    const weighted = source.confidence > 0.8 ? "high" : source.confidence > 0.6 ? "medium" : "low";
+    const weighted =
+      source.confidence > 0.8
+        ? "high"
+        : source.confidence > 0.6
+          ? "medium"
+          : "low";
     factors.push({
       factor: `${source.source} measurement`,
       impact: weighted as "high" | "medium" | "low",
@@ -199,13 +221,17 @@ export function explainMeasurementFusion(
     });
   });
 
-  const variance = Math.max(...sources.map((s) => s.value)) - Math.min(...sources.map((s) => s.value));
+  const variance =
+    Math.max(...sources.map((s) => s.value)) -
+    Math.min(...sources.map((s) => s.value));
   factors.push({
     factor: "Source agreement",
     impact: variance < fusedValue * 0.1 ? "high" : "medium",
     value: `${variance.toLocaleString()} sq ft variance`,
     explanation:
-      variance < fusedValue * 0.1 ? "Excellent agreement between sources." : "Moderate variance; balanced estimate.",
+      variance < fusedValue * 0.1
+        ? "Excellent agreement between sources."
+        : "Moderate variance; balanced estimate.",
   });
 
   return {
@@ -220,9 +246,21 @@ export function explainMeasurementFusion(
     disclaimer:
       "Fused measurements combine multiple data sources. Field verification recommended for critical estimates.",
     userActions: [
-      { label: "Accept Fused Result", action: "accept", description: "Use combined measurement." },
-      { label: "Use Single Source", action: "single-source", description: "Choose one measurement source." },
-      { label: "Manual Entry", action: "manual", description: "Enter custom measurement." },
+      {
+        label: "Accept Fused Result",
+        action: "accept",
+        description: "Use combined measurement.",
+      },
+      {
+        label: "Use Single Source",
+        action: "single-source",
+        description: "Choose one measurement source.",
+      },
+      {
+        label: "Manual Entry",
+        action: "manual",
+        description: "Enter custom measurement.",
+      },
     ],
   };
 }
@@ -245,7 +283,9 @@ export function formatExplanationForUI(explanation: AIPredictionExplanation): {
         : "⚠ Low Confidence – Verify Manually";
 
   const callToAction =
-    explanation.confidence > 0.8 ? "Ready to proceed with report" : "Recommend manual review or additional data";
+    explanation.confidence > 0.8
+      ? "Ready to proceed with report"
+      : "Recommend manual review or additional data";
 
   return {
     headline,

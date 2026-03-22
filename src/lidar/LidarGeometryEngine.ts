@@ -21,7 +21,10 @@ function resolveCoordinateSystem(
 }
 
 /** Horizontal east / north offsets (m) from ref to p; ref = vertex for angle at B. */
-function enuEastNorthMeters(p: Point3D, ref: Point3D): { east: number; north: number } {
+function enuEastNorthMeters(
+  p: Point3D,
+  ref: Point3D,
+): { east: number; north: number } {
   const latRef = (ref.x * Math.PI) / 180;
   const dLat = ((p.x - ref.x) * Math.PI) / 180;
   const dLon = ((p.y - ref.y) * Math.PI) / 180;
@@ -40,9 +43,13 @@ function projectGeographicToENU(points: Point3D[]): Point3D[] {
 }
 
 function geodesicDistanceMeters(p1: Point3D, p2: Point3D): number {
-  const horizontal = turf.distance(turf.point([p1.y, p1.x]), turf.point([p2.y, p2.x]), {
-    units: "meters",
-  });
+  const horizontal = turf.distance(
+    turf.point([p1.y, p1.x]),
+    turf.point([p2.y, p2.x]),
+    {
+      units: "meters",
+    },
+  );
   const dz = p2.z - p1.z;
   return Math.sqrt(horizontal * horizontal + dz * dz);
 }
@@ -92,7 +99,10 @@ export class LidarGeometryEngine {
     pointC: Point3D,
     coordinateSystem: PointCoordinateSystem = "cartesian",
   ): number {
-    const mode = resolveCoordinateSystem([pointA, pointB, pointC], coordinateSystem);
+    const mode = resolveCoordinateSystem(
+      [pointA, pointB, pointC],
+      coordinateSystem,
+    );
     if (mode === "geographic") {
       const enuA = enuEastNorthMeters(pointA, pointB);
       const enuC = enuEastNorthMeters(pointC, pointB);
@@ -111,9 +121,15 @@ export class LidarGeometryEngine {
         z: pointC.z - pointB.z,
       };
       const dotProduct =
-        vectorBA.x * vectorBC.x + vectorBA.y * vectorBC.y + vectorBA.z * vectorBC.z;
-      const magnitudeBA = Math.sqrt(vectorBA.x ** 2 + vectorBA.y ** 2 + vectorBA.z ** 2);
-      const magnitudeBC = Math.sqrt(vectorBC.x ** 2 + vectorBC.y ** 2 + vectorBC.z ** 2);
+        vectorBA.x * vectorBC.x +
+        vectorBA.y * vectorBC.y +
+        vectorBA.z * vectorBC.z;
+      const magnitudeBA = Math.sqrt(
+        vectorBA.x ** 2 + vectorBA.y ** 2 + vectorBA.z ** 2,
+      );
+      const magnitudeBC = Math.sqrt(
+        vectorBC.x ** 2 + vectorBC.y ** 2 + vectorBC.z ** 2,
+      );
       if (magnitudeBA === 0 || magnitudeBC === 0) return 0;
       const cosAngle = dotProduct / (magnitudeBA * magnitudeBC);
       return Math.acos(Math.max(-1, Math.min(1, cosAngle))) * (180 / Math.PI);
@@ -129,16 +145,25 @@ export class LidarGeometryEngine {
       z: pointC.z - pointB.z,
     };
     const dotProduct =
-      vectorBA.x * vectorBC.x + vectorBA.y * vectorBC.y + vectorBA.z * vectorBC.z;
-    const magnitudeBA = Math.sqrt(vectorBA.x ** 2 + vectorBA.y ** 2 + vectorBA.z ** 2);
-    const magnitudeBC = Math.sqrt(vectorBC.x ** 2 + vectorBC.y ** 2 + vectorBC.z ** 2);
+      vectorBA.x * vectorBC.x +
+      vectorBA.y * vectorBC.y +
+      vectorBA.z * vectorBC.z;
+    const magnitudeBA = Math.sqrt(
+      vectorBA.x ** 2 + vectorBA.y ** 2 + vectorBA.z ** 2,
+    );
+    const magnitudeBC = Math.sqrt(
+      vectorBC.x ** 2 + vectorBC.y ** 2 + vectorBC.z ** 2,
+    );
     if (magnitudeBA === 0 || magnitudeBC === 0) return 0;
     const cosAngle = dotProduct / (magnitudeBA * magnitudeBC);
     return Math.acos(Math.max(-1, Math.min(1, cosAngle))) * (180 / Math.PI);
   }
 
   /** Planar area: geodesic polygon (m²) when geographic; shoelace in XY when cartesian. */
-  static calculateArea(points: Point3D[], coordinateSystem: PointCoordinateSystem = "cartesian"): number {
+  static calculateArea(
+    points: Point3D[],
+    coordinateSystem: PointCoordinateSystem = "cartesian",
+  ): number {
     const mode = resolveCoordinateSystem(points, coordinateSystem);
     if (mode === "geographic") {
       return geodesicPolygonAreaSqM(points);
@@ -156,7 +181,10 @@ export class LidarGeometryEngine {
    * Fan volume from origin through first vertex (same model as before).
    * Geographic: vertices projected to local ENU (m) at first point, then metric fan volume.
    */
-  static calculateVolume(points: Point3D[], coordinateSystem: PointCoordinateSystem = "cartesian"): number {
+  static calculateVolume(
+    points: Point3D[],
+    coordinateSystem: PointCoordinateSystem = "cartesian",
+  ): number {
     const mode = resolveCoordinateSystem(points, coordinateSystem);
     if (mode === "geographic") {
       if (points.length < 4) return 0;
@@ -172,7 +200,10 @@ export class LidarGeometryEngine {
     samples: number = 10,
     coordinateSystem: PointCoordinateSystem = "cartesian",
   ): Point3D[] {
-    const mode = resolveCoordinateSystem([startPoint, endPoint], coordinateSystem);
+    const mode = resolveCoordinateSystem(
+      [startPoint, endPoint],
+      coordinateSystem,
+    );
     const profile: Point3D[] = [];
     const n = Math.max(1, Math.floor(samples));
     for (let i = 0; i <= n; i++) {
@@ -194,7 +225,11 @@ export class LidarGeometryEngine {
     return profile;
   }
 
-  static filterByElevation(points: Point3D[], minElevation: number, maxElevation: number): Point3D[] {
+  static filterByElevation(
+    points: Point3D[],
+    minElevation: number,
+    maxElevation: number,
+  ): Point3D[] {
     return points.filter((p) => p.z >= minElevation && p.z <= maxElevation);
   }
 
@@ -216,7 +251,10 @@ export class LidarGeometryEngine {
       minZ = Math.min(minZ, point.z);
       maxZ = Math.max(maxZ, point.z);
     }
-    return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
+    return {
+      min: { x: minX, y: minY, z: minZ },
+      max: { x: maxX, y: maxY, z: maxZ },
+    };
   }
 
   static downsamplePointCloud(
@@ -225,7 +263,9 @@ export class LidarGeometryEngine {
     coordinateSystem: PointCoordinateSystem = "cartesian",
   ): Point3D[] {
     if (gridSize <= 0) return [...points];
-    const mode = points.length ? resolveCoordinateSystem(points, coordinateSystem) : coordinateSystem;
+    const mode = points.length
+      ? resolveCoordinateSystem(points, coordinateSystem)
+      : coordinateSystem;
     const grid = new Map<string, Point3D[]>();
     const ref = points[0];
     for (const point of points) {

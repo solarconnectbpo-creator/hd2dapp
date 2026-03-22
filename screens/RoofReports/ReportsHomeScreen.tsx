@@ -91,10 +91,10 @@ export default function ReportsHomeScreen({ navigation }: Props) {
           </Button>
         </View>
 
-          <ThemedText type="caption" style={styles.singleFlowHint}>
-          Pick a property, then build the report and cost estimate on one screen —
-          tap{" "}
-            <ThemedText type="caption" style={{ fontWeight: "700" }}>
+        <ThemedText type="caption" style={styles.singleFlowHint}>
+          Pick a property, then build the report and cost estimate on one screen
+          — tap{" "}
+          <ThemedText type="caption" style={{ fontWeight: "700" }}>
             Finish & export report
           </ThemedText>{" "}
           to preview and download HTML or JSON.
@@ -108,8 +108,8 @@ export default function ReportsHomeScreen({ navigation }: Props) {
               No reports yet.
             </ThemedText>
             <ThemedText type="small" style={styles.emptyBody}>
-              Tap Start above, choose an address on the map, then build and export
-              on the next screen.
+              Tap Start above, choose an address on the map, then build and
+              export on the next screen.
             </ThemedText>
           </View>
         ) : (

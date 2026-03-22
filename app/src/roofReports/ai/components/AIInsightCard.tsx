@@ -28,23 +28,23 @@ interface AIInsightCardProps {
   title: string;
   explanation: AIPredictionExplanation;
   onAction?: (actionKey: string) => void;
-  variant?: 'pitch' | 'damage' | 'measurement' | 'general';
+  variant?: "pitch" | "damage" | "measurement" | "general";
 }
 
 export default function AIInsightCard({
   title,
   explanation,
   onAction,
-  variant = 'general',
+  variant = "general",
 }: AIInsightCardProps) {
   const { theme } = useTheme();
   const [showDetails, setShowDetails] = useState(false);
   const formatted = formatExplanationForUI(explanation);
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence > 0.85) return '#10b981'; // green
-    if (confidence > 0.7) return '#f59e0b'; // amber
-    return '#ef4444'; // red
+    if (confidence > 0.85) return "#10b981"; // green
+    if (confidence > 0.7) return "#f59e0b"; // amber
+    return "#ef4444"; // red
   };
 
   const getVariantIcon = (): FeatherIconName => {
@@ -100,11 +100,13 @@ export default function AIInsightCard({
 
         {/* Prediction Value */}
         <View style={styles.predictionBox}>
-          <Text style={[styles.predictionLabel, { color: theme.textSecondary }]}>
+          <Text
+            style={[styles.predictionLabel, { color: theme.textSecondary }]}
+          >
             Prediction:
           </Text>
           <Text style={[styles.predictionValue, { color: theme.text }]}>
-            {typeof explanation.prediction === 'object'
+            {typeof explanation.prediction === "object"
               ? JSON.stringify(explanation.prediction)
               : String(explanation.prediction)}
           </Text>
@@ -116,14 +118,16 @@ export default function AIInsightCard({
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
               Key Factors
             </Text>
-            {formatted.factors.slice(0, 2).map((factor: string, idx: number) => (
-              <View key={idx} style={styles.factorItem}>
-                <Feather name="check-circle" size={16} color="#10b981" />
-                <Text style={[styles.factorText, { color: theme.text }]}>
-                  {factor}
-                </Text>
-              </View>
-            ))}
+            {formatted.factors
+              .slice(0, 2)
+              .map((factor: string, idx: number) => (
+                <View key={idx} style={styles.factorItem}>
+                  <Feather name="check-circle" size={16} color="#10b981" />
+                  <Text style={[styles.factorText, { color: theme.text }]}>
+                    {factor}
+                  </Text>
+                </View>
+              ))}
             {formatted.factors.length > 2 && (
               <TouchableOpacity onPress={() => setShowDetails(true)}>
                 <Text style={styles.viewMoreLink}>
@@ -147,28 +151,30 @@ export default function AIInsightCard({
         {/* User Actions */}
         {explanation.userActions && explanation.userActions.length > 0 && (
           <View style={styles.actionsSection}>
-            {explanation.userActions.slice(0, 2).map((action: UserAction, idx: number) => (
-              <TouchableOpacity
-                key={idx}
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor:
-                      idx === 0 ? AppColors.primary : AppColors.secondary,
-                  },
-                ]}
-                onPress={() => onAction?.(action.action)}
-              >
-                <Text
+            {explanation.userActions
+              .slice(0, 2)
+              .map((action: UserAction, idx: number) => (
+                <TouchableOpacity
+                  key={idx}
                   style={[
-                    styles.actionButtonText,
-                    { color: idx === 0 ? "#fff" : theme.text },
+                    styles.actionButton,
+                    {
+                      backgroundColor:
+                        idx === 0 ? AppColors.primary : AppColors.secondary,
+                    },
                   ]}
+                  onPress={() => onAction?.(action.action)}
                 >
-                  {action.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      { color: idx === 0 ? "#fff" : theme.text },
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
           </View>
         )}
 
@@ -186,7 +192,12 @@ export default function AIInsightCard({
 
       {/* Details Modal */}
       <Modal visible={showDetails} transparent animationType="slide">
-        <View style={[styles.modalOverlay, { backgroundColor: theme.backgroundRoot }]}>
+        <View
+          style={[
+            styles.modalOverlay,
+            { backgroundColor: theme.backgroundRoot },
+          ]}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
@@ -200,14 +211,18 @@ export default function AIInsightCard({
             <ScrollView style={styles.modalScroll}>
               {/* Confidence */}
               <View style={styles.detailSection}>
-                <Text style={[styles.detailSectionTitle, { color: theme.text }]}>
+                <Text
+                  style={[styles.detailSectionTitle, { color: theme.text }]}
+                >
                   Confidence Score
                 </Text>
                 <View
                   style={[
                     styles.confidenceBar,
                     {
-                      backgroundColor: getConfidenceColor(explanation.confidence),
+                      backgroundColor: getConfidenceColor(
+                        explanation.confidence,
+                      ),
                     },
                   ]}
                 >
@@ -219,59 +234,85 @@ export default function AIInsightCard({
 
               {/* All Factors */}
               <View style={styles.detailSection}>
-                <Text style={[styles.detailSectionTitle, { color: theme.text }]}>
+                <Text
+                  style={[styles.detailSectionTitle, { color: theme.text }]}
+                >
                   Contributing Factors
                 </Text>
-                {explanation.reasoning.map((factor: ExplanationFactor, idx: number) => (
-                  <View key={idx} style={styles.detailFactorItem}>
-                    <View
-                      style={[
-                        styles.impactBadge,
-                        {
-                          backgroundColor:
-                            factor.impact === 'high'
-                              ? '#ef4444'
-                              : factor.impact === 'medium'
-                                ? '#f59e0b'
-                                : '#10b981',
-                        },
-                      ]}
-                    >
-                      <Text style={styles.impactText}>
-                        {factor.impact.toUpperCase()[0]}
-                      </Text>
-                    </View>
-                    <View style={styles.detailFactorContent}>
-                      <Text style={[styles.factorName, { color: theme.text }]}>
-                        {factor.factor}
-                      </Text>
-                      {factor.value && (
-                        <Text style={[styles.factorValue, { color: theme.textSecondary }]}>
-                          {factor.value}
+                {explanation.reasoning.map(
+                  (factor: ExplanationFactor, idx: number) => (
+                    <View key={idx} style={styles.detailFactorItem}>
+                      <View
+                        style={[
+                          styles.impactBadge,
+                          {
+                            backgroundColor:
+                              factor.impact === "high"
+                                ? "#ef4444"
+                                : factor.impact === "medium"
+                                  ? "#f59e0b"
+                                  : "#10b981",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.impactText}>
+                          {factor.impact.toUpperCase()[0]}
                         </Text>
-                      )}
-                      <Text style={[styles.factorExplanation, { color: theme.text }]}>
-                        {factor.explanation}
-                      </Text>
+                      </View>
+                      <View style={styles.detailFactorContent}>
+                        <Text
+                          style={[styles.factorName, { color: theme.text }]}
+                        >
+                          {factor.factor}
+                        </Text>
+                        {factor.value && (
+                          <Text
+                            style={[
+                              styles.factorValue,
+                              { color: theme.textSecondary },
+                            ]}
+                          >
+                            {factor.value}
+                          </Text>
+                        )}
+                        <Text
+                          style={[
+                            styles.factorExplanation,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {factor.explanation}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ),
+                )}
               </View>
 
               {/* Limitations */}
               {formatted.limitations.length > 0 && (
                 <View style={styles.detailSection}>
-                  <Text style={[styles.detailSectionTitle, { color: theme.text }]}>
+                  <Text
+                    style={[styles.detailSectionTitle, { color: theme.text }]}
+                  >
                     Limitations & Caveats
                   </Text>
-                  {formatted.limitations.map((limitation: string, idx: number) => (
-                    <View key={idx} style={styles.limitationItem}>
-                      <Feather name="alert-triangle" size={14} color="#f59e0b" />
-                      <Text style={[styles.limitationText, { color: theme.text }]}>
-                        {limitation}
-                      </Text>
-                    </View>
-                  ))}
+                  {formatted.limitations.map(
+                    (limitation: string, idx: number) => (
+                      <View key={idx} style={styles.limitationItem}>
+                        <Feather
+                          name="alert-triangle"
+                          size={14}
+                          color="#f59e0b"
+                        />
+                        <Text
+                          style={[styles.limitationText, { color: theme.text }]}
+                        >
+                          {limitation}
+                        </Text>
+                      </View>
+                    ),
+                  )}
                 </View>
               )}
 
@@ -292,44 +333,58 @@ export default function AIInsightCard({
               </View>
 
               {/* All Actions */}
-              {explanation.userActions && explanation.userActions.length > 0 && (
-                <View style={styles.detailSection}>
-                  <Text style={[styles.detailSectionTitle, { color: theme.text }]}>
-                    Next Steps
-                  </Text>
-                  {explanation.userActions.map((action: UserAction, idx: number) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={[
-                        styles.actionOption,
-                        {
-                          backgroundColor: theme.cardBackground,
-                          borderColor: theme.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        onAction?.(action.action);
-                        setShowDetails(false);
-                      }}
+              {explanation.userActions &&
+                explanation.userActions.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text
+                      style={[styles.detailSectionTitle, { color: theme.text }]}
                     >
-                      <View>
-                        <Text style={[styles.actionOptionLabel, { color: theme.text }]}>
-                          {action.label}
-                        </Text>
-                        <Text
+                      Next Steps
+                    </Text>
+                    {explanation.userActions.map(
+                      (action: UserAction, idx: number) => (
+                        <TouchableOpacity
+                          key={idx}
                           style={[
-                            styles.actionOptionDescription,
-                            { color: theme.textSecondary },
+                            styles.actionOption,
+                            {
+                              backgroundColor: theme.cardBackground,
+                              borderColor: theme.border,
+                            },
                           ]}
+                          onPress={() => {
+                            onAction?.(action.action);
+                            setShowDetails(false);
+                          }}
                         >
-                          {action.description}
-                        </Text>
-                      </View>
-                      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                          <View>
+                            <Text
+                              style={[
+                                styles.actionOptionLabel,
+                                { color: theme.text },
+                              ]}
+                            >
+                              {action.label}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.actionOptionDescription,
+                                { color: theme.textSecondary },
+                              ]}
+                            >
+                              {action.description}
+                            </Text>
+                          </View>
+                          <Feather
+                            name="chevron-right"
+                            size={20}
+                            color={theme.textSecondary}
+                          />
+                        </TouchableOpacity>
+                      ),
+                    )}
+                  </View>
+                )}
             </ScrollView>
           </View>
         </View>
@@ -346,40 +401,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     flex: 1,
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     flex: 1,
   },
   confidenceBadge: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: "#f3f4f6",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   confidenceText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: "600",
+    color: "#374151",
   },
   headline: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
   },
   predictionBox: {
-    backgroundColor: 'rgba(0,0,0,0.02)',
+    backgroundColor: "rgba(0,0,0,0.02)",
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -390,19 +445,19 @@ const styles = StyleSheet.create({
   },
   predictionValue: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   factorsSection: {
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
   factorItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 8,
     marginBottom: 8,
   },
@@ -413,13 +468,13 @@ const styles = StyleSheet.create({
   },
   viewMoreLink: {
     fontSize: 13,
-    color: '#3b82f6',
-    fontWeight: '600',
+    color: "#3b82f6",
+    fontWeight: "600",
     marginTop: 4,
   },
   callToAction: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
   },
   actionsSection: {
@@ -430,15 +485,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionButtonText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   detailsToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingVertical: 8,
   },
@@ -453,17 +508,17 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: "#e5e7eb",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     flex: 1,
   },
   modalScroll: {
@@ -475,22 +530,22 @@ const styles = StyleSheet.create({
   },
   detailSectionTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 12,
   },
   confidenceBar: {
     height: 40,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   confidenceBarText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 14,
   },
   detailFactorItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 12,
   },
@@ -498,12 +553,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   impactText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 12,
   },
   detailFactorContent: {
@@ -511,7 +566,7 @@ const styles = StyleSheet.create({
   },
   factorName: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 2,
   },
   factorValue: {
@@ -523,7 +578,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   limitationItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 8,
   },
@@ -536,7 +591,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 24,
   },
@@ -549,14 +604,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   actionOptionLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 2,
   },
   actionOptionDescription: {

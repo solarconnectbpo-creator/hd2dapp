@@ -31,21 +31,20 @@ export async function fetchStlIntelAtPoint(
   const near = opts?.nearMeters ?? DEFAULT_NEAR_M;
   const signal = opts?.signal;
 
-  const [
-    parcelRes,
-    bldRes,
-    tradeRes,
-    lraRes,
-    taxRes,
-    demoRes,
-  ] = await Promise.all([
-    queryPolygonContainsPoint(STL_ASSESSOR_PARCEL_LAYER, lat, lng, signal),
-    queryPointsNear(STL_SLDC_BUILDING_PERMITS_LAYER, lat, lng, near, signal),
-    queryPointsNear(STL_SLDC_TRADES_PERMITS_LAYER, lat, lng, near, signal),
-    queryPolygonContainsPoint(STL_SLDC_LRA_IN_PATH_LAYER, lat, lng, signal),
-    queryPolygonContainsPoint(STL_SLDC_TAX_SALES_LAYER, lat, lng, signal),
-    queryPolygonContainsPoint(STL_BUILDING_DEMOLITIONS_LAYER, lat, lng, signal),
-  ]);
+  const [parcelRes, bldRes, tradeRes, lraRes, taxRes, demoRes] =
+    await Promise.all([
+      queryPolygonContainsPoint(STL_ASSESSOR_PARCEL_LAYER, lat, lng, signal),
+      queryPointsNear(STL_SLDC_BUILDING_PERMITS_LAYER, lat, lng, near, signal),
+      queryPointsNear(STL_SLDC_TRADES_PERMITS_LAYER, lat, lng, near, signal),
+      queryPolygonContainsPoint(STL_SLDC_LRA_IN_PATH_LAYER, lat, lng, signal),
+      queryPolygonContainsPoint(STL_SLDC_TAX_SALES_LAYER, lat, lng, signal),
+      queryPolygonContainsPoint(
+        STL_BUILDING_DEMOLITIONS_LAYER,
+        lat,
+        lng,
+        signal,
+      ),
+    ]);
 
   const attrs = (f: { attributes?: Record<string, unknown> }) =>
     f.attributes ?? {};
@@ -96,9 +95,9 @@ export async function fetchNwsActiveAlertsAtPoint(
 }
 
 /** SPC Day 1 convective outlook GeoJSON (regional; not point-filtered). */
-export async function fetchSpcDay1Outlook(
-  opts?: { signal?: AbortSignal },
-): Promise<unknown> {
+export async function fetchSpcDay1Outlook(opts?: {
+  signal?: AbortSignal;
+}): Promise<unknown> {
   const res = await fetch(
     "https://www.spc.noaa.gov/products/outlook/day1otlk_latest.geojson",
     { signal: opts?.signal },

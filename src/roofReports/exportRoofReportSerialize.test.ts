@@ -7,7 +7,9 @@ import {
 } from "./exportRoofReportSerialize";
 
 /** Minimal valid report — same fields required as Finish & export → Preview. */
-function minimalReport(overrides?: Partial<DamageRoofReport>): DamageRoofReport {
+function minimalReport(
+  overrides?: Partial<DamageRoofReport>,
+): DamageRoofReport {
   return {
     id: "finish-export-test-1",
     createdAtIso: "2026-03-22T12:00:00.000Z",

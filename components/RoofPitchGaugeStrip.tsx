@@ -10,35 +10,62 @@ type Props = {
   label?: string;
 };
 
-/** Compact slope readout: approximate degrees from rise/12 and a 3-zone strip (flat / moderate / steep). */
-export function RoofPitchGaugeStrip({ pitch, label }: Props) {
-  const rise = parseRoofPitchRise(pitch);
-  if (rise === undefined || !Number.isFinite(rise)) return null;
+/** ~0–45° display span (12:12 ≈ 45°). */
+const MAX_DEG = 45;
 
-  const deg = (Math.atan(rise / 12) * 180) / Math.PI;
+/** Compact slope readout: degrees + rise/12 from normalized pitch (6:12, 3:4, 26°, etc.). */
+export function RoofPitchGaugeStrip({ pitch, label }: Props) {
+  const riseOn12 = parseRoofPitchRise(pitch);
+  if (riseOn12 === undefined || !Number.isFinite(riseOn12)) return null;
+
+  const deg = (Math.atan(riseOn12 / 12) * 180) / Math.PI;
+  const pct = Math.min(1, Math.max(0, deg / MAX_DEG));
   const segment = deg < 14 ? 0 : deg < 28 ? 1 : 2;
-  const zoneLabel = segment === 0 ? "Low slope" : segment === 1 ? "Moderate" : "Steep";
+  const zoneLabel =
+    segment === 0 ? "Low slope" : segment === 1 ? "Moderate" : "Steep";
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      accessibilityRole="text"
+      accessibilityLabel={`Roof pitch about ${deg.toFixed(0)} degrees, ${zoneLabel}`}
+    >
       {label ? (
         <ThemedText type="caption" style={styles.label}>
           {label}
         </ThemedText>
       ) : null}
-      <View style={styles.strip}>
-        {[0, 1, 2].map((i) => (
-          <View
-            key={i}
-            style={[
-              styles.seg,
-              { backgroundColor: i === segment ? AppColors.primary : "rgba(148,163,184,0.35)" },
-            ]}
-          />
-        ))}
+      <View style={styles.trackOuter}>
+        <View style={styles.track}>
+          {[0, 1, 2].map((i) => (
+            <View
+              key={i}
+              style={[
+                styles.seg,
+                {
+                  backgroundColor:
+                    i === segment
+                      ? AppColors.primary
+                      : "rgba(148,163,184,0.35)",
+                },
+              ]}
+            />
+          ))}
+        </View>
+        <View
+          style={[
+            styles.marker,
+            {
+              left: `${pct * 100}%`,
+            },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
       </View>
       <ThemedText type="small" style={styles.meta}>
-        ~{deg.toFixed(1)}° ({pitch?.trim()}) · {zoneLabel}
+        {riseOn12.toFixed(1)}/12 · ~{deg.toFixed(1)}° ({pitch?.trim()}) ·{" "}
+        {zoneLabel}
       </ThemedText>
     </View>
   );
@@ -47,7 +74,21 @@ export function RoofPitchGaugeStrip({ pitch, label }: Props) {
 const styles = StyleSheet.create({
   wrap: { marginTop: 8, gap: 6 },
   label: { opacity: 0.85 },
-  strip: { flexDirection: "row", gap: 4, height: 10 },
+  trackOuter: {
+    position: "relative",
+    height: 14,
+    justifyContent: "center",
+  },
+  track: { flexDirection: "row", gap: 4, height: 10 },
   seg: { flex: 1, borderRadius: 4 },
+  marker: {
+    position: "absolute",
+    width: 4,
+    marginLeft: -2,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+    backgroundColor: "rgba(15,23,42,0.92)",
+  },
   meta: { opacity: 0.9 },
 });

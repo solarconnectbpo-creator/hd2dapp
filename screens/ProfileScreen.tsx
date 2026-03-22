@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView, Alert, Platform, Modal, TextInput } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Alert,
+  Platform,
+  Modal,
+  TextInput,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ThemedText } from "@/components/ThemedText";
@@ -11,7 +20,12 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScreenInsets } from "@/hooks/useScreenInsets";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 import * as Haptics from "expo-haptics";
 
@@ -32,9 +46,17 @@ const MENU_ITEMS = [
 ];
 
 const RECENT_ACTIVITY = [
-  { type: "deal", text: "Closed deal with Miller Residence", time: "2 hours ago" },
+  {
+    type: "deal",
+    text: "Closed deal with Miller Residence",
+    time: "2 hours ago",
+  },
   { type: "cert", text: "Earned Solar Pro Certification", time: "1 day ago" },
-  { type: "course", text: "Completed Advanced Closing course", time: "3 days ago" },
+  {
+    type: "course",
+    text: "Completed Advanced Closing course",
+    time: "3 days ago",
+  },
 ];
 
 interface BusinessCard {
@@ -94,20 +116,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       }
       return;
     }
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: async () => {
-            await logout();
-          },
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleForceLogout = async () => {
@@ -118,7 +136,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       }
     } catch (error) {
       console.error("Force logout failed:", error);
-      Alert.alert("Logout error", "Unable to logout. Please refresh and try again.");
+      Alert.alert(
+        "Logout error",
+        "Unable to logout. Please refresh and try again.",
+      );
     }
   };
 
@@ -136,20 +157,22 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   };
 
   const displayName = user?.name || "User";
-  const userRole = user?.userType === "company" 
-    ? `${user.company || "Company"} Account`
-    : "Sales Representative";
-  const userBadges = user?.userType === "company"
-    ? [{ label: "Company", color: AppColors.secondary }]
-    : [{ label: "Top Closer", color: AppColors.accent }, { label: "Sales Rep", color: AppColors.primary }];
+  const userRole =
+    user?.userType === "company"
+      ? `${user.company || "Company"} Account`
+      : "Sales Representative";
+  const userBadges =
+    user?.userType === "company"
+      ? [{ label: "Company", color: AppColors.secondary }]
+      : [
+          { label: "Top Closer", color: AppColors.accent },
+          { label: "Sales Rep", color: AppColors.primary },
+        ];
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop, paddingBottom },
-      ]}
+      contentContainerStyle={[styles.content, { paddingTop, paddingBottom }]}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.profileHeader}>
@@ -162,7 +185,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </ThemedText>
         <View style={styles.badges}>
           {userBadges.map((badge, index) => (
-            <Badge key={index} label={badge.label} color={badge.color} size="medium" />
+            <Badge
+              key={index}
+              label={badge.label}
+              color={badge.color}
+              size="medium"
+            />
           ))}
         </View>
       </View>
@@ -211,7 +239,11 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               </View>
               <ThemedText type="h4">{item.label}</ThemedText>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={theme.textSecondary}
+            />
           </Card>
         ))}
       </View>
@@ -235,7 +267,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               />
             </View>
             <View style={styles.activityContent}>
-              <ThemedText style={styles.activityText}>{activity.text}</ThemedText>
+              <ThemedText style={styles.activityText}>
+                {activity.text}
+              </ThemedText>
               <ThemedText
                 style={[styles.activityTime, { color: theme.textSecondary }]}
               >
@@ -251,17 +285,28 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         onPress={() => Alert.alert("Settings", "Settings screen coming soon!")}
       >
         <Feather name="settings" size={20} color={theme.textSecondary} />
-        <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+        <ThemedText
+          style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}
+        >
           Settings
         </ThemedText>
       </Pressable>
 
       <Pressable
-        style={[styles.logoutButton, { backgroundColor: AppColors.error + "15" }]}
+        style={[
+          styles.logoutButton,
+          { backgroundColor: AppColors.error + "15" },
+        ]}
         onPress={handleLogout}
       >
         <Feather name="log-out" size={20} color={AppColors.error} />
-        <ThemedText style={{ color: AppColors.error, marginLeft: Spacing.sm, fontWeight: "500" }}>
+        <ThemedText
+          style={{
+            color: AppColors.error,
+            marginLeft: Spacing.sm,
+            fontWeight: "500",
+          }}
+        >
           Log Out
         </ThemedText>
       </Pressable>
@@ -302,14 +347,19 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 {/* Business Card Display */}
                 <Card
                   elevation={2}
-                  style={[styles.businessCardPreview, { backgroundColor: AppColors.primary + "10" }]}
+                  style={[
+                    styles.businessCardPreview,
+                    { backgroundColor: AppColors.primary + "10" },
+                  ]}
                 >
                   <View style={styles.cardContent}>
                     <View style={styles.cardHeader}>
                       <Avatar name={displayName} index={0} size={48} />
                       <View style={styles.cardNameContainer}>
                         <ThemedText type="h4">{displayName}</ThemedText>
-                        <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                        <ThemedText
+                          style={{ color: theme.textSecondary, fontSize: 12 }}
+                        >
                           {businessCard.title}
                         </ThemedText>
                       </View>
@@ -319,27 +369,57 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
                     <View style={styles.cardDetails}>
                       <View style={styles.cardDetail}>
-                        <Feather name="briefcase" size={16} color={AppColors.primary} />
-                        <ThemedText style={styles.cardDetailText}>{businessCard.company}</ThemedText>
+                        <Feather
+                          name="briefcase"
+                          size={16}
+                          color={AppColors.primary}
+                        />
+                        <ThemedText style={styles.cardDetailText}>
+                          {businessCard.company}
+                        </ThemedText>
                       </View>
                       <View style={styles.cardDetail}>
-                        <Feather name="mail" size={16} color={AppColors.primary} />
-                        <ThemedText style={styles.cardDetailText}>{businessCard.email}</ThemedText>
+                        <Feather
+                          name="mail"
+                          size={16}
+                          color={AppColors.primary}
+                        />
+                        <ThemedText style={styles.cardDetailText}>
+                          {businessCard.email}
+                        </ThemedText>
                       </View>
                       <View style={styles.cardDetail}>
-                        <Feather name="phone" size={16} color={AppColors.primary} />
-                        <ThemedText style={styles.cardDetailText}>{businessCard.phone}</ThemedText>
+                        <Feather
+                          name="phone"
+                          size={16}
+                          color={AppColors.primary}
+                        />
+                        <ThemedText style={styles.cardDetailText}>
+                          {businessCard.phone}
+                        </ThemedText>
                       </View>
                       {businessCard.website && (
                         <View style={styles.cardDetail}>
-                          <Feather name="globe" size={16} color={AppColors.primary} />
-                          <ThemedText style={styles.cardDetailText}>{businessCard.website}</ThemedText>
+                          <Feather
+                            name="globe"
+                            size={16}
+                            color={AppColors.primary}
+                          />
+                          <ThemedText style={styles.cardDetailText}>
+                            {businessCard.website}
+                          </ThemedText>
                         </View>
                       )}
                       {businessCard.address && (
                         <View style={styles.cardDetail}>
-                          <Feather name="map-pin" size={16} color={AppColors.primary} />
-                          <ThemedText style={styles.cardDetailText}>{businessCard.address}</ThemedText>
+                          <Feather
+                            name="map-pin"
+                            size={16}
+                            color={AppColors.primary}
+                          />
+                          <ThemedText style={styles.cardDetailText}>
+                            {businessCard.address}
+                          </ThemedText>
                         </View>
                       )}
                     </View>
@@ -355,44 +435,82 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                   </Button>
                   <Button
                     onPress={handleShareCard}
-                    style={[styles.halfButton, { backgroundColor: theme.backgroundSecondary }]}
+                    style={[
+                      styles.halfButton,
+                      { backgroundColor: theme.backgroundSecondary },
+                    ]}
                   >
                     Share
                   </Button>
                 </View>
               </ScrollView>
             ) : (
-              <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
-                <ThemedText type="h4" style={styles.editFormTitle}>Edit Business Card</ThemedText>
+              <ScrollView
+                style={styles.modalBody}
+                keyboardShouldPersistTaps="handled"
+              >
+                <ThemedText type="h4" style={styles.editFormTitle}>
+                  Edit Business Card
+                </ThemedText>
 
                 <View style={styles.formField}>
-                  <ThemedText type="small" style={styles.label}>Title</ThemedText>
+                  <ThemedText type="small" style={styles.label}>
+                    Title
+                  </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.backgroundDefault,
+                        color: theme.text,
+                      },
+                    ]}
                     value={editCard.title}
-                    onChangeText={(text) => setEditCard({ ...editCard, title: text })}
+                    onChangeText={(text) =>
+                      setEditCard({ ...editCard, title: text })
+                    }
                     placeholder="Your job title"
                     placeholderTextColor={theme.textSecondary}
                   />
                 </View>
 
                 <View style={styles.formField}>
-                  <ThemedText type="small" style={styles.label}>Company</ThemedText>
+                  <ThemedText type="small" style={styles.label}>
+                    Company
+                  </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.backgroundDefault,
+                        color: theme.text,
+                      },
+                    ]}
                     value={editCard.company}
-                    onChangeText={(text) => setEditCard({ ...editCard, company: text })}
+                    onChangeText={(text) =>
+                      setEditCard({ ...editCard, company: text })
+                    }
                     placeholder="Company name"
                     placeholderTextColor={theme.textSecondary}
                   />
                 </View>
 
                 <View style={styles.formField}>
-                  <ThemedText type="small" style={styles.label}>Email</ThemedText>
+                  <ThemedText type="small" style={styles.label}>
+                    Email
+                  </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.backgroundDefault,
+                        color: theme.text,
+                      },
+                    ]}
                     value={editCard.email}
-                    onChangeText={(text) => setEditCard({ ...editCard, email: text })}
+                    onChangeText={(text) =>
+                      setEditCard({ ...editCard, email: text })
+                    }
                     placeholder="Email address"
                     placeholderTextColor={theme.textSecondary}
                     keyboardType="email-address"
@@ -400,11 +518,21 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 </View>
 
                 <View style={styles.formField}>
-                  <ThemedText type="small" style={styles.label}>Phone</ThemedText>
+                  <ThemedText type="small" style={styles.label}>
+                    Phone
+                  </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.backgroundDefault,
+                        color: theme.text,
+                      },
+                    ]}
                     value={editCard.phone}
-                    onChangeText={(text) => setEditCard({ ...editCard, phone: text })}
+                    onChangeText={(text) =>
+                      setEditCard({ ...editCard, phone: text })
+                    }
                     placeholder="Phone number"
                     placeholderTextColor={theme.textSecondary}
                     keyboardType="phone-pad"
@@ -412,32 +540,49 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 </View>
 
                 <View style={styles.formField}>
-                  <ThemedText type="small" style={styles.label}>Website</ThemedText>
+                  <ThemedText type="small" style={styles.label}>
+                    Website
+                  </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.backgroundDefault,
+                        color: theme.text,
+                      },
+                    ]}
                     value={editCard.website}
-                    onChangeText={(text) => setEditCard({ ...editCard, website: text })}
+                    onChangeText={(text) =>
+                      setEditCard({ ...editCard, website: text })
+                    }
                     placeholder="Website URL"
                     placeholderTextColor={theme.textSecondary}
                   />
                 </View>
 
                 <View style={styles.formField}>
-                  <ThemedText type="small" style={styles.label}>Address</ThemedText>
+                  <ThemedText type="small" style={styles.label}>
+                    Address
+                  </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.backgroundDefault,
+                        color: theme.text,
+                      },
+                    ]}
                     value={editCard.address}
-                    onChangeText={(text) => setEditCard({ ...editCard, address: text })}
+                    onChangeText={(text) =>
+                      setEditCard({ ...editCard, address: text })
+                    }
                     placeholder="Business address"
                     placeholderTextColor={theme.textSecondary}
                   />
                 </View>
 
                 <View style={styles.cardActionButtons}>
-                  <Button
-                    onPress={handleSaveCard}
-                    style={styles.halfButton}
-                  >
+                  <Button onPress={handleSaveCard} style={styles.halfButton}>
                     Save
                   </Button>
                   <Button
@@ -445,7 +590,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                       setEditCard({ ...businessCard });
                       setIsEditMode(false);
                     }}
-                    style={[styles.halfButton, { backgroundColor: theme.backgroundSecondary }]}
+                    style={[
+                      styles.halfButton,
+                      { backgroundColor: theme.backgroundSecondary },
+                    ]}
                   >
                     Cancel
                   </Button>

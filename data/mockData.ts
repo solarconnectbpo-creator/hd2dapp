@@ -20,7 +20,14 @@ export interface Deal {
   contactName: string;
   company: string;
   value: number;
-  stage: "new" | "contacted" | "qualified" | "proposal" | "negotiation" | "won" | "lost";
+  stage:
+    | "new"
+    | "contacted"
+    | "qualified"
+    | "proposal"
+    | "negotiation"
+    | "won"
+    | "lost";
   daysInStage: number;
   phone: string;
   email: string;
@@ -290,7 +297,8 @@ export const POSTS: Post[] = [
     userId: "u1",
     userName: "Marcus Thompson",
     userAvatar: 1,
-    content: "Just closed a $45K roofing deal after 3 follow-ups. Persistence pays off! Never give up on a quality lead.",
+    content:
+      "Just closed a $45K roofing deal after 3 follow-ups. Persistence pays off! Never give up on a quality lead.",
     hashtags: ["roofing", "sales", "closing"],
     likes: 47,
     comments: 12,
@@ -302,7 +310,8 @@ export const POSTS: Post[] = [
     userId: "u2",
     userName: "Jessica Rivera",
     userAvatar: 2,
-    content: "Pro tip: Always do a full home assessment even if they only called for one thing. Found 3 upsell opportunities on my last visit.",
+    content:
+      "Pro tip: Always do a full home assessment even if they only called for one thing. Found 3 upsell opportunities on my last visit.",
     hashtags: ["salestips", "doortodoor"],
     likes: 89,
     comments: 23,
@@ -314,7 +323,8 @@ export const POSTS: Post[] = [
     userId: "u3",
     userName: "Derek Washington",
     userAvatar: 3,
-    content: "Storm season is here! Time to hit the ground running. Who else is crushing it in the Houston area?",
+    content:
+      "Storm season is here! Time to hit the ground running. Who else is crushing it in the Houston area?",
     hashtags: ["stormchasing", "roofing", "houston"],
     likes: 34,
     comments: 8,
@@ -326,7 +336,8 @@ export const POSTS: Post[] = [
     userId: "u4",
     userName: "Rachel Kim",
     userAvatar: 4,
-    content: "Earned my Solar Pro Certification today! 6 months of hard work paid off. Ready to take my career to the next level.",
+    content:
+      "Earned my Solar Pro Certification today! 6 months of hard work paid off. Ready to take my career to the next level.",
     hashtags: ["certification", "solar", "careergrowth"],
     likes: 156,
     comments: 45,
@@ -338,7 +349,8 @@ export const POSTS: Post[] = [
     userId: "u5",
     userName: "Brandon Scott",
     userAvatar: 5,
-    content: "Best objection handler: 'I understand you want to think about it. What specific concerns can I address right now?' Works every time.",
+    content:
+      "Best objection handler: 'I understand you want to think about it. What specific concerns can I address right now?' Works every time.",
     hashtags: ["salestips", "objectionhandling"],
     likes: 203,
     comments: 67,
@@ -356,7 +368,8 @@ export const JOBS: Job[] = [
     type: "full-time",
     experienceLevel: "senior",
     salary: "$80K - $150K OTE",
-    description: "Looking for experienced door-to-door sales professionals to join our growing solar team.",
+    description:
+      "Looking for experienced door-to-door sales professionals to join our growing solar team.",
     requirements: [
       "3+ years D2D experience",
       "Proven track record",
@@ -388,7 +401,8 @@ export const JOBS: Job[] = [
     type: "full-time",
     experienceLevel: "entry",
     salary: "$45K - $90K OTE",
-    description: "No experience needed! We provide full training and mentorship.",
+    description:
+      "No experience needed! We provide full training and mentorship.",
     requirements: [
       "Strong work ethic",
       "Reliable transportation",
@@ -422,7 +436,8 @@ export const COURSES: Course[] = [
     duration: "8 weeks",
     price: 497,
     level: "beginner",
-    description: "Master the fundamentals of door-to-door selling with our comprehensive certification program.",
+    description:
+      "Master the fundamentals of door-to-door selling with our comprehensive certification program.",
     enrolled: true,
     progress: 65,
   },
@@ -433,7 +448,8 @@ export const COURSES: Course[] = [
     duration: "10 weeks",
     price: 997,
     level: "intermediate",
-    description: "Accelerate your roofing sales career with advanced techniques and field strategies.",
+    description:
+      "Accelerate your roofing sales career with advanced techniques and field strategies.",
     enrolled: false,
     progress: 0,
   },
@@ -444,7 +460,8 @@ export const COURSES: Course[] = [
     duration: "12 weeks",
     price: 1497,
     level: "advanced",
-    description: "Complete blueprint for closing high-ticket solar deals with confidence and consistency.",
+    description:
+      "Complete blueprint for closing high-ticket solar deals with confidence and consistency.",
     enrolled: true,
     progress: 30,
   },
@@ -455,7 +472,8 @@ export const COURSES: Course[] = [
     duration: "6 weeks",
     price: 997,
     level: "advanced",
-    description: "Learn to build and lead high-performing sales teams while recruiting top talent.",
+    description:
+      "Learn to build and lead high-performing sales teams while recruiting top talent.",
     enrolled: false,
     progress: 0,
   },
@@ -551,9 +569,9 @@ export const INDUSTRIES = [
 ];
 
 export const LEAD_TYPE_LABELS: Record<string, string> = {
-  "aged": "Aged Lead: $1–$5",
+  aged: "Aged Lead: $1–$5",
   "local-exclusive": "Local Exclusive: $45–$125",
-  "appointment": "Booked Appointment: $125–$350",
+  appointment: "Booked Appointment: $125–$350",
   "live-transfer": "Live Transfer: $200–$600",
 };
 
@@ -598,6 +616,9 @@ export const MOCK_CALL_CENTER: CallCenter = {
   ],
   get monthlyPrice() {
     const agentCount = this.agents.length;
-    return CALL_CENTER_PRICING.firstAgent + (agentCount - 1) * CALL_CENTER_PRICING.additionalAgent;
+    return (
+      CALL_CENTER_PRICING.firstAgent +
+      (agentCount - 1) * CALL_CENTER_PRICING.additionalAgent
+    );
   },
 };

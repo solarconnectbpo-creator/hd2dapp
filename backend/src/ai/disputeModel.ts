@@ -40,7 +40,7 @@ export async function analyzeDispute(
   env: Env,
   dispute: Dispute,
   lead: Lead,
-  vendor: Vendor
+  vendor: Vendor,
 ): Promise<DisputeResolution> {
   try {
     const prompt = `
@@ -75,14 +75,14 @@ Return ONLY valid JSON, no markdown.`;
     return {
       decision: parsed.decision || "rejected",
       reason: parsed.reason || "Unable to determine",
-      vendorImpact: parsed.vendorImpact || "none"
+      vendorImpact: parsed.vendorImpact || "none",
     };
   } catch (error) {
     console.error("Dispute model error:", error);
     return {
       decision: "rejected",
       reason: "AI parsing error",
-      vendorImpact: "none"
+      vendorImpact: "none",
     };
   }
 }

@@ -3,14 +3,21 @@
  * Web only — requires `EXPO_PUBLIC_CESIUM_ION_TOKEN` (or pass ionAccessToken) and static Cesium assets.
  * See `CESIUM_3D_ROOF.md` for copying Build/Workers for production.
  */
+/* eslint-disable import/no-unresolved -- optional web-only dep; `npm i cesium` when using 3D roof tool */
 
 import * as turf from "@turf/turf";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
-import type { Cesium3DRoofToolHandle, Cesium3DRoofToolOptions } from "./cesium3dRoofTool.types";
+import type {
+  Cesium3DRoofToolHandle,
+  Cesium3DRoofToolOptions,
+} from "./cesium3dRoofTool.types";
 
-export type { Cesium3DRoofToolHandle, Cesium3DRoofToolOptions } from "./cesium3dRoofTool.types";
+export type {
+  Cesium3DRoofToolHandle,
+  Cesium3DRoofToolOptions,
+} from "./cesium3dRoofTool.types";
 
 /** Geodesic polygon area (m²) from globe positions. */
 export function calculatePolygonAreaM2(cartesians: any[]): number {
@@ -57,7 +64,9 @@ export async function setupCesium3DRoofTool(
 
   const token = options.ionAccessToken?.trim();
   if (!token) {
-    throw new Error("Cesium ion access token is required (set ionAccessToken or EXPO_PUBLIC_CESIUM_ION_TOKEN).");
+    throw new Error(
+      "Cesium ion access token is required (set ionAccessToken or EXPO_PUBLIC_CESIUM_ION_TOKEN).",
+    );
   }
 
   Cesium.Ion.defaultAccessToken = token;
@@ -74,11 +83,14 @@ export async function setupCesium3DRoofTool(
 
   if (options.gisDataUrl?.trim()) {
     try {
-      const dataSource = await Cesium.GeoJsonDataSource.load(options.gisDataUrl.trim(), {
-        stroke: Cesium.Color.CYAN,
-        fill: Cesium.Color.CYAN.withAlpha(0.15),
-        strokeWidth: 2,
-      });
+      const dataSource = await Cesium.GeoJsonDataSource.load(
+        options.gisDataUrl.trim(),
+        {
+          stroke: Cesium.Color.CYAN,
+          fill: Cesium.Color.CYAN.withAlpha(0.15),
+          strokeWidth: 2,
+        },
+      );
       await viewer.dataSources.add(dataSource);
       await viewer.zoomTo(dataSource);
     } catch (e) {

@@ -16,7 +16,6 @@ import {
   COMMERCIAL_FLAT_ROOF_INSTRUCTIONS_KB_TITLE,
   COMMERCIAL_FLAT_ROOF_INSTRUCTIONS_SECTIONS,
 } from "./lowSlopeCheatSheetInstructions";
-import { propertyMeasurementKbExportLines } from "./propertyMeasurementKnowledgeBase";
 import {
   IBC_CHAPTER_15_KB_DISCLAIMER,
   IBC_CHAPTER_15_KB_TITLE,
@@ -51,11 +50,27 @@ import {
   COMMERCIAL_ROOF_TAX_SECTION_GROUPS,
   commercialRoofTaxNotesApplyToReport,
 } from "./commercialRoofTaxIncentivesKnowledgeBase";
-import { formatPropertyUseLabel } from "./propertyUseClassification";
+import {
+  formatPropertyUseLabel,
+  ircOccupancyForPropertyUse,
+} from "./propertyUseClassification";
 import {
   showIbcChapter15Knowledge,
   showIrcChaptersKnowledge,
 } from "./reportKnowledgeVisibility";
+import {
+  filterIrcChecksForRoofType,
+  type RoofIrcContext,
+} from "./buildingCodeTemplates";
+import { parseRoofPitchRise } from "./roofLogicEngine";
+import { buildRoofScopeOfWork, classifyRoofSystem } from "./roofSystemScope";
+import {
+  filterKbGroups,
+  IBC_CH15_EXPORT_ROOF_GROUP_IDS,
+  IRC8_EXPORT_ROOF_GROUP_IDS,
+  IRC9_EXPORT_ROOF_GROUP_IDS,
+  shouldIncludeMoIrcInsuranceKb,
+} from "./roofKbExportFilter";
 import { FIELD_QA_ITEMS } from "./fieldQaChecklist";
 import {
   safeExportFilenamePart,
@@ -92,6 +107,29 @@ function escapeHtml(input: any): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/** IRC checklist rows limited to roof system / context (same logic as the live editor). */
+function buildingCodeForExport(
+  report: DamageRoofReport,
+): BuildingCodeInfo | undefined {
+  const bc = report.buildingCode;
+  if (!bc) return undefined;
+  const classified = classifyRoofSystem(report.roofType);
+  const ctx: RoofIrcContext = {
+    damageTypes: report.damageTypes ?? [],
+    recommendedAction: report.recommendedAction,
+    roofMaterialType: classified.normalizedRoofType,
+    roofSystemCategory: classified.category,
+    roofFormType: report.roofFormType,
+    roofPitchRise: parseRoofPitchRise(report.measurements?.roofPitch),
+    roofStories: report.measurements?.roofStories,
+    stateCode: bc.stateCode,
+    occupancy: ircOccupancyForPropertyUse(
+      report.propertyUse ?? report.property.propertyUse,
+    ),
+  };
+  return filterIrcChecksForRoofType(bc, ctx) ?? bc;
 }
 
 function toInitials(name?: string): string {
@@ -285,9 +323,35 @@ function renderScheduleInspection(report: DamageRoofReport) {
   `;
 }
 
-function renderEstimate(estimate?: RoofDamageEstimate, inspectorName?: string) {
+function renderEstimate(
+  estimate?: RoofDamageEstimate,
+  inspectorName?: string,
+  report?: DamageRoofReport,
+) {
   if (!estimate) return "";
-  const range = `$${estimate.lowCostUsd.toLocaleString()} - $${estimate.highCostUsd.toLocaleString()}`;
+  const range = `$${estimate.lowCostUsd.toLocaleString()} – $${estimate.highCostUsd.toLocaleString()}`;
+  const areaRaw =
+    estimate.roofAreaSqFt ?? report?.measurements?.roofAreaSqFt ?? undefined;
+  const areaNum =
+    areaRaw != null && Number.isFinite(areaRaw) ? Math.round(areaRaw) : null;
+  const midUsd = (estimate.lowCostUsd + estimate.highCostUsd) / 2;
+  const perSqft = areaNum && areaNum > 0 ? midUsd / areaNum : null;
+
+  const areaBlock =
+    areaNum != null
+      ? `<div style="margin-top:10px;">
+        <div class="label">Roof area basis</div>
+        <div class="metaText">${areaNum.toLocaleString()} sq ft (${(areaNum / 100).toFixed(2)} squares)</div>
+      </div>`
+      : "";
+  const precisionBlock =
+    perSqft != null
+      ? `<div style="margin-top:10px;padding:10px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
+        <div class="label">Indicative unit cost (midpoint of range ÷ area)</div>
+        <div class="metaText" style="margin-top:4px;">≈ $${perSqft.toFixed(2)} / sq ft</div>
+        <div class="muted" style="margin-top:6px;font-size:11px;line-height:1.45;">For budgeting discussion only; actual pricing varies by tear-off, deck repairs, access, and local labor/materials.</div>
+      </div>`
+      : "";
 
   return `
     <div class="section">
@@ -296,10 +360,12 @@ function renderEstimate(estimate?: RoofDamageEstimate, inspectorName?: string) {
         <div><div class="label">Scope</div><div class="metaText">${escapeHtml(estimate.scope.toUpperCase())}</div></div>
         <div><div class="label">Confidence</div><div class="metaText">${escapeHtml(estimate.confidence.toUpperCase())}</div></div>
       </div>
+      ${areaBlock}
       <div style="margin-top:10px;">
-        <div class="label">Preliminary ballpark range</div>
+        <div class="label">Preliminary investment range</div>
         <div class="metaText">${escapeHtml(range)}</div>
       </div>
+      ${precisionBlock}
       <div class="muted" style="margin-top:8px;font-size:11px;line-height:1.45;">
         Calculator output only — not a bid or contract. An on-site inspection confirms scope, code, and final pricing.
       </div>
@@ -673,11 +739,26 @@ function renderEagleViewEstimate(report: DamageRoofReport) {
 }
 
 function renderScopeOfWork(report: DamageRoofReport) {
-  const lines = report.scopeOfWork ?? [];
+  const saved = report.scopeOfWork ?? [];
+  const lines =
+    saved.length > 0
+      ? saved
+      : buildRoofScopeOfWork({
+          roofType: report.roofType,
+          damageTypes: report.damageTypes ?? [],
+          severity: report.severity,
+          recommendedAction: report.recommendedAction,
+          roofAreaSqFt: report.measurements?.roofAreaSqFt,
+        });
   if (!lines.length) return "";
+  const autoNote =
+    saved.length === 0
+      ? `<p class="muted" style="margin:0 0 10px;line-height:1.5;font-size:13px;"><em>Proposal language below is generated from roof system, damage, severity, and measured area — refine in the app as needed.</em></p>`
+      : "";
   return `
     <div class="section">
-      <h2>Scope of work</h2>
+      <h2>Scope of work & proposal</h2>
+      ${autoNote}
       <div class="muted" style="margin-bottom:8px;">
         Roof system: ${escapeHtml(report.roofType || "Not specified")}
         ${report.roofSystemCategory ? ` (${escapeHtml(report.roofSystemCategory)})` : ""}
@@ -722,29 +803,27 @@ function renderMeasurementStatsStrip(report: DamageRoofReport): string {
   `;
 }
 
+/** Omitted from printable export — keeps PDF/HTML focused on roof scope & estimate. */
 function renderPropertyMeasurementKbHtml(): string {
-  const lines = propertyMeasurementKbExportLines();
-  return `
-    <div class="section">
-      <h2>Reference measurement reports (knowledge base)</h2>
-      <p class="muted">Example Minnesota property PDFs are bundled in the HD2D app — open from the report editor or preview to view full documents.</p>
-      <ul>
-        ${lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}
-      </ul>
-    </div>
-  `;
+  return "";
 }
 
 function renderIbcChapter15KbHtml(): string {
-  const groupsHtml = IBC_CHAPTER_15_SECTION_GROUPS.map(
-    (g) => `
+  const ibcGroups = filterKbGroups(
+    IBC_CHAPTER_15_SECTION_GROUPS,
+    IBC_CH15_EXPORT_ROOF_GROUP_IDS,
+  );
+  const groupsHtml = ibcGroups
+    .map(
+      (g) => `
     <div style="margin-top:14px;">
       <div class="label" style="margin-bottom:6px;">${escapeHtml(g.heading)}</div>
       <ul style="margin:0 0 0 18px;line-height:1.45;font-size:13px;">
         ${g.items.map((it) => `<li>${escapeHtml(`${it.ref}: ${it.summary}`)}</li>`).join("")}
       </ul>
     </div>`,
-  ).join("");
+    )
+    .join("");
 
   return `
     <div class="section">
@@ -757,15 +836,21 @@ function renderIbcChapter15KbHtml(): string {
 }
 
 function renderIrcChapter8KbHtml(): string {
-  const groupsHtml = IRC_CHAPTER_8_SECTION_GROUPS.map(
-    (g) => `
+  const ch8Groups = filterKbGroups(
+    IRC_CHAPTER_8_SECTION_GROUPS,
+    IRC8_EXPORT_ROOF_GROUP_IDS,
+  );
+  const groupsHtml = ch8Groups
+    .map(
+      (g) => `
     <div style="margin-top:14px;">
       <div class="label" style="margin-bottom:6px;">${escapeHtml(g.heading)}</div>
       <ul style="margin:0 0 0 18px;line-height:1.45;font-size:13px;">
         ${g.items.map((it) => `<li>${escapeHtml(`${it.ref}: ${it.summary}`)}</li>`).join("")}
       </ul>
     </div>`,
-  ).join("");
+    )
+    .join("");
 
   return `
     <div class="section">
@@ -779,15 +864,21 @@ function renderIrcChapter8KbHtml(): string {
 }
 
 function renderIrcChapter9KbHtml(): string {
-  const groupsHtml = IRC_CHAPTER_9_SECTION_GROUPS.map(
-    (g) => `
+  const ch9Groups = filterKbGroups(
+    IRC_CHAPTER_9_SECTION_GROUPS,
+    IRC9_EXPORT_ROOF_GROUP_IDS,
+  );
+  const groupsHtml = ch9Groups
+    .map(
+      (g) => `
     <div style="margin-top:14px;">
       <div class="label" style="margin-bottom:6px;">${escapeHtml(g.heading)}</div>
       <ul style="margin:0 0 0 18px;line-height:1.45;font-size:13px;">
         ${g.items.map((it) => `<li>${escapeHtml(`${it.ref}: ${it.summary}`)}</li>`).join("")}
       </ul>
     </div>`,
-  ).join("");
+    )
+    .join("");
 
   return `
     <div class="section">
@@ -1204,7 +1295,11 @@ export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
         showIrcChaptersKnowledge(
           report.propertyUse ?? report.property.propertyUse,
         )
-          ? `${renderIrcChapter8KbHtml()}${renderIrcChapter9KbHtml()}${renderMoIrcInsuranceKbHtml()}`
+          ? `${renderIrcChapter8KbHtml()}${renderIrcChapter9KbHtml()}${
+              shouldIncludeMoIrcInsuranceKb(report)
+                ? renderMoIrcInsuranceKbHtml()
+                : ""
+            }`
           : ""
       }
       ${renderCommercialRoofTaxHtml(report)}
@@ -1219,7 +1314,7 @@ export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
       ${renderCommercialFlatRoofInstructionsKb(report)}
       ${renderEagleViewEstimate(report)}
       ${renderDamageSummarySection(report)}
-      ${renderEstimate(report.estimate, creatorName)}
+      ${renderEstimate(report.estimate, creatorName, report)}
       ${renderNonRoofEstimate(report.nonRoofEstimate, creatorName)}
       ${renderScheduleInspection(report)}
       ${renderMetarWeatherSection(report)}
@@ -1227,7 +1322,7 @@ export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
       ${renderAiDamageRisk(report)}
       ${renderScopeOfWork(report)}
       ${renderMeasurements(report.measurements)}
-      ${renderBuildingCode(report.buildingCode, creatorName)}
+      ${renderBuildingCode(buildingCodeForExport(report), creatorName)}
       ${renderImages(report.images)}
 
       <div class="footer">

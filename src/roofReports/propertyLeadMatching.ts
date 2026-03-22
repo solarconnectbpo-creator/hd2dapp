@@ -9,7 +9,10 @@ function normAddr(s: string): string {
  * Best-effort match between a map-selected property and saved CSV/DB leads.
  * Uses address similarity + distance so email / roof type can autofill after a map click.
  */
-export function findBestMatchingLead(property: PropertySelection, leads: PropertySelection[]): PropertySelection | null {
+export function findBestMatchingLead(
+  property: PropertySelection,
+  leads: PropertySelection[],
+): PropertySelection | null {
   if (!leads.length) return null;
 
   const target = normAddr(property.address || "");
@@ -23,7 +26,9 @@ export function findBestMatchingLead(property: PropertySelection, leads: Propert
       if (la === target) score += 120;
       else if (la.includes(target) || target.includes(la)) score += 70;
       else {
-        const tTokens = new Set(target.split(/[^a-z0-9]+/).filter((x) => x.length > 2));
+        const tTokens = new Set(
+          target.split(/[^a-z0-9]+/).filter((x) => x.length > 2),
+        );
         const lTokens = la.split(/[^a-z0-9]+/).filter((x) => x.length > 2);
         let overlap = 0;
         for (const t of lTokens) {
@@ -58,11 +63,14 @@ export function findBestMatchingLead(property: PropertySelection, leads: Propert
  * When CSV/lead has no roof_type, suggest a common default from address heuristics (US-focused).
  */
 export function inferRoofTypeIfMissing(property: PropertySelection): string {
-  if (property.roofType?.trim()) return classifyRoofSystem(property.roofType).normalizedRoofType;
+  if (property.roofType?.trim())
+    return classifyRoofSystem(property.roofType).normalizedRoofType;
 
   const a = (property.address || "").toLowerCase();
   if (
-    /\b(warehouse|industrial|commercial|plaza|strip mall|shopping|office building|retail|storage)\b/.test(a)
+    /\b(warehouse|industrial|commercial|plaza|strip mall|shopping|office building|retail|storage)\b/.test(
+      a,
+    )
   ) {
     return "TPO Single-Ply";
   }

@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { BuildingCodeInfo, DamageType, RecommendedAction, Severity } from "./roofReportTypes";
+import type {
+  BuildingCodeInfo,
+  DamageType,
+  RecommendedAction,
+  Severity,
+} from "./roofReportTypes";
 
 export type CompanyCamPdfExtraction = {
   homeownerName?: string;
@@ -70,9 +75,20 @@ function tryExtractRoofType(text: string): string | undefined {
     const mil = milMatch?.[1] ? `${milMatch[1]}-mil` : undefined;
 
     let attachment: string | undefined;
-    if (lower.includes("mechanically attached") || lower.includes("mechanically-attached")) attachment = "mechanically attached";
-    else if (lower.includes("fully adhered") || lower.includes("fully-adhered")) attachment = "fully adhered";
-    else if (lower.includes("induction welded") || lower.includes("induction-welded") || lower.includes("rhino") || lower.includes("rhinobond")) attachment = "induction welded";
+    if (
+      lower.includes("mechanically attached") ||
+      lower.includes("mechanically-attached")
+    )
+      attachment = "mechanically attached";
+    else if (lower.includes("fully adhered") || lower.includes("fully-adhered"))
+      attachment = "fully adhered";
+    else if (
+      lower.includes("induction welded") ||
+      lower.includes("induction-welded") ||
+      lower.includes("rhino") ||
+      lower.includes("rhinobond")
+    )
+      attachment = "induction welded";
     else if (lower.includes("ballasted")) attachment = "ballasted";
 
     const parts = ["TPO"];
@@ -87,8 +103,18 @@ function tryExtractRoofType(text: string): string | undefined {
     const mil = milMatch?.[1] ? `${milMatch[1]}-mil` : undefined;
 
     let attachment: string | undefined;
-    if (lower.includes("fully adhered") || lower.includes("fully-adhered") || lower.includes("bonded adhesive")) attachment = "fully adhered";
-    else if (lower.includes("mechanically attached") || lower.includes("mechanically-attached") || lower.includes("fasteners")) attachment = "mechanically attached";
+    if (
+      lower.includes("fully adhered") ||
+      lower.includes("fully-adhered") ||
+      lower.includes("bonded adhesive")
+    )
+      attachment = "fully adhered";
+    else if (
+      lower.includes("mechanically attached") ||
+      lower.includes("mechanically-attached") ||
+      lower.includes("fasteners")
+    )
+      attachment = "mechanically attached";
     else if (lower.includes("ballasted")) attachment = "ballasted";
 
     const parts = ["EPDM"];
@@ -103,9 +129,25 @@ function tryExtractRoofType(text: string): string | undefined {
     const mil = milMatch?.[1] ? `${milMatch[1]}-mil` : undefined;
 
     let attachment: string | undefined;
-    if (lower.includes("fully adhered") || lower.includes("fully-adhered") || lower.includes("fa")) attachment = "fully adhered";
-    else if (lower.includes("heat-welded") || lower.includes("heat welded") || lower.includes("hot-air") || lower.includes("heat-welded seams")) attachment = "heat-welded seams";
-    else if (lower.includes("mechanically attached") || lower.includes("mechanically-attached") || lower.includes("ma")) attachment = "mechanically attached";
+    if (
+      lower.includes("fully adhered") ||
+      lower.includes("fully-adhered") ||
+      lower.includes("fa")
+    )
+      attachment = "fully adhered";
+    else if (
+      lower.includes("heat-welded") ||
+      lower.includes("heat welded") ||
+      lower.includes("hot-air") ||
+      lower.includes("heat-welded seams")
+    )
+      attachment = "heat-welded seams";
+    else if (
+      lower.includes("mechanically attached") ||
+      lower.includes("mechanically-attached") ||
+      lower.includes("ma")
+    )
+      attachment = "mechanically attached";
 
     const parts = ["PVC"];
     if (mil) parts.push(mil);
@@ -114,13 +156,24 @@ function tryExtractRoofType(text: string): string | undefined {
   }
 
   // Modified Bitumen: infer APP vs SBS and torch vs self-adhered vs heat-welded
-  if (lower.includes("modified bitumen") || lower.includes("mod bit") || lower.includes("modbit") || lower.includes("sbs") || lower.includes("app")) {
+  if (
+    lower.includes("modified bitumen") ||
+    lower.includes("mod bit") ||
+    lower.includes("modbit") ||
+    lower.includes("sbs") ||
+    lower.includes("app")
+  ) {
     const parts: string[] = [];
     const isApp = lower.includes("app");
     const hasTorch = lower.includes("torch");
     const hasSbs = lower.includes("sbs");
-    const isHeatWelded = lower.includes("heat-welded") || lower.includes("heat welded");
-    const isSelfAdhered = lower.includes("self-adhered") || lower.includes("self adhered") || lower.includes("cold applied") || lower.includes("cold-applied");
+    const isHeatWelded =
+      lower.includes("heat-welded") || lower.includes("heat welded");
+    const isSelfAdhered =
+      lower.includes("self-adhered") ||
+      lower.includes("self adhered") ||
+      lower.includes("cold applied") ||
+      lower.includes("cold-applied");
 
     parts.push("Modified Bitumen");
     if (hasTorch || isApp) parts.push("APP");
@@ -134,20 +187,34 @@ function tryExtractRoofType(text: string): string | undefined {
   }
 
   // Roof coatings: silicone / acrylic / spf / butyl / aluminum fibrated
-  if (lower.includes("coating") || lower.includes("silicone") || lower.includes("acrylic") || lower.includes("spf") || lower.includes("spray foam") || lower.includes("butyl") || lower.includes("aluminum")) {
+  if (
+    lower.includes("coating") ||
+    lower.includes("silicone") ||
+    lower.includes("acrylic") ||
+    lower.includes("spf") ||
+    lower.includes("spray foam") ||
+    lower.includes("butyl") ||
+    lower.includes("aluminum")
+  ) {
     const parts: string[] = ["Coating"];
     if (lower.includes("silicone")) parts.push("silicone");
     else if (lower.includes("acrylic")) parts.push("acrylic");
-    else if (lower.includes("spf") || lower.includes("spray foam")) parts.push("spf");
+    else if (lower.includes("spf") || lower.includes("spray foam"))
+      parts.push("spf");
     else if (lower.includes("butyl")) parts.push("butyl");
     else if (lower.includes("aluminum")) parts.push("aluminum");
 
-    if (lower.includes("3-coat") || lower.includes("3 coat")) parts.push("3-coat");
+    if (lower.includes("3-coat") || lower.includes("3 coat"))
+      parts.push("3-coat");
     return parts.join(" ");
   }
 
   // Composition shingle: 3-tab (from your "3-Tab Comp Shingle" sheet)
-  if (lower.includes("3-tab") || lower.includes("3 tab") || (lower.includes("comp") && lower.includes("shingle"))) {
+  if (
+    lower.includes("3-tab") ||
+    lower.includes("3 tab") ||
+    (lower.includes("comp") && lower.includes("shingle"))
+  ) {
     return "3-Tab 25yr Comp. Shingle";
   }
 
@@ -158,7 +225,9 @@ function tryExtractRoofType(text: string): string | undefined {
 
 function tryExtractNumberFromSqFt(text: string): number | undefined {
   // Captures: 1,234 sq ft / 1234 sqft / 1234 square feet
-  const m = text.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*(?:sq\s*ft|sqft|square\s*feet)\b/i);
+  const m = text.match(
+    /(\d{1,3}(?:,\d{3})+|\d+)\s*(?:sq\s*ft|sqft|square\s*feet)\b/i,
+  );
   if (!m) return undefined;
   const raw = m[1].replace(/,/g, "");
   const n = Number(raw);
@@ -166,7 +235,9 @@ function tryExtractNumberFromSqFt(text: string): number | undefined {
 }
 
 function tryExtractPerimeterFt(text: string): number | undefined {
-  const m = text.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*(?:ft|feet)\b.*\b(perimeter)\b/i);
+  const m = text.match(
+    /(\d{1,3}(?:,\d{3})+|\d+)\s*(?:ft|feet)\b.*\b(perimeter)\b/i,
+  );
   if (!m) return undefined;
   const raw = m[1].replace(/,/g, "");
   const n = Number(raw);
@@ -178,9 +249,15 @@ function clampNonNegativeInt(n: number): number {
   return Math.max(0, Math.round(n));
 }
 
-function tryExtractQtyByKeywords(text: string, keywords: string[], units: string[]): number | undefined {
+function tryExtractQtyByKeywords(
+  text: string,
+  keywords: string[],
+  units: string[],
+): number | undefined {
   const lower = text.toLowerCase();
-  const unitPattern = units.map((u) => u.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")).join("|");
+  const unitPattern = units
+    .map((u) => u.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"))
+    .join("|");
 
   for (const keyword of keywords) {
     const key = keyword.toLowerCase();
@@ -188,19 +265,28 @@ function tryExtractQtyByKeywords(text: string, keywords: string[], units: string
     if (!lower.includes(key)) continue;
 
     // Pattern A: "... keyword ... 2 EA"
-    const a = new RegExp(`${escapedKey}[\\s\\S]{0,120}?(\\d{1,4}(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b`, "i").exec(text);
+    const a = new RegExp(
+      `${escapedKey}[\\s\\S]{0,120}?(\\d{1,4}(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b`,
+      "i",
+    ).exec(text);
     if (a?.[1]) {
       return clampNonNegativeInt(Number(a[1]));
     }
 
     // Pattern B: "2 EA ... keyword ..."
-    const b = new RegExp(`(\\d{1,4}(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b[\\s\\S]{0,120}?${escapedKey}`, "i").exec(text);
+    const b = new RegExp(
+      `(\\d{1,4}(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b[\\s\\S]{0,120}?${escapedKey}`,
+      "i",
+    ).exec(text);
     if (b?.[1]) {
       return clampNonNegativeInt(Number(b[1]));
     }
 
     // Pattern C: "... keyword ... qty: 2"
-    const c = new RegExp(`${escapedKey}[\\s\\S]{0,120}?qty\\s*[:=]?\\s*(\\d{1,4}(?:\\.\\d+)?)`, "i").exec(text);
+    const c = new RegExp(
+      `${escapedKey}[\\s\\S]{0,120}?qty\\s*[:=]?\\s*(\\d{1,4}(?:\\.\\d+)?)`,
+      "i",
+    ).exec(text);
     if (c?.[1]) {
       return clampNonNegativeInt(Number(c[1]));
     }
@@ -241,7 +327,9 @@ function tryExtractWastePct(text: string): number | undefined {
 }
 
 function tryExtractPitch(text: string): string | undefined {
-  const m = text.match(/pitch\s*(\d{1,2}\s*\/\s*\d{1,2})/i) ?? text.match(/(\d{1,2}\s*\/\s*\d{1,2})\s*pitch/i);
+  const m =
+    text.match(/pitch\s*(\d{1,2}\s*\/\s*\d{1,2})/i) ??
+    text.match(/(\d{1,2}\s*\/\s*\d{1,2})\s*pitch/i);
   if (!m?.[1]) return undefined;
   return m[1].replace(/\s+/g, "");
 }
@@ -254,7 +342,9 @@ function tryExtractStories(text: string): number | undefined {
 }
 
 function tryExtractLineItemsCount(text: string): number | undefined {
-  const m = text.match(/line\s*items\s*(\d{1,3})/i) ?? text.match(/(\d{1,3})\s*xactimate\s*line\s*items/i);
+  const m =
+    text.match(/line\s*items\s*(\d{1,3})/i) ??
+    text.match(/(\d{1,3})\s*xactimate\s*line\s*items/i);
   if (!m?.[1]) return undefined;
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : undefined;
@@ -274,10 +364,13 @@ function tryExtractDamageTypes(text: string): DamageType[] | undefined {
 
   if (lower.includes("hail")) out.push("Hail");
   if (lower.includes("wind")) out.push("Wind");
-  if (lower.includes("missing shingle") || lower.includes("missing shingles")) out.push("Missing Shingles");
-  if (lower.includes("leak") || lower.includes("water intrusion")) out.push("Leaks");
+  if (lower.includes("missing shingle") || lower.includes("missing shingles"))
+    out.push("Missing Shingles");
+  if (lower.includes("leak") || lower.includes("water intrusion"))
+    out.push("Leaks");
   if (lower.includes("flashing")) out.push("Flashing");
-  if (lower.includes("structural") || lower.includes("decking damage")) out.push("Structural");
+  if (lower.includes("structural") || lower.includes("decking damage"))
+    out.push("Structural");
 
   return out.length ? out : undefined;
 }
@@ -294,25 +387,42 @@ function tryExtractSeverity(text: string): Severity | undefined {
 
 function recommendActionFromText(text: string): RecommendedAction | undefined {
   const lower = text.toLowerCase();
-  if (/\b(replace|replacement|r&r|full tear[- ]?off)\b/.test(lower)) return "Replace";
+  if (/\b(replace|replacement|r&r|full tear[- ]?off)\b/.test(lower))
+    return "Replace";
   if (/\b(repair|patch|seal)\b/.test(lower)) return "Repair";
   if (/\b(insurance|claim)\b/.test(lower)) return "Insurance Claim Help";
-  if (/\b(further inspection|re-inspect|engineering review)\b/.test(lower)) return "Further Inspection";
+  if (/\b(further inspection|re-inspect|engineering review)\b/.test(lower))
+    return "Further Inspection";
   return undefined;
 }
 
-function tryExtractBuildingCodeFromPdf(text: string): BuildingCodeInfo | undefined {
+function tryExtractBuildingCodeFromPdf(
+  text: string,
+): BuildingCodeInfo | undefined {
   const jurisdictionMatch = text.match(
     /jurisdiction\s*[:\-]?\s*([a-z0-9 ,/.\-]{6,120}?)(?:building\s*code|permit\s*cost|irc\/ibc)/i,
   );
-  const codeRefMatch = text.match(/building\s*code\s*[:\-]?\s*([a-z0-9 /.\-]{4,60})/i);
+  const codeRefMatch = text.match(
+    /building\s*code\s*[:\-]?\s*([a-z0-9 /.\-]{4,60})/i,
+  );
 
-  const codeMatches = Array.from(new Set((text.match(/\b(?:IRC|IBC)\s*[A-Z]?\d{3,4}(?:\.\d+(?:\.\d+)?)?/gi) ?? []).map((x) => x.toUpperCase())));
-  if (!jurisdictionMatch && !codeRefMatch && !codeMatches.length) return undefined;
+  const codeMatches = Array.from(
+    new Set(
+      (
+        text.match(/\b(?:IRC|IBC)\s*[A-Z]?\d{3,4}(?:\.\d+(?:\.\d+)?)?/gi) ?? []
+      ).map((x) => x.toUpperCase()),
+    ),
+  );
+  if (!jurisdictionMatch && !codeRefMatch && !codeMatches.length)
+    return undefined;
 
   return {
-    jurisdiction: jurisdictionMatch?.[1] ? normalizeWhitespace(jurisdictionMatch[1]) : undefined,
-    codeReference: codeRefMatch?.[1] ? normalizeWhitespace(codeRefMatch[1]) : "IRC/IBC references from imported PDF",
+    jurisdiction: jurisdictionMatch?.[1]
+      ? normalizeWhitespace(jurisdictionMatch[1])
+      : undefined,
+    codeReference: codeRefMatch?.[1]
+      ? normalizeWhitespace(codeRefMatch[1])
+      : "IRC/IBC references from imported PDF",
     checks: codeMatches.slice(0, 8).map((code) => ({
       id: `pdf_code_${code.replace(/[^A-Z0-9]/g, "_")}`,
       label: code,
@@ -323,7 +433,9 @@ function tryExtractBuildingCodeFromPdf(text: string): BuildingCodeInfo | undefin
 
 function parseInspectionDateYmd(text: string): string | undefined {
   // Example seen in PDF: "Mar 17, 2026"
-  const m = text.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),\s+(\d{4})\b/i);
+  const m = text.match(
+    /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),\s+(\d{4})\b/i,
+  );
   if (!m) return undefined;
 
   const monthStr = m[1].toLowerCase().slice(0, 3);
@@ -346,7 +458,8 @@ function parseInspectionDateYmd(text: string): string | undefined {
   };
 
   const month = monthMap[monthStr];
-  if (!month || !Number.isFinite(day) || !Number.isFinite(year)) return undefined;
+  if (!month || !Number.isFinite(day) || !Number.isFinite(year))
+    return undefined;
 
   const mm = String(month).padStart(2, "0");
   const dd = String(day).padStart(2, "0");
@@ -362,7 +475,9 @@ function tryExtractProjectName(text: string): string | undefined {
   return m2?.[1] ? normalizeWhitespace(m2[1]) : undefined;
 }
 
-function extractCompanyCamFieldsFromText(text: string): CompanyCamPdfExtraction {
+function extractCompanyCamFieldsFromText(
+  text: string,
+): CompanyCamPdfExtraction {
   const normalized = normalizeWhitespace(text);
 
   const roofAreaSqFt = tryExtractNumberFromSqFt(normalized);
@@ -409,7 +524,12 @@ function extractCompanyCamFieldsFromText(text: string): CompanyCamPdfExtraction 
   );
   const fenceStainSqFt = tryExtractQtyByKeywords(
     normalized,
-    ["stain – wood fence", "stain - wood fence", "stain wood fence", "wood fence / gate"],
+    [
+      "stain – wood fence",
+      "stain - wood fence",
+      "stain wood fence",
+      "wood fence / gate",
+    ],
     ["sf", "sqft", "sq ft"],
   );
   const windowWrapSmallQty = tryExtractQtyByKeywords(
@@ -434,19 +554,12 @@ function extractCompanyCamFieldsFromText(text: string): CompanyCamPdfExtraction 
   );
   const houseWrapSqFt = tryExtractQtyByKeywords(
     normalized,
-    [
-      "house wrap",
-      "air/moisture barrier",
-      "air moisture barrier",
-    ],
+    ["house wrap", "air/moisture barrier", "air moisture barrier"],
     ["sf", "sqft", "sq ft"],
   );
   const fanfoldSqFt = tryExtractQtyByKeywords(
     normalized,
-    [
-      "fanfold foam insulation board",
-      "fanfold foam",
-    ],
+    ["fanfold foam insulation board", "fanfold foam"],
     ["sf", "sqft", "sq ft"],
   );
 
@@ -456,9 +569,14 @@ function extractCompanyCamFieldsFromText(text: string): CompanyCamPdfExtraction 
   if (pitch) extraNotes.push(`Pitch: ${pitch}`);
   if (stories) extraNotes.push(`Stories: ${stories}`);
   if (lineItemsCount) extraNotes.push(`Line Items: ${lineItemsCount}`);
-  if (typeof totalEstimateUsd === "number") extraNotes.push(`PDF Total Estimate: $${totalEstimateUsd.toLocaleString()}`);
-  if (measurementSource) extraNotes.push(`Measurement Source: ${measurementSource}`);
-  if (propertyAddress) extraNotes.push(`PDF Property Address: ${propertyAddress}`);
+  if (typeof totalEstimateUsd === "number")
+    extraNotes.push(
+      `PDF Total Estimate: $${totalEstimateUsd.toLocaleString()}`,
+    );
+  if (measurementSource)
+    extraNotes.push(`Measurement Source: ${measurementSource}`);
+  if (propertyAddress)
+    extraNotes.push(`PDF Property Address: ${propertyAddress}`);
 
   return {
     homeownerName: tryExtractProjectName(normalized),
@@ -494,10 +612,16 @@ function extractCompanyCamFieldsFromText(text: string): CompanyCamPdfExtraction 
 
 export async function extractCompanyCamDataFromPdfFile(
   file: File,
-  onProgress?: (p: { page: number; totalPages: number; status?: string }) => void,
+  onProgress?: (p: {
+    page: number;
+    totalPages: number;
+    status?: string;
+  }) => void,
 ): Promise<CompanyCamPdfExtraction> {
   if (typeof document === "undefined") {
-    throw new Error("CompanyCam PDF import is only supported in the web build.");
+    throw new Error(
+      "CompanyCam PDF import is only supported in the web build.",
+    );
   }
 
   // Dynamic imports so native builds won't break.
@@ -506,7 +630,8 @@ export async function extractCompanyCamDataFromPdfFile(
 
   // Use a matching worker from the same pdfjs-dist package version.
   try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.min.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.min.js";
   } catch {
     // If the workerSrc assignment fails, PDF rendering may still work in some environments.
   }
@@ -570,4 +695,3 @@ export async function extractCompanyCamDataFromPdfFile(
     await worker.terminate();
   }
 }
-

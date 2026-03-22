@@ -29,7 +29,9 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.content, { paddingTop: insets.top + Spacing["3xl"] }]}>
+      <View
+        style={[styles.content, { paddingTop: insets.top + Spacing["3xl"] }]}
+      >
         <View style={styles.header}>
           <HeroLogo />
           <ThemedText type="h1" style={styles.title}>
@@ -49,21 +51,37 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
               pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
             ]}
           >
-            <View style={[styles.optionIcon, { backgroundColor: AppColors.primary + "20" }]}>
+            <View
+              style={[
+                styles.optionIcon,
+                { backgroundColor: AppColors.primary + "20" },
+              ]}
+            >
               <Feather name="log-in" size={28} color={AppColors.primary} />
             </View>
             <View style={styles.optionContent}>
               <ThemedText type="h3">User Login</ThemedText>
-              <ThemedText style={[styles.optionDescription, { color: theme.textSecondary }]}>
+              <ThemedText
+                style={[
+                  styles.optionDescription,
+                  { color: theme.textSecondary },
+                ]}
+              >
                 Sign in with your email and password
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={24} color={theme.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={24}
+              color={theme.textSecondary}
+            />
           </Pressable>
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.xl }]}>
+      <View
+        style={[styles.footer, { paddingBottom: insets.bottom + Spacing.xl }]}
+      >
         <ThemedText style={[styles.footerText, { color: theme.textSecondary }]}>
           By continuing, you agree to our Terms of Service and Privacy Policy
         </ThemedText>

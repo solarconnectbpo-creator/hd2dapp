@@ -57,7 +57,9 @@ export function fuseMeasurements(
     };
   }
 
-  const validSources = sources.filter((s) => s.confidence >= opts.minConfidenceThreshold);
+  const validSources = sources.filter(
+    (s) => s.confidence >= opts.minConfidenceThreshold,
+  );
   if (!validSources.length) {
     return {
       confidence: 0,
@@ -86,7 +88,10 @@ export function fuseMeasurements(
       confidence: topSource.confidence,
       sourcesUsed: [topSource.source],
       fusionStrategy: "top-confidence",
-      discrepancies: checkDiscrepancies(validSources, opts.discrepancyThreshold),
+      discrepancies: checkDiscrepancies(
+        validSources,
+        opts.discrepancyThreshold,
+      ),
     };
   }
 
@@ -108,7 +113,8 @@ export function fuseMeasurements(
       (sum, s) => sum + (s.perimeterFt || 0) * s.confidence,
       0,
     );
-    fusedPerimeter = totalWeight > 0 ? weightedPerimeter / totalWeight : undefined;
+    fusedPerimeter =
+      totalWeight > 0 ? weightedPerimeter / totalWeight : undefined;
   }
 
   const pitchSource = sorted.find((s) => s.pitch);
@@ -149,11 +155,14 @@ function checkDiscrepancies(
   return discrepancies;
 }
 
-export function calculateImprovedConfidence(sources: MeasurementSource[]): number {
+export function calculateImprovedConfidence(
+  sources: MeasurementSource[],
+): number {
   if (!sources.length) return 0;
   if (sources.length === 1) return sources[0].confidence;
 
-  const avgConfidence = sources.reduce((sum, s) => sum + s.confidence, 0) / sources.length;
+  const avgConfidence =
+    sources.reduce((sum, s) => sum + s.confidence, 0) / sources.length;
   const diversityBoost = Math.min(0.1, sources.length * 0.02);
 
   return Math.min(0.99, avgConfidence + diversityBoost);

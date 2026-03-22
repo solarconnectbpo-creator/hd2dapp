@@ -19,6 +19,6 @@ export function verifyEmail(email: string): EmailVerification {
 
   return {
     valid,
-    reason: valid ? "valid" : "invalid_format"
+    reason: valid ? "valid" : "invalid_format",
   };
 }

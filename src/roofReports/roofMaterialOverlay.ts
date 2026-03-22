@@ -28,9 +28,14 @@ const TRACE_LABELS: Record<string, string> = {
   metal: "Cool silver (metal)",
 };
 
-export function getMaterialTheme(material?: RoofMaterialType | string): MaterialTheme {
+export function getMaterialTheme(
+  material?: RoofMaterialType | string,
+): MaterialTheme {
   const k = String(material ?? "shingle").toLowerCase();
-  return (MATERIAL_THEMES as Record<string, MaterialTheme>)[k] ?? MATERIAL_THEMES.shingle;
+  return (
+    (MATERIAL_THEMES as Record<string, MaterialTheme>)[k] ??
+    MATERIAL_THEMES.shingle
+  );
 }
 
 /** Same pattern as your snippet: set fill paint on `patched-roof-layer`. */
@@ -51,7 +56,9 @@ export function syncPatchedRoofGeoJson(
   map: MapboxMap,
   feature: GeoJSON.Feature | GeoJSON.FeatureCollection | null,
 ): void {
-  const src = map.getSource(PATCHED_ROOF_SOURCE_ID) as GeoJSONSource | undefined;
+  const src = map.getSource(PATCHED_ROOF_SOURCE_ID) as
+    | GeoJSONSource
+    | undefined;
   if (!src) return;
   const data: GeoJSON.FeatureCollection =
     feature == null
@@ -70,7 +77,9 @@ export type MaterialTracePalette = {
   label: string;
 };
 
-export function getMaterialTracePalette(material?: RoofMaterialType | string): MaterialTracePalette {
+export function getMaterialTracePalette(
+  material?: RoofMaterialType | string,
+): MaterialTracePalette {
   const t = getMaterialTheme(material);
   const k = String(material ?? "shingle").toLowerCase();
   const halo = t.color.toLowerCase() === "#ffffff" ? "#0F172A" : "#FFFFFF";

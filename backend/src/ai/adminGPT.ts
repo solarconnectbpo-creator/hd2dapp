@@ -22,7 +22,7 @@ interface Env {
 export async function analyzeSystem(
   env: Env,
   logs: any[],
-  metrics: any[]
+  metrics: any[],
 ): Promise<SystemAnalysis> {
   const prompt = `
 You are AdminGPT, an AI system monitoring and diagnosing a SaaS platform.
@@ -61,9 +61,13 @@ Return ONLY valid JSON, no markdown formatting.`;
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
       warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
       security: Array.isArray(parsed.security) ? parsed.security : [],
-      optimizations: Array.isArray(parsed.optimizations) ? parsed.optimizations : [],
+      optimizations: Array.isArray(parsed.optimizations)
+        ? parsed.optimizations
+        : [],
       bottlenecks: Array.isArray(parsed.bottlenecks) ? parsed.bottlenecks : [],
-      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : []
+      recommendations: Array.isArray(parsed.recommendations)
+        ? parsed.recommendations
+        : [],
     };
   } catch (error) {
     console.error("System analysis error:", error);
@@ -73,7 +77,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       security: [],
       optimizations: [],
       bottlenecks: [],
-      recommendations: []
+      recommendations: [],
     };
   }
 }

@@ -73,17 +73,132 @@ export async function getElevationAtLngLat(
 }
 
 /**
- * Estimate roof pitch (rise:12) from corner elevations vs horizontal distance between
- * highest and lowest samples. If those coincide, uses ~¼ perimeter as a characteristic run.
+ * Sample polygon boundary with corners + edge midpoints for smoother terrain sampling.
+ */
+function sampleRingLngLat(ring: GeoJSON.Position[]): [number, number][] {
+  const open = ring.slice(0, -1);
+  if (open.length < 3) return [];
+  const out: [number, number][] = [];
+  for (let i = 0; i < open.length; i++) {
+    const a = open[i];
+    const b = open[(i + 1) % open.length];
+    out.push([a[0], a[1]]);
+    out.push([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+  }
+  return out;
+}
+
+/**
+ * Least-squares plane z = a + b*x + c*y in local meters (ENU). Returns |gradient| = sqrt(b²+c²) = dz/d_horizontal.
+ */
+function fitHorizontalSlopeMm(
+  xs: number[],
+  ys: number[],
+  zs: number[],
+): number | null {
+  const n = xs.length;
+  if (n < 3) return null;
+
+  const mx = xs.reduce((s, v) => s + v, 0) / n;
+  const my = ys.reduce((s, v) => s + v, 0) / n;
+  const mz = zs.reduce((s, v) => s + v, 0) / n;
+
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  let sxz = 0;
+  let syz = 0;
+  for (let i = 0; i < n; i++) {
+    const x = xs[i] - mx;
+    const y = ys[i] - my;
+    const z = zs[i] - mz;
+    sxx += x * x;
+    syy += y * y;
+    sxy += x * y;
+    sxz += x * z;
+    syz += y * z;
+  }
+
+  const det = sxx * syy - sxy * sxy;
+  if (Math.abs(det) < 1e-18) return null;
+
+  const b = (sxz * syy - syz * sxy) / det;
+  const c = (sxx * syz - sxz * sxy) / det;
+  return Math.hypot(b, c);
+}
+
+function metersPerDegLon(latDeg: number): number {
+  return 111_320 * Math.cos((latDeg * Math.PI) / 180);
+}
+
+function toLocalXyMeters(
+  lng: number,
+  lat: number,
+  originLng: number,
+  originLat: number,
+): { x: number; y: number } {
+  return {
+    x: (lng - originLng) * metersPerDegLon(originLat),
+    y: (lat - originLat) * 111_320,
+  };
+}
+
+/**
+ * Estimate pitch (rise:12) from terrain elevations by fitting a best-fit plane to samples.
+ * More stable than max–min corner pairs (which tracked ground slope across the lot, not a roof plane).
+ * Still **advisory**: DEM is ground/terrain, not roof surface.
  */
 export function estimatePitchFrom3DTrace(
   points3D: RoofPoint3D[],
   perimeterMeters: number,
 ): string | undefined {
-  const valid = points3D.filter((p) => p.elevation !== undefined);
-  if (valid.length < 2) return undefined;
+  const valid = points3D.filter(
+    (p) => p.elevation !== undefined && Number.isFinite(p.elevation as number),
+  ) as Array<RoofPoint3D & { elevation: number }>;
+  if (valid.length < 3) return undefined;
 
-  const elevations = valid.map((p) => p.elevation!);
+  let cLon = 0;
+  let cLat = 0;
+  for (const p of valid) {
+    cLon += p.lng;
+    cLat += p.lat;
+  }
+  cLon /= valid.length;
+  cLat /= valid.length;
+
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const zs: number[] = [];
+  for (const p of valid) {
+    const { x, y } = toLocalXyMeters(p.lng, p.lat, cLon, cLat);
+    xs.push(x);
+    ys.push(y);
+    zs.push(p.elevation);
+  }
+
+  const slope = fitHorizontalSlopeMm(xs, ys, zs);
+  if (slope == null || !Number.isFinite(slope)) {
+    return fallbackPitchFromExtent(valid, perimeterMeters);
+  }
+
+  /** Horizontal gradient magnitude (m/m) → rise per 12 in horizontal. */
+  let riseOn12 = slope * 12;
+  if (!Number.isFinite(riseOn12) || riseOn12 < 0) return "0:12";
+
+  /** Ignore micro-noise; cap unrealistic terrain-derived steepness. */
+  if (riseOn12 < 0.15) return "0:12";
+  riseOn12 = Math.min(riseOn12, 24);
+
+  const rounded = Math.round(riseOn12);
+  return `${rounded}:12`;
+}
+
+/** Legacy heuristic if plane fit is degenerate. */
+function fallbackPitchFromExtent(
+  valid: Array<RoofPoint3D & { elevation: number }>,
+  perimeterMeters: number,
+): string | undefined {
+  const elevations = valid.map((p) => p.elevation);
   const maxElev = Math.max(...elevations);
   const minElev = Math.min(...elevations);
   const riseM = maxElev - minElev;
@@ -94,7 +209,13 @@ export function estimatePitchFrom3DTrace(
   let runM = 0;
   for (const a of maxGroup) {
     for (const b of minGroup) {
-      const d = turf.distance(turf.point([a.lng, a.lat]), turf.point([b.lng, b.lat]), { units: "meters" });
+      const d = turf.distance(
+        turf.point([a.lng, a.lat]),
+        turf.point([b.lng, b.lat]),
+        {
+          units: "meters",
+        },
+      );
       if (d > runM) runM = d;
     }
   }
@@ -104,7 +225,7 @@ export function estimatePitchFrom3DTrace(
   }
 
   const risePer12 = (riseM / runM) * 12;
-  const rise = Math.min(24, Math.max(1, Math.round(risePer12)));
+  const rise = Math.min(24, Math.max(0, Math.round(risePer12)));
   return `${rise}:12`;
 }
 
@@ -117,13 +238,14 @@ export async function enhanceRoofTraceWith3D(
   map: MapboxMap | null,
 ): Promise<RoofTrace3D | null> {
   const geom = polygonFeature.geometry;
-  if (!geom || geom.type !== "Polygon" || !geom.coordinates?.[0]?.length) return null;
+  if (!geom || geom.type !== "Polygon" || !geom.coordinates?.[0]?.length)
+    return null;
 
   const ring = geom.coordinates[0];
-  const corners = ring.slice(0, -1) as [number, number][];
+  const samplePts = sampleRingLngLat(ring);
 
   const points3D: RoofPoint3D[] = await Promise.all(
-    corners.map(async ([lng, lat]) => {
+    samplePts.map(async ([lng, lat]) => {
       const elev = await getElevationAtLngLat(lng, lat, map, mapboxToken);
       return { lng, lat, elevation: elev ?? undefined };
     }),
@@ -145,7 +267,10 @@ export async function enhanceRoofTraceWith3D(
 
   const defined = points3D.filter((p) => p.elevation !== undefined);
   const avgElevationM =
-    defined.length > 0 ? defined.reduce((s, p) => s + (p.elevation as number), 0) / defined.length : undefined;
+    defined.length > 0
+      ? defined.reduce((s, p) => s + (p.elevation as number), 0) /
+        defined.length
+      : undefined;
 
   return {
     polygon2D: polygonFeature,

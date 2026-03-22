@@ -29,8 +29,8 @@ export default function ReportsScreen() {
             AI report agents
           </ThemedText>
           <ThemedText type="caption" style={styles.sub}>
-            Data analyzer → report narrative → builder draft. Uses local logic in
-            services/aiAgents.
+            Data analyzer → report narrative → builder draft. Uses local logic
+            in services/aiAgents.
           </ThemedText>
         </View>
 

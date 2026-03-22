@@ -1,4 +1,7 @@
-import { computeRoofPolygonEdgeMetrics, roofEdgeKindAbbrev } from "@/src/roofReports/roofPolygonMetrics";
+import {
+  computeRoofPolygonEdgeMetrics,
+  roofEdgeKindAbbrev,
+} from "@/src/roofReports/roofPolygonMetrics";
 
 export type RoofPitchDiagramInput = {
   roofPitch?: string;
@@ -10,19 +13,24 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function parsePitchToRiseRun(pitch?: string): { rise: number; run: number } | undefined {
+function parsePitchToRiseRun(
+  pitch?: string,
+): { rise: number; run: number } | undefined {
   if (!pitch) return undefined;
   const m = pitch.match(/(\d{1,3}(?:\.\d+)?)\s*[/:]\s*(\d{1,3}(?:\.\d+)?)/);
   if (!m) return undefined;
 
   const rise = Number(m[1]);
   const run = Number(m[2]);
-  if (!Number.isFinite(rise) || !Number.isFinite(run) || run <= 0) return undefined;
+  if (!Number.isFinite(rise) || !Number.isFinite(run) || run <= 0)
+    return undefined;
 
   return { rise, run };
 }
 
-export function buildRoofPitchDiagramSvgDataUrl(input: RoofPitchDiagramInput): string | undefined {
+export function buildRoofPitchDiagramSvgDataUrl(
+  input: RoofPitchDiagramInput,
+): string | undefined {
   const pitch = input.roofPitch?.trim();
   if (!pitch) return undefined;
 
@@ -104,8 +112,13 @@ export type RoofLengthsDiagramInput = {
   roofPitch?: string;
 };
 
-export function buildRoofLengthsDiagramSvgDataUrl(input: RoofLengthsDiagramInput): string | undefined {
-  const metrics = computeRoofPolygonEdgeMetrics(input.roofTraceGeoJson, input.roofPitch);
+export function buildRoofLengthsDiagramSvgDataUrl(
+  input: RoofLengthsDiagramInput,
+): string | undefined {
+  const metrics = computeRoofPolygonEdgeMetrics(
+    input.roofTraceGeoJson,
+    input.roofPitch,
+  );
   if (!metrics?.edges.length) return undefined;
 
   const edges = metrics.edges;
@@ -125,7 +138,8 @@ export function buildRoofLengthsDiagramSvgDataUrl(input: RoofLengthsDiagramInput
 
   const maxBars = 36;
   const groupsCount = edges.length > maxBars ? maxBars : edges.length;
-  const groupSize = edges.length > maxBars ? Math.ceil(edges.length / maxBars) : 1;
+  const groupSize =
+    edges.length > maxBars ? Math.ceil(edges.length / maxBars) : 1;
 
   const groups: Array<{ label: string; planFt: number; slopeFt: number }> = [];
   for (let i = 0; i < edges.length; i += groupSize) {
@@ -141,7 +155,9 @@ export function buildRoofLengthsDiagramSvgDataUrl(input: RoofLengthsDiagramInput
     if (groups.length >= groupsCount) break;
   }
 
-  const maxTotal = Math.max(...groups.map((g) => Math.max(g.planFt, g.slopeFt)));
+  const maxTotal = Math.max(
+    ...groups.map((g) => Math.max(g.planFt, g.slopeFt)),
+  );
   const chartLeft = pad + 56;
   const chartRight = w - pad - 56;
   const chartTop = 142;
@@ -150,7 +166,9 @@ export function buildRoofLengthsDiagramSvgDataUrl(input: RoofLengthsDiagramInput
   const chartWidth = chartRight - chartLeft;
 
   const barGap = 5;
-  const barW = groups.length ? Math.max(8, (chartWidth - barGap * (groups.length - 1)) / groups.length) : 8;
+  const barW = groups.length
+    ? Math.max(8, (chartWidth - barGap * (groups.length - 1)) / groups.length)
+    : 8;
 
   const bars = groups
     .map((g, idx) => {
@@ -211,7 +229,9 @@ export function buildRoofLengthsDiagramSvgDataUrl(input: RoofLengthsDiagramInput
 <text x="56" y="108" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#334155">Per-edge LF — gray plan, orange classified lineal (rake / eave-ridge / hip).</text>
 <text x="56" y="128" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#64748b">${
     ridgeAxisHeadingDeg !== undefined
-      ? esc(`Ridge axis est.: ${ridgeAxisHeadingDeg.toFixed(0)}° from north (PCA on footprint). `)
+      ? esc(
+          `Ridge axis est.: ${ridgeAxisHeadingDeg.toFixed(0)}° from north (PCA on footprint). `,
+        )
       : ""
   }E/R=eave·ridge, Rk=rake, H/V=hip·valley. Pitch required for slope column.</text>
 

@@ -32,10 +32,13 @@ export async function handleRoofReportLanguageAi(
   corsHeaders: Record<string, string>,
 ): Promise<Response> {
   if (request.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
   if (!env.OPENAI_API_KEY?.trim()) {
@@ -44,7 +47,10 @@ export async function handleRoofReportLanguageAi(
         success: false,
         error: "OPENAI_API_KEY is not configured on the server",
       }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -52,24 +58,40 @@ export async function handleRoofReportLanguageAi(
   try {
     body = (await request.json()) as Body;
   } catch {
-    return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid JSON body" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
-  const context = typeof body.context === "string" ? body.context.trim().slice(0, 4000) : "";
+  const context =
+    typeof body.context === "string" ? body.context.trim().slice(0, 4000) : "";
   const estimateRangeExact =
-    typeof body.estimateRangeExact === "string" ? body.estimateRangeExact.trim().slice(0, 200) : "";
+    typeof body.estimateRangeExact === "string"
+      ? body.estimateRangeExact.trim().slice(0, 200)
+      : "";
   const companyName =
-    typeof body.companyName === "string" ? body.companyName.trim().slice(0, 120) : "our team";
+    typeof body.companyName === "string"
+      ? body.companyName.trim().slice(0, 120)
+      : "our team";
   const propertyAddress =
-    typeof body.propertyAddress === "string" ? body.propertyAddress.trim().slice(0, 300) : "";
+    typeof body.propertyAddress === "string"
+      ? body.propertyAddress.trim().slice(0, 300)
+      : "";
 
   if (!context && !estimateRangeExact) {
     return new Response(
-      JSON.stringify({ success: false, error: "Provide context or estimateRangeExact" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        success: false,
+        error: "Provide context or estimateRangeExact",
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -118,7 +140,10 @@ ${context || "(none)"}`;
         error: `OpenAI error ${res.status}`,
         detail: errText.slice(0, 500),
       }),
-      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -128,12 +153,20 @@ ${context || "(none)"}`;
   const content = json.choices?.[0]?.message?.content ?? "";
   const parsed = parseJson(content);
   const clientMessage =
-    typeof parsed.clientMessage === "string" ? parsed.clientMessage.trim().slice(0, 800) : "";
+    typeof parsed.clientMessage === "string"
+      ? parsed.clientMessage.trim().slice(0, 800)
+      : "";
 
   if (!clientMessage) {
     return new Response(
-      JSON.stringify({ success: false, error: "Model returned empty clientMessage" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        success: false,
+        error: "Model returned empty clientMessage",
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -142,6 +175,9 @@ ${context || "(none)"}`;
       success: true,
       data: { clientMessage, model: "gpt-4o-mini" },
     }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
   );
 }

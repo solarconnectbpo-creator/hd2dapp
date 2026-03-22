@@ -45,7 +45,9 @@ export class PitchAnalysisService {
         run,
         ratio,
         degrees: Math.round(estimatedPitch * 10) / 10,
-        percentage: Math.round(Math.tan((estimatedPitch * Math.PI) / 180) * 100),
+        percentage: Math.round(
+          Math.tan((estimatedPitch * Math.PI) / 180) * 100,
+        ),
       },
       roofType: this.classifyRoofByPitch(estimatedPitch),
       recommendations: this.getPitchRecommendations(estimatedPitch),
@@ -77,7 +79,9 @@ export class PitchAnalysisService {
       return empty();
     }
 
-    const ridge = edgePoints.reduce((prev, curr) => (prev.y < curr.y ? prev : curr));
+    const ridge = edgePoints.reduce((prev, curr) =>
+      prev.y < curr.y ? prev : curr,
+    );
 
     const eaves = edgePoints
       .filter((p) => p.y > ridge.y + 10)
@@ -107,14 +111,19 @@ export class PitchAnalysisService {
         run: pixelRun,
         ratio,
         degrees: Math.round(estimatedPitch * 10) / 10,
-        percentage: Math.round(Math.tan((estimatedPitch * Math.PI) / 180) * 100),
+        percentage: Math.round(
+          Math.tan((estimatedPitch * Math.PI) / 180) * 100,
+        ),
       },
       roofType: this.classifyRoofByPitch(estimatedPitch),
       recommendations: this.getPitchRecommendations(estimatedPitch),
     };
   }
 
-  static analyzePitchFromDepth(depthMap: number[][], pixelsPerMeter: number): PitchAnalysisResult {
+  static analyzePitchFromDepth(
+    depthMap: number[][],
+    pixelsPerMeter: number,
+  ): PitchAnalysisResult {
     const empty = (): PitchAnalysisResult => ({
       estimatedPitch: 0,
       confidence: 0,
@@ -171,7 +180,9 @@ export class PitchAnalysisService {
         run: pixelRun,
         ratio,
         degrees: Math.round(estimatedPitch * 10) / 10,
-        percentage: Math.round(Math.tan((estimatedPitch * Math.PI) / 180) * 100),
+        percentage: Math.round(
+          Math.tan((estimatedPitch * Math.PI) / 180) * 100,
+        ),
       },
       roofType: this.classifyRoofByPitch(estimatedPitch),
       recommendations: this.getPitchRecommendations(estimatedPitch),
@@ -203,7 +214,9 @@ export class PitchAnalysisService {
         run: runMeters,
         ratio,
         degrees: Math.round(estimatedPitch * 10) / 10,
-        percentage: Math.round(Math.tan((estimatedPitch * Math.PI) / 180) * 100),
+        percentage: Math.round(
+          Math.tan((estimatedPitch * Math.PI) / 180) * 100,
+        ),
       },
       roofType: this.classifyRoofByPitch(estimatedPitch),
       recommendations: this.getPitchRecommendations(estimatedPitch),

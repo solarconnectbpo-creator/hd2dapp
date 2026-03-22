@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
@@ -25,8 +32,14 @@ interface AuthContextType {
   /** Set when session restore fails (e.g. corrupt storage); cleared on successful load or login. */
   error: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, userType: UserType) => Promise<{ requires2FA: boolean; email?: string } | null>;
-  signup: (data: SignupData) => Promise<{ requires2FA: boolean; email?: string } | null>;
+  login: (
+    email: string,
+    password: string,
+    userType: UserType,
+  ) => Promise<{ requires2FA: boolean; email?: string } | null>;
+  signup: (
+    data: SignupData,
+  ) => Promise<{ requires2FA: boolean; email?: string } | null>;
   loginWithToken: (token: string, user: any) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -125,7 +138,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const getRegisteredUsers = async (): Promise<Record<string, { password: string; user: User }>> => {
+  const getRegisteredUsers = async (): Promise<
+    Record<string, { password: string; user: User }>
+  > => {
     try {
       const usersData = await AsyncStorage.getItem(USERS_STORAGE_KEY);
       return usersData ? JSON.parse(usersData) : {};
@@ -134,28 +149,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const saveRegisteredUsers = async (users: Record<string, { password: string; user: User }>) => {
+  const saveRegisteredUsers = async (
+    users: Record<string, { password: string; user: User }>,
+  ) => {
     await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
   };
 
-  const login = async (email: string, password: string, userType: UserType): Promise<{ requires2FA: boolean; email?: string } | null> => {
+  const login = async (
+    email: string,
+    password: string,
+    userType: UserType,
+  ): Promise<{ requires2FA: boolean; email?: string } | null> => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPassword = password.trim();
 
     const roleFromEmail = (value: string): UserType =>
-      value.includes("admin") ? "admin" : value.includes("company") ? "company" : "sales_rep";
+      value.includes("admin")
+        ? "admin"
+        : value.includes("company")
+          ? "company"
+          : "sales_rep";
 
-    const demoCredentials: Record<string, { password: string; userType: UserType }> = {
-      "test.company@hardcoredoortodoorclosers.com": { password: "TestCompany123!", userType: "company" },
-      "test.rep@hardcoredoortodoorclosers.com": { password: "TestRep123!", userType: "sales_rep" },
-      "admin@hardcoredoortodoorclosers.com": { password: "AdminTest123!", userType: "admin" },
+    const demoCredentials: Record<
+      string,
+      { password: string; userType: UserType }
+    > = {
+      "test.company@hardcoredoortodoorclosers.com": {
+        password: "TestCompany123!",
+        userType: "company",
+      },
+      "test.rep@hardcoredoortodoorclosers.com": {
+        password: "TestRep123!",
+        userType: "sales_rep",
+      },
+      "admin@hardcoredoortodoorclosers.com": {
+        password: "AdminTest123!",
+        userType: "admin",
+      },
       "admin@hd2d.com": { password: "admin123", userType: "admin" },
     };
 
     try {
       // Try API login first; only allow when requested role matches returned role.
-      const result: any = await apiClient.login(normalizedEmail, normalizedPassword);
-      const resolvedType = (result?.user?.user_type || roleFromEmail(normalizedEmail)) as UserType;
+      const result: any = await apiClient.login(
+        normalizedEmail,
+        normalizedPassword,
+      );
+      const resolvedType = (result?.user?.user_type ||
+        roleFromEmail(normalizedEmail)) as UserType;
       if (resolvedType !== userType) return null;
       return {
         requires2FA: true,
@@ -163,13 +204,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     } catch (error) {
       console.error("API login failed, trying local fallback:", error);
-      
+
       // Fallback: check against locally registered users
       try {
         const users = await getRegisteredUsers();
         const userKey = `${normalizedEmail}_${userType}`;
         const user = users[userKey];
-        
+
         if (user && user.password === normalizedPassword) {
           // Local user found with correct password
           return {
@@ -180,13 +221,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Development/demo account fallback (works if backend is temporarily down).
         const demo = demoCredentials[normalizedEmail];
-        if (demo && demo.password === normalizedPassword && demo.userType === userType) {
+        if (
+          demo &&
+          demo.password === normalizedPassword &&
+          demo.userType === userType
+        ) {
           return {
             requires2FA: true,
             email: normalizedEmail,
           };
         }
-        
+
         return null;
       } catch (fallbackError) {
         console.error("Local login fallback failed:", fallbackError);
@@ -195,9 +240,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (data: SignupData): Promise<{ requires2FA: boolean; email?: string } | null> => {
+  const signup = async (
+    data: SignupData,
+  ): Promise<{ requires2FA: boolean; email?: string } | null> => {
     try {
-      await apiClient.register(data.email, data.password, data.name, data.userType, data.phone);
+      await apiClient.register(
+        data.email,
+        data.password,
+        data.name,
+        data.userType,
+        data.phone,
+      );
       return {
         requires2FA: true,
         email: data.email,

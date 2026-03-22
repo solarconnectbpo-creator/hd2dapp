@@ -23,10 +23,15 @@ function getScope(
   const isEpdm = rt.includes("epdm");
   const isPvc = rt.includes("pvc");
   const isModBit =
-    rt.includes("modified") || rt.includes("mod bit") || rt.includes("modbit") || rt.includes("sbs") || rt.includes("app");
+    rt.includes("modified") ||
+    rt.includes("mod bit") ||
+    rt.includes("modbit") ||
+    rt.includes("sbs") ||
+    rt.includes("app");
   const isCoating = rt.includes("coating");
 
-  if (severity >= 4 && (hasReplaceSignal || damageTypes.length >= 3)) return "replace";
+  if (severity >= 4 && (hasReplaceSignal || damageTypes.length >= 3))
+    return "replace";
   if (hasReplaceSignal) return "replace";
 
   // Slate roofs are commonly handled as a full replacement when any meaningful
@@ -34,11 +39,18 @@ function getScope(
   if (isSlate && damageTypes.length >= 2 && severity >= 3) return "replace";
 
   // For low-slope TPO systems, replacement becomes more likely as severity rises.
-  if (isTpo && severity >= 4 && (hasReplaceSignal || damageTypes.length >= 2)) return "replace";
+  if (isTpo && severity >= 4 && (hasReplaceSignal || damageTypes.length >= 2))
+    return "replace";
 
   // Flat commercial membranes + modified bitumen become replacement at higher severity.
-  if ((isEpdm || isPvc) && severity >= 4 && damageTypes.length >= 2) return "replace";
-  if (isModBit && severity >= 4 && (hasReplaceSignal || damageTypes.length >= 2)) return "replace";
+  if ((isEpdm || isPvc) && severity >= 4 && damageTypes.length >= 2)
+    return "replace";
+  if (
+    isModBit &&
+    severity >= 4 &&
+    (hasReplaceSignal || damageTypes.length >= 2)
+  )
+    return "replace";
   if (isCoating && severity >= 4 && hasReplaceSignal) return "replace";
 
   return "repair";
@@ -97,9 +109,7 @@ export function computeRoofDamageEstimate(opts: {
 }): RoofDamageEstimate {
   const rawArea = opts.roofAreaSqFt;
   const area =
-    typeof rawArea === "number" &&
-    Number.isFinite(rawArea) &&
-    rawArea > 0
+    typeof rawArea === "number" && Number.isFinite(rawArea) && rawArea > 0
       ? rawArea
       : NaN;
 
@@ -140,23 +150,56 @@ export function computeRoofDamageEstimate(opts: {
   const isTpo = rt.includes("tpo");
   const isEpdm = rt.includes("epdm");
   const isPvc = rt.includes("pvc");
-  const isModBit = rt.includes("modified") || rt.includes("mod bit") || rt.includes("modbit") || rt.includes("sbs") || rt.includes("app");
+  const isModBit =
+    rt.includes("modified") ||
+    rt.includes("mod bit") ||
+    rt.includes("modbit") ||
+    rt.includes("sbs") ||
+    rt.includes("app");
   const isCoating = rt.includes("coating");
   // "flat" here means generic low-slope without a known membrane/coating system.
-  const isFlat = rt.includes("flat") && !isTpo && !isEpdm && !isPvc && !isModBit && !isCoating;
+  const isFlat =
+    rt.includes("flat") &&
+    !isTpo &&
+    !isEpdm &&
+    !isPvc &&
+    !isModBit &&
+    !isCoating;
 
   // Approximation based on your knowledge-base CSV:
   // - Uses membrane replacement unit prices by mil/attachment
   // - Adds a constant per-square "balance of system" estimate
   //   (deck prep + insulation + misc conditions), and then applies overhead/profit.
   // This keeps the model comparable to the slate example where we price per square.
-  const parseAttachment = (text: string): "fullyAdhered" | "mechanicallyAttached" | "ballasted" | "inductionWelded" | "heatWelded" => {
+  const parseAttachment = (
+    text: string,
+  ):
+    | "fullyAdhered"
+    | "mechanicallyAttached"
+    | "ballasted"
+    | "inductionWelded"
+    | "heatWelded" => {
     const t = text.toLowerCase();
     if (t.includes("ballasted")) return "ballasted";
     if (t.includes("induction")) return "inductionWelded";
-    if (t.includes("heat-weld") || t.includes("heat welded") || t.includes("heat-welded")) return "heatWelded";
-    if (t.includes("fully adhered") || t.includes("fully-adhered") || t.includes("fa")) return "fullyAdhered";
-    if (t.includes("mechanically attached") || t.includes("mechanically-attached") || t.includes("ma") || t.includes("mechanical")) {
+    if (
+      t.includes("heat-weld") ||
+      t.includes("heat welded") ||
+      t.includes("heat-welded")
+    )
+      return "heatWelded";
+    if (
+      t.includes("fully adhered") ||
+      t.includes("fully-adhered") ||
+      t.includes("fa")
+    )
+      return "fullyAdhered";
+    if (
+      t.includes("mechanically attached") ||
+      t.includes("mechanically-attached") ||
+      t.includes("ma") ||
+      t.includes("mechanical")
+    ) {
       return "mechanicallyAttached";
     }
     return "mechanicallyAttached";
@@ -282,10 +325,30 @@ export function computeRoofDamageEstimate(opts: {
       return is3Coat ? 210 : 142;
     }
     if (lower.includes("spf") || lower.includes("spray foam")) {
-      if (lower.includes("4\"") || lower.includes("4 inch") || lower.includes("4-inch")) return 445;
-      if (lower.includes("3\"") || lower.includes("3 inch") || lower.includes("3-inch")) return 345;
-      if (lower.includes("2\"") || lower.includes("2 inch") || lower.includes("2-inch")) return 248;
-      if (lower.includes("1.5") || lower.includes("1.5\"") || lower.includes("1-1/2")) return 198;
+      if (
+        lower.includes('4"') ||
+        lower.includes("4 inch") ||
+        lower.includes("4-inch")
+      )
+        return 445;
+      if (
+        lower.includes('3"') ||
+        lower.includes("3 inch") ||
+        lower.includes("3-inch")
+      )
+        return 345;
+      if (
+        lower.includes('2"') ||
+        lower.includes("2 inch") ||
+        lower.includes("2-inch")
+      )
+        return 248;
+      if (
+        lower.includes("1.5") ||
+        lower.includes('1.5"') ||
+        lower.includes("1-1/2")
+      )
+        return 198;
       return 145;
     }
     if (lower.includes("butyl")) return 225;
@@ -381,7 +444,10 @@ export function computeRoofDamageEstimate(opts: {
   } else {
     // 3-Tab Comp Shingle (from your "3-Tab Comp Shingle" + "Quick Price Reference" sheets)
     const is3TabCompShingle =
-      rt.includes("3-tab") || rt.includes("3 tab") || rt.includes("comp shingle") || rt.includes("composition shingle");
+      rt.includes("3-tab") ||
+      rt.includes("3 tab") ||
+      rt.includes("comp shingle") ||
+      rt.includes("composition shingle");
 
     if (is3TabCompShingle) {
       // Approximate full replacement line-item $/SQ using your example values:
@@ -412,8 +478,12 @@ export function computeRoofDamageEstimate(opts: {
   const mixMultiplier = 1 + clamp((typeCount - 1) * 0.08, 0, 0.35);
   const sevMultiplier = 0.92 + opts.severity * 0.07; // severity 1 => 0.99, severity 5 => 1.27
 
-  const lowCostUsd = Math.round(effectiveSquares * baseLow * mixMultiplier * sevMultiplier);
-  const highCostUsd = Math.round(effectiveSquares * baseHigh * mixMultiplier * sevMultiplier);
+  const lowCostUsd = Math.round(
+    effectiveSquares * baseLow * mixMultiplier * sevMultiplier,
+  );
+  const highCostUsd = Math.round(
+    effectiveSquares * baseHigh * mixMultiplier * sevMultiplier,
+  );
 
   const confidence: RoofDamageEstimate["confidence"] =
     typeCount >= 2 && opts.severity >= 4
@@ -430,7 +500,9 @@ export function computeRoofDamageEstimate(opts: {
     scope,
     areaSqFt: area,
   });
-  const notesMerged = [summary, opts.notes?.trim()].filter(Boolean).join("\n\n");
+  const notesMerged = [summary, opts.notes?.trim()]
+    .filter(Boolean)
+    .join("\n\n");
 
   return sanitizeRoofDamageEstimate({
     estimateId: `est_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -443,4 +515,3 @@ export function computeRoofDamageEstimate(opts: {
     notes: notesMerged || undefined,
   });
 }
-

@@ -18,7 +18,12 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius, AppColors, Typography } from "@/constants/theme";
+import {
+  Spacing,
+  BorderRadius,
+  AppColors,
+  Typography,
+} from "@/constants/theme";
 import type { AuthStackParamList } from "@/navigation/AuthNavigator";
 import { apiClient } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,7 +33,10 @@ type Verify2FAScreenProps = {
   route: RouteProp<AuthStackParamList, "Verify2FA">;
 };
 
-export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenProps) {
+export default function Verify2FAScreen({
+  navigation,
+  route,
+}: Verify2FAScreenProps) {
   const { email } = route.params;
   const { theme } = useTheme();
   const { loginWithToken } = useAuth();
@@ -43,7 +51,10 @@ export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenPr
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          Alert.alert("Code Expired", "2FA code has expired. Please request a new one.");
+          Alert.alert(
+            "Code Expired",
+            "2FA code has expired. Please request a new one.",
+          );
           navigation.goBack();
           return 0;
         }
@@ -70,7 +81,10 @@ export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenPr
         await loginWithToken(result.token, result.user);
       }
     } catch (error) {
-      Alert.alert("Verification Failed", error instanceof Error ? error.message : "Invalid code");
+      Alert.alert(
+        "Verification Failed",
+        error instanceof Error ? error.message : "Invalid code",
+      );
       setCode("");
     } finally {
       setIsLoading(false);
@@ -84,7 +98,10 @@ export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenPr
       setTimeLeft(300);
       setCode("");
     } catch (error) {
-      Alert.alert("Error", error instanceof Error ? error.message : "Failed to resend code");
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to resend code",
+      );
     }
   };
 
@@ -103,32 +120,58 @@ export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenPr
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: AppColors.primary + "20" }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: AppColors.primary + "20" },
+              ]}
+            >
               <Feather name="shield" size={32} color={AppColors.primary} />
             </View>
             <ThemedText type="h2" style={styles.title}>
               Two-Factor Authentication
             </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+            <ThemedText
+              style={[styles.subtitle, { color: theme.textSecondary }]}
+            >
               Enter the 6-digit code sent to your email
             </ThemedText>
             <ThemedText style={[styles.email, { color: theme.textSecondary }]}>
               {email}
             </ThemedText>
-            <View style={[styles.devNotice, { backgroundColor: AppColors.primary + "15" }]}>
-              <ThemedText style={[styles.devNoticeText, { color: AppColors.primary }]}>
+            <View
+              style={[
+                styles.devNotice,
+                { backgroundColor: AppColors.primary + "15" },
+              ]}
+            >
+              <ThemedText
+                style={[styles.devNoticeText, { color: AppColors.primary }]}
+              >
                 Development mode: Use any 6-digit code (e.g., 123456)
               </ThemedText>
             </View>
           </View>
 
           <View style={styles.codeContainer}>
-            <View style={[styles.inputWrapper, { backgroundColor: theme.backgroundDefault }]}>
-              <Feather name="lock" size={20} color={theme.textSecondary} style={styles.icon} />
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: theme.backgroundDefault },
+              ]}
+            >
+              <Feather
+                name="lock"
+                size={20}
+                color={theme.textSecondary}
+                style={styles.icon}
+              />
               <TextInput
                 style={[styles.codeInput, { color: theme.text }]}
                 value={code}
-                onChangeText={(text) => setCode(text.replace(/[^0-9]/g, "").slice(0, 6))}
+                onChangeText={(text) =>
+                  setCode(text.replace(/[^0-9]/g, "").slice(0, 6))
+                }
                 placeholder="000000"
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="number-pad"
@@ -137,9 +180,16 @@ export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenPr
               />
             </View>
 
-            <View style={[styles.timer, { backgroundColor: theme.backgroundDefault }]}>
+            <View
+              style={[
+                styles.timer,
+                { backgroundColor: theme.backgroundDefault },
+              ]}
+            >
               <Feather name="clock" size={18} color={theme.textSecondary} />
-              <ThemedText style={[styles.timerText, { color: theme.textSecondary }]}>
+              <ThemedText
+                style={[styles.timerText, { color: theme.textSecondary }]}
+              >
                 Code expires in {minutes}:{seconds.toString().padStart(2, "0")}
               </ThemedText>
             </View>
@@ -148,13 +198,12 @@ export default function Verify2FAScreen({ navigation, route }: Verify2FAScreenPr
           <Button
             onPress={handleVerify}
             disabled={isLoading || code.length !== 6}
-            style={[styles.verifyButton, { backgroundColor: AppColors.primary }]}
+            style={[
+              styles.verifyButton,
+              { backgroundColor: AppColors.primary },
+            ]}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              "Verify Code"
-            )}
+            {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Verify Code"}
           </Button>
 
           <Pressable

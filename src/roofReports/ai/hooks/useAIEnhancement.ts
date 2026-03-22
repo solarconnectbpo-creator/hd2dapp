@@ -4,13 +4,21 @@
  */
 
 import { useState, useCallback } from "react";
-import { fuseMeasurements, MeasurementSource, FusedMeasurement } from "../measurementFusion";
+import {
+  fuseMeasurements,
+  MeasurementSource,
+  FusedMeasurement,
+} from "../measurementFusion";
 import {
   assessDamageAdvanced,
   AdvancedDamageAssessment,
   WeatherContext,
 } from "../advancedDamageDetector";
-import { checkMeasurementQuality, GuidanceMessage, MeasurementQualityCheck } from "../userGuidanceSystem";
+import {
+  checkMeasurementQuality,
+  GuidanceMessage,
+  MeasurementQualityCheck,
+} from "../userGuidanceSystem";
 import {
   storeCorrectionFeedback,
   AICorrectionFeedback,
@@ -50,7 +58,9 @@ interface UseAIEnhancementReturn {
   photoCaptureGuidance: GuidanceMessage[];
   dismissGuidance: (messageId: string) => void;
 
-  recordCorrection: (feedback: Omit<AICorrectionFeedback, "id" | "timestamp">) => Promise<void>;
+  recordCorrection: (
+    feedback: Omit<AICorrectionFeedback, "id" | "timestamp">,
+  ) => Promise<void>;
   feedbackSummary: FeedbackSummary | null;
   loadFeedbackSummary: () => Promise<void>;
 
@@ -59,18 +69,27 @@ interface UseAIEnhancementReturn {
 }
 
 export function useAIEnhancement(): UseAIEnhancementReturn {
-  const [fusedMeasurement, setFusedMeasurement] = useState<FusedMeasurement | null>(null);
-  const [measurementQuality, setMeasurementQuality] = useState<MeasurementQualityCheck | null>(null);
+  const [fusedMeasurement, setFusedMeasurement] =
+    useState<FusedMeasurement | null>(null);
+  const [measurementQuality, setMeasurementQuality] =
+    useState<MeasurementQualityCheck | null>(null);
   const [measurementExplanation, setMeasurementExplanation] =
     useState<AIPredictionExplanation | null>(null);
 
-  const [damageAssessment, setDamageAssessment] = useState<AdvancedDamageAssessment | null>(null);
-  const [damageExplanation, setDamageExplanation] = useState<AIPredictionExplanation | null>(null);
+  const [damageAssessment, setDamageAssessment] =
+    useState<AdvancedDamageAssessment | null>(null);
+  const [damageExplanation, setDamageExplanation] =
+    useState<AIPredictionExplanation | null>(null);
 
-  const [guidanceMessages, setGuidanceMessages] = useState<GuidanceMessage[]>([]);
-  const [photoCaptureGuidance, setPhotoCaptureGuidance] = useState<GuidanceMessage[]>([]);
+  const [guidanceMessages, setGuidanceMessages] = useState<GuidanceMessage[]>(
+    [],
+  );
+  const [photoCaptureGuidance, setPhotoCaptureGuidance] = useState<
+    GuidanceMessage[]
+  >([]);
 
-  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [feedbackSummary, setFeedbackSummary] =
+    useState<FeedbackSummary | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -120,7 +139,11 @@ export function useAIEnhancement(): UseAIEnhancementReturn {
     ) => {
       setIsProcessing(true);
       try {
-        const assessment = assessDamageAdvanced(aiVisionResult, imageMetadata, weatherContext);
+        const assessment = assessDamageAdvanced(
+          aiVisionResult,
+          imageMetadata,
+          weatherContext,
+        );
         setDamageAssessment(assessment);
 
         const explanation = explainDamageAssessment(

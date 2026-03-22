@@ -85,16 +85,24 @@
 .cesium-lighter .cesium-animation-buttonToggled .cesium-animation-buttonMain {
   stroke: #ea0;
 }
-.cesium-lighter .cesium-animation-rectButton:hover .cesium-animation-buttonMain {
+.cesium-lighter
+  .cesium-animation-rectButton:hover
+  .cesium-animation-buttonMain {
   stroke: #759dc0;
 }
-.cesium-lighter .cesium-animation-buttonToggled:hover .cesium-animation-buttonGlow {
+.cesium-lighter
+  .cesium-animation-buttonToggled:hover
+  .cesium-animation-buttonGlow {
   fill: #fff;
 }
-.cesium-lighter .cesium-animation-buttonToggled:hover .cesium-animation-buttonMain {
+.cesium-lighter
+  .cesium-animation-buttonToggled:hover
+  .cesium-animation-buttonMain {
   stroke: #ea0;
 }
-.cesium-lighter .cesium-animation-rectButton:active .cesium-animation-buttonMain {
+.cesium-lighter
+  .cesium-animation-rectButton:active
+  .cesium-animation-buttonMain {
   fill: #abd6ff;
 }
 .cesium-lighter .cesium-animation-buttonDisabled .cesium-animation-buttonMain {
@@ -129,13 +137,19 @@
 .cesium-lighter .cesium-baseLayerPicker-itemLabel {
   color: black;
 }
-.cesium-lighter .cesium-baseLayerPicker-item:hover .cesium-baseLayerPicker-itemIcon {
+.cesium-lighter
+  .cesium-baseLayerPicker-item:hover
+  .cesium-baseLayerPicker-itemIcon {
   border-color: #000;
 }
-.cesium-lighter .cesium-baseLayerPicker-selectedItem .cesium-baseLayerPicker-itemLabel {
+.cesium-lighter
+  .cesium-baseLayerPicker-selectedItem
+  .cesium-baseLayerPicker-itemLabel {
   color: rgb(0, 61, 168);
 }
-.cesium-lighter .cesium-baseLayerPicker-selectedItem .cesium-baseLayerPicker-itemIcon {
+.cesium-lighter
+  .cesium-baseLayerPicker-selectedItem
+  .cesium-baseLayerPicker-itemIcon {
   border: double 4px rgb(0, 61, 168);
 }
 
@@ -173,12 +187,7 @@
 
 /* packages/widgets/Source/Timeline/lighter.css */
 .cesium-lighter .cesium-timeline-bar {
-  background:
-    linear-gradient(
-      to bottom,
-      #eeeeee 0%,
-      #ffffff 50%,
-      #fafafa 100%);
+  background: linear-gradient(to bottom, #eeeeee 0%, #ffffff 50%, #fafafa 100%);
 }
 .cesium-lighter .cesium-timeline-ticLabel {
   color: #000;

@@ -36,7 +36,7 @@ interface Lead {
 export async function verifyLeadEndpoint(
   req: Request,
   env: Env,
-  user: User
+  user: User,
 ): Promise<Response> {
   try {
     const body = await req.json();
@@ -45,26 +45,28 @@ export async function verifyLeadEndpoint(
     if (!leadId) {
       return new Response(JSON.stringify({ error: "Missing leadId" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // Get lead from database
-    const lead = await env.DB.prepare(
-      "SELECT * FROM leads WHERE id = ?"
-    ).bind(leadId).first();
+    const lead = await env.DB.prepare("SELECT * FROM leads WHERE id = ?")
+      .bind(leadId)
+      .first();
 
     if (!lead) {
       return new Response(JSON.stringify({ error: "Lead not found" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // Check if verification already exists
     const existingVerification = await env.DB.prepare(
-      "SELECT result_json FROM lead_verification WHERE lead_id = ?"
-    ).bind(leadId).first();
+      "SELECT result_json FROM lead_verification WHERE lead_id = ?",
+    )
+      .bind(leadId)
+      .first();
 
     let verificationData: any;
 
@@ -73,21 +75,26 @@ export async function verifyLeadEndpoint(
       verificationData = JSON.parse(existingVerification.result_json);
     } else {
       // Run verification
-      verificationData = await verifyLead(env, lead, vendorId || lead.company_id);
+      verificationData = await verifyLead(
+        env,
+        lead,
+        vendorId || lead.company_id,
+      );
     }
 
     // Determine status and actions
-    const result: VerificationResult = determineVerificationStatus(verificationData);
+    const result: VerificationResult =
+      determineVerificationStatus(verificationData);
 
     return new Response(JSON.stringify(result), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Lead verify endpoint error:", error);
     return new Response(JSON.stringify({ error: "Failed to verify lead" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }

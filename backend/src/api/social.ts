@@ -30,19 +30,22 @@ export async function getExplorePage(req: Request, env: Env, user: User) {
       FROM posts p
       ORDER BY score DESC, p.created_at DESC
       LIMIT 100
-      `
+      `,
     ).all();
 
     return new Response(JSON.stringify(posts.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Get explore page error:", error);
-    return new Response(JSON.stringify({ error: "Failed to fetch explore page" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch explore page" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }
 
@@ -58,7 +61,7 @@ export async function searchPosts(req: Request, env: Env, user: User) {
     if (query.length < 2) {
       return new Response(JSON.stringify({ error: "Query too short" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -73,18 +76,20 @@ export async function searchPosts(req: Request, env: Env, user: User) {
       WHERE p.content LIKE ? OR p.hashtags LIKE ?
       ORDER BY score DESC, p.created_at DESC
       LIMIT 50
-      `
-    ).bind(`%${query}%`, `%${query}%`).all();
+      `,
+    )
+      .bind(`%${query}%`, `%${query}%`)
+      .all();
 
     return new Response(JSON.stringify(posts.results || []), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Search posts error:", error);
     return new Response(JSON.stringify({ error: "Failed to search posts" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   }
 }

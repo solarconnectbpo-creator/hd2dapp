@@ -61,9 +61,7 @@ export type ReportsStackParamList = {
         };
       }
     | undefined;
-  StLouisDataSources:
-    | { latitude?: number; longitude?: number }
-    | undefined;
+  StLouisDataSources: { latitude?: number; longitude?: number } | undefined;
 };
 
 const Stack = createNativeStackNavigator<ReportsStackParamList>();

@@ -4,7 +4,13 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors } from "@/constants/theme";
@@ -123,7 +129,11 @@ function GuidanceMessageCard({
     >
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
-          <Feather name={typeStyles.iconName} size={16} color={typeStyles.iconColor} />
+          <Feather
+            name={typeStyles.iconName}
+            size={16}
+            color={typeStyles.iconColor}
+          />
           <Text
             style={[
               styles.messageTitle,
@@ -143,11 +153,16 @@ function GuidanceMessageCard({
           )}
         </View>
 
-        <Text style={[styles.messageText, { color: theme.text }]}>{message.message}</Text>
+        <Text style={[styles.messageText, { color: theme.text }]}>
+          {message.message}
+        </Text>
 
         {message.action && (
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: typeStyles.iconColor }]}
+            style={[
+              styles.actionButton,
+              { backgroundColor: typeStyles.iconColor },
+            ]}
             onPress={() => {
               message.action?.onPress();
               onAction("primary");

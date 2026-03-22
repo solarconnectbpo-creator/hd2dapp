@@ -31,7 +31,10 @@ export default function ProgressTracker({
       <View
         style={[
           styles.track,
-          { backgroundColor: theme.backgroundTertiary, borderColor: theme.border },
+          {
+            backgroundColor: theme.backgroundTertiary,
+            borderColor: theme.border,
+          },
         ]}
       >
         <View

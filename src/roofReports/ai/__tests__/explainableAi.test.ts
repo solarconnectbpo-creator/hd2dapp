@@ -23,7 +23,9 @@ describe("Explainable AI", () => {
     it("should lower confidence with poor photo quality", () => {
       const exp1 = explainPitchPrediction("8:12", 0.8, "high");
       const exp2 = explainPitchPrediction("8:12", 0.8, "low");
-      expect(exp1.reasoning.length).toBeGreaterThanOrEqual(exp2.reasoning.length);
+      expect(exp1.reasoning.length).toBeGreaterThanOrEqual(
+        exp2.reasoning.length,
+      );
     });
 
     it("should include terrain context when provided", () => {
@@ -31,7 +33,9 @@ describe("Explainable AI", () => {
         elevationVariance: 200,
       });
       expect(
-        explanation.reasoning.some((r) => r.factor === "Terrain elevation data"),
+        explanation.reasoning.some(
+          (r) => r.factor === "Terrain elevation data",
+        ),
       ).toBe(true);
     });
   });

@@ -19,7 +19,7 @@ export interface RoofMeasurementData {
     area: number;
   }>;
   confidence: number;
-  method: 'eagleview' | 'nearmap' | 'lidar' | 'photogrammetry';
+  method: "eagleview" | "nearmap" | "lidar" | "photogrammetry";
 }
 
 export interface PrecisionBuildingData {
@@ -51,13 +51,13 @@ export interface MeasurementRequest {
   zipCode: string;
   latitude: number;
   longitude: number;
-  priority: 'accuracy' | 'speed' | 'cost';
+  priority: "accuracy" | "speed" | "cost";
 }
 
 export interface MeasurementResult {
   success: boolean;
   data: PrecisionBuildingData | null;
-  provider: 'eagleview' | 'nearmap' | 'hybrid' | 'fallback';
+  provider: "eagleview" | "nearmap" | "hybrid" | "fallback";
   confidence: number;
   errorMessage?: string;
   retryCount?: number;
