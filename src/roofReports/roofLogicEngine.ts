@@ -6,6 +6,8 @@
 
 import * as turf from "@turf/turf";
 
+import type { MetarWeatherSnapshot } from "./roofReportTypes";
+
 export type RoofMaterialType = "shingle" | "tile" | "slate" | "tpo" | string;
 
 export type RoofGeometrySegmentType = "eave" | "ridge" | "hip" | "rake" | "valley" | string;
@@ -272,6 +274,8 @@ export function computeAiDamageRisk(opts: {
   damageTypes: string[]; // DamageType[]
   roofMaterialType: RoofMaterialType;
   pitchRise?: number;
+  /** Nearest airport METAR — nudges wind/storm context when available. */
+  metarWeather?: MetarWeatherSnapshot;
 }): DamageRiskResult {
   const roofAge = toNumberOrUndefined(opts.roofAgeYears);
   const sev = Number.isFinite(opts.severity) ? opts.severity : 3;
@@ -281,6 +285,11 @@ export function computeAiDamageRisk(opts: {
   const hasWind = opts.damageTypes.some((d) => String(d).toLowerCase() === "wind");
   const hasLeaks = opts.damageTypes.some((d) => String(d).toLowerCase() === "leaks");
   const hasStructural = opts.damageTypes.some((d) => String(d).toLowerCase() === "structural");
+  const hasMissingShingles = opts.damageTypes.some(
+    (d) => String(d).toLowerCase() === "missing shingles",
+  );
+  const hasFlashing = opts.damageTypes.some((d) => String(d).toLowerCase() === "flashing");
+  const damageTypeCount = opts.damageTypes.length;
 
   const material = String(opts.roofMaterialType).toLowerCase();
   const materialRiskAdj =
@@ -310,6 +319,24 @@ export function computeAiDamageRisk(opts: {
   weather += hasWind ? 0.34 * severityFactor : 0;
   weather += hasLeaks ? 0.18 * severityFactor : 0;
   weather += hasStructural ? 0.28 * severityFactor : 0;
+  weather += hasMissingShingles ? 0.12 * severityFactor : 0;
+  weather += hasFlashing ? 0.06 * severityFactor : 0;
+  if (hasHail && hasWind) weather += 0.08 * severityFactor;
+  if (damageTypeCount >= 3) weather += 0.06 * severityFactor;
+
+  const mw = opts.metarWeather;
+  if (mw) {
+    const gust = typeof mw.windGustKt === "number" ? mw.windGustKt : 0;
+    const spd = typeof mw.windSpdKt === "number" ? mw.windSpdKt : 0;
+    const peakWind = Math.max(gust, spd);
+    if (peakWind >= 28) weather += 0.14 * severityFactor;
+    else if (peakWind >= 20) weather += 0.08 * severityFactor;
+    if (mw.stormIndicators?.length) weather += 0.09 * severityFactor;
+    const raw = (mw.rawMetar ?? "").toUpperCase();
+    if (raw.includes(" TS") || raw.includes("TS ") || raw.includes("+TS")) {
+      weather += 0.1 * severityFactor;
+    }
+  }
 
   // Build score: 0..100
   const scoreRaw = 15 + ageFactor * 18 + weather * 65;
@@ -325,7 +352,19 @@ export function computeAiDamageRisk(opts: {
   if (hasWind) factors.push("Wind damage selected");
   if (hasLeaks) factors.push("Leak-related damage selected");
   if (hasStructural) factors.push("Structural damage selected");
+  if (hasMissingShingles) factors.push("Missing shingles / blow-off pattern noted");
+  if (hasFlashing) factors.push("Flashing-related damage selected");
+  if (hasHail && hasWind) factors.push("Combined hail + wind selection (multi-mode event)");
+  if (damageTypeCount >= 3) factors.push(`Multiple damage modes selected (${damageTypeCount})`);
   if (typeof pitchRise === "number") factors.push(`Pitch: rise=${pitchRise} (rise/run)`);
+  if (mw) {
+    factors.push(`METAR ${mw.stationIcao} @ ${mw.fetchedAtIso.slice(0, 16)}`);
+    if (typeof mw.windGustKt === "number" || typeof mw.windSpdKt === "number") {
+      factors.push(
+        `Observed wind: ${Math.round(mw.windSpdKt ?? 0)} kt gust ${Math.round(mw.windGustKt ?? 0)} kt (airport, not rooftop)`,
+      );
+    }
+  }
 
   const actionPlan: string[] = [];
   if (level === "High") {

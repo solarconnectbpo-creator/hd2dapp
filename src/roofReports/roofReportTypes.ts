@@ -1,3 +1,7 @@
+import type { FieldQaChecklistState } from "./fieldQaChecklist";
+
+export type { FieldQaChecklistId, FieldQaChecklistState } from "./fieldQaChecklist";
+
 export type DamageType =
   | "Hail"
   | "Wind"
@@ -45,6 +49,45 @@ export interface RoofReportCreatedBy {
   userType: "sales_rep" | "company" | "admin";
 }
 
+/** Advisory flags from `computeMeasurementValidationSummary` (trace vs AI vs estimate). */
+export type MeasurementAlertLevel = "ok" | "warning" | "critical";
+
+export interface RoofMeasurementValidationSummary {
+  computedAtIso: string;
+  overallConfidence: "low" | "medium" | "high";
+  areaTraceVsAi?: {
+    traceSqFt: number;
+    aiSqFt: number;
+    divergencePct: number;
+    alertLevel: MeasurementAlertLevel;
+  };
+  perimeterTraceVsAi?: {
+    traceFt: number;
+    aiFt: number;
+    divergencePct: number;
+    alertLevel: MeasurementAlertLevel;
+  };
+  pitchManualVsTerrain?: {
+    manualRise?: number;
+    terrainRise?: number;
+    riseSpread: number;
+    alertLevel: MeasurementAlertLevel;
+  };
+  pitchManualVsAi?: {
+    manualRise?: number;
+    aiRise?: number;
+    riseSpread: number;
+    alertLevel: MeasurementAlertLevel;
+  };
+  estimateAreaVsTrace?: {
+    estimateSqFt: number;
+    traceSqFt: number;
+    divergencePct: number;
+    alertLevel: MeasurementAlertLevel;
+  };
+  messages: string[];
+}
+
 export interface RoofMeasurements {
   roofAreaSqFt?: number;
   roofPerimeterFt?: number;
@@ -88,6 +131,9 @@ export interface RoofMeasurements {
    * Stored for export/review; does not replace manual roof area unless you copy values elsewhere.
    */
   precisionMeasurementSnapshot?: RoofPrecisionMeasurementSnapshot;
+
+  /** Populated when the report is built — cross-checks trace, AI, terrain, and estimate. */
+  measurementValidationSummary?: RoofMeasurementValidationSummary;
 }
 
 /** Serializable record of a precision / hybrid provider run for damage reports. */
@@ -265,6 +311,12 @@ export interface DamageRoofReport {
   materialSystemAnalysis?: import("./roofMaterialSystemAnalysis").RoofMaterialSystemAnalysis;
 
   /**
+   * Inspector confirmed the roof type field + material selector match field conditions
+   * (especially when `materialSystemAnalysis.agreement` is conflict).
+   */
+  materialSystemFieldVerified?: boolean;
+
+  /**
    * AI-style damage risk score + suggested action plan.
    * (Computed from app inputs; optional roof age improves accuracy.)
    */
@@ -308,6 +360,9 @@ export interface DamageRoofReport {
 
   /** Nearest major airport METAR — see `metarWeather.ts`. */
   metarWeather?: MetarWeatherSnapshot;
+
+  /** Optional inspector field QA checklist — see `fieldQaChecklist.ts`. */
+  fieldQaChecklist?: FieldQaChecklistState;
 
   /**
    * Low-slope / commercial membrane & coating line items (MOSL8X cheat sheet catalog).

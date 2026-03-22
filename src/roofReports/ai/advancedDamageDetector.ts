@@ -195,7 +195,7 @@ function getDamageConfig(
   };
 }
 
-function calculateAggregateSeverity(damageTypes: DetectedDamageType[]): number {
+export function calculateAggregateSeverity(damageTypes: DetectedDamageType[]): number {
   if (!damageTypes.length) return 1;
 
   const weightedSum = damageTypes.reduce((sum, dt) => {

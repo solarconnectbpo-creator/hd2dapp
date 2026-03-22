@@ -13,7 +13,7 @@ import type { Cesium3DRoofToolHandle, Cesium3DRoofToolOptions } from "./cesium3d
 export type { Cesium3DRoofToolHandle, Cesium3DRoofToolOptions } from "./cesium3dRoofTool.types";
 
 /** Geodesic polygon area (m²) from globe positions. */
-export function calculatePolygonAreaM2(cartesians: Cesium.Cartesian3[]): number {
+export function calculatePolygonAreaM2(cartesians: any[]): number {
   if (cartesians.length < 3) return 0;
   const ring: [number, number][] = cartesians.map((c) => {
     const cartographic = Cesium.Cartographic.fromCartesian(c);
@@ -52,7 +52,7 @@ function setCesiumBaseUrlFromEnv(): void {
 export async function setupCesium3DRoofTool(
   container: HTMLElement,
   options: Cesium3DRoofToolOptions,
-): Promise<Cesium3DRoofToolHandle & { viewer: Cesium.Viewer }> {
+): Promise<Cesium3DRoofToolHandle & { viewer: any }> {
   setCesiumBaseUrlFromEnv();
 
   const token = options.ionAccessToken?.trim();
@@ -86,13 +86,13 @@ export async function setupCesium3DRoofTool(
     }
   }
 
-  const roofPoints: Cesium.Cartesian3[] = [];
-  const pointEntities: Cesium.Entity[] = [];
-  let polygonEntity: Cesium.Entity | undefined;
+  const roofPoints: any[] = [];
+  const pointEntities: any[] = [];
+  let polygonEntity: any | undefined;
 
   const handler = viewer.screenSpaceEventHandler;
 
-  handler.setInputAction((click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+  handler.setInputAction((click: { position: any }) => {
     const picked = viewer.scene.pick(click.position);
     if (Cesium.defined(picked)) {
       return;

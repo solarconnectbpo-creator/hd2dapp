@@ -6,11 +6,19 @@
  */
 
 import * as turf from "@turf/turf";
+import { Platform } from "react-native";
 
 import type { MetarWeatherSnapshot } from "./roofReportTypes";
 import { US_METAR_REFERENCE_STATIONS } from "./metarStationsUs";
 
 const AWC_METAR_URL = "https://aviationweather.gov/api/data/metar";
+
+/** NOAA weather.gov allows browser CORS; AWC often blocks `fetch` from web apps. */
+const NOAA_USER_AGENT = "hd2dapp/1.0 (roof reports; https://github.com/)";
+
+function noaaObservationsLatestUrl(icao: string): string {
+  return `https://api.weather.gov/stations/${encodeURIComponent(icao)}/observations/latest`;
+}
 
 export interface NearestMetarStation {
   icao: string;
@@ -135,15 +143,131 @@ function buildHumanSummary(row: AwcMetarRow, raw: string, stationLabel: string):
   return lines;
 }
 
-export async function fetchMetarSnapshotForIcao(
-  icaoInput: string,
-  opts?: { nearest?: NearestMetarStation },
+function kmhToKt(kmh: number): number {
+  return Math.round(kmh * 0.539957 * 10) / 10;
+}
+
+interface NoaaLatestObservation {
+  properties?: {
+    rawMessage?: string;
+    stationId?: string;
+    stationName?: string;
+    timestamp?: string;
+    textDescription?: string;
+    temperature?: { value?: number | null };
+    dewpoint?: { value?: number | null };
+    windDirection?: { value?: number | null };
+    windSpeed?: { value?: number | null };
+    windGust?: { value?: number | null };
+    visibility?: { value?: number | null };
+    cloudLayers?: Array<{
+      amount?: string;
+      base?: { value?: number | null };
+    }>;
+  };
+}
+
+/**
+ * Decoded observation from NOAA (CORS-friendly in browsers). Raw METAR text is
+ * often empty in this API — we synthesize a line for display / storm heuristics.
+ */
+async function fetchMetarFromNoaa(
+  icao: string,
+  nearest?: NearestMetarStation,
 ): Promise<MetarWeatherSnapshot> {
-  const icao = normalizeUsMetarIcaoInput(icaoInput);
-  if (!icao || icao.length < 4) {
-    throw new Error("Enter a valid 4-letter ICAO station (e.g. KDFW or DFW).");
+  const res = await fetch(noaaObservationsLatestUrl(icao), {
+    headers: {
+      Accept: "application/geo+json",
+      "User-Agent": NOAA_USER_AGENT,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`NOAA observation failed (${res.status}).`);
   }
 
+  const json = (await res.json()) as NoaaLatestObservation;
+  const p = json.properties;
+  if (!p?.stationId) {
+    throw new Error("Invalid NOAA observation response.");
+  }
+
+  const rawFromApi = (p.rawMessage && p.rawMessage.trim()) || "";
+  const stationLabel = [p.stationId, p.stationName].filter(Boolean).join(" — ");
+  const synthRaw =
+    rawFromApi ||
+    `METAR ${p.stationId} — ${p.textDescription ?? "observation"} (NOAA weather.gov; raw METAR string not included in API response)`;
+
+  const wspdKt =
+    typeof p.windSpeed?.value === "number" && Number.isFinite(p.windSpeed.value)
+      ? kmhToKt(p.windSpeed.value)
+      : undefined;
+  const wgstKt =
+    typeof p.windGust?.value === "number" &&
+    Number.isFinite(p.windGust.value) &&
+    p.windGust.value > 0
+      ? kmhToKt(p.windGust.value)
+      : undefined;
+
+  const visMi =
+    typeof p.visibility?.value === "number" && Number.isFinite(p.visibility.value)
+      ? `${Math.round((p.visibility.value / 1609.34) * 10) / 10} mi`
+      : undefined;
+
+  const row: AwcMetarRow = {
+    icaoId: p.stationId,
+    rawOb: synthRaw,
+    reportTime: p.timestamp,
+    temp: p.temperature?.value ?? undefined,
+    dewp: p.dewpoint?.value ?? undefined,
+    wdir: p.windDirection?.value ?? undefined,
+    wspd: wspdKt,
+    wgst: wgstKt,
+    visib: visMi,
+    fltCat: undefined,
+    cover: p.cloudLayers?.[0]?.amount,
+    clouds: (p.cloudLayers ?? []).map((c) => ({
+      cover: c.amount,
+      base:
+        c.base?.value != null && Number.isFinite(c.base.value)
+          ? Math.round(c.base.value * 3.28084)
+          : undefined,
+    })),
+    name: p.stationName,
+  };
+
+  const summaryLines = buildHumanSummary(row, synthRaw, stationLabel);
+  if (!rawFromApi) {
+    summaryLines.unshift(
+      "Source: NOAA weather.gov (browser-safe). Aviation Weather Center API is often blocked by CORS in web builds.",
+    );
+  }
+
+  const rawForStorm = `${synthRaw} ${p.textDescription ?? ""}`;
+
+  return {
+    fetchedAtIso: new Date().toISOString(),
+    stationIcao: p.stationId,
+    stationName: p.stationName,
+    distanceMilesApprox:
+      nearest?.icao === p.stationId ? nearest.distanceMilesApprox : undefined,
+    rawMetar: rawFromApi || synthRaw,
+    summaryLines,
+    tempC: typeof p.temperature?.value === "number" ? p.temperature.value : undefined,
+    dewpC: typeof p.dewpoint?.value === "number" ? p.dewpoint.value : undefined,
+    windDir: typeof p.windDirection?.value === "number" ? p.windDirection.value : undefined,
+    windSpdKt: wspdKt,
+    windGustKt: wgstKt,
+    visibility: visMi,
+    flightCategory: undefined,
+    cloudsSummary: p.cloudLayers?.[0]?.amount,
+    stormIndicators: extractStormIndicators(rawForStorm),
+  };
+}
+
+async function fetchMetarFromAwc(
+  icao: string,
+  opts?: { nearest?: NearestMetarStation },
+): Promise<MetarWeatherSnapshot> {
   const url = `${AWC_METAR_URL}?ids=${encodeURIComponent(icao)}&format=json&taf=false`;
   const res = await fetch(url);
   if (!res.ok) {
@@ -164,7 +288,10 @@ export async function fetchMetarSnapshotForIcao(
     fetchedAtIso: new Date().toISOString(),
     stationIcao: row.icaoId || icao,
     stationName: row.name,
-    distanceMilesApprox: opts?.nearest?.icao === (row.icaoId || icao) ? opts.nearest.distanceMilesApprox : undefined,
+    distanceMilesApprox:
+      opts?.nearest?.icao === (row.icaoId || icao)
+        ? opts.nearest.distanceMilesApprox
+        : undefined,
     rawMetar: raw.trim(),
     summaryLines,
     tempC: typeof row.temp === "number" ? row.temp : undefined,
@@ -177,4 +304,68 @@ export async function fetchMetarSnapshotForIcao(
     cloudsSummary: row.cover,
     stormIndicators: extractStormIndicators(raw),
   };
+}
+
+/**
+ * Nearest US reference METAR to lat/lng (airport observation — not rooftop).
+ * Returns null if no station or fetch fails (network / inactive ICAO).
+ */
+export async function fetchMetarSnapshotForLatLng(
+  lat: number,
+  lng: number,
+): Promise<MetarWeatherSnapshot | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const nearest = findNearestMetarStation(lat, lng);
+  if (!nearest) return null;
+  try {
+    return await fetchMetarSnapshotForIcao(nearest.icao, { nearest });
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchMetarSnapshotForIcao(
+  icaoInput: string,
+  opts?: { nearest?: NearestMetarStation },
+): Promise<MetarWeatherSnapshot> {
+  const icao = normalizeUsMetarIcaoInput(icaoInput);
+  if (!icao || icao.length < 4) {
+    throw new Error("Enter a valid 4-letter ICAO station (e.g. KDFW or DFW).");
+  }
+
+  const tryNoaaFirst = Platform.OS === "web";
+
+  const tryAwcThenNoaa = async (): Promise<MetarWeatherSnapshot> => {
+    let awcErr: unknown;
+    try {
+      return await fetchMetarFromAwc(icao, opts);
+    } catch (e) {
+      awcErr = e;
+    }
+    try {
+      return await fetchMetarFromNoaa(icao, opts?.nearest);
+    } catch (noaaErr) {
+      const a = awcErr instanceof Error ? awcErr.message : String(awcErr);
+      const b = noaaErr instanceof Error ? noaaErr.message : String(noaaErr);
+      throw new Error(`METAR unavailable (AWC: ${a}; NOAA: ${b})`);
+    }
+  };
+
+  const tryNoaaThenAwc = async (): Promise<MetarWeatherSnapshot> => {
+    let noaaErr: unknown;
+    try {
+      return await fetchMetarFromNoaa(icao, opts?.nearest);
+    } catch (e) {
+      noaaErr = e;
+    }
+    try {
+      return await fetchMetarFromAwc(icao, opts);
+    } catch (awcErr) {
+      const a = noaaErr instanceof Error ? noaaErr.message : String(noaaErr);
+      const b = awcErr instanceof Error ? awcErr.message : String(awcErr);
+      throw new Error(`METAR unavailable (NOAA: ${a}; AWC: ${b})`);
+    }
+  };
+
+  return tryNoaaFirst ? tryNoaaThenAwc() : tryAwcThenNoaa();
 }

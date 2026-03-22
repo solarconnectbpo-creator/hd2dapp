@@ -1,17 +1,21 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import CRMStackNavigator from "@/navigation/CRMStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import ReportsStackNavigator from "@/navigation/ReportsStackNavigator";
+import { RoofReportScreen } from "@/src/screens/RoofReportScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { AppColors, Spacing } from "@/constants/theme";
 
+/** Bottom tabs: CRM, Reports (roof + AI agents stack), Profile. */
 export type MainTabParamList = {
   CRMTab: undefined;
   ReportsTab: undefined;
+  RoofReport: undefined;
   ProfileTab: undefined;
 };
 
@@ -75,6 +79,21 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
+        name="RoofReport"
+        component={RoofReportScreen}
+        options={{
+          title: "AI Roof Report",
+          tabBarLabel: "AI Roof Report",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="home-roof"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="ProfileTab"
         component={ProfileStackNavigator}
         options={{
@@ -87,14 +106,3 @@ export default function MainTabNavigator() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  centerTab: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-});

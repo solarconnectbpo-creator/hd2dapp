@@ -7,3 +7,7 @@ export * from "./advancedDamageDetector";
 export * from "./userGuidanceSystem";
 export * from "./feedbackLoopStorage";
 export * from "./explainableAi";
+
+export { useAIEnhancement } from "./hooks/useAIEnhancement";
+export { default as GuidanceOverlay } from "./components/GuidanceOverlay";
+export { default as MeasurementQualityBadge } from "./components/MeasurementQualityBadge";

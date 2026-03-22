@@ -1,7 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +15,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { Card } from "@/components/Card";
+import { MeasurementAccuracyPanel } from "@/components/MeasurementAccuracyPanel";
 import { RoofPitchGaugeStrip } from "@/components/RoofPitchGaugeStrip";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
@@ -20,7 +25,14 @@ import {
   exportRoofReportToJson,
 } from "@/src/roofReports/exportRoofReport";
 import { roofMeasurementsHaveContent } from "@/src/roofReports/eavemeasureIntegration";
-import { deleteRoofReport } from "@/src/roofReports/roofReportStorage";
+import {
+  FIELD_QA_ITEMS,
+  fieldQaCompletionCount,
+} from "@/src/roofReports/fieldQaChecklist";
+import {
+  deleteRoofReport,
+  getRoofReportById,
+} from "@/src/roofReports/roofReportStorage";
 import type { ReportsStackParamList } from "@/navigation/ReportsStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -81,8 +93,34 @@ type Props = NativeStackScreenProps<ReportsStackParamList, "ReportPreview">;
 
 export default function ReportPreviewScreen({ navigation, route }: Props) {
   const { theme } = useTheme();
-  const { report } = route.params;
+  const { report: routeReport } = route.params;
+  const [report, setReport] = useState(routeReport);
+
+  useEffect(() => {
+    setReport(routeReport);
+  }, [routeReport]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void getRoofReportById(routeReport.id).then((stored) => {
+        if (cancelled || !stored) return;
+        setReport(stored);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [routeReport.id]),
+  );
+
   const [exportBusy, setExportBusy] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  /** "choose" = pick HTML vs JSON; "working" = building file (keeps user gesture on web). */
+  const [exportModalStep, setExportModalStep] = useState<"choose" | "working">(
+    "choose",
+  );
+  const [exportProgressPct, setExportProgressPct] = useState(0);
+  const [exportPhase, setExportPhase] = useState("");
 
   const effectivePropertyUse =
     report.propertyUse ?? report.property.propertyUse;
@@ -109,30 +147,77 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
     ]);
   };
 
-  const exportHtml = async () => {
-    if (exportBusy) return;
-    setExportBusy(true);
-    try {
-      await exportRoofReportToHtml(report);
-    } catch (e) {
-      Alert.alert("Export failed", "Could not export HTML. Try again.");
-      console.error(e);
-    } finally {
-      setExportBusy(false);
+  const showExportError = (title: string, msg: string) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}\n\n${msg}`);
+    } else {
+      Alert.alert(title, msg);
     }
   };
 
-  const exportJson = async () => {
+  const resetExportModal = () => {
+    setExportModalVisible(false);
+    setExportModalStep("choose");
+    setExportProgressPct(0);
+    setExportPhase("");
+    setExportBusy(false);
+  };
+
+  /** Run in the same tap handler as the modal choice so web keeps download permission. */
+  const runExportHtml = () => {
     if (exportBusy) return;
     setExportBusy(true);
-    try {
-      await exportRoofReportToJson(report);
-    } catch (e) {
-      Alert.alert("Export failed", "Could not export JSON. Try again.");
-      console.error(e);
-    } finally {
-      setExportBusy(false);
-    }
+    setExportModalStep("working");
+    setExportProgressPct(0);
+    setExportPhase("Starting…");
+    void exportRoofReportToHtml(report, {
+      onProgress: (pct, phase) => {
+        setExportProgressPct(pct);
+        setExportPhase(phase);
+      },
+    })
+      .then(() => {
+        setTimeout(() => resetExportModal(), 500);
+      })
+      .catch((e) => {
+        const msg =
+          e instanceof Error ? e.message : "Could not export HTML. Try again.";
+        showExportError("Export failed", msg);
+        console.error(e);
+        resetExportModal();
+      });
+  };
+
+  const runExportJson = () => {
+    if (exportBusy) return;
+    setExportBusy(true);
+    setExportModalStep("working");
+    setExportProgressPct(0);
+    setExportPhase("Starting…");
+    void exportRoofReportToJson(report, {
+      onProgress: (pct, phase) => {
+        setExportProgressPct(pct);
+        setExportPhase(phase);
+      },
+    })
+      .then(() => {
+        setTimeout(() => resetExportModal(), 500);
+      })
+      .catch((e) => {
+        const msg =
+          e instanceof Error ? e.message : "Could not export JSON. Try again.";
+        showExportError("Export failed", msg);
+        console.error(e);
+        resetExportModal();
+      });
+  };
+
+  const openExportModal = () => {
+    if (exportBusy) return;
+    setExportModalStep("choose");
+    setExportProgressPct(0);
+    setExportPhase("");
+    setExportModalVisible(true);
   };
 
   const damageList = (report.damageTypes ?? []).join(", ");
@@ -377,6 +462,17 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Card>
+
+      {report.measurements?.measurementValidationSummary ? (
+        <Card style={styles.sectionCard}>
+          <ThemedText type="h4" style={styles.sectionTitle}>
+            Measurement accuracy
+          </ThemedText>
+          <MeasurementAccuracyPanel
+            summary={report.measurements.measurementValidationSummary}
+          />
+        </Card>
+      ) : null}
 
       <Card style={styles.sectionCard}>
         <ThemedText type="h4" style={styles.sectionTitle}>
@@ -724,30 +820,6 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
               ) : null}
             </View>
           ) : null}
-          {report.measurements?.aerialMeasurementProvider ? (
-            <ThemedText
-              type="caption"
-              style={[styles.mutedValue, { marginTop: 8 }]}
-            >
-              Aerial source: {report.measurements.aerialMeasurementProvider}
-            </ThemedText>
-          ) : null}
-          {report.measurements?.aerialMeasurementReference ? (
-            <ThemedText
-              type="caption"
-              style={[styles.mutedValue, { marginTop: 4 }]}
-            >
-              Aerial ref: {report.measurements.aerialMeasurementReference}
-            </ThemedText>
-          ) : null}
-          {report.measurements?.aerialMeasurementReportUrl ? (
-            <ThemedText
-              type="caption"
-              style={[styles.mutedValue, { marginTop: 4 }]}
-            >
-              Aerial link: {report.measurements.aerialMeasurementReportUrl}
-            </ThemedText>
-          ) : null}
           {report.measurements?.notes ? (
             <ThemedText
               type="caption"
@@ -935,6 +1007,14 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
             {report.materialSystemAnalysis.sources.roofTypeField} · Material:{" "}
             {report.materialSystemAnalysis.sources.materialSelector}
           </ThemedText>
+          {report.materialSystemFieldVerified ? (
+            <ThemedText
+              type="caption"
+              style={[styles.mutedValue, { marginTop: 8, color: "#22c55e" }]}
+            >
+              Inspector confirmed roof type + material match field conditions.
+            </ThemedText>
+          ) : null}
 
           {typeof report.materialSystemAnalysis.structuralLoadLbsPerSq ===
           "number" ? (
@@ -1228,6 +1308,57 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
               • {v}
             </ThemedText>
           ))}
+        </Card>
+      ) : null}
+
+      {report.metarWeather ? (
+        <Card style={styles.sectionCard}>
+          <ThemedText type="h4" style={styles.sectionTitle}>
+            Airport weather (METAR)
+          </ThemedText>
+          <ThemedText
+            type="caption"
+            style={[styles.mutedValue, { marginBottom: 8, lineHeight: 18 }]}
+          >
+            {report.metarWeather.stationIcao}
+            {report.metarWeather.distanceMilesApprox != null
+              ? ` · ~${report.metarWeather.distanceMilesApprox} mi from property`
+              : ""}{" "}
+            — airport observation, not rooftop.
+          </ThemedText>
+          {report.metarWeather.summaryLines.slice(0, 10).map((line, i) => (
+            <ThemedText
+              key={`metar-${i}`}
+              type="caption"
+              style={[styles.mutedValue, { marginTop: i ? 4 : 0, lineHeight: 18 }]}
+            >
+              {line}
+            </ThemedText>
+          ))}
+        </Card>
+      ) : null}
+
+      {report.fieldQaChecklist &&
+      Object.values(report.fieldQaChecklist).some(Boolean) ? (
+        <Card style={styles.sectionCard}>
+          <ThemedText type="h4" style={styles.sectionTitle}>
+            Field QA checklist
+          </ThemedText>
+          <ThemedText type="caption" style={[styles.mutedValue, { marginBottom: 10 }]}>
+            Completed {fieldQaCompletionCount(report.fieldQaChecklist)} /{" "}
+            {FIELD_QA_ITEMS.length}
+          </ThemedText>
+          {FIELD_QA_ITEMS.map((it) =>
+            report.fieldQaChecklist?.[it.id] ? (
+              <ThemedText
+                key={it.id}
+                type="caption"
+                style={[styles.mutedValue, { marginTop: 6, lineHeight: 18 }]}
+              >
+                ✓ {it.label}
+              </ThemedText>
+            ) : null,
+          )}
         </Card>
       ) : null}
 
@@ -1562,22 +1693,17 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
         <ThemedText type="h4" style={styles.sectionTitle}>
           Export
         </ThemedText>
+        <ThemedText type="caption" style={[styles.mutedValue, { marginBottom: 10 }]}>
+          Roof inspection report and cost estimate export together — choose HTML
+          to print or save as PDF, or JSON for data backup.
+        </ThemedText>
 
         <Button
-          onPress={() => void exportHtml()}
+          onPress={openExportModal}
           disabled={exportBusy}
           style={styles.exportButton}
         >
-          {exportBusy ? "Exporting…" : "Export HTML (Print to PDF)"}
-        </Button>
-        <View style={{ height: 10 }} />
-        <Button
-          variant="secondary"
-          onPress={() => void exportJson()}
-          disabled={exportBusy}
-          style={[styles.exportButton, styles.secondaryExportButton]}
-        >
-          {exportBusy ? "Exporting…" : "Export JSON"}
+          {exportBusy ? "Exporting…" : "Export report"}
         </Button>
 
         <View style={{ height: 14 }} />
@@ -1592,6 +1718,90 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
       </Card>
 
       <View style={{ height: 24 }} />
+
+      <Modal
+        visible={exportModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (exportModalStep !== "working") setExportModalVisible(false);
+        }}
+      >
+        <Pressable
+          style={styles.exportModalBackdrop}
+          onPress={() => {
+            if (exportModalStep !== "working") setExportModalVisible(false);
+          }}
+        >
+          <Pressable
+            style={[
+              styles.exportModalCard,
+              { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {exportModalStep === "choose" ? (
+              <>
+                <ThemedText type="h4" style={{ marginBottom: 8 }}>
+                  Export report
+                </ThemedText>
+                <ThemedText
+                  type="caption"
+                  style={{ marginBottom: 14, opacity: 0.9, lineHeight: 20 }}
+                >
+                  HTML includes the printable report and cost estimate. JSON is
+                  raw data for backup or tools.
+                </ThemedText>
+                <Button onPress={runExportHtml} style={styles.exportModalButton}>
+                  HTML (print / PDF)
+                </Button>
+                <View style={{ height: 10 }} />
+                <Button
+                  variant="secondary"
+                  onPress={runExportJson}
+                  style={styles.exportModalButton}
+                >
+                  JSON
+                </Button>
+                <View style={{ height: 10 }} />
+                <Button
+                  variant="ghost"
+                  onPress={() => setExportModalVisible(false)}
+                  style={styles.exportModalButton}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <ThemedText type="h4" style={{ marginBottom: 8 }}>
+                  Exporting…
+                </ThemedText>
+                <ThemedText type="caption" style={{ marginBottom: 12, lineHeight: 20 }}>
+                  {exportPhase || "Working…"}{" "}
+                  <ThemedText type="caption" style={{ fontWeight: "700" }}>
+                    {Math.round(exportProgressPct)}%
+                  </ThemedText>
+                </ThemedText>
+                <View style={[styles.exportProgressTrack, { backgroundColor: theme.border }]}>
+                  <View
+                    style={[
+                      styles.exportProgressFill,
+                      {
+                        width: `${Math.min(100, Math.max(0, exportProgressPct))}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <ActivityIndicator
+                  style={{ marginTop: 16 }}
+                  color={AppColors.primary}
+                />
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1669,7 +1879,31 @@ const styles = StyleSheet.create({
   mutedValue: { opacity: 0.8, lineHeight: 18 },
 
   exportButton: { width: "100%" },
-  secondaryExportButton: { borderWidth: 1 },
+  exportModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "center",
+    padding: Spacing.lg,
+  },
+  exportModalCard: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    maxWidth: 420,
+    alignSelf: "center",
+    width: "100%",
+  },
+  exportModalButton: { width: "100%" },
+  exportProgressTrack: {
+    height: 10,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  exportProgressFill: {
+    height: "100%",
+    backgroundColor: AppColors.primary,
+    borderRadius: 6,
+  },
   deleteButton: {
     width: "100%",
     borderColor: "#ef4444",

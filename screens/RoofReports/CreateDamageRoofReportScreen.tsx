@@ -16,7 +16,6 @@ import {
   TextInput,
   View,
   ScrollView,
-  Linking,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -24,6 +23,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { MeasurementAccuracyPanel } from "@/components/MeasurementAccuracyPanel";
 import { RoofPitchGaugeStrip } from "@/components/RoofPitchGaugeStrip";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -40,6 +40,8 @@ import type {
   RoofReportImage,
   BuildingCodeInfo,
   RoofDamageEstimate,
+  MetarWeatherSnapshot,
+  FieldQaChecklistState,
 } from "@/src/roofReports/roofReportTypes";
 import type { ReportsStackParamList } from "@/navigation/ReportsStackNavigator";
 import { upsertRoofReport } from "@/src/roofReports/roofReportStorage";
@@ -72,24 +74,10 @@ import {
   inferPropertyUseType,
   ircOccupancyForPropertyUse,
 } from "@/src/roofReports/propertyUseClassification";
-import {
-  showIbcChapter15Knowledge,
-  showIrcChaptersKnowledge,
-} from "@/src/roofReports/reportKnowledgeVisibility";
 import { getCompanyLogoUrlByName } from "@/src/roofReports/companyBranding";
 import { getDefaultDamageReportCompanyLogoUri } from "@/src/roofReports/coxRoofingLogoAsset";
-import {
-  EAVEMEASURE_AERIAL_SERVICES_URL,
-  EAVEMEASURE_GITHUB_README_URL,
-  EAVEMEASURE_PROVIDER_LABEL,
-  mergeEaveMeasureFields,
-  openEaveMeasureAerialServices,
-  roofMeasurementsHaveContent,
-} from "@/src/roofReports/eavemeasureIntegration";
-import {
-  mergePrecisionSnapshotIntoRoofMeasurements,
-  PRECISION_PROVIDER_LABEL,
-} from "@/src/roofReports/roofPrecisionMeasurement";
+import { roofMeasurementsHaveContent } from "@/src/roofReports/eavemeasureIntegration";
+import { mergePrecisionSnapshotIntoRoofMeasurements } from "@/src/roofReports/roofPrecisionMeasurement";
 import { buildRoofDiagramSvgDataUrl } from "@/src/roofReports/roofDiagram";
 import {
   buildRoofScopeOfWork,
@@ -107,45 +95,20 @@ import {
   parseRoofPitchRise,
 } from "@/src/roofReports/roofLogicEngine";
 import { analyzeRoofMaterialSystem } from "@/src/roofReports/roofMaterialSystemAnalysis";
+import { computeMeasurementValidationSummary } from "@/src/roofReports/roofMeasurementValidation";
+import { fetchMetarSnapshotForLatLng } from "@/src/roofReports/metarWeather";
+import {
+  FIELD_QA_ITEMS,
+  fieldQaCompletionCount,
+} from "@/src/roofReports/fieldQaChecklist";
 import { calculateEagleViewLikeEstimate } from "@/src/roofReports/eagleviewEstimator";
 import { calculateLowSlopeMaterialEstimate } from "@/src/roofReports/lowSlopeEstimator";
 import type { RoofSystemCategory } from "@/src/roofReports/roofSystemScope";
 import { QUICK_PRICE_NON_ROOF } from "@/src/roofReports/quickPriceReference";
-import {
-  IBC_CHAPTER_15_KB_DISCLAIMER,
-  IBC_CHAPTER_15_KB_TITLE,
-  IBC_CHAPTER_15_SECTION_GROUPS,
-  IBC_CHAPTER_15_TYPICAL_EDITION_NOTE,
-} from "@/src/roofReports/ibcChapter15RoofKnowledgeBase";
-import {
-  IRC_CHAPTER_8_ABOUT,
-  IRC_CHAPTER_8_KB_DISCLAIMER,
-  IRC_CHAPTER_8_KB_TITLE,
-  IRC_CHAPTER_8_SECTION_GROUPS,
-  IRC_CHAPTER_8_TYPICAL_EDITION_NOTE,
-} from "@/src/roofReports/ircChapter8RoofCeilingKnowledgeBase";
-import {
-  IRC_CHAPTER_9_ABOUT,
-  IRC_CHAPTER_9_KB_DISCLAIMER,
-  IRC_CHAPTER_9_KB_TITLE,
-  IRC_CHAPTER_9_SECTION_GROUPS,
-  IRC_CHAPTER_9_TYPICAL_EDITION_NOTE,
-} from "@/src/roofReports/ircChapter9RoofAssembliesKnowledgeBase";
-import {
-  MO_IRC_INSURANCE_ABOUT,
-  MO_IRC_INSURANCE_KB_DISCLAIMER,
-  MO_IRC_INSURANCE_KB_TITLE,
-  MO_IRC_INSURANCE_SECTION_GROUPS,
-  MO_IRC_INSURANCE_TYPICAL_EDITION_NOTE,
-} from "@/src/roofReports/missouriIrcInsuranceSupplementKnowledgeBase";
-import {
-  COMMERCIAL_ROOF_TAX_KB_DISCLAIMER,
-  COMMERCIAL_ROOF_TAX_KB_EDITION_NOTE,
-  COMMERCIAL_ROOF_TAX_KB_TITLE,
-  COMMERCIAL_ROOF_TAX_SECTION_GROUPS,
-  commercialRoofTaxNotesApplyToReport,
-} from "@/src/roofReports/commercialRoofTaxIncentivesKnowledgeBase";
 import { apiClient } from "@/services/api";
+import DataSourceConfig from "@/src/components/DataSourceConfig";
+import ReportGenerator from "@/src/components/ReportGenerator";
+import ReportViewer from "@/src/components/ReportViewer";
 
 type Props = NativeStackScreenProps<
   ReportsStackParamList,
@@ -300,10 +263,10 @@ export default function CreateDamageRoofReportScreen({
 }: Props) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { property, mode, autoBuildReport, appliedPrecisionMeasurement } =
+  const { property, autoBuildReport, appliedPrecisionMeasurement } =
     route.params;
-  const reportMode: "full" | "estimate" =
-    mode === "estimate" ? "estimate" : "full";
+  /** Single flow: full damage report + cost estimate (same screen, one export). */
+  const reportMode = "full" as const;
   const shouldAutoBuildReport = autoBuildReport === true;
   const [autoBuildEnabled, setAutoBuildEnabled] = useState(
     shouldAutoBuildReport,
@@ -359,6 +322,15 @@ export default function CreateDamageRoofReportScreen({
     "Insurance Claim Help",
   );
   const [notes, setNotes] = useState("");
+  const [materialSystemFieldVerified, setMaterialSystemFieldVerified] =
+    useState(false);
+  const [metarWeather, setMetarWeather] = useState<MetarWeatherSnapshot | null>(
+    null,
+  );
+  const [metarLoading, setMetarLoading] = useState(false);
+  const [metarError, setMetarError] = useState<string | null>(null);
+  const [fieldQaChecklist, setFieldQaChecklist] =
+    useState<FieldQaChecklistState>({});
 
   const [measurements, setMeasurements] = useState<RoofMeasurements>({});
   const [precisionNavLoading, setPrecisionNavLoading] = useState(false);
@@ -437,24 +409,16 @@ export default function CreateDamageRoofReportScreen({
     ],
   );
 
-  const showIbcKb = useMemo(
-    () => showIbcChapter15Knowledge(propertyUse),
-    [propertyUse],
+  const liveMaterialAnalysis = useMemo(
+    () =>
+      analyzeRoofMaterialSystem({
+        roofTypeRaw: roofType,
+        roofMaterialType: selectedRoofMaterial,
+        roofFormType,
+        pitchRise,
+      }),
+    [roofType, selectedRoofMaterial, roofFormType, pitchRise],
   );
-  const showIrcKb = useMemo(
-    () => showIrcChaptersKnowledge(propertyUse),
-    [propertyUse],
-  );
-
-  const showCommercialRoofTaxCard = useMemo(() => {
-    return commercialRoofTaxNotesApplyToReport({
-      roofType,
-      roofSystemCategory: roofClassification.category,
-      lowSlopeMaterialEstimate: undefined,
-      roofFormType,
-      propertyUse,
-    });
-  }, [roofType, roofFormType, roofClassification.category, propertyUse]);
 
   // Estimate template state (estimate-only mode uses this instead of roof tracing).
   const [roofAreaSqFtManual, setRoofAreaSqFtManual] = useState<string>("");
@@ -462,6 +426,14 @@ export default function CreateDamageRoofReportScreen({
   const [estimate, setEstimate] = useState<RoofDamageEstimate | null>(null);
   const [inspectionAiMessage, setInspectionAiMessage] = useState("");
   const [inspectionAiLoading, setInspectionAiLoading] = useState(false);
+
+  const measurementValidationSummary = useMemo(
+    () =>
+      roofMeasurementsHaveContent(measurements)
+        ? computeMeasurementValidationSummary({ measurements, estimate })
+        : null,
+    [measurements, estimate],
+  );
 
   // Optional non-roof hail items (Fencing & HVAC cheat sheet).
   // These add to the low/high estimate totals.
@@ -477,11 +449,10 @@ export default function CreateDamageRoofReportScreen({
   const [companyCamImporting, setCompanyCamImporting] = useState(false);
   const [companyCamImportProgress, setCompanyCamImportProgress] =
     useState<string>("");
+  const [showAdvancedReportTools, setShowAdvancedReportTools] = useState(false);
+  const [showAiPipeline, setShowAiPipeline] = useState(false);
   const [contactAutofillStatus, setContactAutofillStatus] =
     useState<string>("");
-
-  /** Draft sq ft from EaveMeasure (applied explicitly so it doesn’t fight map trace mid-edit). */
-  const [eaveMeasureSqFtDraft, setEaveMeasureSqFtDraft] = useState("");
 
   const [autoTraceFromFootprintEnabled, setAutoTraceFromFootprintEnabled] =
     useState(true);
@@ -542,6 +513,40 @@ export default function CreateDamageRoofReportScreen({
     ],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!Number.isFinite(property.lat) || !Number.isFinite(property.lng)) {
+      setMetarWeather(null);
+      setMetarError(null);
+      setMetarLoading(false);
+      return;
+    }
+    setMetarLoading(true);
+    setMetarError(null);
+    void fetchMetarSnapshotForLatLng(property.lat, property.lng)
+      .then((snap) => {
+        if (cancelled) return;
+        setMetarWeather(snap);
+        setMetarLoading(false);
+        if (!snap) {
+          setMetarError("No METAR for nearest station (network or coverage).");
+        } else {
+          setMetarError(null);
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setMetarWeather(null);
+        setMetarLoading(false);
+        setMetarError(
+          e instanceof Error ? e.message : "METAR fetch failed. Try Refresh.",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [property.lat, property.lng]);
+
   const toggleDamage = (d: DamageType) => {
     setDamageTypes((prev) =>
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d],
@@ -598,6 +603,7 @@ export default function CreateDamageRoofReportScreen({
       damageTypes,
       roofMaterialType,
       pitchRise,
+      metarWeather: metarWeather ?? undefined,
     });
 
     const roofPitchDiagramImageUrl = buildRoofPitchDiagramSvgDataUrl({
@@ -693,6 +699,9 @@ export default function CreateDamageRoofReportScreen({
       roofMaterialType,
       materialRequirements,
       materialSystemAnalysis,
+      materialSystemFieldVerified: materialSystemFieldVerified
+        ? true
+        : undefined,
       aiDamageRisk,
       lowSlopeMaterialEstimate,
       eagleViewEstimate,
@@ -708,7 +717,11 @@ export default function CreateDamageRoofReportScreen({
         : getCompanyLogoUrlByName(companyName.trim() || undefined),
       creatorName: createdBy?.name,
       measurements: roofMeasurementsHaveContent(measurements)
-        ? measurements
+        ? {
+            ...measurements,
+            measurementValidationSummary:
+              computeMeasurementValidationSummary({ measurements, estimate }),
+          }
         : undefined,
       buildingCode: effectiveBuildingCode,
       images: images.length ? images : undefined,
@@ -777,12 +790,19 @@ export default function CreateDamageRoofReportScreen({
               highCostUsd: nonRoofHighUsd,
             }
           : undefined,
+      metarWeather: metarWeather ?? undefined,
+      fieldQaChecklist: Object.values(fieldQaChecklist).some(Boolean)
+        ? fieldQaChecklist
+        : undefined,
     };
   };
 
   const previewAndExport = async () => {
-    if (!property?.address) {
-      Alert.alert("Missing property", "Please select a property first.");
+    if (!property?.address?.trim()) {
+      Alert.alert(
+        "Missing property",
+        "Pick a property on the map (or search) so the report has an address.",
+      );
       return;
     }
     if (!damageTypes.length) {
@@ -799,12 +819,39 @@ export default function CreateDamageRoofReportScreen({
 
     const report = buildReportPayloadRef.current();
     if (!report) {
-      Alert.alert("Report incomplete", "Could not build the report payload.");
+      Alert.alert(
+        "Report incomplete",
+        "Could not build the report. Check: property address, at least one damage type, and inspection date.",
+      );
       return;
     }
 
-    await upsertRoofReport(report);
-    navigation.navigate("ReportPreview", { report });
+    try {
+      await upsertRoofReport(report);
+      // `push` ensures a new Preview screen with this report. `navigate` can reuse an
+      // existing ReportPreview in the stack and leave stale params after re-saving.
+      navigation.push("ReportPreview", { report });
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "string"
+            ? e
+            : "Unknown error";
+      const name = (e as { name?: string })?.name;
+      const code = (e as { code?: number })?.code;
+      const isQuota =
+        name === "QuotaExceededError" ||
+        code === 22 ||
+        /quota|exceeded|storage|full/i.test(msg);
+      Alert.alert(
+        "Could not save report",
+        isQuota
+          ? "Browser storage is full or blocked. Free space, allow site storage, or remove old reports."
+          : msg,
+      );
+      console.error("upsertRoofReport failed:", e);
+    }
   };
 
   useEffect(() => {
@@ -834,11 +881,24 @@ export default function CreateDamageRoofReportScreen({
     const t = setTimeout(() => {
       if (autoReportNavigatedRef.current) return;
       const report = buildReportPayloadRef.current();
-      if (!report) return;
-      autoReportNavigatedRef.current = true;
-      void upsertRoofReport(report).then(() => {
-        navigation.navigate("ReportPreview", { report });
-      });
+      if (!report) {
+        console.warn(
+          "Auto-build: skipped — report payload empty (address / damage / date).",
+        );
+        return;
+      }
+      void upsertRoofReport(report)
+        .then(() => {
+          autoReportNavigatedRef.current = true;
+          navigation.push("ReportPreview", { report });
+        })
+        .catch((e) => {
+          console.error("Auto-build save failed:", e);
+          Alert.alert(
+            "Could not save report",
+            "Auto-preview was skipped because the report could not be saved. Use “Preview / Export Report” after fixing storage or try again.",
+          );
+        });
     }, delayMs);
 
     return () => clearTimeout(t);
@@ -1072,7 +1132,7 @@ export default function CreateDamageRoofReportScreen({
     // Auto-fill demo building code checks based on location (best-effort).
     autoFillBuildingCode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property.lat, property.lng, reportMode]);
+  }, [property.lat, property.lng]);
 
   const handleRoofTraceChange = (metrics: RoofTraceMetrics | null) => {
     if (!metrics) {
@@ -1873,13 +1933,174 @@ export default function CreateDamageRoofReportScreen({
     <ScreenKeyboardAwareScrollView style={styles.screen}>
       <View style={styles.container}>
         <ThemedText type="h2" style={styles.title}>
-          Damage Roof Report
+          Roof damage report
         </ThemedText>
         <ThemedText type="small" style={styles.subtitle}>
-          {reportMode === "estimate"
-            ? "Damage estimate template: select damage and generate an estimate with photos."
-            : "Select the damage details for the property you clicked on."}
+          Add measurements, damage, and (optional) calculate estimate — then tap
+          Finish & export for preview and HTML/JSON download.
         </ThemedText>
+
+        <Card style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.iconBadge}>
+              <Feather name="zap" size={18} color="#fff" />
+            </View>
+            <ThemedText type="h4" style={{ flex: 1 }}>
+              Finish report
+            </ThemedText>
+          </View>
+          <ThemedText type="caption" style={styles.helperText}>
+            Saves this report and opens preview — export HTML or JSON there. IRC/IBC
+            references appear on preview and export.
+          </ThemedText>
+          <Button onPress={() => void previewAndExport()} style={styles.autoButton}>
+            Finish & export report
+          </Button>
+
+          <Pressable
+            onPress={() => setShowAdvancedReportTools((v) => !v)}
+            style={({ pressed }) => [
+              styles.advancedToggle,
+              { opacity: pressed ? 0.75 : 1 },
+            ]}
+          >
+            <ThemedText type="small" style={styles.advancedToggleText}>
+              {showAdvancedReportTools
+                ? "Hide extra tools"
+                : "More tools (maps, aerial, CSV, GIS, AI pipeline)"}
+            </ThemedText>
+            <Feather
+              name={showAdvancedReportTools ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={theme.textSecondary}
+            />
+          </Pressable>
+
+          {showAdvancedReportTools ? (
+            <View style={{ marginTop: 10, gap: 8 }}>
+              <Button
+                variant="secondary"
+                onPress={() =>
+                  navigation.navigate("GISBuildingMap", {
+                    address: property.address,
+                    latitude: property.lat,
+                    longitude: property.lng,
+                  })
+                }
+                style={styles.autoButton}
+              >
+                OSM building footprint
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() =>
+                  navigation.navigate("ComprehensiveRoof3DAssessment", {
+                    address: property.address,
+                    latitude: property.lat,
+                    longitude: property.lng,
+                  })
+                }
+                style={styles.autoButton}
+              >
+                Full roof assessment (demo)
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => void openPrecisionMeasurement()}
+                disabled={precisionNavLoading}
+                style={styles.autoButton}
+              >
+                {precisionNavLoading ? "Opening…" : "Precision measurement"}
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => navigation.navigate("BulkCsvDamageReports")}
+                style={styles.autoButton}
+              >
+                Bulk CSV import → reports
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() =>
+                  navigation.navigate("StLouisDataSources", {
+                    latitude: property.lat,
+                    longitude: property.lng,
+                  })
+                }
+                style={styles.autoButton}
+              >
+                St. Louis GIS & storm sources
+              </Button>
+              {Platform.OS === "web" ? (
+                <Button
+                  variant="secondary"
+                  onPress={handleImportCompanyCamPdf}
+                  disabled={companyCamImporting}
+                  style={styles.autoButton}
+                >
+                  {companyCamImporting
+                    ? "Importing PDF…"
+                    : "Import CompanyCam PDF"}
+                </Button>
+              ) : null}
+              {companyCamImportProgress ? (
+                <ThemedText
+                  type="caption"
+                  style={[styles.helperText, { marginTop: 4 }]}
+                >
+                  {companyCamImportProgress}
+                </ThemedText>
+              ) : null}
+              {measurements.precisionMeasurementSnapshot ? (
+                <ThemedText
+                  type="caption"
+                  style={[styles.helperText, { marginTop: 4 }]}
+                >
+                  Last precision:{" "}
+                  {measurements.precisionMeasurementSnapshot.success
+                    ? "OK"
+                    : "Incomplete"}{" "}
+                  · {measurements.precisionMeasurementSnapshot.provider}
+                </ThemedText>
+              ) : null}
+            </View>
+          ) : null}
+        </Card>
+
+        <Card style={styles.sectionCard}>
+          <Pressable
+            onPress={() => setShowAiPipeline((v) => !v)}
+            style={({ pressed }) => [
+              styles.aiPipelineHeader,
+              { opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <View style={styles.sectionHeader}>
+              <View style={styles.iconBadge}>
+                <Feather name="cpu" size={18} color="#fff" />
+              </View>
+              <ThemedText type="h4" style={{ flex: 1 }}>
+                AI report pipeline
+              </ThemedText>
+              <Feather
+                name={showAiPipeline ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </View>
+            <ThemedText type="caption" style={styles.helperText}>
+              Data source → run analyzer / builder draft (same as the old AI
+              agents screen). Optional; does not replace your damage report fields.
+            </ThemedText>
+          </Pressable>
+          {showAiPipeline ? (
+            <View style={{ marginTop: 12, gap: Spacing.md }}>
+              <DataSourceConfig />
+              <ReportGenerator />
+              <ReportViewer />
+            </View>
+          ) : null}
+        </Card>
 
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
@@ -1936,48 +2157,6 @@ export default function CreateDamageRoofReportScreen({
               );
             })}
           </View>
-        </Card>
-
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.iconBadge}>
-              <Feather name="layers" size={18} color="#fff" />
-            </View>
-            <ThemedText type="h4" style={{ flex: 1 }}>
-              Roof analysis tools
-            </ThemedText>
-          </View>
-          <ThemedText type="caption" style={styles.propCoords}>
-            Same coordinates as this report — open footprint or full assessment.
-          </ThemedText>
-          <View style={{ height: 10 }} />
-          <Button
-            variant="secondary"
-            onPress={() =>
-              navigation.navigate("GISBuildingMap", {
-                address: property.address,
-                latitude: property.lat,
-                longitude: property.lng,
-              })
-            }
-            style={styles.autoButton}
-          >
-            OSM building footprint
-          </Button>
-          <View style={{ height: 8 }} />
-          <Button
-            variant="secondary"
-            onPress={() =>
-              navigation.navigate("ComprehensiveRoof3DAssessment", {
-                address: property.address,
-                latitude: property.lat,
-                longitude: property.lng,
-              })
-            }
-            style={styles.autoButton}
-          >
-            Full roof assessment
-          </Button>
         </Card>
 
         <Card style={styles.sectionCard}>
@@ -2184,6 +2363,32 @@ export default function CreateDamageRoofReportScreen({
           ) : null}
 
           <View style={{ height: 12 }} />
+          <View style={styles.toggleRow}>
+            <ThemedText type="caption" style={styles.toggleLabel}>
+              Confirmed roof type + material match field
+            </ThemedText>
+            <Switch
+              value={materialSystemFieldVerified}
+              onValueChange={setMaterialSystemFieldVerified}
+              trackColor={{ false: "#94a3b8", true: AppColors.primary }}
+            />
+          </View>
+          {liveMaterialAnalysis?.agreement === "conflict" ? (
+            <ThemedText
+              type="caption"
+              style={{
+                color: "#f59e0b",
+                fontWeight: "700",
+                marginTop: 8,
+                lineHeight: 18,
+              }}
+            >
+              Roof type text and material selector disagree — verify on site before
+              ordering.
+            </ThemedText>
+          ) : null}
+
+          <View style={{ height: 12 }} />
 
           <View style={styles.inputRow}>
             <ThemedText type="small" style={styles.inputLabel}>
@@ -2238,41 +2443,6 @@ export default function CreateDamageRoofReportScreen({
               placeholderTextColor={theme.textSecondary}
             />
           </View>
-        </Card>
-
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.iconBadge}>
-              <Feather name="file-text" size={18} color="#fff" />
-            </View>
-            <ThemedText type="h4" style={{ flex: 1 }}>
-              CompanyCam PDF Import
-            </ThemedText>
-          </View>
-
-          <ThemedText type="caption" style={styles.helperText}>
-            Upload your CompanyCam PDF; we’ll OCR it (web only) and fill what we
-            can.
-          </ThemedText>
-
-          <View style={{ height: 12 }} />
-
-          <Button
-            onPress={handleImportCompanyCamPdf}
-            disabled={companyCamImporting}
-            style={styles.autoButton}
-          >
-            {companyCamImporting ? "Importing..." : "Upload CompanyCam PDF"}
-          </Button>
-
-          {companyCamImportProgress ? (
-            <>
-              <View style={{ height: 10 }} />
-              <ThemedText type="caption" style={styles.helperText}>
-                {companyCamImportProgress}
-              </ThemedText>
-            </>
-          ) : null}
         </Card>
 
         <Card style={styles.sectionCard}>
@@ -2336,6 +2506,129 @@ export default function CreateDamageRoofReportScreen({
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={styles.iconBadge}>
+              <Feather name="cloud" size={18} color="#fff" />
+            </View>
+            <ThemedText type="h4" style={{ flex: 1 }}>
+              Airport weather (METAR)
+            </ThemedText>
+          </View>
+          <ThemedText type="caption" style={styles.helperText}>
+            Nearest US reference station to the pin — airport observation, not rooftop
+            wind. On web, data loads from NOAA weather.gov (CORS-friendly); native
+            may use Aviation Weather Center first. Used for storm context and damage-risk scoring.
+          </ThemedText>
+          {metarLoading ? (
+            <View style={{ marginTop: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator color={AppColors.primary} />
+              <ThemedText type="caption">Loading METAR…</ThemedText>
+            </View>
+          ) : null}
+          {metarError ? (
+            <ThemedText type="caption" style={styles.metarErrorText}>
+              {metarError}
+            </ThemedText>
+          ) : null}
+          {metarWeather ? (
+            <View style={[styles.metarSnapshotBox, { borderColor: theme.border }]}>
+              <ThemedText type="small" style={{ fontWeight: "700" }}>
+                {metarWeather.stationIcao}
+                {metarWeather.distanceMilesApprox != null
+                  ? ` · ~${metarWeather.distanceMilesApprox} mi from pin`
+                  : ""}
+              </ThemedText>
+              {metarWeather.summaryLines.slice(0, 8).map((line, i) => (
+                <ThemedText key={i} type="caption" style={styles.metarLine}>
+                  {line}
+                </ThemedText>
+              ))}
+            </View>
+          ) : !metarLoading ? (
+            <ThemedText type="caption" style={[styles.helperText, { marginTop: 8 }]}>
+              No snapshot loaded.
+            </ThemedText>
+          ) : null}
+          <View style={{ height: 10 }} />
+          <Button
+            variant="secondary"
+            onPress={() => {
+              if (!Number.isFinite(property.lat) || !Number.isFinite(property.lng)) return;
+              setMetarLoading(true);
+              setMetarError(null);
+              void fetchMetarSnapshotForLatLng(property.lat, property.lng)
+                .then((snap) => {
+                  setMetarWeather(snap);
+                  setMetarLoading(false);
+                  if (!snap) {
+                    setMetarError(
+                      "No METAR for nearest station (network or coverage).",
+                    );
+                  }
+                })
+                .catch((e) => {
+                  setMetarWeather(null);
+                  setMetarLoading(false);
+                  setMetarError(
+                    e instanceof Error ? e.message : "METAR fetch failed.",
+                  );
+                });
+            }}
+            style={styles.autoButton}
+          >
+            Refresh METAR
+          </Button>
+        </Card>
+
+        <Card style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.iconBadge}>
+              <Feather name="check-square" size={18} color="#fff" />
+            </View>
+            <ThemedText type="h4" style={{ flex: 1 }}>
+              Field QA checklist
+            </ThemedText>
+          </View>
+          <ThemedText type="caption" style={styles.helperText}>
+            Optional — tap items you completed on site. Shown on preview & HTML export (
+            {fieldQaCompletionCount(fieldQaChecklist)}/{FIELD_QA_ITEMS.length}).
+          </ThemedText>
+          <View style={{ marginTop: 10, gap: 8 }}>
+            {FIELD_QA_ITEMS.map((it) => {
+              const on = fieldQaChecklist[it.id] === true;
+              return (
+                <Pressable
+                  key={it.id}
+                  onPress={() =>
+                    setFieldQaChecklist((prev) => ({
+                      ...prev,
+                      [it.id]: !prev[it.id],
+                    }))
+                  }
+                  style={({ pressed }) => [
+                    styles.fieldQaRow,
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.backgroundSecondary,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={on ? "check-circle" : "circle"}
+                    size={20}
+                    color={on ? "#22c55e" : theme.textSecondary}
+                  />
+                  <ThemedText type="caption" style={{ flex: 1, marginLeft: 10, lineHeight: 18 }}>
+                    {it.label}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+
+        <Card style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.iconBadge}>
               <Feather name="dollar-sign" size={18} color="#fff" />
             </View>
             <ThemedText type="h4" style={{ flex: 1 }}>
@@ -2344,38 +2637,35 @@ export default function CreateDamageRoofReportScreen({
           </View>
 
           <ThemedText type="caption" style={styles.helperText}>
-            {reportMode === "estimate"
-              ? "Enter roof area and damage details — the dollar range updates as you change inputs. Repair vs replace follows your Recommended Action when set to Repair or Replace; otherwise it uses damage severity and types."
-              : "Uses manual entry, traced footprint, or lead roof area. Same repair/replace rules as above. Export includes this estimate when present."}
+            Enter roof area (or use traced/lead area above). The dollar range
+            updates as you change inputs. Repair vs replace follows Recommended
+            Action when set; otherwise severity and damage types. Export includes
+            this estimate when present.
           </ThemedText>
 
-          {reportMode === "estimate" ? (
-            <>
-              <View style={{ height: 10 }} />
-              <View style={styles.inputRow}>
-                <ThemedText type="small" style={styles.inputLabel}>
-                  Roof Area (sq ft)
-                </ThemedText>
-                <TextInput
-                  value={roofAreaSqFtManual}
-                  onChangeText={(t) =>
-                    setRoofAreaSqFtManual(t.replace(/[^0-9]/g, ""))
-                  }
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    {
-                      color: theme.text,
-                      borderColor: theme.border,
-                      backgroundColor: theme.backgroundSecondary,
-                    },
-                  ]}
-                  placeholder="e.g., 1500"
-                  placeholderTextColor={theme.textSecondary}
-                />
-              </View>
-            </>
-          ) : null}
+          <View style={{ height: 10 }} />
+          <View style={styles.inputRow}>
+            <ThemedText type="small" style={styles.inputLabel}>
+              Roof Area (sq ft) — quick entry
+            </ThemedText>
+            <TextInput
+              value={roofAreaSqFtManual}
+              onChangeText={(t) =>
+                setRoofAreaSqFtManual(t.replace(/[^0-9]/g, ""))
+              }
+              keyboardType="numeric"
+              style={[
+                styles.textInput,
+                {
+                  color: theme.text,
+                  borderColor: theme.border,
+                  backgroundColor: theme.backgroundSecondary,
+                },
+              ]}
+              placeholder="e.g., 1500 (optional if traced above)"
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
 
           <View style={{ height: 12 }} />
           <Button onPress={handleCalculateEstimate} style={styles.autoButton}>
@@ -2451,10 +2741,8 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.helperText}>
-            Included in HTML/PDF export. Dollar amounts come only from the
-            calculator above (not AI). Optional AI text invites the homeowner
-            to call — set EXPO_PUBLIC_INSPECTION_PHONE / EXPO_PUBLIC_INSPECTION_EMAIL
-            in env.
+            Shown on preview & export. Set EXPO_PUBLIC_INSPECTION_PHONE / EMAIL in
+            env for contact lines.
           </ThemedText>
           {inspectionAiLoading ? (
             <View style={{ marginTop: 10, flexDirection: "row", alignItems: "center" }}>
@@ -2501,226 +2789,6 @@ export default function CreateDamageRoofReportScreen({
           >
             {scheduleInspectionPreview.disclaimer}
           </ThemedText>
-        </Card>
-
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.iconBadge}>
-              <Feather name="crosshair" size={18} color="#fff" />
-            </View>
-            <ThemedText type="h4" style={{ flex: 1 }}>
-              Precision measurement (Nearmap / EagleView)
-            </ThemedText>
-          </View>
-
-          <ThemedText type="caption" style={styles.helperText}>
-            Run the same orchestration used on the Reports home: Nearmap
-            coverage tile + optional EagleView order via your measurement proxy
-            (or client fallback in dev). Results merge into this report’s
-            measurements and notes when you tap Apply on the precision screen.
-          </ThemedText>
-
-          {measurements.precisionMeasurementSnapshot ? (
-            <>
-              <View style={{ height: 10 }} />
-              <ThemedText type="small" style={styles.kvLabel}>
-                Last integrated run
-              </ThemedText>
-              <ThemedText type="caption" style={styles.helperText}>
-                {measurements.precisionMeasurementSnapshot.success
-                  ? "Success"
-                  : "Incomplete"}{" "}
-                · {measurements.precisionMeasurementSnapshot.provider} ·{" "}
-                {(
-                  measurements.precisionMeasurementSnapshot.confidence * 100
-                ).toFixed(0)}
-                % ·{" "}
-                {new Date(
-                  measurements.precisionMeasurementSnapshot.capturedAtIso,
-                ).toLocaleString()}
-              </ThemedText>
-            </>
-          ) : null}
-
-          <View style={{ height: 12 }} />
-
-          <Button
-            onPress={() => void openPrecisionMeasurement()}
-            disabled={precisionNavLoading}
-            style={styles.autoButton}
-          >
-            {precisionNavLoading ? "Opening…" : "Open precision measurement"}
-          </Button>
-
-          <View style={{ height: 8 }} />
-          <ThemedText type="caption" style={styles.mutedCaption}>
-            Provider label when saved: {PRECISION_PROVIDER_LABEL}
-          </ThemedText>
-        </Card>
-
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.iconBadge}>
-              <Feather name="navigation" size={18} color="#fff" />
-            </View>
-            <ThemedText type="h4" style={{ flex: 1 }}>
-              Aerial roof measurements (EaveMeasure)
-            </ThemedText>
-          </View>
-
-          <ThemedText type="caption" style={styles.helperText}>
-            The{" "}
-            <ThemedText
-              type="link"
-              onPress={() =>
-                void Linking.openURL(EAVEMEASURE_GITHUB_README_URL)
-              }
-            >
-              eavemeasure-aerial-roof-measurement
-            </ThemedText>{" "}
-            GitHub repo is informational (links to services). There is no API
-            there — order reports on EaveMeasure’s site, then record the
-            reference and roof area here so estimates and exports include them.
-          </ThemedText>
-
-          <View style={{ height: 12 }} />
-
-          <Button
-            onPress={() => void openEaveMeasureAerialServices()}
-            style={styles.autoButton}
-          >
-            Open EaveMeasure aerial services
-          </Button>
-
-          <View style={{ height: 8 }} />
-          <ThemedText type="caption" style={styles.mutedCaption}>
-            {EAVEMEASURE_AERIAL_SERVICES_URL}
-          </ThemedText>
-
-          <View style={{ height: 14 }} />
-
-          <View style={styles.inputRow}>
-            <ThemedText type="small" style={styles.inputLabel}>
-              Report / job reference (optional)
-            </ThemedText>
-            <TextInput
-              value={measurements.aerialMeasurementReference ?? ""}
-              onChangeText={(t) =>
-                setMeasurements((prev) =>
-                  mergeEaveMeasureFields(
-                    prev,
-                    t,
-                    prev.aerialMeasurementReportUrl ?? "",
-                  ),
-                )
-              }
-              style={[
-                styles.textInput,
-                {
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.backgroundSecondary,
-                },
-              ]}
-              placeholder="e.g., order # or report ID"
-              placeholderTextColor={theme.textSecondary}
-            />
-          </View>
-
-          <View style={{ height: 12 }} />
-
-          <View style={styles.inputRow}>
-            <ThemedText type="small" style={styles.inputLabel}>
-              Report link (optional)
-            </ThemedText>
-            <TextInput
-              value={measurements.aerialMeasurementReportUrl ?? ""}
-              onChangeText={(t) =>
-                setMeasurements((prev) =>
-                  mergeEaveMeasureFields(
-                    prev,
-                    prev.aerialMeasurementReference ?? "",
-                    t,
-                  ),
-                )
-              }
-              style={[
-                styles.textInput,
-                {
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.backgroundSecondary,
-                },
-              ]}
-              placeholder="https://…"
-              placeholderTextColor={theme.textSecondary}
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={{ height: 12 }} />
-
-          <View style={styles.inputRow}>
-            <ThemedText type="small" style={styles.inputLabel}>
-              Roof area from aerial report (sq ft)
-            </ThemedText>
-            <TextInput
-              value={eaveMeasureSqFtDraft}
-              onChangeText={(t) =>
-                setEaveMeasureSqFtDraft(t.replace(/[^0-9]/g, ""))
-              }
-              keyboardType="numeric"
-              style={[
-                styles.textInput,
-                {
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.backgroundSecondary,
-                },
-              ]}
-              placeholder="e.g., 2450"
-              placeholderTextColor={theme.textSecondary}
-            />
-          </View>
-
-          <View style={{ height: 12 }} />
-
-          <Button
-            onPress={() => {
-              const raw = eaveMeasureSqFtDraft.trim();
-              const n = raw ? Number(raw) : NaN;
-              if (!Number.isFinite(n) || n <= 0) {
-                Alert.alert(
-                  "Roof area",
-                  "Enter the living / roof area from your EaveMeasure report (square feet), then apply.",
-                );
-                return;
-              }
-              const rounded = Math.round(n);
-              setMeasurements((prev) => {
-                const base = mergeEaveMeasureFields(
-                  prev,
-                  prev.aerialMeasurementReference ?? "",
-                  prev.aerialMeasurementReportUrl ?? "",
-                );
-                return {
-                  ...base,
-                  roofAreaSqFt: rounded,
-                  aerialMeasurementProvider:
-                    base.aerialMeasurementProvider ||
-                    EAVEMEASURE_PROVIDER_LABEL,
-                };
-              });
-              setRoofAreaSqFtManual(String(rounded));
-              Alert.alert(
-                "Applied",
-                `Roof area set to ${rounded.toLocaleString()} sq ft for this report and estimate calculations.`,
-              );
-            }}
-            style={styles.autoButton}
-          >
-            Apply aerial sq ft to report & estimate
-          </Button>
         </Card>
 
         <Card style={styles.sectionCard}>
@@ -2980,8 +3048,7 @@ export default function CreateDamageRoofReportScreen({
           <View style={{ height: 12 }} />
           <View style={styles.toggleRow}>
             <ThemedText type="caption" style={styles.toggleLabel}>
-              Auto-open preview (
-              {reportMode === "estimate" ? "estimate" : "damage report"})
+              Auto-open preview
             </ThemedText>
             <Switch
               value={autoBuildEnabled}
@@ -3151,244 +3218,13 @@ export default function CreateDamageRoofReportScreen({
                 ) : null}
               </View>
             ) : null}
+            {measurementValidationSummary ? (
+              <View style={{ marginTop: 14 }}>
+                <MeasurementAccuracyPanel summary={measurementValidationSummary} />
+              </View>
+            ) : null}
           </View>
         </Card>
-
-        {showIbcKb ? (
-          <Card style={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.iconBadge}>
-                <Feather name="layers" size={18} color="#fff" />
-              </View>
-              <ThemedText type="h4" style={{ flex: 1 }}>
-                {IBC_CHAPTER_15_KB_TITLE}
-              </ThemedText>
-            </View>
-            <ThemedText type="caption" style={styles.helperText}>
-              {IBC_CHAPTER_15_KB_DISCLAIMER}
-            </ThemedText>
-            <ThemedText
-              type="caption"
-              style={[styles.helperText, { marginTop: 6, opacity: 0.85 }]}
-            >
-              {IBC_CHAPTER_15_TYPICAL_EDITION_NOTE}
-            </ThemedText>
-            {IBC_CHAPTER_15_SECTION_GROUPS.map((grp) => (
-              <View key={grp.id} style={{ marginTop: 12 }}>
-                <ThemedText
-                  type="caption"
-                  style={{ fontWeight: "700", opacity: 0.95 }}
-                >
-                  {grp.heading}
-                </ThemedText>
-                {grp.items.map((it) => (
-                  <ThemedText
-                    key={`${grp.id}-${it.ref}`}
-                    type="caption"
-                    style={[
-                      styles.helperText,
-                      { marginBottom: 0, marginTop: 6 },
-                    ]}
-                  >
-                    • {it.ref}: {it.summary}
-                  </ThemedText>
-                ))}
-              </View>
-            ))}
-          </Card>
-        ) : null}
-
-        {showIrcKb ? (
-          <>
-            <Card style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.iconBadge}>
-                  <Feather name="home" size={18} color="#fff" />
-                </View>
-                <ThemedText type="h4" style={{ flex: 1 }}>
-                  {IRC_CHAPTER_8_KB_TITLE}
-                </ThemedText>
-              </View>
-              <ThemedText type="caption" style={styles.helperText}>
-                {IRC_CHAPTER_8_KB_DISCLAIMER}
-              </ThemedText>
-              <ThemedText
-                type="caption"
-                style={[styles.helperText, { marginTop: 6, opacity: 0.85 }]}
-              >
-                {IRC_CHAPTER_8_TYPICAL_EDITION_NOTE}
-              </ThemedText>
-              <ThemedText
-                type="caption"
-                style={[styles.helperText, { marginTop: 10, lineHeight: 18 }]}
-              >
-                {IRC_CHAPTER_8_ABOUT}
-              </ThemedText>
-              {IRC_CHAPTER_8_SECTION_GROUPS.map((grp) => (
-                <View key={grp.id} style={{ marginTop: 12 }}>
-                  <ThemedText
-                    type="caption"
-                    style={{ fontWeight: "700", opacity: 0.95 }}
-                  >
-                    {grp.heading}
-                  </ThemedText>
-                  {grp.items.map((it) => (
-                    <ThemedText
-                      key={`${grp.id}-${it.ref}`}
-                      type="caption"
-                      style={[
-                        styles.helperText,
-                        { marginBottom: 0, marginTop: 6 },
-                      ]}
-                    >
-                      • {it.ref}: {it.summary}
-                    </ThemedText>
-                  ))}
-                </View>
-              ))}
-            </Card>
-
-            <Card style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.iconBadge}>
-                  <Feather name="umbrella" size={18} color="#fff" />
-                </View>
-                <ThemedText type="h4" style={{ flex: 1 }}>
-                  {IRC_CHAPTER_9_KB_TITLE}
-                </ThemedText>
-              </View>
-              <ThemedText type="caption" style={styles.helperText}>
-                {IRC_CHAPTER_9_KB_DISCLAIMER}
-              </ThemedText>
-              <ThemedText
-                type="caption"
-                style={[styles.helperText, { marginTop: 6, opacity: 0.85 }]}
-              >
-                {IRC_CHAPTER_9_TYPICAL_EDITION_NOTE}
-              </ThemedText>
-              <ThemedText
-                type="caption"
-                style={[styles.helperText, { marginTop: 10, lineHeight: 18 }]}
-              >
-                {IRC_CHAPTER_9_ABOUT}
-              </ThemedText>
-              {IRC_CHAPTER_9_SECTION_GROUPS.map((grp) => (
-                <View key={grp.id} style={{ marginTop: 12 }}>
-                  <ThemedText
-                    type="caption"
-                    style={{ fontWeight: "700", opacity: 0.95 }}
-                  >
-                    {grp.heading}
-                  </ThemedText>
-                  {grp.items.map((it) => (
-                    <ThemedText
-                      key={`${grp.id}-${it.ref}`}
-                      type="caption"
-                      style={[
-                        styles.helperText,
-                        { marginBottom: 0, marginTop: 6 },
-                      ]}
-                    >
-                      • {it.ref}: {it.summary}
-                    </ThemedText>
-                  ))}
-                </View>
-              ))}
-            </Card>
-
-            <Card style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.iconBadge}>
-                  <Feather name="shield" size={18} color="#fff" />
-                </View>
-                <ThemedText type="h4" style={{ flex: 1 }}>
-                  {MO_IRC_INSURANCE_KB_TITLE}
-                </ThemedText>
-              </View>
-              <ThemedText type="caption" style={styles.helperText}>
-                {MO_IRC_INSURANCE_KB_DISCLAIMER}
-              </ThemedText>
-              <ThemedText
-                type="caption"
-                style={[styles.helperText, { marginTop: 6, opacity: 0.85 }]}
-              >
-                {MO_IRC_INSURANCE_TYPICAL_EDITION_NOTE}
-              </ThemedText>
-              <ThemedText
-                type="caption"
-                style={[styles.helperText, { marginTop: 10, lineHeight: 18 }]}
-              >
-                {MO_IRC_INSURANCE_ABOUT}
-              </ThemedText>
-              {MO_IRC_INSURANCE_SECTION_GROUPS.map((grp) => (
-                <View key={grp.id} style={{ marginTop: 12 }}>
-                  <ThemedText
-                    type="caption"
-                    style={{ fontWeight: "700", opacity: 0.95 }}
-                  >
-                    {grp.heading}
-                  </ThemedText>
-                  {grp.items.map((it) => (
-                    <ThemedText
-                      key={`${grp.id}-${it.ref}`}
-                      type="caption"
-                      style={[
-                        styles.helperText,
-                        { marginBottom: 0, marginTop: 6 },
-                      ]}
-                    >
-                      • {it.ref}: {it.summary}
-                    </ThemedText>
-                  ))}
-                </View>
-              ))}
-            </Card>
-          </>
-        ) : null}
-
-        {showCommercialRoofTaxCard ? (
-          <Card style={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.iconBadge}>
-                <Feather name="dollar-sign" size={18} color="#fff" />
-              </View>
-              <ThemedText type="h4" style={{ flex: 1 }}>
-                {COMMERCIAL_ROOF_TAX_KB_TITLE}
-              </ThemedText>
-            </View>
-            <ThemedText type="caption" style={styles.helperText}>
-              {COMMERCIAL_ROOF_TAX_KB_DISCLAIMER}
-            </ThemedText>
-            <ThemedText
-              type="caption"
-              style={[styles.helperText, { marginTop: 6, opacity: 0.85 }]}
-            >
-              {COMMERCIAL_ROOF_TAX_KB_EDITION_NOTE}
-            </ThemedText>
-            {COMMERCIAL_ROOF_TAX_SECTION_GROUPS.map((grp) => (
-              <View key={grp.id} style={{ marginTop: 12 }}>
-                <ThemedText
-                  type="caption"
-                  style={{ fontWeight: "700", opacity: 0.95 }}
-                >
-                  {grp.heading}
-                </ThemedText>
-                {grp.items.map((it) => (
-                  <ThemedText
-                    key={`${grp.id}-${it.ref}`}
-                    type="caption"
-                    style={[
-                      styles.helperText,
-                      { marginBottom: 0, marginTop: 6 },
-                    ]}
-                  >
-                    • {it.ref}: {it.summary}
-                  </ThemedText>
-                ))}
-              </View>
-            ))}
-          </Card>
-        ) : null}
 
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
@@ -3482,27 +3318,6 @@ export default function CreateDamageRoofReportScreen({
                   ))}
                 </View>
               </ScrollView>
-              <View style={{ height: 12 }} />
-              <View style={styles.aiPitchRow}>
-                <Button
-                  onPress={handleAiDamageAutoFill}
-                  disabled={damageAiLoading}
-                  variant="secondary"
-                  style={styles.autoButton}
-                >
-                  {damageAiLoading ? "Analyzing…" : "Run AI damage draft"}
-                </Button>
-                {damageAiLoading ? (
-                  <ActivityIndicator
-                    color={AppColors.primary}
-                    style={{ marginLeft: 8 }}
-                  />
-                ) : null}
-              </View>
-              <ThemedText type="caption" style={[styles.helperText, { marginTop: 6 }]}>
-                Fills damage fields and notes using the first photo above (same as
-                the button under Damage Types).
-              </ThemedText>
             </>
           ) : null}
         </Card>
@@ -3595,12 +3410,6 @@ export default function CreateDamageRoofReportScreen({
           />
         </Card>
 
-        <View style={{ height: 12 }} />
-
-        <Button onPress={previewAndExport} style={styles.previewButton}>
-          Preview / Export Report
-        </Button>
-
         <View style={{ height: 22 }} />
       </View>
     </ScreenKeyboardAwareScrollView>
@@ -3649,6 +3458,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   metarLine: { lineHeight: 18, marginBottom: 4, opacity: 0.95 },
+  fieldQaRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
   autofillStatus: { color: "#16a34a", fontWeight: "600" },
 
   inputRow: { gap: 8 },
@@ -3731,8 +3547,6 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
 
-  previewButton: { marginTop: 2 },
-
   kvRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3806,4 +3620,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1,
   },
+
+  advancedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 6,
+  },
+  advancedToggleText: { flex: 1, fontWeight: "600", opacity: 0.88 },
+  aiPipelineHeader: { marginBottom: 0 },
 });

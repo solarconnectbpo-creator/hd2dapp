@@ -35,12 +35,55 @@ import {
   inferRoofTypeIfMissing,
 } from "@/src/roofReports/propertyLeadMatching";
 import { inferPropertyUseType } from "@/src/roofReports/propertyUseClassification";
+import { persistBulkDamageReportsFromLeads } from "@/src/roofReports/bulkPersistDamageReportsFromLeads";
+import { MISSOURI_BBOX } from "@/constants/stlDataSources";
+import {
+  fetchStlIntelAtPoint,
+  type StlIntelBundle,
+} from "@/services/stlIntelClient";
 
 type Props = NativeStackScreenProps<ReportsStackParamList, "PropertyMapPicker">;
+
+function isInMissouriBbox(lat: number, lng: number): boolean {
+  return (
+    lat >= MISSOURI_BBOX.south &&
+    lat <= MISSOURI_BBOX.north &&
+    lng >= MISSOURI_BBOX.west &&
+    lng <= MISSOURI_BBOX.east
+  );
+}
+
+function summarizeStlIntel(b: StlIntelBundle): string[] {
+  const lines: string[] = [];
+  lines.push(
+    b.parcel
+      ? "City assessor parcel: match"
+      : "City assessor parcel: none at this point",
+  );
+  lines.push(`Building permits (≈75 m): ${b.buildingPermits.length}`);
+  lines.push(`Trades permits (≈75 m): ${b.tradesPermits.length}`);
+  if (b.lraParcel) lines.push("LRA (in path): parcel flagged");
+  if (b.taxSaleParcel) lines.push("Tax sale layer: parcel flagged");
+  if (b.demolitionParcel) lines.push("Demolition layer: parcel flagged");
+  return lines;
+}
 
 export default function PropertyMapPickerScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const { user, isLoading } = useAuth();
+
+  const bulkCreatedBy = useMemo(
+    () =>
+      user
+        ? {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            userType: user.userType as "sales_rep" | "company" | "admin",
+          }
+        : undefined,
+    [user],
+  );
   const [selected, setSelected] = useState<PropertySelection | null>(null);
   const selectedRef = useRef<PropertySelection | null>(null);
   const [importedLeads, setImportedLeads] = useState<PropertySelection[]>([]);
@@ -54,7 +97,13 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
     { lat: number; lng: number; key: number } | undefined
   >(undefined);
   const [autoBuildReport, setAutoBuildReport] = useState(true);
+  const [bulkReportsBusy, setBulkReportsBusy] = useState(false);
   const [leadApiHint, setLeadApiHint] = useState<string | null>(null);
+  const [stlIntel, setStlIntel] = useState<StlIntelBundle | null>(null);
+  const [stlIntelLoading, setStlIntelLoading] = useState(false);
+  const [stlIntelError, setStlIntelError] = useState<string | null>(null);
+  const [stlIntelOutsideMissouri, setStlIntelOutsideMissouri] =
+    useState(false);
   const tabBarHeight = React.useContext(BottomTabBarHeightContext) ?? 70;
 
   const identifyRoofType = (p: PropertySelection): PropertySelection => {
@@ -98,6 +147,40 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
 
   useEffect(() => {
     selectedRef.current = selected;
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) {
+      setStlIntel(null);
+      setStlIntelLoading(false);
+      setStlIntelError(null);
+      setStlIntelOutsideMissouri(false);
+      return;
+    }
+    if (!isInMissouriBbox(selected.lat, selected.lng)) {
+      setStlIntel(null);
+      setStlIntelLoading(false);
+      setStlIntelError(null);
+      setStlIntelOutsideMissouri(true);
+      return;
+    }
+    setStlIntelOutsideMissouri(false);
+    const ac = new AbortController();
+    setStlIntelLoading(true);
+    setStlIntelError(null);
+    void fetchStlIntelAtPoint(selected.lat, selected.lng, { signal: ac.signal })
+      .then((bundle) => {
+        setStlIntel(bundle);
+      })
+      .catch((e: Error & { name?: string }) => {
+        if (e?.name === "AbortError") return;
+        setStlIntel(null);
+        setStlIntelError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setStlIntelLoading(false);
+      });
+    return () => ac.abort();
   }, [selected]);
 
   useEffect(() => {
@@ -347,9 +430,40 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
           }
         }
 
-        if (warnings.length) {
-          // Keep the UI calm; show only the first warning.
-          Alert.alert("CSV import finished", warnings[0]);
+        // One AI-assisted damage report per contact row (same engine as Bulk CSV screen).
+        setBulkReportsBusy(true);
+        setCsvInfo(`Imported ${leads.length} properties — saving AI reports…`);
+        try {
+          const { reports } = await persistBulkDamageReportsFromLeads(leads, {
+            companyNameFallback: "Cox Roofing",
+            createdBy: bulkCreatedBy,
+          });
+          setCsvInfo(
+            `Imported ${leads.length} properties · ${reports.length} AI reports saved`,
+          );
+          const body =
+            `Created ${reports.length} AI damage reports from this upload. Open Roof Reports to review or export.` +
+            (warnings.length ? `\n\nNote: ${warnings[0]}` : "");
+          Alert.alert("CSV imported", body);
+        } catch (e) {
+          console.error(e);
+          const msg = e instanceof Error ? e.message : String(e);
+          const quota =
+            (typeof DOMException !== "undefined" &&
+              e instanceof DOMException &&
+              e.name === "QuotaExceededError") ||
+            /quota|exceeded|5mb/i.test(msg);
+          Alert.alert(
+            quota ? "Storage full" : "Reports not saved",
+            quota
+              ? `Could not save all reports (browser storage ~5MB limit). Try fewer rows, delete old reports under Roof Reports, or use Bulk CSV → export in batches. ${msg}`
+              : `Leads are on the map, but reports failed to save: ${msg}`,
+          );
+          if (warnings.length) {
+            Alert.alert("CSV note", warnings[0]);
+          }
+        } finally {
+          setBulkReportsBusy(false);
         }
 
         // Helpful: auto-select first imported lead.
@@ -363,20 +477,11 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
     }
   };
 
-  const handleNext = () => {
+  const handleStartReport = () => {
     if (!selected) return;
     navigation.navigate("CreateDamageRoofReport", {
       property: selected,
       mode: "full",
-      autoBuildReport,
-    });
-  };
-
-  const handleEstimateOnly = () => {
-    if (!selected) return;
-    navigation.navigate("CreateDamageRoofReport", {
-      property: selected,
-      mode: "estimate",
       autoBuildReport,
     });
   };
@@ -450,7 +555,8 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
               </ThemedText>
               <ThemedText type="caption" style={styles.topOverlayHint}>
                 CSV headers: lat/lng + optional address, name/homeowner, company,
-                email, phone, roof_sqft, roof_type. Map needs Mapbox token.
+                email, phone, roof_sqft, roof_type. Each row gets an AI damage
+                report saved under Roof Reports. Map needs Mapbox token.
               </ThemedText>
               {Platform.OS === "web" ? (
                 <ThemedText type="caption" style={styles.topOverlayHint}>
@@ -461,8 +567,12 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
 
             <View style={{ width: 16 }} />
 
-            <Button onPress={handleUploadCsv} style={styles.uploadButton}>
-              Upload CSV
+            <Button
+              onPress={handleUploadCsv}
+              disabled={bulkReportsBusy}
+              style={styles.uploadButton}
+            >
+              {bulkReportsBusy ? "Saving reports…" : "Upload CSV"}
             </Button>
           </View>
 
@@ -636,7 +746,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
 
             <View style={styles.toggleRow}>
               <ThemedText type="caption" style={styles.toggleLabel}>
-                Auto-open damage report / estimate after select
+                Auto-open report after select
               </ThemedText>
               <Switch
                 value={autoBuildReport}
@@ -647,18 +757,8 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
 
             <View style={{ height: 10 }} />
 
-            <Button onPress={handleNext} style={styles.nextButton}>
-              Continue to Report
-            </Button>
-
-            <View style={{ height: 10 }} />
-
-            <Button
-              onPress={handleEstimateOnly}
-              variant="secondary"
-              style={[styles.secondaryButton, styles.estimateButton]}
-            >
-              Estimate Only
+            <Button onPress={handleStartReport} style={styles.nextButton}>
+              Start roof report & estimate
             </Button>
 
             <View style={{ height: 14 }} />
@@ -669,6 +769,63 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
             >
               Roof analysis (this property)
             </ThemedText>
+
+            <ThemedText
+              type="caption"
+              style={{ opacity: 0.85, marginBottom: 6, marginTop: 4 }}
+            >
+              St. Louis city GIS (auto)
+            </ThemedText>
+            {stlIntelOutsideMissouri ? (
+              <ThemedText type="caption" style={styles.stlHint}>
+                Selection is outside Missouri — St. Louis city GIS fetch skipped.
+                You can still open the STL tools screen with these coordinates.
+              </ThemedText>
+            ) : null}
+            {stlIntelLoading ? (
+              <View style={styles.stlRow}>
+                <ActivityIndicator color={AppColors.primary} />
+                <ThemedText type="caption" style={styles.stlHint}>
+                  Loading parcel & permits…
+                </ThemedText>
+              </View>
+            ) : null}
+            {stlIntelError ? (
+              <ThemedText type="caption" style={styles.stlErr}>
+                {stlIntelError}
+              </ThemedText>
+            ) : null}
+            {!stlIntelLoading &&
+            !stlIntelError &&
+            stlIntel &&
+            !stlIntelOutsideMissouri ? (
+              <View style={{ marginBottom: 10 }}>
+                {summarizeStlIntel(stlIntel).map((line, idx) => (
+                  <ThemedText
+                    key={`stl-${idx}`}
+                    type="caption"
+                    style={styles.stlHint}
+                  >
+                    {line}
+                  </ThemedText>
+                ))}
+              </View>
+            ) : null}
+
+            <Button
+              variant="secondary"
+              onPress={() =>
+                navigation.navigate("StLouisDataSources", {
+                  latitude: selected.lat,
+                  longitude: selected.lng,
+                })
+              }
+              style={styles.secondaryButton}
+            >
+              Full STL GIS & storm sources
+            </Button>
+
+            <View style={{ height: 8 }} />
 
             <Button
               variant="secondary"
@@ -814,7 +971,14 @@ const styles = StyleSheet.create({
   toggleLabel: { opacity: 0.85 },
   nextButton: { width: "100%" },
   secondaryButton: { width: "100%", borderWidth: 1 },
-  estimateButton: { borderColor: "rgba(255,255,255,0.18)" },
   hintTitle: { textAlign: "center" },
   hintBody: { textAlign: "center", opacity: 0.8, marginTop: 6 },
+  stlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  stlHint: { opacity: 0.82, lineHeight: 18, marginBottom: 2 },
+  stlErr: { color: "#fca5a5", marginBottom: 8, lineHeight: 18 },
 });

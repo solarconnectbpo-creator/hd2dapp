@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Text,
   Pressable,
+  Dimensions,
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -22,6 +23,7 @@ import AdminNavigator from "@/navigation/AdminNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PurchasedLeadsProvider } from "@/contexts/PurchasedLeadsContext";
+import { AIAgentsProvider } from "@/src/contexts/AIAgentsContext";
 import { useTheme } from "@/hooks/useTheme";
 import { AppColors } from "@/constants/theme";
 
@@ -138,8 +140,10 @@ function AppShell() {
   return (
     <AuthProvider>
       <PurchasedLeadsProvider>
-        <AppNavigation />
-        <StatusBar style="auto" />
+        <AIAgentsProvider>
+          <AppNavigation />
+          <StatusBar style="auto" />
+        </AIAgentsProvider>
       </PurchasedLeadsProvider>
     </AuthProvider>
   );
@@ -151,7 +155,7 @@ export default function App() {
       return (
         <ErrorBoundary>
           <SafeAreaProvider>
-            <View style={styles.root}>
+            <View style={[styles.root, styles.fillViewportWeb]}>
               <PrecisionMeasurementBootstrap />
               <StatusBar style="auto" />
             </View>
@@ -177,7 +181,7 @@ export default function App() {
     return (
       <ErrorBoundary>
         <SafeAreaProvider>
-          <View style={styles.root}>
+          <View style={[styles.root, styles.fillViewportWeb]}>
             <AppShell />
           </View>
         </SafeAreaProvider>
@@ -202,6 +206,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
+  /** Web: guarantee min height matches the window so content isn’t collapsed to a blank area. */
+  fillViewportWeb:
+    Platform.OS === "web"
+      ? { minHeight: Dimensions.get("window").height, width: "100%" }
+      : {},
   loadingContainer: {
     flex: 1,
     justifyContent: "center",

@@ -87,63 +87,18 @@ export default function ReportsHomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate("PropertyMapPicker")}
             style={styles.ctaButton}
           >
-            Create New Damage Report
+            Start roof report & estimate
           </Button>
         </View>
 
-        <View style={styles.ctaRow}>
-          <Button
-            variant="secondary"
-            onPress={() => navigation.navigate("BulkCsvDamageReports")}
-            style={styles.ctaButton}
-          >
-            Bulk import contacts (CSV) → reports
-          </Button>
-        </View>
-
-        <View style={styles.ctaRow}>
-          <Button
-            variant="secondary"
-            onPress={() => navigation.navigate("PrecisionMeasurement")}
-            style={styles.ctaButton}
-          >
-            Precision measurement (Nearmap / EagleView)
-          </Button>
-        </View>
-
-        <ThemedText type="small" style={styles.toolsSectionTitle}>
-          Roof analysis tools
+          <ThemedText type="caption" style={styles.singleFlowHint}>
+          Pick a property, then build the report and cost estimate on one screen —
+          tap{" "}
+            <ThemedText type="caption" style={{ fontWeight: "700" }}>
+            Finish & export report
+          </ThemedText>{" "}
+          to preview and download HTML or JSON.
         </ThemedText>
-        <ThemedText type="caption" style={styles.toolsSectionHint}>
-          Pick a property on the map for real coordinates, or use demos below
-          (GIS footprint + assessment).
-        </ThemedText>
-
-        <View style={styles.ctaRow}>
-          <Button
-            variant="secondary"
-            onPress={() =>
-              navigation.navigate("GISBuildingMap", {
-                address: "1600 Pennsylvania Ave NW, Washington, DC",
-                latitude: 38.8976763,
-                longitude: -77.0365298,
-              })
-            }
-            style={styles.ctaButton}
-          >
-            OSM building footprint (demo area)
-          </Button>
-        </View>
-
-        <View style={styles.ctaRow}>
-          <Button
-            variant="secondary"
-            onPress={() => navigation.navigate("ComprehensiveRoof3DAssessment")}
-            style={styles.ctaButton}
-          >
-            Full roof assessment (synthetic demo)
-          </Button>
-        </View>
 
         {isLoading ? (
           <ActivityIndicator color={AppColors.primary} />
@@ -153,8 +108,8 @@ export default function ReportsHomeScreen({ navigation }: Props) {
               No reports yet.
             </ThemedText>
             <ThemedText type="small" style={styles.emptyBody}>
-              Select a property on the map, fill in the damage details, then
-              export the report.
+              Tap Start above, choose an address on the map, then build and export
+              on the next screen.
             </ThemedText>
           </View>
         ) : (
@@ -236,12 +191,11 @@ const styles = StyleSheet.create({
   ctaRow: { marginTop: 6 },
   ctaButton: { width: "100%" },
 
-  toolsSectionTitle: { marginTop: 18, fontWeight: "700", opacity: 0.95 },
-  toolsSectionHint: {
+  singleFlowHint: {
     marginTop: 4,
-    marginBottom: 4,
-    opacity: 0.75,
-    lineHeight: 18,
+    opacity: 0.82,
+    lineHeight: 20,
+    paddingHorizontal: 2,
   },
 
   emptyState: { paddingVertical: 24, alignItems: "center", gap: 8 },

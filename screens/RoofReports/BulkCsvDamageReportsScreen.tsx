@@ -19,8 +19,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ReportsStackParamList } from "@/navigation/ReportsStackNavigator";
 import { parsePropertyLeadsCsvText } from "@/src/roofReports/parsePropertyLeadsCsv";
-import { createBulkDamageReportFromLead } from "@/src/roofReports/createBulkDamageReportFromLead";
-import { appendRoofReportsBatch } from "@/src/roofReports/roofReportStorage";
+import { persistBulkDamageReportsFromLeads } from "@/src/roofReports/bulkPersistDamageReportsFromLeads";
 import { saveRoofLeads } from "@/src/roofReports/roofLeadsStorage";
 import { exportBulkRoofReportsHtml } from "@/src/roofReports/exportRoofReport";
 import type {
@@ -95,8 +94,48 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         } catch (e) {
           console.error(e);
         }
-        if (warnings.length) {
-          Alert.alert("CSV import finished", warnings[0]);
+
+        setGenerating(true);
+        setGenerationProgress({ done: 0, total: parsed.length });
+        try {
+          const { reports, compact } = await persistBulkDamageReportsFromLeads(
+            parsed,
+            {
+              companyNameFallback: companyFallback.trim() || undefined,
+              createdBy,
+              onProgress: (done, total) =>
+                setGenerationProgress({ done, total }),
+            },
+          );
+          setLastGenerated(reports);
+          const baseMsg = compact
+            ? `Created ${reports.length} AI damage reports (compact mode: no satellite image per row to fit storage). Open Roof Reports to review.`
+            : `Created ${reports.length} AI damage reports. Open Roof Reports or export HTML below.`;
+          Alert.alert(
+            "Contacts imported",
+            warnings.length ? `${baseMsg}\n\nNote: ${warnings[0]}` : baseMsg,
+          );
+          setCsvHint(`Loaded ${parsed.length} rows · ${reports.length} reports saved`);
+        } catch (e) {
+          console.error(e);
+          const msg = e instanceof Error ? e.message : String(e);
+          const quota =
+            (typeof DOMException !== "undefined" &&
+              e instanceof DOMException &&
+              e.name === "QuotaExceededError") ||
+            /quota|exceeded|5mb/i.test(msg);
+          Alert.alert(
+            quota ? "Storage full" : "Could not save reports",
+            quota
+              ? `Browser storage is often limited to ~5MB. Try fewer rows or delete old reports. ${msg}`
+              : msg,
+          );
+          if (warnings.length) {
+            Alert.alert("CSV note", warnings[0]);
+          }
+        } finally {
+          setGenerating(false);
+          setGenerationProgress(null);
         }
       };
       input.click();
@@ -106,43 +145,26 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
     }
   };
 
-  const generateReports = useCallback(async () => {
-    if (!leads.length) {
-      Alert.alert("No contacts", "Upload a CSV first.");
-      return;
-    }
+  const runPersistCurrentLeads = useCallback(async () => {
+    if (!leads.length) return;
     setGenerating(true);
     setGenerationProgress({ done: 0, total: leads.length });
-    const base = Date.now();
-    const out: DamageRoofReport[] = [];
-    /** Fewer storage round-trips; avoids O(n²) reload+rewrite per row. */
-    const BATCH_SIZE = 50;
-    /** Omit per-report Mapbox + embedded logo URLs so large jobs stay under ~5MB browser quota. */
-    const compact = leads.length >= 80;
     try {
-      for (let start = 0; start < leads.length; start += BATCH_SIZE) {
-        const end = Math.min(start + BATCH_SIZE, leads.length);
-        const batch: DamageRoofReport[] = [];
-        for (let i = start; i < end; i++) {
-          batch.push(
-            createBulkDamageReportFromLead(leads[i], {
-              idSeed: base + i,
-              companyNameFallback: companyFallback.trim() || undefined,
-              createdBy,
-              compact,
-            }),
-          );
-        }
-        await appendRoofReportsBatch(batch);
-        out.push(...batch);
-        setGenerationProgress({ done: end, total: leads.length });
-      }
-      setLastGenerated(out);
+      const { reports, compact } = await persistBulkDamageReportsFromLeads(
+        leads,
+        {
+          companyNameFallback: companyFallback.trim() || undefined,
+          createdBy,
+          onProgress: (done, total) =>
+            setGenerationProgress({ done, total }),
+        },
+      );
+      setLastGenerated(reports);
       Alert.alert(
         "Reports created",
         compact
-          ? `Generated ${out.length} damage reports (compact mode: no satellite preview image per row to fit browser storage). Open Roof Reports to review.`
-          : `Generated ${out.length} damage reports. You can open them from Roof Reports or export HTML below.`,
+          ? `Generated ${reports.length} damage reports (compact mode: no satellite preview image per row to fit browser storage). Open Roof Reports to review.`
+          : `Generated ${reports.length} damage reports. You can open them from Roof Reports or export HTML below.`,
       );
     } catch (e) {
       console.error(e);
@@ -155,8 +177,8 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
       Alert.alert(
         quota ? "Storage full" : "Bulk generation failed",
         quota
-          ? `Browser storage is usually limited to about 5MB. ${out.length} reports were saved before the error. Try fewer rows, or use Export HTML in smaller batches. Details: ${msg}`
-          : `${out.length} reports saved before the error: ${msg}`,
+          ? `Browser storage is usually limited to about 5MB. Try fewer rows, or use Export HTML in smaller batches. Details: ${msg}`
+          : msg,
       );
     } finally {
       setGenerating(false);
@@ -164,22 +186,60 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
     }
   }, [leads, companyFallback, createdBy]);
 
+  const generateReports = useCallback(async () => {
+    if (!leads.length) {
+      Alert.alert("No contacts", "Upload a CSV first.");
+      return;
+    }
+    if (lastGenerated?.length) {
+      Alert.alert(
+        "Generate again?",
+        "Reports were already created for this list (including after upload). This adds another full set of reports.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Add another set",
+            style: "destructive",
+            onPress: () => void runPersistCurrentLeads(),
+          },
+        ],
+      );
+      return;
+    }
+    await runPersistCurrentLeads();
+  }, [leads, lastGenerated?.length, runPersistCurrentLeads]);
+
   const exportAllHtml = async () => {
     const list = lastGenerated ?? [];
     if (!list.length) {
       Alert.alert("Nothing to export", "Generate reports first.");
       return;
     }
-    if (Platform.OS !== "web") {
-      Alert.alert(
-        "Export",
-        "Bulk HTML download is available on web. On mobile, open each report from Roof Reports → Preview / Export.",
-      );
+    if (Platform.OS === "web") {
+      try {
+        await exportBulkRoofReportsHtml(list);
+        Alert.alert(
+          "Export",
+          "Downloads should start in your browser (one file per report). Check your Downloads folder.",
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Export failed.";
+        Alert.alert("Export failed", msg);
+        console.error(e);
+      }
       return;
     }
     setExporting(true);
     try {
       await exportBulkRoofReportsHtml(list);
+      Alert.alert(
+        "Export",
+        "Each report was opened in the share sheet. Save or share each file, or use Preview → Export for a single report.",
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Export failed.";
+      Alert.alert("Export failed", msg);
+      console.error(e);
     } finally {
       setExporting(false);
     }
@@ -209,10 +269,10 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
       </View>
 
       <ThemedText type="caption" style={styles.lead}>
-        Upload a contact list with columns: latitude, longitude, address,
-        contact name, company (optional), and optional roof fields. One damage
-        report is created per row with default hail / severity 3 — open any
-        report to edit before export.
+        Upload a contact list (lat/lng, address, name, company, optional roof
+        fields). Each row becomes an AI-assisted damage report automatically
+        (default hail, severity 3, risk scoring + assessment notes). Open Roof
+        Reports to review or export.
       </ThemedText>
 
       <Card style={styles.card}>
@@ -282,14 +342,18 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
 
       <Card style={styles.card}>
         <ThemedText type="h4" style={styles.sectionTitle}>
-          3. Generate & export
+          3. Generate again & export
+        </ThemedText>
+        <ThemedText type="caption" style={styles.helper}>
+          Reports are created automatically when you upload a CSV (step 1). Use
+          the button below only if you need a second copy of the same list.
         </ThemedText>
         <Button
           onPress={() => void generateReports()}
           disabled={generating || !leads.length}
           style={styles.btn}
         >
-          {generating ? "Generating…" : "Generate damage reports"}
+          {generating ? "Generating…" : "Generate damage reports again"}
         </Button>
         {generationProgress ? (
           <ThemedText type="caption" style={styles.progressText}>
@@ -310,13 +374,17 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
           disabled={exporting || !lastGenerated?.length}
           style={styles.btn}
         >
-          {exporting ? "Downloading…" : "Export all as HTML (web)"}
+          {exporting
+            ? Platform.OS === "web"
+              ? "Downloading…"
+              : "Exporting…"
+            : "Export all as HTML"}
         </Button>
         <ThemedText type="caption" style={styles.helper}>
-          Export downloads one HTML file per report (browser may ask to allow
-          multiple downloads). Reports are also saved under Roof Reports. Very
-          large jobs (1000+ rows) use compact reports and batched saves so they
-          fit typical browser storage (~5MB).
+          Exports one HTML file per report. On web, your browser may ask to allow
+          multiple downloads. On mobile, the share sheet opens for each file in
+          sequence. Reports stay saved under Roof Reports. Very large jobs (1000+
+          rows) use compact reports and batched saves.
         </ThemedText>
       </Card>
 

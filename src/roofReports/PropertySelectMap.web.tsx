@@ -141,27 +141,30 @@ export default function PropertySelectMap({
               .setLngLat([lng, lat])
               .addTo(map);
 
-            const address = await reverseGeocodeNominatim(lat, lng);
+            const rawAddress = await reverseGeocodeNominatim(lat, lng);
             if (seq !== requestSeq) return;
+
+            const fallbackAddress = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            const addressLine = rawAddress.trim() ? rawAddress.trim() : fallbackAddress;
 
             const leadMatch = findNearbyLead(lat, lng, leadsRef.current);
             const property: PropertySelection = leadMatch
               ? {
                   ...leadMatch,
-                  address: address.trim() ? address.trim() : leadMatch.address,
+                  address: addressLine || leadMatch.address?.trim() || fallbackAddress,
                   lat,
                   lng,
                   clickedAtIso: new Date().toISOString(),
                 }
               : {
-                  address,
+                  address: addressLine,
                   lat,
                   lng,
                   clickedAtIso: new Date().toISOString(),
                 };
 
             map.easeTo({ center: [lng, lat], zoom: 17, duration: 600 });
-            setStatus(`Selected: ${address}`);
+            setStatus(`Selected: ${addressLine}`);
             onPropertySelectedRef.current(property);
           } finally {
             if (seq === requestSeq) setIsGeocoding(false);

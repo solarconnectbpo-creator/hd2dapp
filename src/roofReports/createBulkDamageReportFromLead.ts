@@ -2,6 +2,7 @@ import { computeAiDamageRisk, type RoofMaterialType } from "./roofLogicEngine";
 import { classifyRoofSystem, buildRoofScopeOfWork } from "./roofSystemScope";
 import { inferPropertyUseType } from "./propertyUseClassification";
 import { getCompanyLogoUrlByName } from "./companyBranding";
+import { explainDamageAssessment } from "./ai/explainableAi";
 import type {
   DamageRoofReport,
   DamageType,
@@ -88,6 +89,18 @@ export function createBulkDamageReportFromLead(
     pitchRise: undefined,
   });
 
+  const damageLabel = DEFAULT_DAMAGE[0]?.toLowerCase() ?? "hail";
+  const explain = explainDamageAssessment(
+    damageLabel,
+    DEFAULT_SEVERITY,
+    0.72,
+    1,
+  );
+  const aiExplainSummary = explain.reasoning
+    .slice(0, 2)
+    .map((r) => `${r.factor}: ${r.explanation}`)
+    .join(" ");
+
   const companyName =
     (
       property.companyName?.trim() ||
@@ -126,8 +139,10 @@ export function createBulkDamageReportFromLead(
     damageTypes: DEFAULT_DAMAGE,
     severity: DEFAULT_SEVERITY,
     recommendedAction: DEFAULT_ACTION,
-    notes:
-      "Auto-generated from CSV contact import. Review all fields, photos, and measurements before final export.",
+    notes: [
+      "Auto-generated from imported contacts (CSV). Review all fields, photos, and measurements before final export.",
+      `AI assessment (template): ${aiExplainSummary}`,
+    ].join("\n\n"),
     companyName,
     companyLogoUrl: compact ? undefined : getCompanyLogoUrlByName(companyName),
     creatorName: opts.createdBy?.name,

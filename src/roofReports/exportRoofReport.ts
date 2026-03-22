@@ -1,11 +1,6 @@
-import {
-  cacheDirectory,
-  documentDirectory,
-  writeAsStringAsync,
-  EncodingType,
-} from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
+
+import { shareTextFile } from "@/src/utils/shareTextFile";
 
 import type {
   DamageRoofReport,
@@ -61,55 +56,17 @@ import {
   showIbcChapter15Knowledge,
   showIrcChaptersKnowledge,
 } from "./reportKnowledgeVisibility";
+import { FIELD_QA_ITEMS } from "./fieldQaChecklist";
+import {
+  safeExportFilenamePart,
+  serializeRoofReportToJsonPretty,
+} from "./exportRoofReportSerialize";
 
-function downloadTextFile(filename: string, content: string, mime: string) {
-  if (typeof document === "undefined") return;
+/** Progress 0–100 and short label for export UI. */
+export type ExportProgressCallback = (percent: number, phase: string) => void;
 
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  // Defer revoke so Safari/Chrome finish the download before the blob URL is invalidated.
-  setTimeout(() => URL.revokeObjectURL(url), 250);
-}
-
-function safeExportFilenamePart(id: string): string {
-  const s = id.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return s.length > 0 ? s.slice(0, 96) : "report";
-}
-
-async function shareTextFileNative(
-  filename: string,
-  mime: string,
-  content: string,
-): Promise<void> {
-  const base = cacheDirectory ?? documentDirectory;
-  if (!base) {
-    Alert.alert("Export failed", "File storage is not available on this device.");
-    return;
-  }
-  const path = `${base}${filename}`;
-  await writeAsStringAsync(path, content, {
-    encoding: EncodingType.UTF8,
-  });
-  const canShare = await Sharing.isAvailableAsync();
-  if (!canShare) {
-    Alert.alert(
-      "Export saved",
-      `Report file was written to the app cache. Sharing is not available on this device.\n\n${path}`,
-    );
-    return;
-  }
-  await Sharing.shareAsync(path, {
-    mimeType: mime,
-    dialogTitle: "Export roof report",
-  });
+export interface ExportRoofReportOptions {
+  onProgress?: ExportProgressCallback;
 }
 
 function formatDate(iso: string) {
@@ -207,33 +164,6 @@ function renderBuildingCode(
 
 function renderMeasurements(measurements?: RoofMeasurements) {
   if (!measurements) return "";
-  const aerialRows: string[] = [];
-  if (measurements.aerialMeasurementProvider?.trim()) {
-    aerialRows.push(
-      `<div><div class="label">Aerial measurement source</div><div class="value">${escapeHtml(
-        measurements.aerialMeasurementProvider.trim(),
-      )}</div></div>`,
-    );
-  }
-  if (measurements.aerialMeasurementReference?.trim()) {
-    aerialRows.push(
-      `<div><div class="label">Aerial report / job ref</div><div class="value">${escapeHtml(
-        measurements.aerialMeasurementReference.trim(),
-      )}</div></div>`,
-    );
-  }
-  if (measurements.aerialMeasurementReportUrl?.trim()) {
-    const u = measurements.aerialMeasurementReportUrl.trim();
-    aerialRows.push(
-      `<div style="grid-column:1/-1;"><div class="label">Aerial report link</div><div class="value"><a href="${escapeHtml(
-        u,
-      )}" target="_blank" rel="noreferrer">${escapeHtml(u)}</a></div></div>`,
-    );
-  }
-  const aerialBlock =
-    aerialRows.length > 0
-      ? `<div class="grid2" style="margin-top:12px;">${aerialRows.join("")}</div>`
-      : "";
 
   return `
     <div class="section">
@@ -303,7 +233,25 @@ function renderMeasurements(measurements?: RoofMeasurements) {
             </div>`
           : ""
       }
-      ${aerialBlock}
+      ${
+        measurements.measurementValidationSummary
+          ? `<div style="margin-top:14px;padding:12px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;">
+              <div class="label">Measurement cross-check (${escapeHtml(
+                measurements.measurementValidationSummary.overallConfidence,
+              )} confidence)</div>
+              <ul style="margin:8px 0 0 16px;padding:0;font-size:12px;line-height:1.45;color:#334155;">
+                ${measurements.measurementValidationSummary.messages
+                  .map((m) => `<li>${escapeHtml(m)}</li>`)
+                  .join("")}
+              </ul>
+              ${
+                measurements.measurementValidationSummary.messages.length === 0
+                  ? `<div class="muted" style="margin-top:6px;font-size:12px;">Sources agree within configured tolerances (or only one source is present).</div>`
+                  : ""
+              }
+            </div>`
+          : ""
+      }
       ${
         measurements.notes
           ? `<div class="muted" style="margin-top:10px;">${escapeHtml(measurements.notes)}</div>`
@@ -550,6 +498,39 @@ function renderMaterialRequirements(report: DamageRoofReport) {
       </div>
       ${mr.notes ? `<div class="muted" style="margin-top:10px; line-height:1.45;">Notes: ${escapeHtml(mr.notes)}</div>` : ""}
       ${extrasBlock}
+    </div>
+  `;
+}
+
+function renderMetarWeatherSection(report: DamageRoofReport): string {
+  const m = report.metarWeather;
+  if (!m) return "";
+  const lines = m.summaryLines
+    .slice(0, 14)
+    .map(
+      (l) =>
+        `<div class="muted" style="font-size:12px;line-height:1.45;margin-top:4px;">${escapeHtml(l)}</div>`,
+    )
+    .join("");
+  return `
+    <div class="section">
+      <h2>Airport weather (METAR)</h2>
+      <p class="muted">Nearest reference station to the property — airport observation, not rooftop wind.</p>
+      ${lines}
+    </div>
+  `;
+}
+
+function renderFieldQaSection(report: DamageRoofReport): string {
+  const q = report.fieldQaChecklist;
+  if (!q || !Object.values(q).some(Boolean)) return "";
+  const items = FIELD_QA_ITEMS.filter((it) => q[it.id])
+    .map((it) => `<li>${escapeHtml(it.label)}</li>`)
+    .join("");
+  return `
+    <div class="section">
+      <h2>Field QA checklist</h2>
+      <ul style="margin:8px 0 0 18px;line-height:1.45;font-size:13px;">${items}</ul>
     </div>
   `;
 }
@@ -890,6 +871,11 @@ function renderMaterialSystemAnalysis(report: DamageRoofReport): string {
         Covering (from roof type): ${escapeHtml(a.coveringDescription)}<br/>
         Agreement: <span style="${agreementStyle}">${escapeHtml(a.agreement)}</span><br/>
         <span style="font-size:12px;">Roof type field: ${escapeHtml(a.sources.roofTypeField)} · Material: ${escapeHtml(a.sources.materialSelector)}</span>
+        ${
+          report.materialSystemFieldVerified
+            ? `<br/><span style="color:#15803d;font-weight:600;">Inspector confirmed roof type + material match field conditions.</span>`
+            : ""
+        }
       </div>
       ${
         typeof a.structuralLoadLbsPerSq === "number"
@@ -961,30 +947,43 @@ function renderDamageSummarySection(report: DamageRoofReport): string {
 
 export async function exportRoofReportToJson(
   report: DamageRoofReport,
+  options?: ExportRoofReportOptions,
 ): Promise<void> {
+  const onProgress = options?.onProgress;
   const filename = `RoofReport_${safeExportFilenamePart(report.id)}.json`;
-  const json = JSON.stringify(report, null, 2);
+  onProgress?.(8, "Preparing…");
+  onProgress?.(25, "Serializing report…");
+  const json = serializeRoofReportToJsonPretty(report);
+  onProgress?.(70, "Encoding…");
 
   if (Platform.OS === "web") {
-    downloadTextFile(filename, json, "application/json");
+    onProgress?.(90, "Starting download…");
+    const { downloadTextFileWebSync } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../utils/shareTextFile.web") as typeof import("../utils/shareTextFile.web");
+    const r = downloadTextFileWebSync(filename, json, "application/json");
+    if (!r.ok) throw new Error(r.error);
+    onProgress?.(100, "Complete");
     return;
   }
 
-  await shareTextFileNative(filename, "application/json", json);
+  onProgress?.(85, "Opening share…");
+  const result = await shareTextFile(filename, json, "application/json");
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  onProgress?.(100, "Complete");
 }
 
-export async function exportRoofReportToHtml(
-  report: DamageRoofReport,
-): Promise<void> {
-  const filename = `RoofReport_${safeExportFilenamePart(report.id)}.html`;
-
+/** Full printable HTML (used by export and tests). */
+export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
   const companyName = report.companyName || "Roof Inspection Co.";
   const creatorName = report.creatorName || report.createdBy?.name || "";
   const photosCount = report.images?.length ?? 0;
   const logoUrl = getCompanyLogoUrl(report);
   const intro = getIntroNarrative(companyName);
 
-  const html = `<!doctype html>
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -1223,6 +1222,8 @@ export async function exportRoofReportToHtml(
       ${renderEstimate(report.estimate, creatorName)}
       ${renderNonRoofEstimate(report.nonRoofEstimate, creatorName)}
       ${renderScheduleInspection(report)}
+      ${renderMetarWeatherSection(report)}
+      ${renderFieldQaSection(report)}
       ${renderAiDamageRisk(report)}
       ${renderScopeOfWork(report)}
       ${renderMeasurements(report.measurements)}
@@ -1235,13 +1236,36 @@ export async function exportRoofReportToHtml(
     </div>
   </body>
 </html>`;
+}
+
+export async function exportRoofReportToHtml(
+  report: DamageRoofReport,
+  options?: ExportRoofReportOptions,
+): Promise<void> {
+  const onProgress = options?.onProgress;
+  const filename = `RoofReport_${safeExportFilenamePart(report.id)}.html`;
+  onProgress?.(4, "Preparing…");
+  onProgress?.(12, "Building HTML…");
+  const html = buildRoofReportHtmlDocument(report);
+  onProgress?.(82, "Preparing file…");
 
   if (Platform.OS === "web") {
-    downloadTextFile(filename, html, "text/html");
+    onProgress?.(92, "Starting download…");
+    const { downloadTextFileWebSync } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../utils/shareTextFile.web") as typeof import("../utils/shareTextFile.web");
+    const r = downloadTextFileWebSync(filename, html, "text/html");
+    if (!r.ok) throw new Error(r.error);
+    onProgress?.(100, "Complete");
     return;
   }
 
-  await shareTextFileNative(filename, "text/html", html);
+  onProgress?.(88, "Opening share…");
+  const result = await shareTextFile(filename, html, "text/html");
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  onProgress?.(100, "Complete");
 }
 
 /** Download one HTML file per report (web). Small delay avoids browser download throttling. */

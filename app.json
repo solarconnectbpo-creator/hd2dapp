@@ -37,7 +37,17 @@
         }
       ],
       "expo-web-browser",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 33,
+            "targetSdkVersion": 33,
+            "minSdkVersion": 21
+          }
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": false
