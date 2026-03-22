@@ -39,6 +39,11 @@ yarn-error.*
 .config/
 .local/
 
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
 # typescript
 *.tsbuildinfo
 
