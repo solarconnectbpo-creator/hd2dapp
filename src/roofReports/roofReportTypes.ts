@@ -35,8 +35,14 @@ export interface PropertySelection {
   homeownerName?: string;
   /** Business / account name from CSV (e.g. company, contractor). */
   companyName?: string;
+  /** Office / company phone from CSV (for exports and follow-up). */
+  companyPhone?: string;
+  /** Office / company email from CSV. */
+  companyEmail?: string;
   email?: string;
   phone?: string;
+  /** Per-row inspector override (bulk CSV); otherwise screen default applies. */
+  inspectorName?: string;
 
   // Optional roof details that may come from an uploaded CSV
   roofSqFt?: number;
@@ -279,6 +285,10 @@ export interface DamageRoofReport {
   propertyUse?: PropertyUseType;
 
   companyName?: string;
+  /** Company office phone (e.g. from bulk CSV). */
+  companyPhone?: string;
+  /** Company office email (e.g. from bulk CSV). */
+  companyEmail?: string;
   companyLogoUrl?: string;
   creatorName?: string;
 

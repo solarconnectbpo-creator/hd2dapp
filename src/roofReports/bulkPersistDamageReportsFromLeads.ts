@@ -8,6 +8,8 @@ import type {
 
 export type BulkPersistDamageReportsOptions = {
   companyNameFallback?: string;
+  /** Shown as inspector on each bulk report unless the row sets `inspectorName`. */
+  inspectorName?: string;
   createdBy?: RoofReportCreatedBy;
   onProgress?: (done: number, total: number) => void;
 };
@@ -37,6 +39,7 @@ export async function persistBulkDamageReportsFromLeads(
         createBulkDamageReportFromLead(leads[i], {
           idSeed: base + i,
           companyNameFallback: opts.companyNameFallback,
+          inspectorName: opts.inspectorName,
           createdBy: opts.createdBy,
           compact,
         }),

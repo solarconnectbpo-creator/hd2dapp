@@ -3,6 +3,7 @@ import { classifyRoofSystem, buildRoofScopeOfWork } from "./roofSystemScope";
 import { inferPropertyUseType } from "./propertyUseClassification";
 import { getCompanyLogoUrlByName } from "./companyBranding";
 import { explainDamageAssessment } from "./ai/explainableAi";
+import { computeRoofDamageEstimate } from "./roofEstimate";
 import type {
   DamageRoofReport,
   DamageType,
@@ -60,6 +61,8 @@ export function createBulkDamageReportFromLead(
   opts: {
     idSeed: number;
     companyNameFallback?: string;
+    /** Default inspector on bulk reports (e.g. "Seth"); row `inspectorName` overrides. */
+    inspectorName?: string;
     createdBy?: RoofReportCreatedBy;
     /** Omit heavy URL fields so large CSV imports stay under browser storage limits (~5MB). */
     compact?: boolean;
@@ -108,7 +111,22 @@ export function createBulkDamageReportFromLead(
       ""
     ).trim() || undefined;
 
+  const inspectorDisplay =
+    property.inspectorName?.trim() ||
+    opts.inspectorName?.trim() ||
+    opts.createdBy?.name ||
+    "";
+
   const compact = opts.compact === true;
+
+  const estimate = computeRoofDamageEstimate({
+    roofAreaSqFt: property.roofSqFt,
+    damageTypes: DEFAULT_DAMAGE,
+    severity: DEFAULT_SEVERITY,
+    roofType: classified.normalizedRoofType,
+    recommendedAction: DEFAULT_ACTION,
+    notes: "Bulk import estimate (review before sending to homeowner).",
+  });
 
   const measurements =
     typeof property.roofSqFt === "number" &&
@@ -144,10 +162,15 @@ export function createBulkDamageReportFromLead(
       `AI assessment (template): ${aiExplainSummary}`,
     ].join("\n\n"),
     companyName,
-    companyLogoUrl: compact ? undefined : getCompanyLogoUrlByName(companyName),
-    creatorName: opts.createdBy?.name,
+    companyPhone: property.companyPhone?.trim() || undefined,
+    companyEmail: property.companyEmail?.trim() || undefined,
+    companyLogoUrl: compact
+      ? undefined
+      : getCompanyLogoUrlByName(companyName ?? "Cox Roofing"),
+    creatorName: inspectorDisplay || undefined,
     createdBy: opts.createdBy,
     measurements,
+    estimate,
     aiDamageRisk: {
       score: risk.score,
       level: risk.level,

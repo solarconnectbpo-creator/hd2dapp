@@ -1258,6 +1258,17 @@ export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
             ${!report.homeownerEmail && !report.homeownerPhone ? "—" : ""}
           </div>
         </div>
+        ${
+          report.companyPhone || report.companyEmail
+            ? `<div class="chip">
+          <span class="label">Company office</span>
+          <div class="metaText">
+            ${report.companyEmail ? `${escapeHtml(report.companyEmail)}<br/>` : ""}
+            ${report.companyPhone ? escapeHtml(report.companyPhone) : ""}
+          </div>
+        </div>`
+            : ""
+        }
         <div class="chip">
           <span class="label">Roof type</span>
           <div class="metaText">${report.roofType ? escapeHtml(report.roofType) : "—"}</div>

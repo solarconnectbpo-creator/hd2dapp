@@ -68,6 +68,8 @@ export function parsePropertyLeadsCsvText(csvText: string): ParsedCsvResult {
 
   const nameKey = pickFirstHeaderKey(first, [
     "name",
+    "homeowner_name",
+    "homeownername",
     "homeowner",
     "owner",
     "ownername",
@@ -148,6 +150,26 @@ export function parsePropertyLeadsCsvText(csvText: string): ParsedCsvResult {
     "contractor",
     "account",
   ]);
+  const companyPhoneKey = pickFirstHeaderKey(first, [
+    "company_phone",
+    "companyphone",
+    "business_phone",
+    "office_phone",
+    "org_phone",
+  ]);
+  const companyEmailKey = pickFirstHeaderKey(first, [
+    "company_email",
+    "companyemail",
+    "business_email",
+    "office_email",
+    "org_email",
+  ]);
+  const inspectorKey = pickFirstHeaderKey(first, [
+    "inspector",
+    "inspector_name",
+    "inspectorname",
+    "field_inspector",
+  ]);
 
   if (!latKey || !lngKey) {
     return {
@@ -213,6 +235,19 @@ export function parsePropertyLeadsCsvText(csvText: string): ParsedCsvResult {
         ? String(row[companyKey]).trim()
         : "";
 
+    const companyPhone =
+      companyPhoneKey && row[companyPhoneKey] != null
+        ? String(row[companyPhoneKey]).trim()
+        : "";
+    const companyEmail =
+      companyEmailKey && row[companyEmailKey] != null
+        ? String(row[companyEmailKey]).trim()
+        : "";
+    const inspectorName =
+      inspectorKey && row[inspectorKey] != null
+        ? String(row[inspectorKey]).trim()
+        : "";
+
     leads.push({
       id: idKey && row[idKey] != null ? String(row[idKey]) : undefined,
       address: addressFromCsv.trim() ? addressFromCsv.trim() : fallbackAddress,
@@ -221,6 +256,9 @@ export function parsePropertyLeadsCsvText(csvText: string): ParsedCsvResult {
       clickedAtIso: nowIso,
       homeownerName: homeownerName || undefined,
       companyName: companyName || undefined,
+      companyPhone: companyPhone || undefined,
+      companyEmail: companyEmail || undefined,
+      inspectorName: inspectorName || undefined,
       email: email || undefined,
       phone: phone || undefined,
       roofSqFt: normalizedRoofSqFt,

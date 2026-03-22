@@ -22,6 +22,11 @@ import { parsePropertyLeadsCsvText } from "@/src/roofReports/parsePropertyLeadsC
 import { persistBulkDamageReportsFromLeads } from "@/src/roofReports/bulkPersistDamageReportsFromLeads";
 import { saveRoofLeads } from "@/src/roofReports/roofLeadsStorage";
 import { exportBulkRoofReportsHtml } from "@/src/roofReports/exportRoofReport";
+import {
+  BULK_LEADS_CSV_TEMPLATE,
+  exportBulkEstimateManifestOnly,
+  exportBulkEstimatePackageWeb,
+} from "@/src/roofReports/bulkEstimateManifestExport";
 import type {
   DamageRoofReport,
   PropertySelection,
@@ -38,8 +43,10 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
   const [leads, setLeads] = useState<PropertySelection[]>([]);
   const [csvHint, setCsvHint] = useState("");
   const [companyFallback, setCompanyFallback] = useState("Cox Roofing");
+  const [inspectorDefault, setInspectorDefault] = useState("Seth");
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingPackage, setExportingPackage] = useState(false);
   const [lastGenerated, setLastGenerated] = useState<DamageRoofReport[] | null>(
     null,
   );
@@ -102,6 +109,7 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
             parsed,
             {
               companyNameFallback: companyFallback.trim() || undefined,
+              inspectorName: inspectorDefault.trim() || "Seth",
               createdBy,
               onProgress: (done, total) =>
                 setGenerationProgress({ done, total }),
@@ -156,6 +164,7 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         leads,
         {
           companyNameFallback: companyFallback.trim() || undefined,
+          inspectorName: inspectorDefault.trim() || "Seth",
           createdBy,
           onProgress: (done, total) => setGenerationProgress({ done, total }),
         },
@@ -185,7 +194,7 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
       setGenerating(false);
       setGenerationProgress(null);
     }
-  }, [leads, companyFallback, createdBy]);
+  }, [leads, companyFallback, inspectorDefault, createdBy]);
 
   const generateReports = useCallback(async () => {
     if (!leads.length) {
@@ -209,6 +218,61 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
     }
     await runPersistCurrentLeads();
   }, [leads, lastGenerated?.length, runPersistCurrentLeads]);
+
+  const downloadImportTemplate = () => {
+    if (Platform.OS !== "web") {
+      Alert.alert(
+        "Template",
+        "Download the template from the web build, or copy columns: lat,lng,address,homeowner_name,email,phone,company,company_phone,company_email,inspector_name,roof_sqft,roof_type",
+      );
+      return;
+    }
+    try {
+      const { downloadTextFileWebSync } =
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        require("@/src/utils/shareTextFile.web") as typeof import("@/src/utils/shareTextFile.web");
+      const r = downloadTextFileWebSync(
+        "bulk-leads-import-template.csv",
+        BULK_LEADS_CSV_TEMPLATE,
+        "text/csv;charset=utf-8",
+      );
+      if (!r.ok) throw new Error(r.error);
+      Alert.alert("Template", "Saved bulk-leads-import-template.csv");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("Download failed", msg);
+    }
+  };
+
+  const exportManifestAndHtml = async () => {
+    const list = lastGenerated ?? [];
+    if (!list.length) {
+      Alert.alert("Nothing to export", "Generate reports first.");
+      return;
+    }
+    setExportingPackage(true);
+    try {
+      if (Platform.OS === "web") {
+        await exportBulkEstimatePackageWeb(list);
+        Alert.alert(
+          "Export package",
+          "Downloaded the manifest CSV first, then one HTML file per row. File names in the CSV match each report HTML. Use for email or CRM.",
+        );
+      } else {
+        await exportBulkEstimateManifestOnly(list);
+        Alert.alert(
+          "Manifest CSV",
+          "Shared the contact + estimate summary CSV. Use “Export all as HTML” for report files, or open this screen on web for one-click CSV + HTML.",
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("Export failed", msg);
+      console.error(e);
+    } finally {
+      setExportingPackage(false);
+    }
+  };
 
   const exportAllHtml = async () => {
     const list = lastGenerated ?? [];
@@ -265,15 +329,15 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
           <Feather name="upload-cloud" size={20} color="#fff" />
         </View>
         <ThemedText type="h2" style={styles.headerTitle}>
-          Bulk CSV → damage reports
+          Bulk CSV → estimates for contacts
         </ThemedText>
       </View>
 
       <ThemedText type="caption" style={styles.lead}>
-        Upload a contact list (lat/lng, address, name, company, optional roof
-        fields). Each row becomes an AI-assisted damage report automatically
-        (default hail, severity 3, risk scoring + assessment notes). Open Roof
-        Reports to review or export.
+        Upload a contact list (lat/lng, address, homeowner + company contact
+        fields). Each row becomes a damage + estimate report with Cox Roofing
+        branding (bundled logo) and inspector name (default Seth). Export a
+        manifest CSV plus matching HTML files for organized outreach.
       </ThemedText>
 
       <Card style={styles.card}>
@@ -386,6 +450,23 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
           allow multiple downloads. On mobile, the share sheet opens for each
           file in sequence. Reports stay saved under Roof Reports. Very large
           jobs (1000+ rows) use compact reports and batched saves.
+        </ThemedText>
+        <View style={{ height: 12 }} />
+        <Button
+          variant="secondary"
+          onPress={() => void exportManifestAndHtml()}
+          disabled={exportingPackage || !lastGenerated?.length}
+          style={styles.btn}
+        >
+          {exportingPackage
+            ? "Exporting package…"
+            : "Export manifest CSV + all HTML (organized)"}
+        </Button>
+        <ThemedText type="caption" style={styles.helper}>
+          Downloads a spreadsheet with contact info, company fields, inspector,
+          estimate range, and the matching HTML filename for each property—then
+          the report files (web). Use the manifest to track who gets which
+          estimate.
         </ThemedText>
       </Card>
 
