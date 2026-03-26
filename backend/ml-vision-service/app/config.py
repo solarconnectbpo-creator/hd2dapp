@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     detectron2_weights_path: str = ""
     detectron2_score_thresh: float = 0.5
     detectron2_include_polygons: bool = False
+    # Pixel² → ft² for mask totals: calibrate from ortho GSD or a known reference length on the image.
+    # When > 0, segmentation JSON includes estimatedRoofAreaSqFt for the app / estimates.
+    detectron2_sqft_per_px_sq: float = 0.0
 
     # --- Roboflow hosted model (https://docs.roboflow.com/inference/hosted-api) ---
     roboflow_api_key: str = ""

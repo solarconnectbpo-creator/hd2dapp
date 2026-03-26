@@ -10,6 +10,8 @@ export type RoofSegmentationResult = {
   perPolygonAreaPx?: number[];
   imageWidth?: number;
   imageHeight?: number;
+  /** When ml-vision-service sets DETECTRON2_SQFT_PER_PX_SQ (mask px² → ft²). */
+  estimatedRoofAreaSqFt?: number;
   /** Omitted when server sets detectron2_include_polygons=false (large). */
   polygons?: number[][][] | null;
 };

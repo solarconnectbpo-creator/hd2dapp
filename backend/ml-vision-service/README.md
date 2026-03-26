@@ -54,9 +54,11 @@ Tune `app/inference.py` → `map_roboflow_to_hd2d` to match **your** class names
    ```env
    VISION_PROVIDER=detectron2
    DETECTRON2_WEIGHTS_PATH=C:/path/to/model_final.pth
+   # Optional: ft² per pixel² from ortho GSD or a scale bar — adds segmentation.estimatedRoofAreaSqFt
+   DETECTRON2_SQFT_PER_PX_SQ=0
    ```
 
-4. The **Expo app** calls `POST /api/ai/roof-vision` on the Worker; the Worker proxies here. The JSON response includes **`segmentation`** for the UI and report notes.
+4. The **Expo app** calls `POST /api/ai/roof-vision` on the Worker; the Worker proxies here. The JSON response includes **`segmentation`** for the UI and report notes. When **`DETECTRON2_SQFT_PER_PX_SQ`** is set to a positive ft²/px² value, **`estimatedRoofAreaSqFt`** is included for estimate cross-checks (mask area ≠ legal plan area; compare to map trace).
 
 > The default **Dockerfile** here only installs `requirements.txt` (no torch/detectron2). For containerized Detectron2, extend the image with PyTorch + a matching Detectron2 build or mount weights at runtime.
 

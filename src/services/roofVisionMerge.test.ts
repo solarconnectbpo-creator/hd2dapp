@@ -57,4 +57,19 @@ describe("mergeGptWithVisionDamage", () => {
     });
     expect(out.notes).toContain("Vision (detectron2)");
   });
+
+  it("notes calibrated mask sq ft when segmentation includes estimatedRoofAreaSqFt", () => {
+    const out = mergeGptWithVisionDamage(gpt, {
+      provider: "detectron2",
+      segmentation: {
+        polygonCount: 2,
+        totalAreaPx: 50000,
+        estimatedRoofAreaSqFt: 2450.5,
+        imageWidth: 2048,
+        imageHeight: 1536,
+      },
+    });
+    expect(out.notes).toContain("2,451");
+    expect(out.notes).toContain("sq ft");
+  });
 });

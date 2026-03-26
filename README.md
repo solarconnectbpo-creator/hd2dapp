@@ -1,24 +1,26 @@
 # hd2dapp
 
-Expo (React Native + web) app for Hardcore Door-to-Door Closers workflows, including roof reports and CRM.
+Expo (React Native + web) for CRM, roof reports, and damage estimates.
 
-## Measurements & estimates (accuracy)
+## Estimates & measurements (what to build)
 
-- **Traced footprint**: Area and perimeter from the map trace use **geodesic** math on WGS84 (`@turf/turf`): horizontal **plan** area in sq ft, not sloped roof surface.
-- **Pitch**: Enter as `6/12`, `6:12`, `6`, or `26.5°`. Edge lineals in diagrams use a simplified slope model; field takeoffs should still be verified.
-- **AI / multiple sources**: When several sources are fused (`src/roofReports/ai/measurementFusion.ts`), area and perimeter use **confidence-weighted means** computed only from sources that actually provide that number (missing fields no longer pull the average down). Pitch is fused as a weighted **rise/12** when parseable.
-- **Dollar estimates** (`computeRoofDamageEstimate`): Built from plan area + waste + system-specific rates. Treat outputs as **indicative**; align allowances with your carrier or Xactimate workflow.
+1. **Map trace (app)** — Geodesic **plan** footprint area / perimeter (`src/roofReports/roofPolygonMetrics.ts`, `RoofTraceMap.web.tsx`). Use this as the primary **sq ft** input for `computeRoofDamageEstimate` in `src/roofReports/roofEstimate.ts`.
+2. **PyTorch / Detectron2 (Python)** — Train roof masks in **`roof-detectron/`**, convert pixel areas to ft² with **`roof_measurement_summary(..., sqft_per_px_sq=...)`** in `roof-detectron/utils.py` (calibrate from ortho GSD or a known reference).
+3. **Vision API (`backend/ml-vision-service`)** — Run **`VISION_PROVIDER=detectron2`** with `DETECTRON2_WEIGHTS_PATH`. Set **`DETECTRON2_SQFT_PER_PX_SQ`** (ft² per pixel²) so responses include **`segmentation.estimatedRoofAreaSqFt`** for notes and cross-checks against the trace. Install stack: **`roof-detectron/install-detectron2.ps1`** or **`backend/ml-vision-service/install-detectron2.ps1`** (PyTorch + Detectron2; Windows needs MSVC — see those READMEs).
+4. **Fusion** — `src/roofReports/ai/measurementFusion.ts` combines multiple area/pitch sources when you wire them in.
+5. **Dollar range** — Still **indicative**; tune rates in `roofEstimate*` modules to match your market or Xactimate.
+
+`call-ai-system/` is **gitignored** (not part of this app).
 
 ## Development
 
 ```bash
 npm install
 npm start
-# Web
 npm run web
 ```
 
-Copy `.env.example` to `.env` / `.env.local` as needed for Mapbox, Supabase, etc.
+Copy `.env.example` to `.env` / `.env.local` for Mapbox, Supabase, etc.
 
 ## Deployment
 

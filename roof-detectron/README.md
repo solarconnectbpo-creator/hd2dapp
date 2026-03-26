@@ -92,7 +92,7 @@ summary = roof_measurement_summary(polys, sqft_per_px_sq=YOUR_CALIBRATION)
 # summary["total_area_sqft"] when scale is set
 ```
 
-Calibrate `sqft_per_px_sq` from ground sample distance (GSD) or known reference length on the image.
+Calibrate `sqft_per_px_sq` from ground sample distance (GSD) or known reference length on the image. The same value can be set as **`DETECTRON2_SQFT_PER_PX_SQ`** in `backend/ml-vision-service/.env` so the API returns **`segmentation.estimatedRoofAreaSqFt`** for the app.
 
 ## Pro settings
 

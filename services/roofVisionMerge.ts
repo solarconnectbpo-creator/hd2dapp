@@ -82,15 +82,24 @@ export function mergeGptWithVisionDamage(
     ? (vision.recommendedAction as RecommendedAction)
     : gpt.recommendedAction;
 
+  const maskSqFt = vision.segmentation?.estimatedRoofAreaSqFt;
+  const maskAreaHint =
+    typeof maskSqFt === "number" &&
+    Number.isFinite(maskSqFt) &&
+    maskSqFt > 0
+      ? ` Calibrated mask area ~${Math.round(maskSqFt).toLocaleString()} sq ft (use with trace/manual for estimates).`
+      : "";
+
   const visionNote =
     vision.provider === "stub"
       ? "Vision (stub): configure backend/ml-vision-service and Worker ROOF_VISION_* for CNN."
       : [
           `Vision (${vision.provider ?? "local"}${vision.model ? ` · ${vision.model}` : ""})`,
           vision.notes?.trim(),
+          maskAreaHint,
         ]
           .filter(Boolean)
-          .join(": ");
+          .join(" ");
 
   const alreadyHasVisionLine =
     vision.provider === "stub"

@@ -180,12 +180,20 @@ async def infer_detectron2(image_b64: str, mime: str) -> dict[str, Any]:
         include_polygons=bool(settings.detectron2_include_polygons),
     )
 
+    scale = float(settings.detectron2_sqft_per_px_sq or 0.0)
+    total_px = float(seg.get("totalAreaPx") or 0)
+    if scale > 0 and total_px > 0:
+        seg["estimatedRoofAreaSqFt"] = round(total_px * scale, 1)
+
     base = await infer_stub(image_b64, mime)
     n = int(seg.get("polygonCount") or 0)
-    total_px = float(seg.get("totalAreaPx") or 0)
     notes = (
         f"Roof segmentation (Detectron2): {n} facet(s), ~{total_px:,.0f} px² total. "
-        "Pixel areas — multiply by (ft²/px²) from GSD or a known reference for sq ft."
+        + (
+            f" Calibrated ~{seg['estimatedRoofAreaSqFt']:,.1f} sq ft (DETECTRON2_SQFT_PER_PX_SQ)."
+            if seg.get("estimatedRoofAreaSqFt") is not None
+            else " Pixel areas — set DETECTRON2_SQFT_PER_PX_SQ (ft²/px²) from GSD or a known reference for sq ft."
+        )
     )
     return {
         **base,

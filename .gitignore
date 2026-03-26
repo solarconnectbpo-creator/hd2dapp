@@ -40,6 +40,9 @@ yarn-error.*
 .config/
 .local/
 
+# unrelated local monorepo (not part of HD2D app build)
+call-ai-system/
+
 # Python
 __pycache__/
 *.py[cod]
