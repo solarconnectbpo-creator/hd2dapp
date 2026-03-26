@@ -1668,6 +1668,24 @@ export default function CreateDamageRoofReportScreen({
       if (visionOutcome && !visionOutcome.error) {
         d = mergeGptWithVisionDamage(d, visionOutcome);
       }
+
+      const maskSqFtVision = visionOutcome?.segmentation?.estimatedRoofAreaSqFt;
+      const hasExistingRoofArea =
+        (measurements.roofAreaSqFt != null &&
+          Number.isFinite(measurements.roofAreaSqFt) &&
+          measurements.roofAreaSqFt > 0) ||
+        roofAreaSqFtManual.trim().length > 0;
+      const appliedMaskAreaToForm =
+        typeof maskSqFtVision === "number" &&
+        Number.isFinite(maskSqFtVision) &&
+        maskSqFtVision > 0 &&
+        !hasExistingRoofArea;
+      if (appliedMaskAreaToForm) {
+        const rounded = Math.round(maskSqFtVision);
+        setMeasurements((prev) => ({ ...prev, roofAreaSqFt: rounded }));
+        setRoofAreaSqFtManual(String(rounded));
+      }
+
       setDamageTypes(d.damageTypes.length ? d.damageTypes : ["Hail"]);
       setSeverity(d.severity);
       setRecommendedAction(d.recommendedAction);
@@ -1692,15 +1710,25 @@ export default function CreateDamageRoofReportScreen({
         return before ? `${before}\n\n---\n${block}` : block;
       });
       const seg = visionOutcome?.segmentation;
-      const segHint =
-        seg != null &&
+      let completionExtra = "";
+      if (
+        typeof maskSqFtVision === "number" &&
+        Number.isFinite(maskSqFtVision) &&
+        maskSqFtVision > 0
+      ) {
+        completionExtra = appliedMaskAreaToForm
+          ? `\n\nRoof area (~${Math.round(maskSqFtVision).toLocaleString()} sq ft) was filled from calibrated PyTorch masks. The estimate updates automatically.`
+          : `\n\nVision suggests ~${Math.round(maskSqFtVision).toLocaleString()} sq ft from calibrated masks — trace or Roof Area was kept; edit sq ft if you want the mask total.`;
+      } else if (
+        seg &&
         seg.polygonCount != null &&
         seg.totalAreaPx != null
-          ? `\n\nRoof segmentation: ${seg.polygonCount} facet(s), ~${Math.round(seg.totalAreaPx)} px² total (calibrate scale for sq ft).`
-          : "";
+      ) {
+        completionExtra = `\n\nSegmentation: ${seg.polygonCount} facet(s), ~${Math.round(seg.totalAreaPx)} px². Set DETECTRON2_SQFT_PER_PX_SQ on ml-vision-service for sq ft.`;
+      }
       Alert.alert(
         "AI draft applied",
-        `Damage fields and notes were filled from the image. Review everything before saving.${segHint}`,
+        `Damage fields and notes were filled from the image. Review everything before saving.${completionExtra}`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
