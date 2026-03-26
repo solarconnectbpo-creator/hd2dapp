@@ -1,59 +1,57 @@
-import Papa from "papaparse";
 import { Platform } from "react-native";
 
 import { shareTextFile } from "@/src/utils/shareTextFile";
 
 import type { DamageRoofReport } from "./roofReportTypes";
-import { buildRoofReportHtmlDocument } from "./exportRoofReport";
-import { safeExportFilenamePart } from "./exportRoofReportSerialize";
+import {
+  BULK_LEADS_CSV_TEMPLATE,
+  buildBulkEstimateManifestCsv,
+  roofReportHtmlFilename,
+} from "./bulkEstimateManifestCsv";
+import {
+  buildRoofReportHtmlDocument,
+  exportBulkRoofReportsHtml,
+} from "./exportRoofReport";
 
-/** Same basename as `exportRoofReportToHtml` downloads. */
-export function roofReportHtmlFilename(report: DamageRoofReport): string {
-  return `RoofReport_${safeExportFilenamePart(report.id)}.html`;
-}
+export {
+  BULK_LEADS_CSV_TEMPLATE,
+  buildBulkEstimateManifestCsv,
+  buildBulkEstimateManifestRows,
+  type BulkManifestRow,
+  roofReportHtmlFilename,
+} from "./bulkEstimateManifestCsv";
 
-export type BulkManifestRow = Record<string, string | number | undefined>;
-
-export function buildBulkEstimateManifestRows(
-  reports: DamageRoofReport[],
-): BulkManifestRow[] {
-  return reports.map((r) => {
-    const est = r.estimate;
-    return {
-      report_id: r.id,
-      created_at_utc: r.createdAtIso,
-      property_address: r.property.address,
-      latitude: r.property.lat,
-      longitude: r.property.lng,
-      contact_name: r.homeownerName ?? "",
-      contact_email: r.homeownerEmail ?? "",
-      contact_phone: r.homeownerPhone ?? "",
-      company_name: r.companyName ?? "",
-      company_phone: r.companyPhone ?? r.property.companyPhone ?? "",
-      company_email: r.companyEmail ?? r.property.companyEmail ?? "",
-      inspector_name: r.creatorName ?? r.createdBy?.name ?? "",
-      roof_type: r.roofType ?? "",
-      damage_types: (r.damageTypes ?? []).join("; "),
-      severity: r.severity,
-      recommended_action: r.recommendedAction,
-      estimate_low_usd: est?.lowCostUsd ?? "",
-      estimate_high_usd: est?.highCostUsd ?? "",
-      estimate_confidence: est?.confidence ?? "",
-      estimate_notes: est?.notes ? String(est.notes).slice(0, 500) : "",
-      html_report_filename: roofReportHtmlFilename(r),
-    };
-  });
-}
-
-export function buildBulkEstimateManifestCsv(reports: DamageRoofReport[]): string {
-  const rows = buildBulkEstimateManifestRows(reports);
-  return Papa.unparse(rows, { header: true });
-}
+export type BulkExportDamageReportsOptions = {
+  /** Defaults to `bulk-damage-reports-<timestamp>.csv`. */
+  manifestBasename?: string;
+  /** Delay between HTML downloads on web (browser throttling). */
+  delayBetweenHtmlMs?: number;
+};
 
 /**
- * Web: download manifest CSV, then each HTML (filenames match `html_report_filename`).
- * Keeps contacts + estimates aligned with report files for outreach.
+ * Bulk export after CSV upload: manifest CSV (contacts + estimate columns + HTML filename)
+ * plus one HTML damage report per row.
+ * - **Web:** manifest first, then each `RoofReport_<id>.html` (same names as manifest column).
+ * - **Native:** shares manifest CSV, then opens share for each HTML sequentially.
  */
+export async function bulkExportDamageReports(
+  reports: DamageRoofReport[],
+  options?: BulkExportDamageReportsOptions,
+): Promise<void> {
+  if (reports.length === 0) return;
+  const manifest =
+    options?.manifestBasename ?? `bulk-damage-reports-${Date.now()}.csv`;
+  const delay = options?.delayBetweenHtmlMs ?? 280;
+
+  if (Platform.OS === "web") {
+    await exportBulkEstimatePackageWeb(reports, manifest, delay);
+    return;
+  }
+
+  await exportBulkEstimateManifestOnly(reports, manifest);
+  await exportBulkRoofReportsHtml(reports, delay);
+}
+
 /** Native / fallback: share only the manifest CSV (HTML still via Export all as HTML). */
 export async function exportBulkEstimateManifestOnly(
   reports: DamageRoofReport[],
@@ -68,41 +66,52 @@ export async function exportBulkEstimateManifestOnly(
   if (!result.ok) throw new Error(result.error);
 }
 
+/**
+ * Bulk export: one CSV with contacts + estimate columns (same rows as the manifest).
+ * No HTML files — use after CSV upload / bulk generate for spreadsheets or CRM.
+ */
+export async function exportBulkEstimatesCsvOnly(
+  reports: DamageRoofReport[],
+  basename = `bulk-estimates-${Date.now()}.csv`,
+): Promise<void> {
+  if (reports.length === 0) return;
+  await exportBulkEstimateManifestOnly(reports, basename);
+}
+
 export async function exportBulkEstimatePackageWeb(
   reports: DamageRoofReport[],
   manifestBasename = "bulk-estimates-manifest.csv",
-  delayMs = 280,
+  _delayMs = 280,
 ): Promise<void> {
   if (Platform.OS !== "web") {
     throw new Error("Bulk CSV + HTML package is supported on web.");
   }
   const csv = buildBulkEstimateManifestCsv(reports);
-  const { downloadTextFileWebSync } =
+  const { downloadBlobWebSync } =
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require("../utils/shareTextFile.web") as typeof import("../utils/shareTextFile.web");
-  const r0 = downloadTextFileWebSync(
-    manifestBasename,
-    csv,
-    "text/csv;charset=utf-8",
-  );
-  if (!r0.ok) throw new Error(r0.error);
+  const { zipSyncTextFiles } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("../utils/bulkWebZipDownload") as typeof import("../utils/bulkWebZipDownload");
 
-  for (let i = 0; i < reports.length; i++) {
-    const rep = reports[i];
-    const html = buildRoofReportHtmlDocument(rep);
-    const name = roofReportHtmlFilename(rep);
-    const r = downloadTextFileWebSync(name, html, "text/html;charset=utf-8");
-    if (!r.ok) throw new Error(r.error);
-    if (i < reports.length - 1) {
-      await new Promise((res) => setTimeout(res, delayMs));
-    }
+  const manifestPath = manifestBasename.replace(/[/\\?%*:|"<>]/g, "_").trim() || "manifest.csv";
+  const zipEntries: { path: string; content: string }[] = [
+    { path: manifestPath, content: csv },
+  ];
+  for (const rep of reports) {
+    zipEntries.push({
+      path: roofReportHtmlFilename(rep),
+      content: buildRoofReportHtmlDocument(rep),
+    });
   }
-}
 
-/**
- * Sample CSV for bulk import (lat/lng required). Company + inspector columns optional.
- * Default branding uses Cox Roofing + bundled logo when company includes "Cox".
- */
-export const BULK_LEADS_CSV_TEMPLATE = `lat,lng,address,homeowner_name,email,phone,company,company_phone,company_email,inspector_name,roof_sqft,roof_type
-39.123456,-94.578901,"123 Example Rd, Kansas City, MO 64108",Jane Doe,jane@example.com,555-0100,Cox Roofing,555-0200,estimates@coxroofing.com,Seth,2850,Asphalt Shingle
-`;
+  const zipped = zipSyncTextFiles(zipEntries);
+  const blob = new Blob([new Uint8Array(zipped)], { type: "application/zip" });
+  const zipName = manifestBasename.replace(/\.csv$/i, ".zip");
+  const safeZip =
+    zipName.endsWith(".zip") && zipName.length > 4
+      ? zipName
+      : `bulk-damage-reports-${Date.now()}.zip`;
+  const r = downloadBlobWebSync(safeZip, blob);
+  if (!r.ok) throw new Error(r.error);
+}

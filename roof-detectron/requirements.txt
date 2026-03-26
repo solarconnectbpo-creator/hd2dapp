@@ -1,0 +1,15 @@
+# PyTorch: install FIRST (match your CUDA if GPU; CPU wheels are default).
+#   py -3 -m pip install torch torchvision torchaudio
+# CUDA 12.x example:
+#   py -3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+#
+# Then:
+#   py -3 -m pip install -r requirements.txt
+#
+# Detectron2 (Windows): requires Microsoft C++ Build Tools + install with torch visible:
+#   py -3 -m pip install "git+https://github.com/facebookresearch/detectron2.git" --no-build-isolation
+# Or run: .\install-detectron2.ps1
+
+opencv-python>=4.8.0
+matplotlib>=3.7.0
+tqdm>=4.66.0

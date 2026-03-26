@@ -185,17 +185,70 @@ export interface RoofReportImage {
   uploadedAtIso: string;
 }
 
+/** One row in the damage-estimate calculator (quantities tie to effective squares or LF). */
+export interface RoofEstimateLineItem {
+  id: string;
+  category:
+    | "tearOff"
+    | "underlayment"
+    | "roofCover"
+    | "flashings"
+    | "membrane"
+    | "insulation"
+    | "accessories"
+    | "coating"
+    | "labor"
+    | "general"
+    | "fee";
+  description: string;
+  unit: "SQ" | "LF" | "SF" | "EA";
+  /** Effective roofing squares, linear feet, etc. */
+  quantity: number;
+  /** Indicative $/unit at the low end of the range (before rounding drift). */
+  unitLowUsd: number;
+  unitHighUsd: number;
+  lowUsd: number;
+  highUsd: number;
+  note?: string;
+}
+
+/**
+ * IRC-oriented items that often apply when re-roofing; not priced as separate rows unless noted.
+ * Always confirm with AHJ / local amendments.
+ */
+export interface RoofCodeUpgradeHint {
+  id: string;
+  title: string;
+  /** e.g. "IRC R905.2.7" */
+  codeReference?: string;
+  rationale: string;
+  applicability: "typical" | "climate_dependent" | "verify_local";
+}
+
 export interface RoofDamageEstimate {
   estimateId: string;
   createdAtIso: string;
 
   roofAreaSqFt?: number;
+  /** Plan area × (1 + waste factor), divided by 100 — same basis as $/SQ math. */
+  effectiveSquares?: number;
+  /** Waste allowance as percent (e.g. 12). */
+  wasteFactorPct?: number;
   // "repair" or "replace" is our simplified approach label.
   scope: "repair" | "replace";
 
   lowCostUsd: number;
   highCostUsd: number;
   confidence: "low" | "medium" | "high";
+
+  /** How the range was built (waste, multipliers, and trade buckets). */
+  methodology?: string;
+
+  /** Trade-style line items; amounts include damage-type mix + severity multipliers. */
+  lineItems?: RoofEstimateLineItem[];
+
+  /** Code-driven upgrades / verification items for this roof system. */
+  codeUpgrades?: RoofCodeUpgradeHint[];
 
   // Optional human notes (e.g., "estimated due to hail impact patterns")
   notes?: string;

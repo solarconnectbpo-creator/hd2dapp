@@ -7,11 +7,17 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8090
 
-    # stub | roboflow | http_json
+    # stub | roboflow | http_json | detectron2
     vision_provider: str = "stub"
 
     # Optional shared secret (set same on Worker proxy)
     service_secret: str = ""
+
+    # --- Detectron2 Mask R-CNN (roof instance segmentation) ---
+    # Train with repo roof-detectron; point to model_final.pth
+    detectron2_weights_path: str = ""
+    detectron2_score_thresh: float = 0.5
+    detectron2_include_polygons: bool = False
 
     # --- Roboflow hosted model (https://docs.roboflow.com/inference/hosted-api) ---
     roboflow_api_key: str = ""

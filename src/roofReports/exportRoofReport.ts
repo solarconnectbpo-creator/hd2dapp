@@ -11,6 +11,7 @@ import type {
   RoofDamageEstimate,
   NonRoofLineItemsEstimate,
 } from "./roofReportTypes";
+import { sumRoofEstimateLineItems } from "./roofEstimateTotals";
 import { getCompanyLogoUrl, getIntroNarrative } from "./companyBranding";
 import {
   COMMERCIAL_FLAT_ROOF_INSTRUCTIONS_KB_TITLE,
@@ -107,6 +108,31 @@ function escapeHtml(input: any): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/** Whole USD for export (avoids float artifacts like $33,290.428 from raw toLocaleString). */
+function formatUsdWhole(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return Math.round(n).toLocaleString("en-US");
+}
+
+function normalizeInspectorToken(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * If the stored "creator" label is the same as the company name (common for company-role logins),
+ * omit it for inspector attribution so we don't duplicate the business name as a person.
+ */
+function resolveInspectorForExport(report: DamageRoofReport): string | undefined {
+  const companyNorm = normalizeInspectorToken(report.companyName || "");
+  const pick = (raw?: string): string | undefined => {
+    const t = (raw || "").trim();
+    if (!t) return undefined;
+    if (companyNorm && normalizeInspectorToken(t) === companyNorm) return undefined;
+    return t;
+  };
+  return pick(report.creatorName) ?? pick(report.createdBy?.name);
 }
 
 /** IRC checklist rows limited to roof system / context (same logic as the live editor). */
@@ -323,13 +349,83 @@ function renderScheduleInspection(report: DamageRoofReport) {
   `;
 }
 
+function renderEstimateLineItemsHtml(estimate: RoofDamageEstimate): string {
+  const items = estimate.lineItems;
+  if (!items?.length) return "";
+  const rows = items
+    .map(
+      (it) => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top;">${escapeHtml(it.description)}${it.note ? `<div class="muted" style="margin-top:4px;font-size:10px;">${escapeHtml(it.note)}</div>` : ""}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(it.unit)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(it.quantity.toFixed(2))}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">$${formatUsdWhole(it.lowUsd)} – $${formatUsdWhole(it.highUsd)}</td>
+    </tr>`,
+    )
+    .join("");
+  const sum = sumRoofEstimateLineItems(items);
+  const drift =
+    Math.abs(sum.lowUsd - estimate.lowCostUsd) > 2 ||
+    Math.abs(sum.highUsd - estimate.highCostUsd) > 2;
+  const driftNote = drift
+    ? `<div class="muted" style="margin-top:6px;font-size:10px;line-height:1.45;">Line item subtotal ($${formatUsdWhole(sum.lowUsd)} – $${formatUsdWhole(sum.highUsd)}) differs from the final total — this report uses the final total above; older exports may omit add-on rows.</div>`
+    : "";
+  return `
+    <div style="margin-top:14px;">
+      <div class="label">Line item breakdown (trade buckets)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left;padding:8px 10px;">Description</th>
+            <th style="padding:8px 10px;">Unit</th>
+            <th style="padding:8px 10px;">Qty</th>
+            <th style="padding:8px 10px;">Range</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="padding:10px 10px;text-align:right;font-weight:700;border-top:2px solid #cbd5e1;">Final total</td>
+            <td style="padding:10px 10px;font-weight:700;border-top:2px solid #cbd5e1;">$${formatUsdWhole(estimate.lowCostUsd)} – $${formatUsdWhole(estimate.highCostUsd)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="muted" style="margin-top:6px;font-size:10px;line-height:1.45;">Line items sum to this final total (±$2 rounding). Display $/SQ is derived per effective square.</div>
+      ${driftNote}
+    </div>
+  `;
+}
+
+function renderCodeUpgradeHintsHtml(estimate: RoofDamageEstimate): string {
+  const hints = estimate.codeUpgrades;
+  if (!hints?.length) return "";
+  const rows = hints
+    .map(
+      (h) => `
+    <li style="margin-bottom:10px;line-height:1.45;">
+      <strong>${escapeHtml(h.title)}</strong>
+      ${h.codeReference ? `<span class="muted"> — ${escapeHtml(h.codeReference)}</span>` : ""}
+      <div class="muted" style="margin-top:4px;font-size:11px;">${escapeHtml(h.rationale)}</div>
+      <div class="muted" style="margin-top:2px;font-size:10px;">Applicability: ${escapeHtml(h.applicability)}</div>
+    </li>`,
+    )
+    .join("");
+  return `
+    <div style="margin-top:14px;padding:12px 14px;background:#fffbeb;border-radius:8px;border:1px solid #fcd34d;">
+      <div class="label">Code & upgrade considerations</div>
+      <ul style="margin:0;padding-left:18px;margin-top:8px;">${rows}</ul>
+      <div class="muted" style="margin-top:10px;font-size:10px;line-height:1.45;">Confirm with the AHJ and local amendments. Educational only — not a code determination.</div>
+    </div>
+  `;
+}
+
 function renderEstimate(
   estimate?: RoofDamageEstimate,
   inspectorName?: string,
   report?: DamageRoofReport,
 ) {
   if (!estimate) return "";
-  const range = `$${estimate.lowCostUsd.toLocaleString()} – $${estimate.highCostUsd.toLocaleString()}`;
+  const range = `$${formatUsdWhole(estimate.lowCostUsd)} – $${formatUsdWhole(estimate.highCostUsd)}`;
   const areaRaw =
     estimate.roofAreaSqFt ?? report?.measurements?.roofAreaSqFt ?? undefined;
   const areaNum =
@@ -362,10 +458,20 @@ function renderEstimate(
       </div>
       ${areaBlock}
       <div style="margin-top:10px;">
-        <div class="label">Preliminary investment range</div>
+        <div class="label">Final total (investment range)</div>
         <div class="metaText">${escapeHtml(range)}</div>
       </div>
       ${precisionBlock}
+      ${estimate.methodology ? `<div class="muted" style="margin-top:10px;font-size:11px;line-height:1.45;">${escapeHtml(estimate.methodology)}</div>` : ""}
+      ${renderEstimateLineItemsHtml(estimate)}
+      ${renderCodeUpgradeHintsHtml(estimate)}
+      ${
+        report?.eagleViewEstimate
+          ? `<div class="muted" style="margin-top:10px;padding:10px 12px;background:#fefce8;border-radius:8px;border:1px solid #fde047;font-size:11px;line-height:1.45;">
+        This <strong>damage cost range</strong> and any <strong>materials &amp; labor breakdown</strong> in this report use different models (damage vs. takeoff). Totals may not match; use each for its intended purpose.
+      </div>`
+          : ""
+      }
       <div class="muted" style="margin-top:8px;font-size:11px;line-height:1.45;">
         Calculator output only — not a bid or contract. An on-site inspection confirms scope, code, and final pricing.
       </div>
@@ -406,7 +512,7 @@ function renderNonRoofEstimate(
       `Fanfold foam: ${Math.round(nonRoof.fanfoldSqFt).toLocaleString()} sq ft`,
     );
 
-  const range = `$${nonRoof.lowCostUsd.toLocaleString()} - $${nonRoof.highCostUsd.toLocaleString()}`;
+  const range = `$${formatUsdWhole(nonRoof.lowCostUsd)} - $${formatUsdWhole(nonRoof.highCostUsd)}`;
   return `
     <div class="section">
       <h2>Non-Roof Items (Itemized)</h2>
@@ -709,21 +815,21 @@ function renderEagleViewEstimate(report: DamageRoofReport) {
 
   const m = ev.materials;
   const lines = [
-    `Shingles: ${m.shingles.quantity.toFixed(2)} sq · $${escapeHtml(m.shingles.cost.toLocaleString())}`,
-    `Underlayment: ${m.underlayment.quantity} roll(s) · $${escapeHtml(m.underlayment.cost.toLocaleString())}`,
-    `Ice & Water: ${m.iceAndWater.quantity} roll(s) · $${escapeHtml(m.iceAndWater.cost.toLocaleString())}`,
-    `Ridge Vent: ${m.ridgeVent.quantity} piece(s) · $${escapeHtml(m.ridgeVent.cost.toLocaleString())}`,
-    `Ridge Cap: ${m.ridgeCap.quantity} bundle(s) · $${escapeHtml(m.ridgeCap.cost.toLocaleString())}`,
-    `Starter Strip: ${m.starterStrip.quantity} bundle(s) · $${escapeHtml(m.starterStrip.cost.toLocaleString())}`,
-    `Nails: ${m.nails.quantity} lb · $${escapeHtml(m.nails.cost.toLocaleString())}`,
+    `Shingles: ${m.shingles.quantity.toFixed(2)} sq · $${formatUsdWhole(m.shingles.cost)}`,
+    `Underlayment: ${m.underlayment.quantity} roll(s) · $${formatUsdWhole(m.underlayment.cost)}`,
+    `Ice & Water: ${m.iceAndWater.quantity} roll(s) · $${formatUsdWhole(m.iceAndWater.cost)}`,
+    `Ridge Vent: ${m.ridgeVent.quantity} piece(s) · $${formatUsdWhole(m.ridgeVent.cost)}`,
+    `Ridge Cap: ${m.ridgeCap.quantity} bundle(s) · $${formatUsdWhole(m.ridgeCap.cost)}`,
+    `Starter Strip: ${m.starterStrip.quantity} bundle(s) · $${formatUsdWhole(m.starterStrip.cost)}`,
+    `Nails: ${m.nails.quantity} lb · $${formatUsdWhole(m.nails.cost)}`,
   ];
 
   return `
     <div class="section">
       <h2>Materials & labor breakdown</h2>
       <div class="grid2">
-        <div><div class="label">Final Total</div><div class="value">$${escapeHtml(ev.totals.final.toLocaleString())}</div></div>
-        <div><div class="label">Labor Total</div><div class="value">$${escapeHtml(ev.labor.total.toLocaleString())}</div></div>
+        <div><div class="label">Final Total</div><div class="value">$${escapeHtml(formatUsdWhole(ev.totals.final))}</div></div>
+        <div><div class="label">Labor Total</div><div class="value">$${escapeHtml(formatUsdWhole(ev.labor.total))}</div></div>
       </div>
       <div style="margin-top:10px;">
         <div class="label">Materials (quantities & costs)</div>
@@ -732,7 +838,7 @@ function renderEagleViewEstimate(report: DamageRoofReport) {
         </ul>
       </div>
       <div class="muted" style="margin-top:10px;">
-        Materials Total: $${escapeHtml(m.total.toLocaleString())} · Subtotal: $${escapeHtml(ev.totals.subtotal.toLocaleString())} · Overhead: $${escapeHtml(ev.additional.overhead.toLocaleString())} · Profit: $${escapeHtml(ev.additional.profit.toLocaleString())}
+        Materials Total: $${escapeHtml(formatUsdWhole(m.total))} · Subtotal: $${escapeHtml(formatUsdWhole(ev.totals.subtotal))} · Overhead: $${escapeHtml(formatUsdWhole(ev.additional.overhead))} · Profit: $${escapeHtml(formatUsdWhole(ev.additional.profit))}
       </div>
     </div>
   `;
@@ -1069,7 +1175,7 @@ export async function exportRoofReportToJson(
 /** Full printable HTML (used by export and tests). */
 export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
   const companyName = report.companyName || "Roof Inspection Co.";
-  const creatorName = report.creatorName || report.createdBy?.name || "";
+  const inspectorExportName = resolveInspectorForExport(report);
   const photosCount = report.images?.length ?? 0;
   const logoUrl = getCompanyLogoUrl(report);
   const intro = getIntroNarrative(companyName);
@@ -1241,7 +1347,7 @@ export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
         &nbsp;·&nbsp; <strong>Report ID</strong> ${escapeHtml(report.id)}
         &nbsp;·&nbsp; <strong>Created</strong> ${escapeHtml(formatDate(report.createdAtIso))}
         <br/>
-        <strong>Photos</strong> ${escapeHtml(photosCount.toString())}${creatorName ? ` &nbsp;·&nbsp; <strong>Inspector</strong> ${escapeHtml(creatorName)}` : ""}
+        <strong>Photos</strong> ${escapeHtml(photosCount.toString())}${inspectorExportName ? ` &nbsp;·&nbsp; <strong>Inspector</strong> ${escapeHtml(inspectorExportName)}` : ""}
       </div>
       <div class="intro">${escapeHtml(intro)}</div>
 
@@ -1325,15 +1431,15 @@ export function buildRoofReportHtmlDocument(report: DamageRoofReport): string {
       ${renderCommercialFlatRoofInstructionsKb(report)}
       ${renderEagleViewEstimate(report)}
       ${renderDamageSummarySection(report)}
-      ${renderEstimate(report.estimate, creatorName, report)}
-      ${renderNonRoofEstimate(report.nonRoofEstimate, creatorName)}
+      ${renderEstimate(report.estimate, inspectorExportName, report)}
+      ${renderNonRoofEstimate(report.nonRoofEstimate, inspectorExportName)}
       ${renderScheduleInspection(report)}
       ${renderMetarWeatherSection(report)}
       ${renderFieldQaSection(report)}
       ${renderAiDamageRisk(report)}
       ${renderScopeOfWork(report)}
       ${renderMeasurements(report.measurements)}
-      ${renderBuildingCode(buildingCodeForExport(report), creatorName)}
+      ${renderBuildingCode(buildingCodeForExport(report), inspectorExportName)}
       ${renderImages(report.images)}
 
       <div class="footer">
@@ -1374,11 +1480,47 @@ export async function exportRoofReportToHtml(
   onProgress?.(100, "Complete");
 }
 
-/** Download one HTML file per report (web). Small delay avoids browser download throttling. */
+/**
+ * Download HTML for many reports (web: one ZIP when multiple, so the browser keeps
+ * the user gesture; native: share sheet per file).
+ */
 export async function exportBulkRoofReportsHtml(
   reports: DamageRoofReport[],
   delayMs = 280,
 ): Promise<void> {
+  if (reports.length === 0) return;
+
+  if (Platform.OS === "web") {
+    const { downloadTextFileWebSync, downloadBlobWebSync } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../utils/shareTextFile.web") as typeof import("../utils/shareTextFile.web");
+    const { zipSyncTextFiles } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../utils/bulkWebZipDownload") as typeof import("../utils/bulkWebZipDownload");
+
+    if (reports.length === 1) {
+      const report = reports[0]!;
+      const filename = `RoofReport_${safeExportFilenamePart(report.id)}.html`;
+      const html = buildRoofReportHtmlDocument(report);
+      const r = downloadTextFileWebSync(filename, html, "text/html;charset=utf-8");
+      if (!r.ok) throw new Error(r.error);
+      return;
+    }
+
+    const zipEntries = reports.map((report) => ({
+      path: `RoofReport_${safeExportFilenamePart(report.id)}.html`,
+      content: buildRoofReportHtmlDocument(report),
+    }));
+    const zipped = zipSyncTextFiles(zipEntries);
+    const blob = new Blob([new Uint8Array(zipped)], {
+      type: "application/zip",
+    });
+    const zipName = `RoofReports_bulk_${Date.now()}.zip`;
+    const r = downloadBlobWebSync(zipName, blob);
+    if (!r.ok) throw new Error(r.error);
+    return;
+  }
+
   for (let i = 0; i < reports.length; i++) {
     await exportRoofReportToHtml(reports[i]);
     if (i < reports.length - 1) {

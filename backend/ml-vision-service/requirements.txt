@@ -3,3 +3,9 @@ uvicorn[standard]==0.32.1
 httpx==0.28.1
 python-multipart==0.0.20
 pydantic-settings==2.6.1
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+# Detectron2 (optional, VISION_PROVIDER=detectron2):
+#   pip install torch torchvision torchaudio
+#   pip install "git+https://github.com/facebookresearch/detectron2.git" --no-build-isolation
+# Windows: requires MSVC Build Tools. See README + install-detectron2.ps1

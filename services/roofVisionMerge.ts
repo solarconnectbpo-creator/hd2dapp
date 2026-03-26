@@ -51,12 +51,17 @@ export function mergeGptWithVisionDamage(
 ): GptDamageDraft {
   if (!vision || vision.error || vision.success === false) return gpt;
 
+  const hasSeg =
+    vision.segmentation != null &&
+    typeof vision.segmentation.polygonCount === "number" &&
+    typeof vision.segmentation.totalAreaPx === "number";
+
   const hasSignal =
     (vision.damageTypes && vision.damageTypes.length > 0) ||
     vision.severity != null ||
     vision.recommendedAction;
 
-  if (!hasSignal) return gpt;
+  if (!hasSignal && !hasSeg) return gpt;
 
   const vTypes = (vision.damageTypes ?? []).filter(isDamageType);
   const mergedTypes = [...new Set([...gpt.damageTypes, ...vTypes])];

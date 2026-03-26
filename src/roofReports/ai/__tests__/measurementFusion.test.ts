@@ -61,6 +61,45 @@ describe("Measurement Fusion", () => {
       expect(result.areaSqFt).toBeLessThan(1100);
     });
 
+    it("should not dilute area when another high-confidence source omits area", () => {
+      const sources: MeasurementSource[] = [
+        {
+          areaSqFt: 2000,
+          confidence: 0.8,
+          source: "user-trace",
+          timestamp: Date.now(),
+        },
+        {
+          confidence: 0.75,
+          source: "aerial-api",
+          timestamp: Date.now(),
+        },
+      ];
+      const result = fuseMeasurements(sources);
+      expect(result.areaSqFt).toBe(2000);
+    });
+
+    it("should fuse pitch as weighted rise/12 when multiple sources disagree", () => {
+      const sources: MeasurementSource[] = [
+        {
+          areaSqFt: 1000,
+          pitch: "6/12",
+          confidence: 0.8,
+          source: "ai-vision",
+          timestamp: Date.now(),
+        },
+        {
+          areaSqFt: 1000,
+          pitch: "8/12",
+          confidence: 0.8,
+          source: "user-trace",
+          timestamp: Date.now(),
+        },
+      ];
+      const result = fuseMeasurements(sources);
+      expect(result.pitch).toBe("7/12");
+    });
+
     it("should detect significant discrepancies", () => {
       const sources: MeasurementSource[] = [
         {

@@ -3,6 +3,17 @@
  * Merge results with GPT-based /api/ai/roof-damage in the UI as needed.
  */
 
+/** Detectron2 / future segmentation payloads (pixel space). */
+export type RoofSegmentationResult = {
+  polygonCount?: number;
+  totalAreaPx?: number;
+  perPolygonAreaPx?: number[];
+  imageWidth?: number;
+  imageHeight?: number;
+  /** Omitted when server sets detectron2_include_polygons=false (large). */
+  polygons?: number[][][] | null;
+};
+
 export type RoofVisionInferenceResult = {
   success?: boolean;
   provider?: string;
@@ -13,6 +24,8 @@ export type RoofVisionInferenceResult = {
   confidence?: number;
   notes?: string;
   error?: string;
+  /** Roof facet masks + areas when Worker → ml-vision-service uses Detectron2. */
+  segmentation?: RoofSegmentationResult;
 };
 
 export async function inferRoofVision(

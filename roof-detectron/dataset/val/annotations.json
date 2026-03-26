@@ -1,0 +1,16 @@
+{
+  "info": {
+    "description": "Roof val — replace with Roboflow COCO export",
+    "version": "1.0"
+  },
+  "licenses": [],
+  "images": [],
+  "annotations": [],
+  "categories": [
+    {
+      "id": 1,
+      "name": "roof",
+      "supercategory": "building"
+    }
+  ]
+}

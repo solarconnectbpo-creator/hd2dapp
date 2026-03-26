@@ -24,8 +24,8 @@ import { saveRoofLeads } from "@/src/roofReports/roofLeadsStorage";
 import { exportBulkRoofReportsHtml } from "@/src/roofReports/exportRoofReport";
 import {
   BULK_LEADS_CSV_TEMPLATE,
-  exportBulkEstimateManifestOnly,
-  exportBulkEstimatePackageWeb,
+  bulkExportDamageReports,
+  exportBulkEstimatesCsvOnly,
 } from "@/src/roofReports/bulkEstimateManifestExport";
 import type {
   DamageRoofReport,
@@ -47,6 +47,7 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingPackage, setExportingPackage] = useState(false);
+  const [exportingEstimatesCsv, setExportingEstimatesCsv] = useState(false);
   const [lastGenerated, setLastGenerated] = useState<DamageRoofReport[] | null>(
     null,
   );
@@ -170,11 +171,61 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         },
       );
       setLastGenerated(reports);
+      const regMsg = compact
+        ? `Generated ${reports.length} damage reports (compact mode: no satellite preview image per row to fit browser storage). Open Roof Reports to review.`
+        : `Generated ${reports.length} damage reports. You can open them from Roof Reports or export below.`;
       Alert.alert(
         "Reports created",
-        compact
-          ? `Generated ${reports.length} damage reports (compact mode: no satellite preview image per row to fit browser storage). Open Roof Reports to review.`
-          : `Generated ${reports.length} damage reports. You can open them from Roof Reports or export HTML below.`,
+        `${regMsg}\n\nExport now?`,
+        [
+          { text: "Later", style: "cancel" },
+          {
+            text: "Estimates CSV only",
+            onPress: () => {
+              void (async () => {
+                setExportingEstimatesCsv(true);
+                try {
+                  await exportBulkEstimatesCsvOnly(reports);
+                  Alert.alert(
+                    "Export",
+                    Platform.OS === "web"
+                      ? "Downloaded bulk-estimates CSV (contacts + estimate columns). No HTML files."
+                      : "Shared bulk-estimates CSV with contacts and estimate columns.",
+                  );
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  Alert.alert("Export failed", msg);
+                  console.error(e);
+                } finally {
+                  setExportingEstimatesCsv(false);
+                }
+              })();
+            },
+          },
+          {
+            text: "Manifest + HTML",
+            onPress: () => {
+              void (async () => {
+                setExportingPackage(true);
+                try {
+                  await bulkExportDamageReports(reports);
+                  Alert.alert(
+                    "Bulk export",
+                    Platform.OS === "web"
+                      ? "Downloaded one ZIP: manifest CSV plus each HTML report."
+                      : "Manifest CSV shared, then each HTML via share sheet.",
+                  );
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  Alert.alert("Export failed", msg);
+                  console.error(e);
+                } finally {
+                  setExportingPackage(false);
+                }
+              })();
+            },
+          },
+        ],
       );
     } catch (e) {
       console.error(e);
@@ -252,25 +303,43 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
     }
     setExportingPackage(true);
     try {
-      if (Platform.OS === "web") {
-        await exportBulkEstimatePackageWeb(list);
-        Alert.alert(
-          "Export package",
-          "Downloaded the manifest CSV first, then one HTML file per row. File names in the CSV match each report HTML. Use for email or CRM.",
-        );
-      } else {
-        await exportBulkEstimateManifestOnly(list);
-        Alert.alert(
-          "Manifest CSV",
-          "Shared the contact + estimate summary CSV. Use “Export all as HTML” for report files, or open this screen on web for one-click CSV + HTML.",
-        );
-      }
+      await bulkExportDamageReports(list);
+      Alert.alert(
+        "Bulk export",
+        Platform.OS === "web"
+          ? "Downloaded one ZIP with manifest CSV + HTML reports (columns match filenames)."
+          : "Manifest CSV shared, then each HTML report.",
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       Alert.alert("Export failed", msg);
       console.error(e);
     } finally {
       setExportingPackage(false);
+    }
+  };
+
+  const exportEstimatesCsvOnly = async () => {
+    const list = lastGenerated ?? [];
+    if (!list.length) {
+      Alert.alert("Nothing to export", "Generate reports first.");
+      return;
+    }
+    setExportingEstimatesCsv(true);
+    try {
+      await exportBulkEstimatesCsvOnly(list);
+      Alert.alert(
+        "Export",
+        Platform.OS === "web"
+          ? "Downloaded bulk-estimates CSV. Open in Excel or Sheets for sorting and filtering."
+          : "Shared bulk-estimates CSV with contacts and estimate columns.",
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("Export failed", msg);
+      console.error(e);
+    } finally {
+      setExportingEstimatesCsv(false);
     }
   };
 
@@ -285,7 +354,7 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         await exportBulkRoofReportsHtml(list);
         Alert.alert(
           "Export",
-          "Downloads should start in your browser (one file per report). Check your Downloads folder.",
+          "Downloaded a ZIP with all HTML reports (or a single HTML if only one). Check your Downloads folder.",
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Export failed.";
@@ -337,7 +406,8 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         Upload a contact list (lat/lng, address, homeowner + company contact
         fields). Each row becomes a damage + estimate report with Cox Roofing
         branding (bundled logo) and inspector name (default Seth). Export a
-        manifest CSV plus matching HTML files for organized outreach.
+        manifest CSV plus matching HTML files for organized outreach, or export
+        a single estimates spreadsheet (CSV only) without HTML.
       </ThemedText>
 
       <Card style={styles.card}>
@@ -436,7 +506,12 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
         <Button
           variant="secondary"
           onPress={() => void exportAllHtml()}
-          disabled={exporting || !lastGenerated?.length}
+          disabled={
+            exporting ||
+            exportingEstimatesCsv ||
+            exportingPackage ||
+            !lastGenerated?.length
+          }
           style={styles.btn}
         >
           {exporting
@@ -446,16 +521,42 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
             : "Export all as HTML"}
         </Button>
         <ThemedText type="caption" style={styles.helper}>
-          Exports one HTML file per report. On web, your browser may ask to
-          allow multiple downloads. On mobile, the share sheet opens for each
-          file in sequence. Reports stay saved under Roof Reports. Very large
-          jobs (1000+ rows) use compact reports and batched saves.
+          On web: one ZIP with all HTML files (or one HTML if only one report).
+          On mobile, the share sheet opens for each file. Reports stay saved
+          under Roof Reports. Very large jobs use compact reports and batched
+          saves.
+        </ThemedText>
+        <View style={{ height: 12 }} />
+        <Button
+          variant="secondary"
+          onPress={() => void exportEstimatesCsvOnly()}
+          disabled={
+            exportingEstimatesCsv ||
+            exporting ||
+            exportingPackage ||
+            !lastGenerated?.length
+          }
+          style={styles.btn}
+        >
+          {exportingEstimatesCsv
+            ? "Exporting…"
+            : "Export estimates CSV only"}
+        </Button>
+        <ThemedText type="caption" style={styles.helper}>
+          One spreadsheet: contacts, roof area, damage estimate range, optional
+          EagleView / non-roof columns, and the matching HTML filename for
+          reference—no report files downloaded.
         </ThemedText>
         <View style={{ height: 12 }} />
         <Button
           variant="secondary"
           onPress={() => void exportManifestAndHtml()}
-          disabled={exportingPackage || !lastGenerated?.length}
+          disabled={
+            exportingPackage ||
+            exportingEstimatesCsv ||
+            exporting ||
+            !lastGenerated?.length
+          }
           style={styles.btn}
         >
           {exportingPackage
@@ -463,10 +564,9 @@ export default function BulkCsvDamageReportsScreen({ navigation }: Props) {
             : "Export manifest CSV + all HTML (organized)"}
         </Button>
         <ThemedText type="caption" style={styles.helper}>
-          Downloads a spreadsheet with contact info, company fields, inspector,
-          estimate range, and the matching HTML filename for each property—then
-          the report files (web). Use the manifest to track who gets which
-          estimate.
+          Web: one ZIP containing the manifest CSV plus each HTML report (same
+          filenames as the spreadsheet column). Use the manifest to match rows
+          to files. Native: manifest first, then each HTML via the share sheet.
         </ThemedText>
       </Card>
 

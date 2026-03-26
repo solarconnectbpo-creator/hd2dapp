@@ -44,4 +44,17 @@ describe("mergeGptWithVisionDamage", () => {
     expect(out.recommendedAction).toBe("Repair");
     expect(out.notes).toContain("Vision (stub)");
   });
+
+  it("merges when vision has only segmentation (no damage fields)", () => {
+    const out = mergeGptWithVisionDamage(gpt, {
+      provider: "detectron2",
+      segmentation: {
+        polygonCount: 4,
+        totalAreaPx: 12000,
+        imageWidth: 1024,
+        imageHeight: 768,
+      },
+    });
+    expect(out.notes).toContain("Vision (detectron2)");
+  });
 });

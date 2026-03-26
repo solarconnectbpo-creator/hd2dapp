@@ -92,12 +92,14 @@ export default function ReportsHomeScreen({ navigation }: Props) {
         </View>
 
         <ThemedText type="caption" style={styles.singleFlowHint}>
-          Pick a property, then build the report and cost estimate on one screen
-          — tap{" "}
+          Pick a property, then build the damage report and estimate on one
+          screen. Tap{" "}
           <ThemedText type="caption" style={{ fontWeight: "700" }}>
             Finish & export report
           </ThemedText>{" "}
-          to preview and download HTML or JSON.
+          to open the finish sheet (save and preview, plus optional GIS,
+          precision, CSV, STL sources, and CompanyCam on web). Download HTML or
+          JSON from the preview screen.
         </ThemedText>
 
         {isLoading ? (

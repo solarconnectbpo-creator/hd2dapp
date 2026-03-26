@@ -4,6 +4,8 @@
  * with confidence weighting for highest accuracy.
  */
 
+import { parsePitchRiseRun } from "../roofPolygonMetrics";
+
 export interface MeasurementSource {
   areaSqFt?: number;
   perimeterFt?: number;
@@ -30,6 +32,28 @@ export interface SourceDiscrepancy {
   variance: number;
   sources: string[];
   recommendation: string;
+}
+
+/** Weighted mean of pitch as rise/12 when multiple sources disagree (parseable pitches only). */
+function fusePitchFromSources(
+  sources: MeasurementSource[],
+): string | undefined {
+  let num = 0;
+  let den = 0;
+  for (const s of sources) {
+    const rr = parsePitchRiseRun(s.pitch);
+    if (!rr || rr.run <= 0) continue;
+    const riseOn12 = (rr.rise / rr.run) * 12;
+    num += riseOn12 * s.confidence;
+    den += s.confidence;
+  }
+  if (den <= 0) {
+    const raw = sources.find((x) => x.pitch?.trim())?.pitch?.trim();
+    return raw;
+  }
+  const riseOn12 = num / den;
+  const r = Math.round(riseOn12 * 10) / 10;
+  return `${r}/12`;
 }
 
 /**
@@ -95,34 +119,34 @@ export function fuseMeasurements(
     };
   }
 
-  const totalWeight = validSources.reduce((sum, s) => sum + s.confidence, 0);
-
   let fusedArea: number | undefined;
   let fusedPerimeter: number | undefined;
 
-  if (validSources.some((s) => s.areaSqFt)) {
-    const weightedArea = validSources.reduce(
-      (sum, s) => sum + (s.areaSqFt || 0) * s.confidence,
-      0,
-    );
-    fusedArea = totalWeight > 0 ? weightedArea / totalWeight : undefined;
-  }
+  /** Weighted mean using only sources that supply the metric (avoids diluting by empty fields). */
+  const weightedMean = (
+    pick: (s: MeasurementSource) => number | undefined,
+  ): number | undefined => {
+    let num = 0;
+    let den = 0;
+    for (const s of validSources) {
+      const v = pick(s);
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        num += v * s.confidence;
+        den += s.confidence;
+      }
+    }
+    return den > 0 ? num / den : undefined;
+  };
 
-  if (validSources.some((s) => s.perimeterFt)) {
-    const weightedPerimeter = validSources.reduce(
-      (sum, s) => sum + (s.perimeterFt || 0) * s.confidence,
-      0,
-    );
-    fusedPerimeter =
-      totalWeight > 0 ? weightedPerimeter / totalWeight : undefined;
-  }
+  fusedArea = weightedMean((s) => s.areaSqFt);
+  fusedPerimeter = weightedMean((s) => s.perimeterFt);
 
-  const pitchSource = sorted.find((s) => s.pitch);
+  const fusedPitch = fusePitchFromSources(validSources);
 
   return {
     areaSqFt: fusedArea ? Math.round(fusedArea) : undefined,
     perimeterFt: fusedPerimeter ? Math.round(fusedPerimeter) : undefined,
-    pitch: pitchSource?.pitch,
+    pitch: fusedPitch,
     confidence: Math.max(...validSources.map((s) => s.confidence)),
     sourcesUsed: validSources.map((s) => s.source),
     fusionStrategy: "weighted-average",
@@ -136,7 +160,12 @@ function checkDiscrepancies(
 ): SourceDiscrepancy[] {
   const discrepancies: SourceDiscrepancy[] = [];
 
-  const areasWithValues = sources.filter((s) => s.areaSqFt);
+  const areasWithValues = sources.filter(
+    (s) =>
+      typeof s.areaSqFt === "number" &&
+      Number.isFinite(s.areaSqFt) &&
+      s.areaSqFt > 0,
+  );
   if (areasWithValues.length > 1) {
     const min = Math.min(...areasWithValues.map((s) => s.areaSqFt!));
     const max = Math.max(...areasWithValues.map((s) => s.areaSqFt!));

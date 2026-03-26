@@ -25,6 +25,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { MeasurementAccuracyPanel } from "@/components/MeasurementAccuracyPanel";
 import { RoofPitchGaugeStrip } from "@/components/RoofPitchGaugeStrip";
+import { RoofReportToolsModal } from "@/components/RoofReportToolsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { AppColors, BorderRadius, Spacing } from "@/constants/theme";
@@ -52,6 +53,7 @@ import {
   sanitizeRoofDamageEstimate,
   isEstimateDisplaySafe,
 } from "@/src/roofReports/roofEstimateValidate";
+import { mergeNonRoofIntoRoofDamageEstimate } from "@/src/roofReports/roofEstimateTotals";
 import { buildScheduleInspectionBlock } from "@/src/roofReports/scheduleInspectionBlock";
 import {
   getInspectionEmail,
@@ -454,7 +456,8 @@ export default function CreateDamageRoofReportScreen({
   const [companyCamImporting, setCompanyCamImporting] = useState(false);
   const [companyCamImportProgress, setCompanyCamImportProgress] =
     useState<string>("");
-  const [showAdvancedReportTools, setShowAdvancedReportTools] = useState(false);
+  const [roofToolsModalVisible, setRoofToolsModalVisible] = useState(false);
+  const [finishExportBusy, setFinishExportBusy] = useState(false);
   const [showAiPipeline, setShowAiPipeline] = useState(false);
   const [contactAutofillStatus, setContactAutofillStatus] =
     useState<string>("");
@@ -792,24 +795,25 @@ export default function CreateDamageRoofReportScreen({
     };
   };
 
-  const previewAndExport = async () => {
+  /** Returns true when the report was saved and preview was opened. */
+  const previewAndExport = async (): Promise<boolean> => {
     if (!property?.address?.trim()) {
       Alert.alert(
         "Missing property",
         "Pick a property on the map (or search) so the report has an address.",
       );
-      return;
+      return false;
     }
     if (!damageTypes.length) {
       Alert.alert("Missing damage types", "Select at least one damage type.");
-      return;
+      return false;
     }
     if (!inspectionDate.trim()) {
       Alert.alert(
         "Missing inspection date",
         "Add an inspection date (YYYY-MM-DD).",
       );
-      return;
+      return false;
     }
 
     const report = buildReportPayloadRef.current();
@@ -818,7 +822,7 @@ export default function CreateDamageRoofReportScreen({
         "Report incomplete",
         "Could not build the report. Check: property address, at least one damage type, and inspection date.",
       );
-      return;
+      return false;
     }
 
     try {
@@ -826,6 +830,7 @@ export default function CreateDamageRoofReportScreen({
       // `push` ensures a new Preview screen with this report. `navigate` can reuse an
       // existing ReportPreview in the stack and leave stale params after re-saving.
       navigation.push("ReportPreview", { report });
+      return true;
     } catch (e) {
       const msg =
         e instanceof Error
@@ -846,6 +851,7 @@ export default function CreateDamageRoofReportScreen({
           : msg,
       );
       console.error("upsertRoofReport failed:", e);
+      return false;
     }
   };
 
@@ -1240,14 +1246,14 @@ export default function CreateDamageRoofReportScreen({
       roofType: roofTypeForEstimate,
       recommendedAction,
       notes: buildEstimateComplianceNotes(),
+      stateCode: buildingCode?.stateCode,
+      roofPitch: measurements.roofPitch,
     });
 
     setEstimate(
-      sanitizeRoofDamageEstimate({
-        ...next,
-        lowCostUsd: next.lowCostUsd + nonRoofLowUsd,
-        highCostUsd: next.highCostUsd + nonRoofHighUsd,
-      }),
+      sanitizeRoofDamageEstimate(
+        mergeNonRoofIntoRoofDamageEstimate(next, nonRoofLowUsd, nonRoofHighUsd),
+      ),
     );
   };
 
@@ -1274,14 +1280,14 @@ export default function CreateDamageRoofReportScreen({
       roofType: roofTypeForEstimate,
       recommendedAction,
       notes: buildEstimateComplianceNotes(),
+      stateCode: buildingCode?.stateCode,
+      roofPitch: measurements.roofPitch,
     });
 
     setEstimate(
-      sanitizeRoofDamageEstimate({
-        ...next,
-        lowCostUsd: next.lowCostUsd + nonRoofLowUsd,
-        highCostUsd: next.highCostUsd + nonRoofHighUsd,
-      }),
+      sanitizeRoofDamageEstimate(
+        mergeNonRoofIntoRoofDamageEstimate(next, nonRoofLowUsd, nonRoofHighUsd),
+      ),
     );
   }, [
     roofAreaSqFtManual,
@@ -1300,6 +1306,8 @@ export default function CreateDamageRoofReportScreen({
     fanfoldSqFt,
     roofTypeForEstimate,
     effectiveBuildingCode,
+    buildingCode?.stateCode,
+    measurements.roofPitch,
     nonRoofLowUsd,
     nonRoofHighUsd,
     buildEstimateComplianceNotes,
@@ -1683,9 +1691,16 @@ export default function CreateDamageRoofReportScreen({
           .trim();
         return before ? `${before}\n\n---\n${block}` : block;
       });
+      const seg = visionOutcome?.segmentation;
+      const segHint =
+        seg != null &&
+        seg.polygonCount != null &&
+        seg.totalAreaPx != null
+          ? `\n\nRoof segmentation: ${seg.polygonCount} facet(s), ~${Math.round(seg.totalAreaPx)} px² total (calibrate scale for sq ft).`
+          : "";
       Alert.alert(
         "AI draft applied",
-        "Damage fields and notes were filled from the image. Review everything before saving.",
+        `Damage fields and notes were filled from the image. Review everything before saving.${segHint}`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1950,7 +1965,8 @@ export default function CreateDamageRoofReportScreen({
         </ThemedText>
         <ThemedText type="small" style={styles.subtitle}>
           Add measurements, damage, and (optional) calculate estimate — then tap
-          Finish & export for preview and HTML/JSON download.
+          Finish & export to save, open preview (HTML/JSON), and access GIS /
+          import tools in one place.
         </ThemedText>
 
         <Card style={styles.sectionCard}>
@@ -1963,124 +1979,73 @@ export default function CreateDamageRoofReportScreen({
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.helperText}>
-            Saves this report and opens preview — export HTML or JSON there.
-            IRC/IBC references appear on preview and export.
+            Opens a finish sheet: save and preview first, or use optional GIS,
+            precision, CSV, STL sources, and CompanyCam (web). Export HTML or
+            JSON on the preview screen. IRC/IBC references appear there.
           </ThemedText>
           <Button
-            onPress={() => void previewAndExport()}
+            onPress={() => setRoofToolsModalVisible(true)}
             style={styles.autoButton}
           >
             Finish & export report
           </Button>
-
-          <Pressable
-            onPress={() => setShowAdvancedReportTools((v) => !v)}
-            style={({ pressed }) => [
-              styles.advancedToggle,
-              { opacity: pressed ? 0.75 : 1 },
-            ]}
+          <ThemedText
+            type="caption"
+            style={[styles.helperText, { marginTop: 8 }]}
           >
-            <ThemedText type="small" style={styles.advancedToggleText}>
-              {showAdvancedReportTools
-                ? "Hide extra tools"
-                : "More tools (maps, aerial, CSV, GIS, AI pipeline)"}
+            Configure the damage cost estimate in the Damage Estimate section
+            below before saving.
+          </ThemedText>
+          {companyCamImportProgress ? (
+            <ThemedText
+              type="caption"
+              style={[styles.helperText, { marginTop: 8 }]}
+            >
+              {companyCamImportProgress}
             </ThemedText>
-            <Feather
-              name={showAdvancedReportTools ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={theme.textSecondary}
-            />
-          </Pressable>
-
-          {showAdvancedReportTools ? (
-            <View style={{ marginTop: 10, gap: 8 }}>
-              <Button
-                variant="secondary"
-                onPress={() =>
-                  navigation.navigate("GISBuildingMap", {
-                    address: property.address,
-                    latitude: property.lat,
-                    longitude: property.lng,
-                  })
-                }
-                style={styles.autoButton}
-              >
-                OSM building footprint
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() =>
-                  navigation.navigate("ComprehensiveRoof3DAssessment", {
-                    address: property.address,
-                    latitude: property.lat,
-                    longitude: property.lng,
-                  })
-                }
-                style={styles.autoButton}
-              >
-                Full roof assessment (demo)
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => void openPrecisionMeasurement()}
-                disabled={precisionNavLoading}
-                style={styles.autoButton}
-              >
-                {precisionNavLoading ? "Opening…" : "Precision measurement"}
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => navigation.navigate("BulkCsvDamageReports")}
-                style={styles.autoButton}
-              >
-                Bulk CSV import → reports
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() =>
-                  navigation.navigate("StLouisDataSources", {
-                    latitude: property.lat,
-                    longitude: property.lng,
-                  })
-                }
-                style={styles.autoButton}
-              >
-                St. Louis GIS & storm sources
-              </Button>
-              {Platform.OS === "web" ? (
-                <Button
-                  variant="secondary"
-                  onPress={handleImportCompanyCamPdf}
-                  disabled={companyCamImporting}
-                  style={styles.autoButton}
-                >
-                  {companyCamImporting
-                    ? "Importing PDF…"
-                    : "Import CompanyCam PDF"}
-                </Button>
-              ) : null}
-              {companyCamImportProgress ? (
-                <ThemedText
-                  type="caption"
-                  style={[styles.helperText, { marginTop: 4 }]}
-                >
-                  {companyCamImportProgress}
-                </ThemedText>
-              ) : null}
-              {measurements.precisionMeasurementSnapshot ? (
-                <ThemedText
-                  type="caption"
-                  style={[styles.helperText, { marginTop: 4 }]}
-                >
-                  Last precision:{" "}
-                  {measurements.precisionMeasurementSnapshot.success
-                    ? "OK"
-                    : "Incomplete"}{" "}
-                  · {measurements.precisionMeasurementSnapshot.provider}
-                </ThemedText>
-              ) : null}
-            </View>
           ) : null}
+          {measurements.precisionMeasurementSnapshot ? (
+            <ThemedText
+              type="caption"
+              style={[styles.helperText, { marginTop: 4 }]}
+            >
+              Last precision:{" "}
+              {measurements.precisionMeasurementSnapshot.success
+                ? "OK"
+                : "Incomplete"}{" "}
+              · {measurements.precisionMeasurementSnapshot.provider}
+            </ThemedText>
+          ) : null}
+
+          <RoofReportToolsModal
+            visible={roofToolsModalVisible}
+            onClose={() => setRoofToolsModalVisible(false)}
+            navigation={navigation}
+            property={{
+              address: property.address,
+              lat: property.lat,
+              lng: property.lng,
+            }}
+            mode="report"
+            finishReport={{
+              loading: finishExportBusy,
+              label: "Save & open preview",
+              onPress: async () => {
+                setFinishExportBusy(true);
+                try {
+                  if (await previewAndExport()) setRoofToolsModalVisible(false);
+                } finally {
+                  setFinishExportBusy(false);
+                }
+              },
+            }}
+            onPrecisionMeasurement={openPrecisionMeasurement}
+            precisionNavLoading={precisionNavLoading}
+            onCompanyCamPdf={
+              Platform.OS === "web" ? handleImportCompanyCamPdf : undefined
+            }
+            companyCamImporting={companyCamImporting}
+          />
         </Card>
 
         <Card style={styles.sectionCard}>
@@ -2514,10 +2479,11 @@ export default function CreateDamageRoofReportScreen({
             style={[styles.helperText, { marginTop: 8 }]}
           >
             Drafts damage types, severity, and recommended action from your
-            first photo in the Photos section (or satellite if no photo).
-            With an uploaded photo, also calls{" "}
-            <ThemedText type="small">/api/ai/roof-vision</ThemedText> (CNN
-            service when configured on the Worker). Requires backend{" "}
+            first photo in the Photos section (or satellite if no photo). With
+            an uploaded photo, also calls{" "}
+            <ThemedText type="small">/api/ai/roof-vision</ThemedText> (Python
+            vision service: Roboflow, Detectron2 roof masks, etc., when
+            configured on the Worker). Requires backend{" "}
             <ThemedText type="small">OPENAI_API_KEY</ThemedText>. Advisory only
             — verify on site.
           </ThemedText>
@@ -2724,15 +2690,17 @@ export default function CreateDamageRoofReportScreen({
                   {estimate.scope.toUpperCase()}
                 </ThemedText>
               </View>
-              <View style={styles.kvRow}>
-                <ThemedText type="small" style={styles.kvLabel}>
-                  Preliminary ballpark
-                </ThemedText>
-                <ThemedText type="small" style={styles.kvValue}>
-                  ${estimate.lowCostUsd.toLocaleString()} – $
-                  {estimate.highCostUsd.toLocaleString()}
-                </ThemedText>
-              </View>
+              {!estimate.lineItems?.length ? (
+                <View style={styles.kvRow}>
+                  <ThemedText type="small" style={styles.kvLabel}>
+                    Final total
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.kvValue}>
+                    ${estimate.lowCostUsd.toLocaleString()} – $
+                    {estimate.highCostUsd.toLocaleString()}
+                  </ThemedText>
+                </View>
+              ) : null}
               <View style={{ height: 8 }} />
               <View style={styles.kvRow}>
                 <ThemedText type="small" style={styles.kvLabel}>
@@ -2748,6 +2716,89 @@ export default function CreateDamageRoofReportScreen({
                 Confidence: {estimate.confidence}. Totals include non-roof line
                 items (fencing/HVAC) when entered below.
               </ThemedText>
+              {estimate.methodology ? (
+                <ThemedText
+                  type="caption"
+                  style={[styles.helperText, { marginTop: 10 }]}
+                >
+                  {estimate.methodology}
+                </ThemedText>
+              ) : null}
+              {estimate.lineItems && estimate.lineItems.length > 0 ? (
+                <View style={{ marginTop: 12 }}>
+                  <ThemedText type="small" style={{ fontWeight: "700" }}>
+                    Line items (trade buckets)
+                  </ThemedText>
+                  {estimate.lineItems.map((row) => (
+                    <View
+                      key={row.id}
+                      style={{
+                        marginTop: 8,
+                        paddingBottom: 8,
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: theme.border,
+                      }}
+                    >
+                      <ThemedText type="small" style={{ fontWeight: "600" }}>
+                        {row.description}
+                      </ThemedText>
+                      <ThemedText type="caption" style={styles.helperText}>
+                        {row.unit} × {row.quantity.toFixed(2)} → $
+                        {row.lowUsd.toLocaleString()} – $
+                        {row.highUsd.toLocaleString()}
+                      </ThemedText>
+                      {row.note ? (
+                        <ThemedText type="caption" style={styles.helperText}>
+                          {row.note}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                  ))}
+                  <View
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTopWidth: StyleSheet.hairlineWidth,
+                      borderTopColor: theme.border,
+                    }}
+                  >
+                    <View style={styles.kvRow}>
+                      <ThemedText type="small" style={styles.kvLabel}>
+                        Final total
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.kvValue}>
+                        ${estimate.lowCostUsd.toLocaleString()} – $
+                        {estimate.highCostUsd.toLocaleString()}
+                      </ThemedText>
+                    </View>
+                    <ThemedText type="caption" style={[styles.helperText, { marginTop: 6 }]}>
+                      Sum of the line items above (roof trade buckets plus other
+                      property add-ons when entered).
+                    </ThemedText>
+                  </View>
+                </View>
+              ) : null}
+              {estimate.codeUpgrades && estimate.codeUpgrades.length > 0 ? (
+                <View style={{ marginTop: 12 }}>
+                  <ThemedText type="small" style={{ fontWeight: "700" }}>
+                    Code & upgrade considerations
+                  </ThemedText>
+                  {estimate.codeUpgrades.map((c) => (
+                    <View key={c.id} style={{ marginTop: 8 }}>
+                      <ThemedText type="small">
+                        {c.title}
+                        {c.codeReference ? ` — ${c.codeReference}` : ""}
+                      </ThemedText>
+                      <ThemedText type="caption" style={styles.helperText}>
+                        {c.rationale}
+                      </ThemedText>
+                      <ThemedText type="caption" style={styles.helperText}>
+                        ({c.applicability})
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </>
           ) : null}
 
@@ -3197,8 +3248,9 @@ export default function CreateDamageRoofReportScreen({
             style={[styles.helperText, { marginTop: 6 }]}
           >
             Used to generate the Pitches Diagram. Example formats:{" "}
-            <ThemedText type="small">6/12</ThemedText> or{" "}
-            <ThemedText type="small">4:12</ThemedText>.
+            <ThemedText type="small">6/12</ThemedText>,{" "}
+            <ThemedText type="small">4:12</ThemedText>, or shorthand{" "}
+            <ThemedText type="small">6</ThemedText> (meaning 6/12).
           </ThemedText>
 
           <View style={{ marginTop: 14, gap: 10 }}>
@@ -3227,10 +3279,19 @@ export default function CreateDamageRoofReportScreen({
               model sees a clear scale or measurement overlay (otherwise they
               stay empty). Advisory only — verify on site.
             </ThemedText>
-            {measurements.roofPitch ? (
+            {measurements.roofPitch?.trim() ||
+            measurements.roofPitchAiGauge?.estimatePitch?.trim() ? (
               <RoofPitchGaugeStrip
-                pitch={measurements.roofPitch}
-                label="Slope gauge (from pitch)"
+                pitch={
+                  measurements.roofPitch?.trim() ||
+                  measurements.roofPitchAiGauge?.estimatePitch?.trim() ||
+                  ""
+                }
+                label={
+                  measurements.roofPitch?.trim()
+                    ? "Slope gauge (from pitch)"
+                    : "Slope gauge (AI estimate)"
+                }
               />
             ) : null}
             {measurements.roofPitchAiGauge ? (
@@ -3686,14 +3747,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
 
-  advancedToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginTop: 14,
-    paddingVertical: 6,
-  },
-  advancedToggleText: { flex: 1, fontWeight: "600", opacity: 0.88 },
   aiPipelineHeader: { marginBottom: 0 },
 });

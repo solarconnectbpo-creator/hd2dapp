@@ -1,0 +1,21 @@
+# Paths and training defaults (read by train.py / inference.py if extended).
+# Detectron2 core settings are still applied in train.py via get_cfg().
+
+dataset:
+  train_images: dataset/train/images
+  train_annotations: dataset/train/annotations.json
+  val_images: dataset/val/images
+  val_annotations: dataset/val/annotations.json
+
+model:
+  zoo_config: COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml
+  weights_out: output/model_final.pth
+  num_classes: 1
+  score_thresh_test: 0.5
+
+train:
+  ims_per_batch: 2
+  base_lr: 0.00025
+  max_iter: 3000
+  dataloader_workers: 2
+  roi_batch_size_per_image: 128

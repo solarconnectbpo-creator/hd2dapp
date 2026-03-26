@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from .config import settings
+from . import segmentation_detectron2 as d2seg
 
 DAMAGE_TYPES = [
     "Hail",
@@ -153,6 +154,50 @@ def map_generic_to_hd2d(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def infer_detectron2(image_b64: str, mime: str) -> dict[str, Any]:
+    """Roof facet masks + areas (px²); damage fields default to conservative stub."""
+    if not d2seg.detectron2_available():
+        raise ValueError(
+            "Detectron2 is not installed. Install torch, torchvision, opencv-python-headless, "
+            "then: pip install 'git+https://github.com/facebookresearch/detectron2.git'"
+        )
+    wpath = settings.detectron2_weights_path.strip()
+    if not wpath:
+        raise ValueError(
+            "DETECTRON2_WEIGHTS_PATH is required for VISION_PROVIDER=detectron2 "
+            "(path to model_final.pth from training)",
+        )
+    try:
+        raw = base64.b64decode(image_b64, validate=False)
+    except Exception as e:
+        raise ValueError(f"Invalid base64: {e}") from e
+
+    img = d2seg.decode_image_bgr(raw)
+    seg = d2seg.run_segmentation_bgr(
+        img,
+        weights_path=wpath,
+        score_thresh=float(settings.detectron2_score_thresh),
+        include_polygons=bool(settings.detectron2_include_polygons),
+    )
+
+    base = await infer_stub(image_b64, mime)
+    n = int(seg.get("polygonCount") or 0)
+    total_px = float(seg.get("totalAreaPx") or 0)
+    notes = (
+        f"Roof segmentation (Detectron2): {n} facet(s), ~{total_px:,.0f} px² total. "
+        "Pixel areas — multiply by (ft²/px²) from GSD or a known reference for sq ft."
+    )
+    return {
+        **base,
+        "success": True,
+        "provider": "detectron2",
+        "model": "mask_rcnn_R_50_FPN_3x",
+        "notes": notes,
+        "segmentation": seg,
+        "confidence": min(1.0, 0.55 + 0.05 * min(n, 8)),
+    }
+
+
 async def run_inference(image_b64: str, mime: str) -> dict[str, Any]:
     provider = settings.vision_provider.strip().lower()
     if provider == "stub":
@@ -161,4 +206,6 @@ async def run_inference(image_b64: str, mime: str) -> dict[str, Any]:
         return await infer_roboflow(image_b64, mime)
     if provider in ("http_json", "http", "managed"):
         return await infer_http_json(image_b64, mime)
+    if provider == "detectron2":
+        return await infer_detectron2(image_b64, mime)
     raise ValueError(f"Unknown VISION_PROVIDER: {provider}")

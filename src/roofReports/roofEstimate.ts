@@ -2,8 +2,29 @@ import type {
   DamageType,
   RecommendedAction,
   RoofDamageEstimate,
+  RoofEstimateLineItem,
   Severity,
 } from "./roofReportTypes";
+import {
+  getRoofCodeUpgradeHints,
+  shouldIncludeIceWaterLine,
+} from "./roofEstimateCodeUpgrades";
+import {
+  buildAsphaltSteepSlopeLines,
+  buildCoatingSystemLines,
+  buildGenericSteepTradeLines,
+  buildModBitLines,
+  buildSinglePlyMembraneLines,
+  buildThreeTabCompositionLines,
+  cloneBosWithTearWeight,
+} from "./roofEstimateLineAllocation";
+import {
+  getCoatingReplacementRate,
+  getEpdmMembraneRate,
+  getModBitReplacementRate,
+  getPvcMembraneRate,
+  getTpoMembraneRate,
+} from "./roofEstimateMembraneRates";
 import { sanitizeRoofDamageEstimate } from "./roofEstimateValidate";
 
 function clamp(n: number, min: number, max: number) {
@@ -94,10 +115,10 @@ function buildEstimateSummary(opts: {
 }
 
 /**
- * Demo estimate calculator. Replace with your real pricing model later.
- * - Uses roof area (sq ft)
- * - Uses severity + damage type mix
- * - Produces a low/high range.
+ * Roof damage $ range from plan-area (sq ft), roof system, severity, and scope.
+ * - Area input should be **horizontal footprint / plan** from trace, lead, or manual entry — not sloped “sheet” area unless you adjust.
+ * - Adds a **waste factor** (see `WASTE_FACTOR`) before per-square pricing; line items follow `roofEstimateLineAllocation` + membrane rates.
+ * - For **surface-area context**, see `buildRoofMeasurementGuidanceNotes` (pitch → approximate surface).
  */
 export function computeRoofDamageEstimate(opts: {
   roofAreaSqFt?: number;
@@ -106,6 +127,10 @@ export function computeRoofDamageEstimate(opts: {
   roofType?: string;
   notes?: string;
   recommendedAction?: RecommendedAction;
+  /** US state (e.g. MO) — ice-barrier & code-upgrade hints. */
+  stateCode?: string;
+  /** e.g. "6/12" — drives ice & water line item when low-slope. */
+  roofPitch?: string;
 }): RoofDamageEstimate {
   const rawArea = opts.roofAreaSqFt;
   const area =
@@ -125,6 +150,12 @@ export function computeRoofDamageEstimate(opts: {
       notes:
         opts.notes?.trim() ||
         "Enter a roof area (sq ft from trace, lead, or manual entry) to generate a dollar range.",
+      codeUpgrades: getRoofCodeUpgradeHints({
+        roofType: opts.roofType,
+        stateCode: opts.stateCode,
+        roofPitch: opts.roofPitch,
+        scope: "repair",
+      }),
     });
   }
 
@@ -166,200 +197,11 @@ export function computeRoofDamageEstimate(opts: {
     !isModBit &&
     !isCoating;
 
-  // Approximation based on your knowledge-base CSV:
-  // - Uses membrane replacement unit prices by mil/attachment
-  // - Adds a constant per-square "balance of system" estimate
-  //   (deck prep + insulation + misc conditions), and then applies overhead/profit.
-  // This keeps the model comparable to the slate example where we price per square.
-  const parseAttachment = (
-    text: string,
-  ):
-    | "fullyAdhered"
-    | "mechanicallyAttached"
-    | "ballasted"
-    | "inductionWelded"
-    | "heatWelded" => {
-    const t = text.toLowerCase();
-    if (t.includes("ballasted")) return "ballasted";
-    if (t.includes("induction")) return "inductionWelded";
-    if (
-      t.includes("heat-weld") ||
-      t.includes("heat welded") ||
-      t.includes("heat-welded")
-    )
-      return "heatWelded";
-    if (
-      t.includes("fully adhered") ||
-      t.includes("fully-adhered") ||
-      t.includes("fa")
-    )
-      return "fullyAdhered";
-    if (
-      t.includes("mechanically attached") ||
-      t.includes("mechanically-attached") ||
-      t.includes("ma") ||
-      t.includes("mechanical")
-    ) {
-      return "mechanicallyAttached";
-    }
-    return "mechanicallyAttached";
-  };
-
-  const getTpoMembraneRate = (): number => {
-    // Mil (45/60/80/90). Default to 60 if not found.
-    const milMatch = rt.match(/\b(45|60|80|90)\s*-?\s*mil\b/i);
-    const mil = milMatch?.[1] ? milMatch[1] : "60";
-
-    // Attachment method. Default to mechanically attached.
-    const attachment = parseAttachment(rt);
-
-    // Membrane $/SQ from your CSV (TPO membrane line items).
-    const membraneRateTable: Record<string, number> = {
-      "45-mechanicallyAttached": 285,
-      "45-fullyAdhered": 340,
-      "45-inductionWelded": 315,
-      "45-ballasted": 265,
-
-      "60-mechanicallyAttached": 345,
-      "60-fullyAdhered": 415,
-      "60-inductionWelded": 385,
-      "60-ballasted": 320,
-
-      "80-mechanicallyAttached": 445,
-      "80-fullyAdhered": 525,
-      "80-inductionWelded": 495,
-
-      "90-mechanicallyAttached": 520,
-      "90-fullyAdhered": 615,
-      "90-inductionWelded": 580,
-    };
-
-    const key = `${mil}-${attachment}`;
-    const fallbackKey = `${mil}-mechanicallyAttached`;
-    return membraneRateTable[key] ?? membraneRateTable[fallbackKey] ?? 345;
-  };
-
-  const getEpdmMembraneRate = (): number => {
-    const milMatch = rt.match(/\b(45|60|90)\s*-?\s*mil\b/i);
-    const mil = milMatch?.[1] ? milMatch[1] : "60";
-    const attachment = parseAttachment(rt);
-
-    const membraneRateTable: Record<string, number> = {
-      "45-fullyAdhered": 295,
-      "45-mechanicallyAttached": 265,
-      "45-ballasted": 235,
-
-      "60-fullyAdhered": 365,
-      "60-mechanicallyAttached": 328,
-      "60-ballasted": 298,
-
-      "90-fullyAdhered": 485,
-      "90-mechanicallyAttached": 435,
-      "90-ballasted": 398,
-    };
-
-    const key = `${mil}-${attachment}`;
-    const fallbackKey = "60-mechanicallyAttached";
-    return membraneRateTable[key] ?? membraneRateTable[fallbackKey] ?? 328;
-  };
-
-  const getPvcMembraneRate = (): number => {
-    const milMatch = rt.match(/\b(40|50|60|80)\s*-?\s*mil\b/i);
-    const mil = milMatch?.[1] ? milMatch[1] : "60";
-    const attachment = parseAttachment(rt);
-
-    const membraneRateTable: Record<string, number> = {
-      "40-mechanicallyAttached": 310,
-      "40-fullyAdhered": 375,
-
-      "50-mechanicallyAttached": 365,
-      "50-fullyAdhered": 435,
-      "50-heatWelded": 395,
-
-      "60-mechanicallyAttached": 425,
-      "60-fullyAdhered": 505,
-      "60-heatWelded": 465,
-
-      "80-mechanicallyAttached": 545,
-      "80-fullyAdhered": 635,
-      "80-heatWelded": 595,
-    };
-
-    const key = `${mil}-${attachment}`;
-    const fallbackKey = "60-mechanicallyAttached";
-    return membraneRateTable[key] ?? membraneRateTable[fallbackKey] ?? 425;
-  };
-
-  const getModBitReplacementRate = (): number => {
-    // Modified Bitumen CSV default 2-ply system replace rates:
-    // - APP torch-applied 2-ply system: $335/SQ
-    // - SBS self-adhered 2-ply system: $320/SQ
-    // - SBS heat-welded 2-ply system: $342/SQ
-    const lower = rt;
-    const hasTorch = lower.includes("torch");
-    const isSbs = lower.includes("sbs");
-    const isApp = lower.includes("app");
-
-    if (hasTorch || isApp) return 335;
-    if (isSbs) {
-      if (lower.includes("heat") || lower.includes("weld")) return 342;
-      return 320;
-    }
-    // Default to torch-applied APP to avoid under-estimating.
-    return 335;
-  };
-
-  const getCoatingReplacementRate = (): number => {
-    // Uses coating system totals from your CSV as a starting point.
-    // Silicone: 2-coat $185, 3-coat $268
-    // Acrylic: 2-coat $142, 3-coat $210, elastomeric $148
-    // SPF: 1" $145, 1.5" $198, 2" $248, 3" $345, 4" $445
-    // Butyl: 2-coat $225
-    // Aluminum fibrated: 1-coat $48, 2-coat $88
-    const lower = rt;
-    const is3Coat = lower.includes("3-coat") || lower.includes("3 coat");
-
-    if (lower.includes("silicone")) return is3Coat ? 268 : 185;
-    if (lower.includes("acrylic")) {
-      if (lower.includes("elastomer")) return 148;
-      return is3Coat ? 210 : 142;
-    }
-    if (lower.includes("spf") || lower.includes("spray foam")) {
-      if (
-        lower.includes('4"') ||
-        lower.includes("4 inch") ||
-        lower.includes("4-inch")
-      )
-        return 445;
-      if (
-        lower.includes('3"') ||
-        lower.includes("3 inch") ||
-        lower.includes("3-inch")
-      )
-        return 345;
-      if (
-        lower.includes('2"') ||
-        lower.includes("2 inch") ||
-        lower.includes("2-inch")
-      )
-        return 248;
-      if (
-        lower.includes("1.5") ||
-        lower.includes('1.5"') ||
-        lower.includes("1-1/2")
-      )
-        return 198;
-      return 145;
-    }
-    if (lower.includes("butyl")) return 225;
-    if (lower.includes("aluminum")) {
-      const twoCoat = lower.includes("2-coat") || lower.includes("2 coat");
-      return twoCoat ? 88 : 48;
-    }
-
-    // Default to silicone 2-coat.
-    return 185;
-  };
+  const is3TabCompShingle =
+    rt.includes("3-tab") ||
+    rt.includes("3 tab") ||
+    rt.includes("comp shingle") ||
+    rt.includes("composition shingle");
 
   // Base per-square ranges for repair/replace.
   let repairRateLow = 1400;
@@ -388,7 +230,7 @@ export function computeRoofDamageEstimate(opts: {
     replaceRateLow = 2200;
     replaceRateHigh = 3000;
   } else if (isTpo) {
-    const membraneRate = getTpoMembraneRate();
+    const membraneRate = getTpoMembraneRate(rt);
 
     // Base balance-of-system estimate per square (before waste/overhead).
     // Uses key unit prices from your knowledge-base sheets (Quick Price Reference / TPO sheet):
@@ -407,7 +249,7 @@ export function computeRoofDamageEstimate(opts: {
     replaceRateLow = Math.round(basePerSq * 1.05);
     replaceRateHigh = Math.round(basePerSq * 1.3);
   } else if (isEpdm) {
-    const membraneRate = getEpdmMembraneRate();
+    const membraneRate = getEpdmMembraneRate(rt);
     // EPDM tear-off removal (single-ply): $44.75 / SQ
     const balanceOfSystem = 44.75 + 18.5 + 142 + 12.5 + 28 + 4.5; // $/SQ heuristic
     const basePerSq = (balanceOfSystem + membraneRate) * 1.21;
@@ -416,7 +258,7 @@ export function computeRoofDamageEstimate(opts: {
     replaceRateLow = Math.round(basePerSq * 1.05);
     replaceRateHigh = Math.round(basePerSq * 1.3);
   } else if (isPvc) {
-    const membraneRate = getPvcMembraneRate();
+    const membraneRate = getPvcMembraneRate(rt);
     // PVC tear-off removal (single-ply): $48.50 / SQ
     const balanceOfSystem = 48.5 + 18.5 + 142 + 12.5 + 28 + 4.5; // $/SQ heuristic
     const basePerSq = (balanceOfSystem + membraneRate) * 1.21;
@@ -425,7 +267,7 @@ export function computeRoofDamageEstimate(opts: {
     replaceRateLow = Math.round(basePerSq * 1.05);
     replaceRateHigh = Math.round(basePerSq * 1.3);
   } else if (isModBit) {
-    const modBitRate = getModBitReplacementRate();
+    const modBitRate = getModBitReplacementRate(rt);
     // Modified bitumen tear-off removal (Quick Price Reference / Modified Bitumen tear-off):
     // Remove Modified Bitumen Roof: $80.69 / SQ
     const balanceOfSystem = 80.69 + 18.5 + 142 + 12.5 + 28 + 4.5; // $/SQ heuristic
@@ -435,7 +277,7 @@ export function computeRoofDamageEstimate(opts: {
     replaceRateLow = Math.round(basePerSq * 1.05);
     replaceRateHigh = Math.round(basePerSq * 1.3);
   } else if (isCoating) {
-    const coatingRate = getCoatingReplacementRate();
+    const coatingRate = getCoatingReplacementRate(rt);
     const basePerSq = (coatingRate + 18.5) * 1.21; // add light surface prep heuristic
     repairRateLow = Math.round(basePerSq * 0.9);
     repairRateHigh = Math.round(basePerSq * 1.05);
@@ -443,12 +285,6 @@ export function computeRoofDamageEstimate(opts: {
     replaceRateHigh = Math.round(basePerSq * 1.3);
   } else {
     // 3-Tab Comp Shingle (from your "3-Tab Comp Shingle" + "Quick Price Reference" sheets)
-    const is3TabCompShingle =
-      rt.includes("3-tab") ||
-      rt.includes("3 tab") ||
-      rt.includes("comp shingle") ||
-      rt.includes("composition shingle");
-
     if (is3TabCompShingle) {
       // Approximate full replacement line-item $/SQ using your example values:
       // - Remove 3-Tab 25yr Comp. Shingle – incl. felt: $89.24 / SQ
@@ -504,14 +340,125 @@ export function computeRoofDamageEstimate(opts: {
     .filter(Boolean)
     .join("\n\n");
 
+  const codeUpgrades = getRoofCodeUpgradeHints({
+    roofType: opts.roofType,
+    stateCode: opts.stateCode,
+    roofPitch: opts.roofPitch,
+    scope,
+  });
+
+  const includeIceWaterLine = shouldIncludeIceWaterLine(
+    opts.stateCode,
+    opts.roofPitch,
+  );
+
+  let lineItems: RoofEstimateLineItem[] = [];
+  if (isSlate) {
+    lineItems = buildGenericSteepTradeLines({
+      label: "Natural slate",
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isMetal) {
+    lineItems = buildGenericSteepTradeLines({
+      label: "Metal panel",
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isTile) {
+    lineItems = buildGenericSteepTradeLines({
+      label: "Tile",
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isFlat) {
+    lineItems = buildGenericSteepTradeLines({
+      label: "Low-slope / built-up (generic)",
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isTpo) {
+    lineItems = buildSinglePlyMembraneLines({
+      membraneLabel: "TPO (thermoplastic olefin)",
+      membraneRate: getTpoMembraneRate(rt),
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isEpdm) {
+    lineItems = buildSinglePlyMembraneLines({
+      membraneLabel: "EPDM (rubber)",
+      membraneRate: getEpdmMembraneRate(rt),
+      bosParts: cloneBosWithTearWeight(
+        44.75,
+        "Tear-off removal (EPDM single-ply)",
+      ),
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isPvc) {
+    lineItems = buildSinglePlyMembraneLines({
+      membraneLabel: "PVC (thermoplastic)",
+      membraneRate: getPvcMembraneRate(rt),
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isModBit) {
+    lineItems = buildModBitLines({
+      modBitRate: getModBitReplacementRate(rt),
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (isCoating) {
+    lineItems = buildCoatingSystemLines({
+      coatingLabel: (opts.roofType ?? "Coating system").trim().slice(0, 48),
+      coatingRate: getCoatingReplacementRate(rt),
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else if (is3TabCompShingle) {
+    lineItems = buildThreeTabCompositionLines({
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+    });
+  } else {
+    lineItems = buildAsphaltSteepSlopeLines({
+      scope,
+      totalLow: lowCostUsd,
+      totalHigh: highCostUsd,
+      effectiveSquares,
+      includeIceWaterLine,
+    });
+  }
+
+  const methodology = [
+    `Plan area ${Math.round(area)} sq ft → ${effectiveSquares.toFixed(2)} effective squares (includes ${Math.round(WASTE_FACTOR * 100)}% waste).`,
+    `Damage-type mix ×${mixMultiplier.toFixed(2)} and severity ×${sevMultiplier.toFixed(2)} scale the scoped $/SQ model.`,
+    `Line items are trade buckets that sum to the ${scope === "replace" ? "replacement" : "repair"} range (±$1 rounding).`,
+  ].join(" ");
+
   return sanitizeRoofDamageEstimate({
     estimateId: `est_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     createdAtIso: new Date().toISOString(),
     roofAreaSqFt: Math.round(area),
+    effectiveSquares: Math.round(effectiveSquares * 100) / 100,
+    wasteFactorPct: Math.round(WASTE_FACTOR * 100),
     scope,
     lowCostUsd,
     highCostUsd,
     confidence,
+    methodology,
+    lineItems,
+    codeUpgrades,
     notes: notesMerged || undefined,
   });
 }

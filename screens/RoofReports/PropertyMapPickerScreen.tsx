@@ -16,6 +16,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { RoofReportToolsModal } from "@/components/RoofReportToolsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { Spacing, AppColors, BorderRadius } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
@@ -103,6 +104,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
   const [stlIntelLoading, setStlIntelLoading] = useState(false);
   const [stlIntelError, setStlIntelError] = useState<string | null>(null);
   const [stlIntelOutsideMissouri, setStlIntelOutsideMissouri] = useState(false);
+  const [roofToolsModalVisible, setRoofToolsModalVisible] = useState(false);
   const tabBarHeight = React.useContext(BottomTabBarHeightContext) ?? 70;
 
   const identifyRoofType = (p: PropertySelection): PropertySelection => {
@@ -814,46 +816,23 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
 
             <Button
               variant="secondary"
-              onPress={() =>
-                navigation.navigate("StLouisDataSources", {
-                  latitude: selected.lat,
-                  longitude: selected.lng,
-                })
-              }
+              onPress={() => setRoofToolsModalVisible(true)}
               style={styles.secondaryButton}
             >
-              Full STL GIS & storm sources
+              Roof tools & data
             </Button>
 
-            <View style={{ height: 8 }} />
-
-            <Button
-              variant="secondary"
-              onPress={() =>
-                navigation.navigate("GISBuildingMap", {
-                  address: selected.address,
-                  latitude: selected.lat,
-                  longitude: selected.lng,
-                })
-              }
-              style={styles.secondaryButton}
-            >
-              OSM building footprint
-            </Button>
-            <View style={{ height: 8 }} />
-            <Button
-              variant="secondary"
-              onPress={() =>
-                navigation.navigate("ComprehensiveRoof3DAssessment", {
-                  address: selected.address,
-                  latitude: selected.lat,
-                  longitude: selected.lng,
-                })
-              }
-              style={styles.secondaryButton}
-            >
-              Full roof assessment
-            </Button>
+            <RoofReportToolsModal
+              visible={roofToolsModalVisible}
+              onClose={() => setRoofToolsModalVisible(false)}
+              navigation={navigation}
+              property={{
+                address: selected.address,
+                lat: selected.lat,
+                lng: selected.lng,
+              }}
+              mode="mapPicker"
+            />
 
             <View style={{ height: 10 }} />
 

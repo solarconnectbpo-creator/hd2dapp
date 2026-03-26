@@ -67,6 +67,43 @@ export function downloadTextFileWebSync(
   }
 }
 
+/** Same user-gesture rules as {@link downloadTextFileWebSync}; use for ZIP / binary blobs. */
+export function downloadBlobWebSync(
+  filename: string,
+  blob: Blob,
+): ShareTextFileResult {
+  try {
+    if (typeof document === "undefined") {
+      return {
+        ok: false,
+        error: "Download is only available in a browser environment.",
+      };
+    }
+
+    const safeName = sanitizeDownloadFilename(filename);
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = safeName;
+    link.rel = "noopener noreferrer";
+    link.setAttribute(
+      "style",
+      "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0.01;pointer-events:auto",
+    );
+    document.body.appendChild(link);
+    void link.offsetWidth;
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+    return { ok: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: message };
+  }
+}
+
 export async function shareTextFile(
   filename: string,
   content: string,

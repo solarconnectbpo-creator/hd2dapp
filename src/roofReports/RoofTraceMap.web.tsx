@@ -30,6 +30,10 @@ import {
   updateMapPaintForMaterial,
 } from "./roofMaterialOverlay";
 import { waitForHtmlElement } from "./mapDomUtils";
+import {
+  computePolygonFootprintAreaSqFt,
+  computePolygonPerimeterFeet,
+} from "./roofPolygonMetrics";
 
 const MAP_CONTAINER_ID = "roofTraceMapContainer";
 const OSM_FALLBACK_STYLE = {
@@ -387,22 +391,17 @@ export default function RoofTraceMap({
               return;
             }
 
-            let areaSqFt: number | undefined;
-            let perimeterFt: number | undefined;
-
-            try {
-              areaSqFt = turf.area(feature) * 10.7639104167;
-            } catch {
-              // ignore
-            }
-
-            try {
-              const line = turf.polygonToLine(feature);
-              perimeterFt =
-                turf.length(line, { units: "kilometers" }) * 3280.839895;
-            } catch {
-              // ignore
-            }
+            const areaSqFt = computePolygonFootprintAreaSqFt(
+              feature as GeoJSON.Feature<
+                GeoJSON.Polygon | GeoJSON.MultiPolygon
+              >,
+            );
+            const perimeterFt =
+              feature.geometry?.type === "Polygon"
+                ? computePolygonPerimeterFeet(
+                    feature as GeoJSON.Feature<GeoJSON.Polygon>,
+                  )
+                : undefined;
 
             const roundedArea =
               areaSqFt && Number.isFinite(areaSqFt)

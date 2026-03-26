@@ -12,4 +12,10 @@ if (-not (Test-Path .venv)) {
 }
 $pip = Join-Path $PSScriptRoot ".venv\Scripts\pip.exe"
 & $pip install -r requirements.txt
-Write-Host "Done. Activate: .\.venv\Scripts\Activate.ps1  then: uvicorn app.main:app --reload --port 8090"
+Write-Host ""
+Write-Host "Core deps installed. For Detectron2 (VISION_PROVIDER=detectron2):"
+Write-Host "  1) Install MSVC Build Tools (C++ workload)"
+Write-Host "  2) Run: .\install-detectron2.ps1"
+Write-Host ""
+Write-Host "Done. Activate: .\.venv\Scripts\Activate.ps1"
+Write-Host "Then: python -m uvicorn app.main:app --reload --port 8090"

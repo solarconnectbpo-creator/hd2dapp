@@ -18,12 +18,14 @@ import { Card } from "@/components/Card";
 import { MeasurementAccuracyPanel } from "@/components/MeasurementAccuracyPanel";
 import { RoofPitchGaugeStrip } from "@/components/RoofPitchGaugeStrip";
 import { Button } from "@/components/Button";
+import { RoofReportToolsModal } from "@/components/RoofReportToolsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { AppColors, BorderRadius, Spacing } from "@/constants/theme";
 import {
   exportRoofReportToHtml,
   exportRoofReportToJson,
 } from "@/src/roofReports/exportRoofReport";
+import { sumRoofEstimateLineItems } from "@/src/roofReports/roofEstimateTotals";
 import { roofMeasurementsHaveContent } from "@/src/roofReports/eavemeasureIntegration";
 import {
   FIELD_QA_ITEMS,
@@ -121,6 +123,7 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
   );
   const [exportProgressPct, setExportProgressPct] = useState(0);
   const [exportPhase, setExportPhase] = useState("");
+  const [roofToolsModalVisible, setRoofToolsModalVisible] = useState(false);
 
   const effectivePropertyUse =
     report.propertyUse ?? report.property.propertyUse;
@@ -376,36 +379,28 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
             </ThemedText>
           </View>
           <ThemedText type="caption" style={styles.propCoords}>
-            Same coordinates as this report — open footprint or full assessment.
+            Same coordinates as this report — open footprint or full assessment
+            from one menu.
           </ThemedText>
           <View style={{ height: 10 }} />
           <Button
             variant="secondary"
-            onPress={() =>
-              navigation.navigate("GISBuildingMap", {
-                address: report.property.address,
-                latitude: report.property.lat,
-                longitude: report.property.lng,
-              })
-            }
+            onPress={() => setRoofToolsModalVisible(true)}
             style={styles.autoButton}
           >
-            OSM building footprint
+            Roof tools & data
           </Button>
-          <View style={{ height: 8 }} />
-          <Button
-            variant="secondary"
-            onPress={() =>
-              navigation.navigate("ComprehensiveRoof3DAssessment", {
-                address: report.property.address,
-                latitude: report.property.lat,
-                longitude: report.property.lng,
-              })
-            }
-            style={styles.autoButton}
-          >
-            Full roof assessment
-          </Button>
+          <RoofReportToolsModal
+            visible={roofToolsModalVisible}
+            onClose={() => setRoofToolsModalVisible(false)}
+            navigation={navigation}
+            property={{
+              address: report.property.address,
+              lat: report.property.lat,
+              lng: report.property.lng,
+            }}
+            mode="preview"
+          />
         </Card>
       ) : null}
 
@@ -759,10 +754,19 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
               Roof Pitch: {report.measurements.roofPitch}
             </ThemedText>
           ) : null}
-          {report.measurements?.roofPitch ? (
+          {report.measurements?.roofPitch?.trim() ||
+          report.measurements?.roofPitchAiGauge?.estimatePitch?.trim() ? (
             <RoofPitchGaugeStrip
-              pitch={report.measurements.roofPitch}
-              label="Slope gauge"
+              pitch={
+                report.measurements?.roofPitch?.trim() ||
+                report.measurements?.roofPitchAiGauge?.estimatePitch?.trim() ||
+                ""
+              }
+              label={
+                report.measurements?.roofPitch?.trim()
+                  ? "Slope gauge"
+                  : "Slope gauge (AI)"
+              }
             />
           ) : null}
           {report.measurements?.roofPitchAiGauge ? (
@@ -1549,16 +1553,95 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           <ThemedText type="small" style={styles.value}>
             Scope: {estimate.scope.toUpperCase()}
           </ThemedText>
-          <ThemedText type="small" style={[styles.value, { marginTop: 8 }]}>
-            Preliminary ballpark: ${estimate.lowCostUsd.toLocaleString()} – $
-            {estimate.highCostUsd.toLocaleString()}
-          </ThemedText>
+          {!estimate.lineItems?.length ? (
+            <ThemedText type="small" style={[styles.value, { marginTop: 8 }]}>
+              Final total: ${estimate.lowCostUsd.toLocaleString()} – $
+              {estimate.highCostUsd.toLocaleString()}
+            </ThemedText>
+          ) : null}
           <ThemedText
             type="caption"
             style={[styles.mutedValue, { marginTop: 8 }]}
           >
             Confidence: {estimate.confidence}
           </ThemedText>
+          {estimate.methodology ? (
+            <ThemedText
+              type="caption"
+              style={[styles.mutedValue, { marginTop: 8, lineHeight: 18 }]}
+            >
+              {estimate.methodology}
+            </ThemedText>
+          ) : null}
+          {estimate.lineItems && estimate.lineItems.length > 0 ? (
+            <View style={{ marginTop: 12 }}>
+              <ThemedText type="small" style={{ fontWeight: "700" }}>
+                Line items (trade buckets)
+              </ThemedText>
+              {estimate.lineItems.map((row) => (
+                <View
+                  key={row.id}
+                  style={{
+                    marginTop: 8,
+                    paddingBottom: 8,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: theme.border,
+                  }}
+                >
+                  <ThemedText type="small" style={{ fontWeight: "600" }}>
+                    {row.description}
+                  </ThemedText>
+                  <ThemedText type="caption" style={styles.mutedValue}>
+                    {row.unit} × {row.quantity.toFixed(2)} → $
+                    {row.lowUsd.toLocaleString()} – $
+                    {row.highUsd.toLocaleString()}
+                  </ThemedText>
+                  {row.note ? (
+                    <ThemedText type="caption" style={styles.mutedValue}>
+                      {row.note}
+                    </ThemedText>
+                  ) : null}
+                </View>
+              ))}
+              <View
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: theme.border,
+                }}
+              >
+                <ThemedText type="small" style={{ fontWeight: "700" }}>
+                  Final total: ${estimate.lowCostUsd.toLocaleString()} – $
+                  {estimate.highCostUsd.toLocaleString()}
+                </ThemedText>
+                {(() => {
+                  const s = sumRoofEstimateLineItems(estimate.lineItems);
+                  const drift =
+                    Math.abs(s.lowUsd - estimate.lowCostUsd) > 2 ||
+                    Math.abs(s.highUsd - estimate.highCostUsd) > 2;
+                  return drift ? (
+                    <ThemedText
+                      type="caption"
+                      style={[styles.mutedValue, { marginTop: 6 }]}
+                    >
+                      Line item subtotal ($
+                      {s.lowUsd.toLocaleString()} – $
+                      {s.highUsd.toLocaleString()}) may differ on older
+                      reports; the final total above is authoritative.
+                    </ThemedText>
+                  ) : (
+                    <ThemedText
+                      type="caption"
+                      style={[styles.mutedValue, { marginTop: 6 }]}
+                    >
+                      Matches the sum of the line items above.
+                    </ThemedText>
+                  );
+                })()}
+              </View>
+            </View>
+          ) : null}
           {estimate.notes ? (
             <ThemedText
               type="caption"

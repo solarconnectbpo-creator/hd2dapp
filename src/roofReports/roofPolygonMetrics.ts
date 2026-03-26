@@ -88,6 +88,14 @@ export function parsePitchRiseRun(
     const rise = Math.tan((deg * Math.PI) / 180) * 12;
     return { rise, run: 12 };
   }
+  /** Shorthand "6" = 6/12 (common in field notes). */
+  const lone = s.match(/^\s*(\d{1,2}(?:\.\d+)?)\s*$/);
+  if (lone) {
+    const rise = Number(lone[1]);
+    if (Number.isFinite(rise) && rise >= 0 && rise <= 24) {
+      return { rise, run: 12 };
+    }
+  }
   return undefined;
 }
 
@@ -304,4 +312,39 @@ export function computeRoofPolygonEdgeMetrics(
 
   const perimeterPlanFt = edges.reduce((s, e) => s + e.planFeet, 0);
   return { edges, perimeterPlanFt, ridgeAxisHeadingDeg };
+}
+
+/** sq m → sq ft (international foot). */
+const SQ_M_TO_SQ_FT = 10.76391041670972;
+
+/**
+ * Geodesic footprint area from a polygon / multipolygon feature (WGS84), square feet.
+ * Matches trace workflow: horizontal projection on the ellipsoid, not sloped surface area.
+ */
+export function computePolygonFootprintAreaSqFt(
+  feature: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>,
+): number | undefined {
+  try {
+    const sqM = turf.area(feature);
+    if (!Number.isFinite(sqM) || sqM <= 0) return undefined;
+    return sqM * SQ_M_TO_SQ_FT;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Geodesic perimeter length along polygon rings, feet (WGS84).
+ */
+export function computePolygonPerimeterFeet(
+  feature: GeoJSON.Feature<GeoJSON.Polygon>,
+): number | undefined {
+  try {
+    const line = turf.polygonToLine(feature);
+    const length = turf.length(line, { units: "feet" });
+    if (!Number.isFinite(length) || length <= 0) return undefined;
+    return length;
+  } catch {
+    return undefined;
+  }
 }

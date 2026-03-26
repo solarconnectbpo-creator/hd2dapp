@@ -1,3 +1,4 @@
+# FastAPI + httpx only. For Detectron2, use a custom image (PyTorch + build tools) or run the service on a VM.
 FROM python:3.11-slim
 
 WORKDIR /app

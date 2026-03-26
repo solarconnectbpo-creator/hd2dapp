@@ -72,23 +72,27 @@ export function RoofPitchGaugeStrip({ pitch, label }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 8, gap: 6 },
+  wrap: { marginTop: 8, gap: 6, width: "100%", alignSelf: "stretch" },
   label: { opacity: 0.85 },
   trackOuter: {
     position: "relative",
     height: 14,
     justifyContent: "center",
+    width: "100%",
+    alignSelf: "stretch",
+    paddingHorizontal: 2,
   },
-  track: { flexDirection: "row", gap: 4, height: 10 },
+  track: { flexDirection: "row", gap: 4, height: 10, width: "100%" },
   seg: { flex: 1, borderRadius: 4 },
   marker: {
     position: "absolute",
     width: 4,
-    marginLeft: -2,
     top: 0,
     bottom: 0,
     borderRadius: 2,
     backgroundColor: "rgba(15,23,42,0.92)",
+    zIndex: 2,
+    elevation: 2,
   },
   meta: { opacity: 0.9 },
 });

@@ -20,4 +20,10 @@ describe("parsePitchRiseRun", () => {
     expect(pr?.rise).toBeCloseTo(6, 0);
     expect(parseRoofPitchRise("45°")).toBeCloseTo(12, 0);
   });
+
+  it("parses shorthand rise-only as rise/12", () => {
+    expect(parsePitchRiseRun("6")).toEqual({ rise: 6, run: 12 });
+    expect(parseRoofPitchRise("6")).toBeCloseTo(6, 5);
+    expect(parsePitchRiseRun("12")).toEqual({ rise: 12, run: 12 });
+  });
 });
