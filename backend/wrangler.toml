@@ -22,7 +22,20 @@ vars = { ENVIRONMENT = "development" }
 [env.production]
 vars = { ENVIRONMENT = "production" }
 
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "hd2d"
+database_id = "local-dev"
+
+[[env.production.kv_namespaces]]
+binding = "HD2D_CACHE"
+id = "hd2d-cache"
+preview_id = "hd2d-cache-preview"
+
+# Configure runtime secrets via Wrangler:
+# - wrangler secret put OPENAI_API_KEY --env production --config backend/wrangler.toml
+# - wrangler secret put SESSION_SECRET --env production --config backend/wrangler.toml
+
 # Build configuration
 [build]
 command = "npm install"
-watch_paths = ["src/**/*.ts"]

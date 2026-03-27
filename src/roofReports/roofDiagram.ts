@@ -1,11 +1,13 @@
 import * as turf from "@turf/turf";
 
 import {
+  computeRoofFootprintLineTotals,
   computeRoofPolygonEdgeMetrics,
   extractLargestPolygonFromTrace,
-  roofEdgeKindAbbrev,
+  roofEdgeDetailLabel,
   type RoofEdgeKind,
 } from "@/src/roofReports/roofPolygonMetrics";
+import { buildFacetPiecesFromSvgVerts } from "@/src/roofReports/roofDiagramFacets";
 
 export interface RoofDiagramInput {
   roofTraceGeoJson?: any;
@@ -18,14 +20,21 @@ export interface RoofDiagramInput {
   satelliteImageUrl?: string;
   propertyLat?: number;
   propertyLng?: number;
+  /**
+   * When true, the footer includes plan lineal takeoff (eave / rake / ridge span / hip / valley LF)
+   * for the same roof-damage estimate context. Omit for measurement-only diagrams.
+   */
+  includeRoofEstimateTakeoff?: boolean;
 }
 
 /** Match Mapbox static export dimensions. */
 export const ROOF_DIAGRAM_SATELLITE_ZOOM = 20;
 export const ROOF_DIAGRAM_WIDTH = 1200;
 export const ROOF_DIAGRAM_HEIGHT = 700;
-/** Bottom stats strip — diagram + satellite render above this. */
-const FOOTER_H = 56;
+/** Bottom stats strip when lineal takeoff row is shown (roof estimate context). */
+const FOOTER_H_WITH_LINEAL = 92;
+/** Single-row footer when lineal takeoff is omitted. */
+const FOOTER_H_COMPACT = 56;
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -158,72 +167,29 @@ function metersPerDegLon(latDeg: number): number {
   return 111_320 * Math.cos((latDeg * Math.PI) / 180);
 }
 
-function ringToEnu(openRing: GeoJSON.Position[]): { x: number; y: number }[] {
-  let cLon = 0;
-  let cLat = 0;
-  for (const p of openRing) {
-    cLon += p[0];
-    cLat += p[1];
-  }
-  cLon /= openRing.length;
-  cLat /= openRing.length;
-  const mx = metersPerDegLon(cLat);
-  return openRing.map((p) => ({
-    x: (p[0] - cLon) * mx,
-    y: (p[1] - cLat) * 111_320,
-  }));
-}
-
-function signedArea2(verts: { x: number; y: number }[]): number {
-  let a = 0;
-  const n = verts.length;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    a += verts[i].x * verts[j].y - verts[j].x * verts[i].y;
-  }
-  return a / 2;
-}
-
-/** Reflex (concave) interior corner in plan — valley indicator. */
-function vertexIsReflex(enu: { x: number; y: number }[], i: number): boolean {
-  const n = enu.length;
-  const p0 = enu[(i - 1 + n) % n];
-  const p1 = enu[i];
-  const p2 = enu[(i + 1) % n];
-  const ux = p1.x - p0.x;
-  const uy = p1.y - p0.y;
-  const vx = p2.x - p1.x;
-  const vy = p2.y - p1.y;
-  const cross = ux * vy - uy * vx;
-  const area = signedArea2(enu);
-  const ccw = area > 0;
-  return ccw ? cross < 0 : cross > 0;
-}
-
-/** EagleView-style colors: eave green, rake yellow, hip purple, valley red, ridge line orange. */
+/** EagleView-style: eave green, rake yellow, hip purple, valley red, ridge purple, facet blue. */
 const C = {
-  fill: "rgba(52, 152, 219, 0.48)",
+  facetFill: "rgba(30, 144, 255, 0.46)",
+  fillFallback: "rgba(30, 144, 255, 0.48)",
   eave: "#27AE60",
   rake: "#F1C40F",
   hip: "#9B59B6",
   valley: "#E74C3C",
-  eaveRidgeParallel: "#27AE60",
-  ridgeLine: "#E67E22",
+  ridgeLine: "#9B59B6",
   label: "#ffffff",
   labelStroke: "rgba(0,0,0,0.55)",
 };
 
-function edgeStrokeColor(
+function edgeDetailStrokeColor(
   kind: RoofEdgeKind,
-  edgeEndVertexIdx: number,
-  enu: { x: number; y: number }[],
+  openRingLonLat: GeoJSON.Position[],
+  endVertexIndex0: number,
 ): string {
-  if (kind === "rake") return C.rake;
-  if (kind === "eave_ridge") return C.eaveRidgeParallel;
-  if (kind === "hip_valley") {
-    return vertexIsReflex(enu, edgeEndVertexIdx) ? C.valley : C.hip;
-  }
-  return C.eaveRidgeParallel;
+  const d = roofEdgeDetailLabel(kind, openRingLonLat, endVertexIndex0);
+  if (d === "Eave") return C.eave;
+  if (d === "Rake") return C.rake;
+  if (d === "Hip") return C.hip;
+  return C.valley;
 }
 
 export function buildRoofDiagramSvgDataUrl(
@@ -238,7 +204,11 @@ export function buildRoofDiagramSvgDataUrl(
   const h = ROOF_DIAGRAM_HEIGHT;
   const pad = 44;
   const zoom = ROOF_DIAGRAM_SATELLITE_ZOOM;
-  const drawH = h - FOOTER_H;
+  const includeRoofEstimateTakeoff = input.includeRoofEstimateTakeoff === true;
+  const footerH = includeRoofEstimateTakeoff
+    ? FOOTER_H_WITH_LINEAL
+    : FOOTER_H_COMPACT;
+  const drawH = h - footerH;
 
   const poly = extractLargestPolygonFromTrace(input.roofTraceGeoJson);
   const edgeMetrics = computeRoofPolygonEdgeMetrics(
@@ -258,7 +228,6 @@ export function buildRoofDiagramSvgDataUrl(
 
   let points = "";
   let verts: { x: number; y: number }[] = [];
-  let vertsEnu: { x: number; y: number }[] = [];
   let openRingLonLat: GeoJSON.Position[] = [];
 
   let satelliteDisplayUrl = input.satelliteImageUrl?.trim() ?? "";
@@ -276,7 +245,6 @@ export function buildRoofDiagramSvgDataUrl(
           ring[0][1] === ring[ring.length - 1][1]
             ? ring.slice(0, -1)
             : ring.slice();
-        vertsEnu = ringToEnu(openRingLonLat);
 
         const envToken =
           typeof process !== "undefined"
@@ -336,20 +304,34 @@ export function buildRoofDiagramSvgDataUrl(
     }
   }
 
+  const lineTotals = computeRoofFootprintLineTotals(
+    input.roofTraceGeoJson,
+    input.roofPitch,
+  );
+
+  const facetPieces =
+    poly && verts.length >= 3 && verts.length === openRingLonLat.length
+      ? buildFacetPiecesFromSvgVerts(verts, area, poly)
+      : [];
+
   const edgeLabels: string[] = [];
   const edgeLines: string[] = [];
   const n = verts.length;
 
-  if (n >= 3 && edgeMetrics?.edges.length === n) {
+  if (n >= 3 && edgeMetrics?.edges.length === n && openRingLonLat.length === n) {
     for (let i = 0; i < n; i++) {
       const a = verts[i];
       const b = verts[(i + 1) % n];
       const m = edgeMetrics.edges[i];
       const plan = m?.planFeet;
       const slope = m?.slopeFeetApprox;
-      const abbr = m ? roofEdgeKindAbbrev(m.kind) : "";
       const endIdx = (i + 1) % n;
-      const stroke = edgeStrokeColor(m.kind, endIdx, vertsEnu);
+      const detail = m
+        ? roofEdgeDetailLabel(m.kind, openRingLonLat, endIdx)
+        : "";
+      const stroke = m
+        ? edgeDetailStrokeColor(m.kind, openRingLonLat, endIdx)
+        : C.eave;
 
       edgeLines.push(
         `<line x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" stroke="${stroke}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />`,
@@ -381,7 +363,7 @@ export function buildRoofDiagramSvgDataUrl(
       } else {
         label = `E${i + 1}`;
       }
-      const sub = `${abbr}`;
+      const sub = detail;
 
       const lx = midX + perpX;
       const ly = midY + perpY;
@@ -392,7 +374,7 @@ export function buildRoofDiagramSvgDataUrl(
     }
   }
 
-  /** Optional ridge axis line (orange dashed) — PCA from metrics (satellite view only). */
+  /** Ridge axis line (purple) — PCA from metrics (satellite view only). */
   let ridgeOverlay = "";
   if (
     useSatellite &&
@@ -456,15 +438,20 @@ export function buildRoofDiagramSvgDataUrl(
           drawH,
         );
       }
-      ridgeOverlay = `<line x1="${p0.x.toFixed(2)}" y1="${p0.y.toFixed(2)}" x2="${p1.x.toFixed(2)}" y2="${p1.y.toFixed(2)}" stroke="${C.ridgeLine}" stroke-width="3" stroke-dasharray="10 7" stroke-opacity="0.95" />`;
+      ridgeOverlay = `<line x1="${p0.x.toFixed(2)}" y1="${p0.y.toFixed(2)}" x2="${p1.x.toFixed(2)}" y2="${p1.y.toFixed(2)}" stroke="${C.ridgeLine}" stroke-width="4" stroke-opacity="0.95" />`;
     } catch {
       // ignore
     }
   }
 
-  /** Centroid label — total area (EagleView-style). */
+  /** Centroid total — show when no facet split (single fill). */
   let areaCallout = "";
-  if (verts.length >= 3 && area && Number.isFinite(area)) {
+  if (
+    facetPieces.length === 0 &&
+    verts.length >= 3 &&
+    area &&
+    Number.isFinite(area)
+  ) {
     let cx = 0;
     let cy = 0;
     for (const v of verts) {
@@ -492,25 +479,50 @@ export function buildRoofDiagramSvgDataUrl(
       ? `${squares.toFixed(2)} squares`
       : "N/A";
 
-  const legend = `<g transform="translate(${w - 280}, ${satelliteImageHeight - 118})">
-<rect x="0" y="0" width="260" height="96" rx="8" fill="rgba(15,23,42,0.72)" stroke="rgba(255,255,255,0.2)"/>
-<text x="12" y="22" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#f8fafc">Traced perimeter</text>
-<line x1="12" y1="34" x2="40" y2="34" stroke="${C.eave}" stroke-width="4"/><text x="48" y="38" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Eave / ridge∥</text>
-<line x1="12" y1="50" x2="40" y2="50" stroke="${C.rake}" stroke-width="4"/><text x="48" y="54" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Rake</text>
-<line x1="140" y1="34" x2="168" y2="34" stroke="${C.hip}" stroke-width="4"/><text x="176" y="38" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Hip</text>
-<line x1="140" y1="50" x2="168" y2="50" stroke="${C.valley}" stroke-width="4"/><text x="176" y="54" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Valley</text>
-<text x="12" y="78" font-family="Arial, Helvetica, sans-serif" font-size="9" fill="#94a3b8">Geodesic LF · PCA ridge axis · pitch model</text>
+  const legend = `<g transform="translate(${w - 280}, ${satelliteImageHeight - 132})">
+<rect x="0" y="0" width="260" height="112" rx="8" fill="rgba(15,23,42,0.78)" stroke="rgba(255,255,255,0.2)"/>
+<text x="12" y="20" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#f8fafc">Edge types</text>
+<line x1="12" y1="32" x2="40" y2="32" stroke="${C.eave}" stroke-width="4"/><text x="48" y="36" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Eave</text>
+<line x1="12" y1="48" x2="40" y2="48" stroke="${C.rake}" stroke-width="4"/><text x="48" y="52" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Rake</text>
+<line x1="12" y1="64" x2="40" y2="64" stroke="${C.ridgeLine}" stroke-width="4"/><text x="48" y="68" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Ridge axis</text>
+<line x1="140" y1="32" x2="168" y2="32" stroke="${C.hip}" stroke-width="4"/><text x="176" y="36" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Hip</text>
+<line x1="140" y1="48" x2="168" y2="48" stroke="${C.valley}" stroke-width="4"/><text x="176" y="52" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#e2e8f0">Valley</text>
+<text x="12" y="94" font-family="Arial, Helvetica, sans-serif" font-size="9" fill="#94a3b8">Facets = triangulated plan · LF = geodesic</text>
 </g>`;
 
   const titleBlock = `
 <text x="56" y="52" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" fill="#f8fafc">Roof measurement diagram</text>
 <text x="56" y="82" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#e2e8f0">${esc(roofType ? `Roof: ${roofType}` : "Roof: Not specified")}</text>`;
 
+  const lineTakeoff =
+    includeRoofEstimateTakeoff &&
+    lineTotals &&
+    (lineTotals.eaveLf > 0 ||
+      lineTotals.rakeLf > 0 ||
+      lineTotals.hipLf > 0 ||
+      lineTotals.valleyLf > 0 ||
+      lineTotals.ridgeSpanLf > 0)
+      ? `Eave ${Math.round(lineTotals.eaveLf)} LF · Rake ${Math.round(lineTotals.rakeLf)} LF · Ridge ${Math.round(lineTotals.ridgeSpanLf)} LF · Hip ${Math.round(lineTotals.hipLf)} LF · Valley ${Math.round(lineTotals.valleyLf)} LF`
+      : "";
+
+  const lineTakeoffHint =
+    includeRoofEstimateTakeoff && !lineTakeoff
+      ? "Lineal takeoff (plan): trace the roof and set pitch for slope LF on edges."
+      : "";
+
+  const statsBarSecondRow =
+    includeRoofEstimateTakeoff && (lineTakeoff || lineTakeoffHint)
+      ? `<text x="24" y="${h - 22}" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" fill="#cbd5e1">${esc(lineTakeoff || lineTakeoffHint)}</text>`
+      : "";
+
+  const statsBarFirstY = includeRoofEstimateTakeoff ? h - 58 : h - 22;
+
   const statsBar = `
-<rect x="0" y="${h - 56}" width="${w}" height="56" fill="rgba(15,23,42,0.88)"/>
-<text x="24" y="${h - 22}" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#f8fafc">Area: ${esc(metricArea)}</text>
-<text x="420" y="${h - 22}" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#f8fafc">Perimeter: ${esc(metricPerim)}</text>
-<text x="820" y="${h - 22}" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#f8fafc">Squares: ${esc(metricSquares)}</text>`;
+<rect x="0" y="${h - footerH}" width="${w}" height="${footerH}" fill="rgba(15,23,42,0.92)"/>
+<text x="24" y="${statsBarFirstY}" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#f8fafc">Area: ${esc(metricArea)}</text>
+<text x="400" y="${statsBarFirstY}" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#f8fafc">Perimeter: ${esc(metricPerim)}</text>
+<text x="780" y="${statsBarFirstY}" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#f8fafc">Squares: ${esc(metricSquares)}</text>
+${statsBarSecondRow}`;
 
   const bgLayer = useSatellite
     ? `<image href="${esc(satelliteDisplayUrl)}" x="0" y="0" width="${w}" height="${satelliteImageHeight}" preserveAspectRatio="none" opacity="1"/>
@@ -519,12 +531,28 @@ export function buildRoofDiagramSvgDataUrl(
 <rect x="0" y="0" width="${w}" height="${h}" fill="url(#fallbackBg)"/>
 <rect x="0" y="0" width="${w}" height="${h}" fill="url(#grid)"/>`;
 
+  const fs = facetPieces.length;
+  const facetFont = fs > 28 ? 9 : fs > 16 ? 10 : 12;
+  const facetFillLayer =
+    fs > 0
+      ? `<g>${facetPieces.map((f) => `<polygon points="${f.pointsAttr}" fill="${C.facetFill}" stroke="none" />`).join("\n")}</g>`
+      : "";
+  const facetTextLayer =
+    fs > 0
+      ? `<g>${facetPieces.map((f) => `<text x="${f.cx.toFixed(1)}" y="${f.cy.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="${facetFont}" font-weight="800" fill="${C.label}" stroke="${C.labelStroke}" stroke-width="0.35">${esc(`${f.labelSqFt.toFixed(1)} ft`)}</text>`).join("\n")}</g>`
+      : "";
+  const singleFill =
+    fs === 0 && points
+      ? `<polygon points="${points}" fill="${C.fillFallback}" stroke="none"/>`
+      : "";
+
   const diagramBody =
     points && verts.length
-      ? `<polygon points="${points}" fill="${C.fill}" stroke="none"/>
+      ? `${facetFillLayer}${singleFill}
 ${ridgeOverlay}
 <g>${edgeLines.join("\n")}</g>
 <g>${edgeLabels.join("\n")}</g>
+${facetTextLayer}
 ${areaCallout}
 ${legend}
 `

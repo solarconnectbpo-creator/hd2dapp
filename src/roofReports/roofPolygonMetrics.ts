@@ -172,6 +172,138 @@ function classifyEdgeKind(absDot: number): RoofEdgeKind {
   return "hip_valley";
 }
 
+function signedArea2(verts: { x: number; y: number }[]): number {
+  let a = 0;
+  const n = verts.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    a += verts[i].x * verts[j].y - verts[j].x * verts[i].y;
+  }
+  return a / 2;
+}
+
+/** Concave footprint vertex — valley condition on boundary (plan). */
+function vertexIsReflexInternal(
+  enu: { x: number; y: number }[],
+  i: number,
+): boolean {
+  const n = enu.length;
+  const p0 = enu[(i - 1 + n) % n];
+  const p1 = enu[i];
+  const p2 = enu[(i + 1) % n];
+  const ux = p1.x - p0.x;
+  const uy = p1.y - p0.y;
+  const vx = p2.x - p1.x;
+  const vy = p2.y - p1.y;
+  const cross = ux * vy - uy * vx;
+  const area = signedArea2(enu);
+  const ccw = area > 0;
+  return ccw ? cross < 0 : cross > 0;
+}
+
+function ringVerticesEnu(openRingLonLat: GeoJSON.Position[]): {
+  x: number;
+  y: number;
+}[] {
+  let cLon = 0;
+  let cLat = 0;
+  for (const p of openRingLonLat) {
+    cLon += p[0];
+    cLat += p[1];
+  }
+  cLon /= openRingLonLat.length;
+  cLat /= openRingLonLat.length;
+  return openRingLonLat.map((p) =>
+    toLocalEnuMeters(p[0], p[1], cLon, cLat),
+  );
+}
+
+/**
+ * Whether vertex `i` (0-based on the open ring) is reflex — used for valley vs hip on boundary.
+ */
+export function vertexIsReflexAt(
+  openRingLonLat: GeoJSON.Position[],
+  vertexIndex0: number,
+): boolean {
+  const enu = ringVerticesEnu(openRingLonLat);
+  return vertexIsReflexInternal(enu, vertexIndex0);
+}
+
+/** Human-readable edge role for diagrams / takeoffs. */
+export function roofEdgeDetailLabel(
+  kind: RoofEdgeKind,
+  openRingLonLat: GeoJSON.Position[],
+  /** 0-based index of vertex at end of edge (i+1 for edge i→i+1). */
+  endVertexIndex0: number,
+): "Eave" | "Rake" | "Hip" | "Valley" {
+  if (kind === "rake") return "Rake";
+  if (kind === "eave_ridge") return "Eave";
+  return vertexIsReflexAt(openRingLonLat, endVertexIndex0)
+    ? "Valley"
+    : "Hip";
+}
+
+const METERS_TO_FT = 3.280839895013123;
+
+export type RoofFootprintLineTotals = {
+  /** Boundary edges parallel to ridge axis (drip / horizontal run). */
+  eaveLf: number;
+  rakeLf: number;
+  hipLf: number;
+  valleyLf: number;
+  /** Plan length of ridge line along PCA ridge axis (interior peak line model). */
+  ridgeSpanLf: number;
+};
+
+/**
+ * Aggregate plan lineal feet by eave / rake / hip / valley, plus ridge span (plan).
+ * Ridge span is the extent of the footprint along the PCA ridge direction (not perimeter).
+ */
+export function computeRoofFootprintLineTotals(
+  roofTraceGeoJson: any,
+  pitch?: string,
+): RoofFootprintLineTotals | null {
+  const m = computeRoofPolygonEdgeMetrics(roofTraceGeoJson, pitch);
+  if (!m) return null;
+  const poly = extractLargestPolygonFromTrace(roofTraceGeoJson);
+  if (!poly) return null;
+  const ring = poly.geometry.coordinates?.[0] ?? [];
+  const openRing =
+    ring.length > 3 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1]
+      ? ring.slice(0, -1)
+      : ring.slice();
+  if (openRing.length < 3) return null;
+
+  let eaveLf = 0;
+  let rakeLf = 0;
+  let hipLf = 0;
+  let valleyLf = 0;
+  const n = openRing.length;
+
+  for (let i = 0; i < m.edges.length; i++) {
+    const e = m.edges[i];
+    const endV = (i + 1) % n;
+    if (e.kind === "rake") rakeLf += e.planFeet;
+    else if (e.kind === "eave_ridge") eaveLf += e.planFeet;
+    else if (e.kind === "hip_valley") {
+      if (vertexIsReflexAt(openRing, endV)) valleyLf += e.planFeet;
+      else hipLf += e.planFeet;
+    }
+  }
+
+  const ridgeSpanLf = m.ridgeSpanPlanFt ?? 0;
+
+  return {
+    eaveLf,
+    rakeLf,
+    hipLf,
+    valleyLf,
+    ridgeSpanLf,
+  };
+}
+
 /** Main roof pitch angle from horizontal. */
 function mainPitchAngleRad(rise: number, run: number): number {
   return Math.atan(rise / run);
@@ -228,6 +360,8 @@ export function computeRoofPolygonEdgeMetrics(
   perimeterPlanFt: number;
   /** Estimated ridge axis, degrees from north (clockwise). Undefined if axis not computed. */
   ridgeAxisHeadingDeg?: number;
+  /** Plan extent along ridge axis (ft) — model ridge line length for takeoffs. */
+  ridgeSpanPlanFt?: number;
 } | null {
   const poly = extractLargestPolygonFromTrace(roofTraceGeoJson);
   if (!poly) return null;
@@ -310,8 +444,21 @@ export function computeRoofPolygonEdgeMetrics(
     }
   }
 
+  let ridgeSpanPlanFt: number | undefined;
+  if (ridge && pts.length >= 3) {
+    const enuPts = pts.map((p) => toLocalEnuMeters(p[0], p[1], cLon, cLat));
+    let minP = Infinity;
+    let maxP = -Infinity;
+    for (const p of enuPts) {
+      const proj = p.x * ridge.ux + p.y * ridge.uy;
+      minP = Math.min(minP, proj);
+      maxP = Math.max(maxP, proj);
+    }
+    ridgeSpanPlanFt = (maxP - minP) * METERS_TO_FT;
+  }
+
   const perimeterPlanFt = edges.reduce((s, e) => s + e.planFeet, 0);
-  return { edges, perimeterPlanFt, ridgeAxisHeadingDeg };
+  return { edges, perimeterPlanFt, ridgeAxisHeadingDeg, ridgeSpanPlanFt };
 }
 
 /** sq m → sq ft (international foot). */

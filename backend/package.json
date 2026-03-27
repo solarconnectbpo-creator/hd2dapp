@@ -7,9 +7,14 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
-    "build": "wrangler build"
+    "build": "wrangler build",
+    "report-server": "node server.js",
+    "secret:openai:prod": "wrangler secret put OPENAI_API_KEY --config wrangler.toml --env production --from-env OPENAI_API_KEY",
+    "deploy:prod": "wrangler deploy --config wrangler.toml --env production"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "openai": "^4.28.0",
     "node-fetch": "^3.3.2"
   },

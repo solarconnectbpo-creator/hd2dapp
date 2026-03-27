@@ -131,6 +131,8 @@ export function computeRoofDamageEstimate(opts: {
   stateCode?: string;
   /** e.g. "6/12" — drives ice & water line item when low-slope. */
   roofPitch?: string;
+  /** Regional market multiplier (labor + material), where 1.0 = baseline. */
+  regionalCostMultiplier?: number;
 }): RoofDamageEstimate {
   const rawArea = opts.roofAreaSqFt;
   const area =
@@ -320,6 +322,15 @@ export function computeRoofDamageEstimate(opts: {
   const highCostUsd = Math.round(
     effectiveSquares * baseHigh * mixMultiplier * sevMultiplier,
   );
+  const regionalMultiplier = clamp(
+    Number.isFinite(opts.regionalCostMultiplier ?? NaN)
+      ? (opts.regionalCostMultiplier as number)
+      : 1,
+    0.75,
+    1.45,
+  );
+  const adjustedLowCostUsd = Math.round(lowCostUsd * regionalMultiplier);
+  const adjustedHighCostUsd = Math.round(highCostUsd * regionalMultiplier);
 
   const confidence: RoofDamageEstimate["confidence"] =
     typeCount >= 2 && opts.severity >= 4
@@ -356,37 +367,37 @@ export function computeRoofDamageEstimate(opts: {
   if (isSlate) {
     lineItems = buildGenericSteepTradeLines({
       label: "Natural slate",
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isMetal) {
     lineItems = buildGenericSteepTradeLines({
       label: "Metal panel",
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isTile) {
     lineItems = buildGenericSteepTradeLines({
       label: "Tile",
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isFlat) {
     lineItems = buildGenericSteepTradeLines({
       label: "Low-slope / built-up (generic)",
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isTpo) {
     lineItems = buildSinglePlyMembraneLines({
       membraneLabel: "TPO (thermoplastic olefin)",
       membraneRate: getTpoMembraneRate(rt),
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isEpdm) {
@@ -397,44 +408,44 @@ export function computeRoofDamageEstimate(opts: {
         44.75,
         "Tear-off removal (EPDM single-ply)",
       ),
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isPvc) {
     lineItems = buildSinglePlyMembraneLines({
       membraneLabel: "PVC (thermoplastic)",
       membraneRate: getPvcMembraneRate(rt),
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isModBit) {
     lineItems = buildModBitLines({
       modBitRate: getModBitReplacementRate(rt),
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (isCoating) {
     lineItems = buildCoatingSystemLines({
       coatingLabel: (opts.roofType ?? "Coating system").trim().slice(0, 48),
       coatingRate: getCoatingReplacementRate(rt),
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else if (is3TabCompShingle) {
     lineItems = buildThreeTabCompositionLines({
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
     });
   } else {
     lineItems = buildAsphaltSteepSlopeLines({
       scope,
-      totalLow: lowCostUsd,
-      totalHigh: highCostUsd,
+      totalLow: adjustedLowCostUsd,
+      totalHigh: adjustedHighCostUsd,
       effectiveSquares,
       includeIceWaterLine,
     });
@@ -443,6 +454,7 @@ export function computeRoofDamageEstimate(opts: {
   const methodology = [
     `Plan area ${Math.round(area)} sq ft → ${effectiveSquares.toFixed(2)} effective squares (includes ${Math.round(WASTE_FACTOR * 100)}% waste).`,
     `Damage-type mix ×${mixMultiplier.toFixed(2)} and severity ×${sevMultiplier.toFixed(2)} scale the scoped $/SQ model.`,
+    `Regional market multiplier ×${regionalMultiplier.toFixed(2)} applied to the final range.`,
     `Line items are trade buckets that sum to the ${scope === "replace" ? "replacement" : "repair"} range (±$1 rounding).`,
   ].join(" ");
 
@@ -453,8 +465,8 @@ export function computeRoofDamageEstimate(opts: {
     effectiveSquares: Math.round(effectiveSquares * 100) / 100,
     wasteFactorPct: Math.round(WASTE_FACTOR * 100),
     scope,
-    lowCostUsd,
-    highCostUsd,
+    lowCostUsd: adjustedLowCostUsd,
+    highCostUsd: adjustedHighCostUsd,
     confidence,
     methodology,
     lineItems,

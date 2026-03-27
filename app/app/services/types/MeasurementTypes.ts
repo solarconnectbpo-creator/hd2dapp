@@ -19,7 +19,12 @@ export interface RoofMeasurementData {
     area: number;
   }>;
   confidence: number;
-  method: "eagleview" | "nearmap" | "lidar" | "photogrammetry";
+  method:
+    | "eagleview"
+    | "nearmap"
+    | "roof3d"
+    | "lidar"
+    | "photogrammetry";
 }
 
 export interface PrecisionBuildingData {
@@ -57,7 +62,7 @@ export interface MeasurementRequest {
 export interface MeasurementResult {
   success: boolean;
   data: PrecisionBuildingData | null;
-  provider: "eagleview" | "nearmap" | "hybrid" | "fallback";
+  provider: "roof3d" | "eagleview" | "nearmap" | "hybrid" | "fallback";
   confidence: number;
   errorMessage?: string;
   retryCount?: number;

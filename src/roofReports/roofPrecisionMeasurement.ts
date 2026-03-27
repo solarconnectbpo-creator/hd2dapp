@@ -9,7 +9,8 @@ import type {
 
 const PRECISION_TAG = "[Precision measurement]";
 
-export const PRECISION_PROVIDER_LABEL = "Nearmap / EagleView (precision)";
+export const PRECISION_PROVIDER_LABEL =
+  "Roof3D / Nearmap / EagleView (precision)";
 
 export function buildRoofPrecisionMeasurementSnapshot(
   result: HybridMeasurementResult,
@@ -41,6 +42,14 @@ export function buildRoofPrecisionMeasurementSnapshot(
     nearmapSurveyIds: d?.nearmapSurveyIds,
     eagleViewOrderId: d?.eagleViewOrderId,
     eagleViewStatus: d?.eagleViewStatus,
+    roofAreaSqFt: d?.roofAreaSqFt,
+    roofPerimeterFt: d?.roofPerimeterFt,
+    roofPitch: d?.roofPitch,
+    ridgesLf: d?.ridgesLf,
+    valleysLf: d?.valleysLf,
+    hipsLf: d?.hipsLf,
+    rakesLf: d?.rakesLf,
+    eavesLf: d?.eavesLf,
     errorMessage: result.errorMessage,
   };
 }
@@ -65,6 +74,11 @@ function buildPrecisionNoteBlock(s: RoofPrecisionMeasurementSnapshot): string {
   if (s.eagleViewOrderId) {
     lines.push(
       `EagleView order: ${s.eagleViewOrderId}${s.eagleViewStatus ? ` (${s.eagleViewStatus})` : ""}`,
+    );
+  }
+  if (s.roofAreaSqFt != null || s.roofPerimeterFt != null || s.roofPitch) {
+    lines.push(
+      `Derived metrics: Area ${s.roofAreaSqFt != null ? Math.round(s.roofAreaSqFt).toLocaleString() + " sq ft" : "—"} · Perimeter ${s.roofPerimeterFt != null ? Math.round(s.roofPerimeterFt).toLocaleString() + " ft" : "—"} · Pitch ${s.roofPitch || "—"}`,
     );
   }
   if (s.errorMessage) {
@@ -113,6 +127,27 @@ export function mergePrecisionSnapshotIntoRoofMeasurements(
       buildPrecisionNoteBlock(snapshot),
     ),
   };
+  if (
+    snapshot.roofAreaSqFt != null &&
+    Number.isFinite(snapshot.roofAreaSqFt) &&
+    snapshot.roofAreaSqFt > 0
+  ) {
+    next.roofAreaSqFt = Math.round(snapshot.roofAreaSqFt);
+    next.roofAreaPrimarySource = "precision_import";
+  }
+  if (
+    snapshot.roofPerimeterFt != null &&
+    Number.isFinite(snapshot.roofPerimeterFt) &&
+    snapshot.roofPerimeterFt > 0
+  ) {
+    next.roofPerimeterFt = Math.round(snapshot.roofPerimeterFt);
+  }
+  if (snapshot.roofPitch?.trim()) {
+    next.roofPitch = snapshot.roofPitch.trim();
+  }
+  if (snapshot.confidence >= 0.85) next.measurementConfidenceBadge = "high";
+  else if (snapshot.confidence >= 0.6) next.measurementConfidenceBadge = "medium";
+  else next.measurementConfidenceBadge = "low";
   if (!hasEaveRef && refLine) {
     next.aerialMeasurementReference = refLine;
   }

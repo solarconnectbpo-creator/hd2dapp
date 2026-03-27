@@ -16,6 +16,7 @@ import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { Spacing, AppColors, BorderRadius } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
+import { apiClient } from "@/services/api";
 
 import {
   deleteRoofReport,
@@ -30,6 +31,8 @@ export default function ReportsHomeScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const [reports, setReports] = useState<DamageRoofReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [storyBusy, setStoryBusy] = useState(false);
+  const [storyText, setStoryText] = useState("");
 
   const refresh = useCallback(async () => {
     try {
@@ -67,6 +70,36 @@ export default function ReportsHomeScreen({ navigation }: Props) {
     ]);
   };
 
+  const handleTestBedtimeStory = async () => {
+    setStoryBusy(true);
+    setStoryText("");
+    try {
+      const res = (await apiClient.generateBedtimeStory({
+        model: "gpt-5.4",
+        prompt: "Write a short bedtime story about a unicorn.",
+      })) as {
+        success?: boolean;
+        data?: { outputText?: string };
+        error?: string;
+      };
+      if (res?.success && res.data?.outputText?.trim()) {
+        setStoryText(res.data.outputText.trim());
+      } else {
+        Alert.alert(
+          "AI demo",
+          res?.error || "No story text returned from backend.",
+        );
+      }
+    } catch (e) {
+      Alert.alert(
+        "AI demo failed",
+        e instanceof Error ? e.message : "Request failed.",
+      );
+    } finally {
+      setStoryBusy(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
@@ -90,16 +123,37 @@ export default function ReportsHomeScreen({ navigation }: Props) {
             Start roof report & estimate
           </Button>
         </View>
+        <View style={{ height: 8 }} />
+        <Button
+          variant="secondary"
+          onPress={handleTestBedtimeStory}
+          disabled={storyBusy}
+          style={styles.ctaButton}
+        >
+          {storyBusy ? "Generating AI story…" : "Test AI bedtime story route"}
+        </Button>
+        {storyText ? (
+          <Card style={styles.reportCard}>
+            <ThemedText type="small" style={{ fontWeight: "700" }}>
+              AI demo output
+            </ThemedText>
+            <ThemedText
+              type="caption"
+              style={{ marginTop: 8, lineHeight: 19, opacity: 0.95 }}
+            >
+              {storyText}
+            </ThemedText>
+          </Card>
+        ) : null}
 
         <ThemedText type="caption" style={styles.singleFlowHint}>
-          Pick a property, then build the damage report and estimate on one
-          screen. Tap{" "}
+          Pick a property, then trace or enter roof measurements and build the
+          damage estimate on one screen. Tap{" "}
           <ThemedText type="caption" style={{ fontWeight: "700" }}>
             Finish & export report
           </ThemedText>{" "}
-          to open the finish sheet (save and preview, plus optional GIS,
-          precision, CSV, STL sources, and CompanyCam on web). Download HTML or
-          JSON from the preview screen.
+          to save and preview (HTML or JSON). Optional tools: aerial measurement
+          orders, bulk CSV, regional GIS, CompanyCam (web).
         </ThemedText>
 
         {isLoading ? (

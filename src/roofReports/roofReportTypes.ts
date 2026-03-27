@@ -97,6 +97,16 @@ export interface RoofMeasurementValidationSummary {
   messages: string[];
 }
 
+/** Where the exported primary roof area came from (audit / transparency). */
+export type RoofAreaPrimarySource =
+  | "trace"
+  | "manual_entry"
+  | "estimate_fallback"
+  | "lead_csv"
+  | "ai_vision"
+  | "precision_import"
+  | "unknown";
+
 export interface RoofMeasurements {
   roofAreaSqFt?: number;
   roofPerimeterFt?: number;
@@ -136,20 +146,27 @@ export interface RoofMeasurements {
   aerialMeasurementReportUrl?: string;
 
   /**
-   * Last integrated run from **Precision measurement** (Nearmap / EagleView via proxy or client fallback).
+   * Last integrated run from **Precision measurement** (Roof3D / Nearmap / EagleView).
    * Stored for export/review; does not replace manual roof area unless you copy values elsewhere.
    */
   precisionMeasurementSnapshot?: RoofPrecisionMeasurementSnapshot;
 
   /** Populated when the report is built — cross-checks trace, AI, terrain, and estimate. */
   measurementValidationSummary?: RoofMeasurementValidationSummary;
+
+  /** Set on save — which input drove `roofAreaSqFt` in export. */
+  roofAreaPrimarySource?: RoofAreaPrimarySource;
+  /** ISO time when roof area audit fields were recorded at save. */
+  roofAreaRecordedAtIso?: string;
+  /** Short trust signal for UI / HTML (aligned with validation when present). */
+  measurementConfidenceBadge?: "high" | "medium" | "low";
 }
 
 /** Serializable record of a precision / hybrid provider run for damage reports. */
 export interface RoofPrecisionMeasurementSnapshot {
   capturedAtIso: string;
   success: boolean;
-  provider: "eagleview" | "nearmap" | "hybrid" | "fallback";
+  provider: "roof3d" | "eagleview" | "nearmap" | "hybrid" | "fallback";
   confidence: number;
   processingTimeMs: number;
   priority: "accuracy" | "speed" | "cost";
@@ -163,6 +180,14 @@ export interface RoofPrecisionMeasurementSnapshot {
   nearmapSurveyIds?: string[];
   eagleViewOrderId?: string;
   eagleViewStatus?: string;
+  roofAreaSqFt?: number;
+  roofPerimeterFt?: number;
+  roofPitch?: string;
+  ridgesLf?: number;
+  valleysLf?: number;
+  hipsLf?: number;
+  rakesLf?: number;
+  eavesLf?: number;
   errorMessage?: string;
 }
 

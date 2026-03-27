@@ -14,6 +14,8 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { AppColors, BorderRadius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
+import PropertySelectMap from "@/src/roofReports/PropertySelectMap";
+import type { PropertySelection } from "@/src/roofReports/roofReportTypes";
 import { useRoofReportGeneration } from "@/src/hooks/useRoofReportGeneration";
 import ProgressTracker from "@/src/components/ProgressTracker";
 
@@ -43,9 +45,19 @@ export function RoofReportScreen() {
   const [roofAge, setRoofAge] = useState("");
   const [roofType, setRoofType] = useState("Asphalt Shingle");
   const [squareFootage, setSquareFootage] = useState("");
+  const [roofPerimeterFt, setRoofPerimeterFt] = useState("");
+  const [roofPitch, setRoofPitch] = useState("");
+  const [stateCode, setStateCode] = useState("");
+  const [carrierScopeText, setCarrierScopeText] = useState("");
+  const [deductibleUsd, setDeductibleUsd] = useState("");
+  const [nonRecoverableDepreciationUsd, setNonRecoverableDepreciationUsd] =
+    useState("");
   const [visibleIssues, setVisibleIssues] = useState("");
   const [notes, setNotes] = useState("");
   const [showForm, setShowForm] = useState(true);
+  const [selectedProperty, setSelectedProperty] =
+    useState<PropertySelection | null>(null);
+  const [entryMode, setEntryMode] = useState<"builder" | "map">("builder");
 
   const handleGenerateReport = async () => {
     if (!address.trim()) {
@@ -65,12 +77,40 @@ export function RoofReportScreen() {
 
     const age = Number.parseInt(roofAge, 10);
     const sqft = Number.parseInt(squareFootage, 10);
+    const perimeter = roofPerimeterFt.trim()
+      ? Number.parseFloat(roofPerimeterFt)
+      : undefined;
+    const deductible = deductibleUsd.trim()
+      ? Number.parseFloat(deductibleUsd)
+      : undefined;
+    const nonRecoverableDepreciation = nonRecoverableDepreciationUsd.trim()
+      ? Number.parseFloat(nonRecoverableDepreciationUsd)
+      : undefined;
     if (!Number.isFinite(age) || age < 0) {
       Alert.alert("Error", "Please enter a valid roof age");
       return;
     }
     if (!Number.isFinite(sqft) || sqft <= 0) {
       Alert.alert("Error", "Please enter valid square footage");
+      return;
+    }
+    if (perimeter != null && (!Number.isFinite(perimeter) || perimeter <= 0)) {
+      Alert.alert("Error", "Please enter a valid roof perimeter");
+      return;
+    }
+    if (
+      deductible != null &&
+      (!Number.isFinite(deductible) || deductible < 0)
+    ) {
+      Alert.alert("Error", "Please enter a valid deductible amount");
+      return;
+    }
+    if (
+      nonRecoverableDepreciation != null &&
+      (!Number.isFinite(nonRecoverableDepreciation) ||
+        nonRecoverableDepreciation < 0)
+    ) {
+      Alert.alert("Error", "Please enter a valid non-recoverable depreciation");
       return;
     }
 
@@ -86,9 +126,17 @@ export function RoofReportScreen() {
 
     const data = {
       address: address.trim(),
+      latitude: selectedProperty?.lat,
+      longitude: selectedProperty?.lng,
       roofAge: age,
       roofType,
       squareFootage: sqft,
+      roofPerimeterFt: perimeter,
+      roofPitch: roofPitch.trim() || undefined,
+      stateCode: stateCode.trim().toUpperCase() || undefined,
+      carrierScopeText: carrierScopeText.trim() || undefined,
+      deductibleUsd: deductible,
+      nonRecoverableDepreciationUsd: nonRecoverableDepreciation,
       visibleIssues: issues,
       notes: notes.trim() || undefined,
     };
@@ -159,6 +207,15 @@ export function RoofReportScreen() {
             >
               {report.address}
             </Text>
+            {typeof report.measurements.latitude === "number" &&
+            typeof report.measurements.longitude === "number" ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Coordinates: {report.measurements.latitude.toFixed(6)},{" "}
+                {report.measurements.longitude.toFixed(6)}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.reportSection}>
@@ -274,7 +331,419 @@ export function RoofReportScreen() {
             >
               Urgency: {report.costEstimate.urgency}
             </Text>
+            {report.costEstimate.scope ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Scope: {report.costEstimate.scope}
+              </Text>
+            ) : null}
+            {report.costEstimate.confidence ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Confidence: {report.costEstimate.confidence}
+              </Text>
+            ) : null}
+            {report.costEstimate.basis ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                {report.costEstimate.basis}
+              </Text>
+            ) : null}
+            {report.costEstimate.lineItems?.length ? (
+              <>
+                <Text
+                  style={[
+                    styles.subTitle,
+                    { color: theme.text, marginTop: Spacing.md },
+                  ]}
+                >
+                  Key Line Items
+                </Text>
+                {report.costEstimate.lineItems.map((line, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.listItem, { color: theme.textSecondary }]}
+                  >
+                    • {line}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+            {report.costEstimate.codeUpgrades?.length ? (
+              <>
+                <Text
+                  style={[
+                    styles.subTitle,
+                    { color: theme.text, marginTop: Spacing.md },
+                  ]}
+                >
+                  Code Upgrade Checks
+                </Text>
+                {report.costEstimate.codeUpgrades.map((line, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.listItem, { color: theme.textSecondary }]}
+                  >
+                    • {line}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+            {report.costEstimate.recoveryDeltaRange ? (
+              <>
+                <Text
+                  style={[
+                    styles.subTitle,
+                    { color: theme.text, marginTop: Spacing.md },
+                  ]}
+                >
+                  Claim Audit & Recovery
+                </Text>
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Potential Recovery Delta:{" "}
+                  {report.costEstimate.recoveryDeltaRange}
+                </Text>
+                {report.costEstimate.auditSummary ? (
+                  <Text
+                    style={[
+                      styles.sectionContent,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {report.costEstimate.auditSummary}
+                  </Text>
+                ) : null}
+                {report.costEstimate.auditFindings?.map((line, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.listItem, { color: theme.textSecondary }]}
+                  >
+                    • {line}
+                  </Text>
+                ))}
+                {report.costEstimate.auditTimeline?.length ? (
+                  <>
+                    <Text
+                      style={[
+                        styles.subTitle,
+                        { color: theme.text, marginTop: Spacing.md },
+                      ]}
+                    >
+                      Audit Workflow
+                    </Text>
+                    {report.costEstimate.auditTimeline.map((step, index) => (
+                      <Text
+                        key={index}
+                        style={[
+                          styles.listItem,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {index + 1}. {step}
+                      </Text>
+                    ))}
+                  </>
+                ) : null}
+              </>
+            ) : null}
           </View>
+
+          <View style={styles.reportSection}>
+            <Text style={[styles.sectionTitle, { color: AppColors.primary }]}>
+              Measurement Intelligence
+            </Text>
+            <Text
+              style={[styles.sectionContent, { color: theme.textSecondary }]}
+            >
+              Plan Area:{" "}
+              {Math.round(report.measurements.areaSqFt).toLocaleString()} sq ft
+            </Text>
+            {typeof report.measurements.perimeterFt === "number" ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Perimeter:{" "}
+                {Math.round(report.measurements.perimeterFt).toLocaleString()}{" "}
+                ft
+              </Text>
+            ) : null}
+            {report.measurements.pitch ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Pitch: {report.measurements.pitch}
+              </Text>
+            ) : null}
+            {typeof report.measurements.effectiveSquares === "number" ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Effective Squares (with waste):{" "}
+                {report.measurements.effectiveSquares.toFixed(2)}
+              </Text>
+            ) : null}
+            {typeof report.measurements.wasteFactorPct === "number" ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Waste Factor: {report.measurements.wasteFactorPct}%
+              </Text>
+            ) : null}
+            {report.measurements.roofSystemCategory ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Roof System Category: {report.measurements.roofSystemCategory}
+              </Text>
+            ) : null}
+            {typeof report.measurements.qualityScore === "number" ? (
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Measurement Quality Score: {report.measurements.qualityScore}
+                /100
+              </Text>
+            ) : null}
+            {report.measurements.qualityWarnings?.length ? (
+              <>
+                <Text
+                  style={[
+                    styles.subTitle,
+                    { color: theme.text, marginTop: Spacing.md },
+                  ]}
+                >
+                  Measurement Warnings
+                </Text>
+                {report.measurements.qualityWarnings.map((line, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.listItem, { color: theme.textSecondary }]}
+                  >
+                    • {line}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+            {report.measurements.guidance?.length ? (
+              <>
+                <Text
+                  style={[
+                    styles.subTitle,
+                    { color: theme.text, marginTop: Spacing.md },
+                  ]}
+                >
+                  Guidance Notes
+                </Text>
+                {report.measurements.guidance.map((line, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.listItem, { color: theme.textSecondary }]}
+                  >
+                    • {line}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+          </View>
+
+          {report.carrierComparison ? (
+            <View style={styles.reportSection}>
+              <Text style={[styles.sectionTitle, { color: AppColors.primary }]}>
+                Carrier Scope Comparison
+              </Text>
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Valuation basis: {report.carrierComparison.valuationBasis}
+              </Text>
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Parser confidence: {report.carrierComparison.parserConfidence}
+              </Text>
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Parsed from line math total: $
+                {report.carrierComparison.parsedFromLineMathTotalUsd.toLocaleString()}
+              </Text>
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Line math mismatch count:{" "}
+                {report.carrierComparison.lineMathMismatchCount}
+              </Text>
+              {typeof report.carrierComparison.parsedRcvUsd === "number" ? (
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Parsed RCV: $
+                  {report.carrierComparison.parsedRcvUsd.toLocaleString()}
+                </Text>
+              ) : null}
+              {typeof report.carrierComparison.parsedAcvUsd === "number" ? (
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Parsed ACV: $
+                  {report.carrierComparison.parsedAcvUsd.toLocaleString()}
+                </Text>
+              ) : null}
+              {typeof report.carrierComparison.parsedDepreciationUsd ===
+              "number" ? (
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Parsed Depreciation: $
+                  {report.carrierComparison.parsedDepreciationUsd.toLocaleString()}
+                </Text>
+              ) : null}
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Carrier parsed items:{" "}
+                {report.carrierComparison.carrierItemsCount}
+              </Text>
+              {report.carrierComparison.detectedLineCodes.length > 0 ? (
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Detected line codes:{" "}
+                  {report.carrierComparison.detectedLineCodes.join(", ")}
+                </Text>
+              ) : null}
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Carrier parsed total: $
+                {report.carrierComparison.parsedCarrierTotalUsd.toLocaleString()}
+              </Text>
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Estimator midpoint: $
+                {report.carrierComparison.estimatedMidUsd.toLocaleString()}
+              </Text>
+              <Text
+                style={[styles.sectionContent, { color: theme.textSecondary }]}
+              >
+                Delta ({report.carrierComparison.deltaDirection}): $
+                {report.carrierComparison.deltaUsd.toLocaleString()}
+              </Text>
+              {report.carrierComparison.settlementProjection ? (
+                <>
+                  <Text
+                    style={[
+                      styles.subTitle,
+                      { color: theme.text, marginTop: Spacing.md },
+                    ]}
+                  >
+                    Settlement Projection
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sectionContent,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Deductible: $
+                    {report.carrierComparison.settlementProjection.deductibleUsd.toLocaleString()}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sectionContent,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Recoverable depreciation: $
+                    {report.carrierComparison.settlementProjection.recoverableDepreciationUsd.toLocaleString()}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sectionContent,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Initial ACV payment (est): $
+                    {report.carrierComparison.settlementProjection.initialPaymentUsd.toLocaleString()}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sectionContent,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Final total payment after recoverable dep (est): $
+                    {report.carrierComparison.settlementProjection.projectedFinalPaymentUsd.toLocaleString()}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sectionContent,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Estimated out-of-pocket vs estimator midpoint: $
+                    {report.carrierComparison.settlementProjection.estimatedOutOfPocketUsd.toLocaleString()}
+                  </Text>
+                </>
+              ) : null}
+              {report.carrierComparison.likelyMissingItems.length > 0 ? (
+                <>
+                  <Text
+                    style={[
+                      styles.subTitle,
+                      { color: theme.text, marginTop: Spacing.md },
+                    ]}
+                  >
+                    Likely Missing Scope
+                  </Text>
+                  {report.carrierComparison.likelyMissingItems.map(
+                    (line, index) => (
+                      <Text
+                        key={index}
+                        style={[
+                          styles.listItem,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        • {line}
+                      </Text>
+                    ),
+                  )}
+                </>
+              ) : null}
+              {report.carrierComparison.note ? (
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  {report.carrierComparison.note}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={styles.reportSection}>
             <Text style={[styles.sectionTitle, { color: AppColors.primary }]}>
@@ -344,6 +813,14 @@ export function RoofReportScreen() {
                 setAddress("");
                 setRoofAge("");
                 setSquareFootage("");
+                setRoofPerimeterFt("");
+                setRoofPitch("");
+                setStateCode("");
+                setCarrierScopeText("");
+                setDeductibleUsd("");
+                setNonRecoverableDepreciationUsd("");
+                setSelectedProperty(null);
+                setEntryMode("builder");
                 setVisibleIssues("");
                 setNotes("");
               }}
@@ -371,9 +848,94 @@ export function RoofReportScreen() {
           Roof Inspection Report Generator
         </Text>
         <Text style={[styles.formDescription, { color: theme.textSecondary }]}>
-          Enter roof details to generate a comprehensive AI-powered inspection
-          report
+          New roof intelligence interface with map-driven property intake and
+          estimator workflow.
         </Text>
+
+        <View style={styles.modeTabs}>
+          <TouchableOpacity
+            style={[
+              styles.modeTabButton,
+              entryMode === "builder" && styles.modeTabButtonActive,
+            ]}
+            onPress={() => setEntryMode("builder")}
+            disabled={isLoading}
+          >
+            <Text
+              style={[
+                styles.modeTabText,
+                entryMode === "builder" && styles.modeTabTextActive,
+              ]}
+            >
+              Estimate Builder
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.modeTabButton,
+              entryMode === "map" && styles.modeTabButtonActive,
+            ]}
+            onPress={() => setEntryMode("map")}
+            disabled={isLoading}
+          >
+            <Text
+              style={[
+                styles.modeTabText,
+                entryMode === "map" && styles.modeTabTextActive,
+              ]}
+            >
+              Map Intake
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {entryMode === "map" ? (
+          <View style={styles.formSection}>
+            <Text style={[styles.label, { color: theme.text }]}>
+              Mapping Data Intake
+            </Text>
+            <View style={[styles.mapPanel, { borderColor: theme.border }]}>
+              <PropertySelectMap
+                onPropertySelected={(property) => {
+                  setSelectedProperty(property);
+                  if (!address.trim()) setAddress(property.address);
+                }}
+              />
+            </View>
+            {selectedProperty ? (
+              <View
+                style={[
+                  styles.mapSelectionCard,
+                  {
+                    backgroundColor: theme.backgroundSecondary,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.subTitle, { color: theme.text }]}>
+                  Selected Property
+                </Text>
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  {selectedProperty.address}
+                </Text>
+                <Text
+                  style={[
+                    styles.sectionContent,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  {selectedProperty.lat.toFixed(6)},{" "}
+                  {selectedProperty.lng.toFixed(6)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.formSection}>
           <Text style={[styles.label, { color: theme.text }]}>Address *</Text>
@@ -464,6 +1026,140 @@ export function RoofReportScreen() {
             placeholderTextColor={theme.textSecondary}
             value={squareFootage}
             onChangeText={setSquareFootage}
+            keyboardType="numeric"
+            editable={!isLoading}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            Roof Perimeter (ft)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+              },
+            ]}
+            placeholder="e.g., 220"
+            placeholderTextColor={theme.textSecondary}
+            value={roofPerimeterFt}
+            onChangeText={setRoofPerimeterFt}
+            keyboardType="numeric"
+            editable={!isLoading}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            Roof Pitch (rise/12)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+              },
+            ]}
+            placeholder="e.g., 6/12"
+            placeholderTextColor={theme.textSecondary}
+            value={roofPitch}
+            onChangeText={setRoofPitch}
+            editable={!isLoading}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            State Code (for code upgrades)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+              },
+            ]}
+            placeholder="e.g., TX, MO, CO"
+            placeholderTextColor={theme.textSecondary}
+            value={stateCode}
+            onChangeText={setStateCode}
+            autoCapitalize="characters"
+            maxLength={2}
+            editable={!isLoading}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            Carrier Scope Line Items (optional)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              styles.multilineInput,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+              },
+            ]}
+            placeholder={`Paste carrier lines, one per row (Xactimate-style supported)\nRFG250 Tear Off 42.00 SQ $4,200\nRFGDRP Drip Edge 220.00 LF $680\nRCV: $16,480  ACV: $13,900  Depreciation: $2,580`}
+            placeholderTextColor={theme.textSecondary}
+            value={carrierScopeText}
+            onChangeText={setCarrierScopeText}
+            multiline
+            numberOfLines={5}
+            editable={!isLoading}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            Policy Deductible (optional)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+              },
+            ]}
+            placeholder="e.g., 2500"
+            placeholderTextColor={theme.textSecondary}
+            value={deductibleUsd}
+            onChangeText={setDeductibleUsd}
+            keyboardType="numeric"
+            editable={!isLoading}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            Non-recoverable depreciation (optional)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+              },
+            ]}
+            placeholder="e.g., 500"
+            placeholderTextColor={theme.textSecondary}
+            value={nonRecoverableDepreciationUsd}
+            onChangeText={setNonRecoverableDepreciationUsd}
             keyboardType="numeric"
             editable={!isLoading}
           />
@@ -575,8 +1271,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: Spacing.xl,
   },
+  modeTabs: {
+    flexDirection: "row",
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  modeTabButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "rgba(128,128,128,0.35)",
+    borderRadius: BorderRadius.xs,
+    paddingVertical: Spacing.sm,
+    alignItems: "center",
+    backgroundColor: "rgba(128,128,128,0.08)",
+  },
+  modeTabButtonActive: {
+    borderColor: AppColors.primary,
+    backgroundColor: "rgba(212, 175, 55, 0.16)",
+  },
+  modeTabText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#9CA3AF",
+  },
+  modeTabTextActive: {
+    color: AppColors.primary,
+  },
   formSection: {
     marginBottom: Spacing.xl,
+  },
+  mapPanel: {
+    minHeight: 260,
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    overflow: "hidden",
+    marginTop: Spacing.sm,
+  },
+  mapSelectionCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
   },
   label: {
     fontSize: 14,

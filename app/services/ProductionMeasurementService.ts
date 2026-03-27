@@ -57,7 +57,7 @@ function sanitizeResult(
   includeRawPayloads: boolean,
 ): HybridMeasurementResult {
   if (includeRawPayloads) return r;
-  const { nearmapRaw: _n, eagleViewRaw: _e, ...rest } = r;
+  const { roof3dRaw: _r3, nearmapRaw: _n, eagleViewRaw: _e, ...rest } = r;
   return rest;
 }
 

@@ -1,6 +1,12 @@
-import { Linking, Alert } from "react-native";
+import { Alert, Linking } from "react-native";
 
 import type { RoofMeasurements } from "./roofReportTypes";
+export {
+  flattenMeasurementsForExport,
+  mergeEstimateRoofAreaIntoMeasurements,
+  mergeManualRoofAreaIntoMeasurements,
+  roofMeasurementsHaveContent,
+} from "./roofMeasurementsMerge";
 
 /** Marketing / docs repo (no SDK): https://github.com/eavemeasure/eavemeasure-aerial-roof-measurement */
 export const EAVEMEASURE_GITHUB_README_URL =
@@ -14,25 +20,6 @@ export const EAVEMEASURE_AERIAL_SERVICES_URL =
   "https://eavemeasure.com/aerial-roof-measurement-services/";
 
 export const EAVEMEASURE_PROVIDER_LABEL = "EaveMeasure";
-
-export function roofMeasurementsHaveContent(m?: RoofMeasurements): boolean {
-  if (!m) return false;
-  return !!(
-    (typeof m.roofAreaSqFt === "number" &&
-      Number.isFinite(m.roofAreaSqFt) &&
-      m.roofAreaSqFt > 0) ||
-    (typeof m.roofPerimeterFt === "number" &&
-      Number.isFinite(m.roofPerimeterFt) &&
-      m.roofPerimeterFt > 0) ||
-    (m.roofPitch && m.roofPitch.trim().length > 0) ||
-    !!m.roofPitchAiGauge?.estimatePitch?.trim() ||
-    (m.notes && m.notes.trim()) ||
-    (m.aerialMeasurementReference && m.aerialMeasurementReference.trim()) ||
-    (m.aerialMeasurementReportUrl && m.aerialMeasurementReportUrl.trim()) ||
-    (m.aerialMeasurementProvider && m.aerialMeasurementProvider.trim()) ||
-    !!m.precisionMeasurementSnapshot?.capturedAtIso
-  );
-}
 
 export async function openEaveMeasureAerialServices(): Promise<void> {
   const url = EAVEMEASURE_AERIAL_SERVICES_URL;

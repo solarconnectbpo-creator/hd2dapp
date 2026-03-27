@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   View,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -25,6 +26,8 @@ import {
   exportRoofReportToHtml,
   exportRoofReportToJson,
 } from "@/src/roofReports/exportRoofReport";
+import { serializeRoofReportToJsonPretty } from "@/src/roofReports/exportRoofReportSerialize";
+import { saveLastFailedExportDraft } from "@/src/roofReports/roofReportOfflineDraft";
 import { sumRoofEstimateLineItems } from "@/src/roofReports/roofEstimateTotals";
 import { roofMeasurementsHaveContent } from "@/src/roofReports/eavemeasureIntegration";
 import {
@@ -124,6 +127,8 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
   const [exportProgressPct, setExportProgressPct] = useState(0);
   const [exportPhase, setExportPhase] = useState("");
   const [roofToolsModalVisible, setRoofToolsModalVisible] = useState(false);
+  const [redactJsonExport, setRedactJsonExport] = useState(false);
+  const [showUnitsGlossary, setShowUnitsGlossary] = useState(false);
 
   const effectivePropertyUse =
     report.propertyUse ?? report.property.propertyUse;
@@ -187,6 +192,7 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           e instanceof Error ? e.message : "Could not export HTML. Try again.";
         showExportError("Export failed", msg);
         console.error(e);
+        void saveLastFailedExportDraft(serializeRoofReportToJsonPretty(report));
         resetExportModal();
       });
   };
@@ -198,6 +204,7 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
     setExportProgressPct(0);
     setExportPhase("Starting…");
     void exportRoofReportToJson(report, {
+      redactPii: redactJsonExport,
       onProgress: (pct, phase) => {
         setExportProgressPct(pct);
         setExportPhase(phase);
@@ -211,6 +218,7 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           e instanceof Error ? e.message : "Could not export JSON. Try again.";
         showExportError("Export failed", msg);
         console.error(e);
+        void saveLastFailedExportDraft(serializeRoofReportToJsonPretty(report));
         resetExportModal();
       });
   };
@@ -281,6 +289,29 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           Inspection {report.inspectionDate} · Report {report.id.slice(0, 8)}…
         </ThemedText>
       </View>
+
+      {!roofMeasurementsHaveContent(report.measurements) &&
+      report.estimate?.roofAreaSqFt ? (
+        <Card
+          style={[
+            styles.sectionCard,
+            {
+              borderWidth: 1,
+              borderColor: "rgba(245, 158, 11, 0.65)",
+              backgroundColor: "rgba(245, 158, 11, 0.08)",
+            },
+          ]}
+        >
+          <ThemedText type="small" style={{ fontWeight: "700" }}>
+            Measurements note
+          </ThemedText>
+          <ThemedText type="caption" style={{ marginTop: 6, lineHeight: 18 }}>
+            This report has estimate area but no full measurement block in
+            export. Open the damage report again, confirm roof area / trace, and
+            save so HTML/JSON include complete quantities.
+          </ThemedText>
+        </Card>
+      ) : null}
 
       <Card style={styles.sectionCard}>
         {logoUrl ? (
@@ -1790,10 +1821,44 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
           to print or save as PDF, or JSON for data backup.
         </ThemedText>
 
+        <Pressable
+          onPress={() => setShowUnitsGlossary((v) => !v)}
+          style={({ pressed }) => ({
+            marginBottom: 12,
+            opacity: pressed ? 0.85 : 1,
+          })}
+          accessibilityRole="button"
+          accessibilityLabel="Units glossary: squares, sq ft, LF"
+        >
+          <ThemedText type="caption" style={{ fontWeight: "700" }}>
+            {showUnitsGlossary ? "▼" : "▶"} Sq ft vs squares vs LF
+          </ThemedText>
+        </Pressable>
+        {showUnitsGlossary ? (
+          <ThemedText
+            type="caption"
+            style={[styles.mutedValue, { marginBottom: 12, lineHeight: 18 }]}
+          >
+            <ThemedText type="caption" style={{ fontWeight: "700" }}>
+              sq ft:
+            </ThemedText>{" "}
+            plan area of the roof surface.{" "}
+            <ThemedText type="caption" style={{ fontWeight: "700" }}>
+              Square (sq):
+            </ThemedText>{" "}
+            100 sq ft (roofing trade unit).{" "}
+            <ThemedText type="caption" style={{ fontWeight: "700" }}>
+              LF:
+            </ThemedText>{" "}
+            lineal feet along an edge (eaves, ridges, etc.).
+          </ThemedText>
+        ) : null}
+
         <Button
           onPress={openExportModal}
           disabled={exportBusy}
           style={styles.exportButton}
+          accessibilityLabel="Open export options for HTML or JSON"
         >
           {exportBusy ? "Exporting…" : "Export report"}
         </Button>
@@ -1847,9 +1912,28 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
                   HTML includes the printable report and cost estimate. JSON is
                   raw data for backup or tools.
                 </ThemedText>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                    gap: 12,
+                  }}
+                >
+                  <ThemedText type="caption" style={{ flex: 1 }}>
+                    Redact homeowner & schedule contacts in JSON
+                  </ThemedText>
+                  <Switch
+                    value={redactJsonExport}
+                    onValueChange={setRedactJsonExport}
+                    trackColor={{ false: "#94a3b8", true: AppColors.primary }}
+                  />
+                </View>
                 <Button
                   onPress={runExportHtml}
                   style={styles.exportModalButton}
+                  accessibilityLabel="Export as HTML for print or PDF"
                 >
                   HTML (print / PDF)
                 </Button>
@@ -1858,8 +1942,9 @@ export default function ReportPreviewScreen({ navigation, route }: Props) {
                   variant="secondary"
                   onPress={runExportJson}
                   style={styles.exportModalButton}
+                  accessibilityLabel="Export as JSON file"
                 >
-                  JSON
+                  JSON{redactJsonExport ? " (redacted)" : ""}
                 </Button>
                 <View style={{ height: 10 }} />
                 <Button

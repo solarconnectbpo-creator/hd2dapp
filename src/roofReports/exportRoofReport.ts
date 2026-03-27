@@ -77,12 +77,16 @@ import {
   safeExportFilenamePart,
   serializeRoofReportToJsonPretty,
 } from "./exportRoofReportSerialize";
+import { redactReportPiiForExport } from "./exportRoofReportRedact";
+import { formatRoofAreaSourceLabel } from "./roofMeasurementAudit";
 
 /** Progress 0–100 and short label for export UI. */
 export type ExportProgressCallback = (percent: number, phase: string) => void;
 
 export interface ExportRoofReportOptions {
   onProgress?: ExportProgressCallback;
+  /** When true, JSON export masks homeowner and schedule contact fields. */
+  redactPii?: boolean;
 }
 
 function formatDate(iso: string) {
@@ -244,6 +248,35 @@ function renderMeasurements(measurements?: RoofMeasurements) {
             : "Not traced"
         }</div></div>
       </div>
+      ${
+        measurements.roofAreaPrimarySource
+          ? `<div style="margin-top:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+              <div class="label">Primary roof area source</div>
+              <div class="value" style="margin-top:4px;">${escapeHtml(
+                formatRoofAreaSourceLabel(measurements.roofAreaPrimarySource),
+              )}</div>
+              ${
+                measurements.roofAreaRecordedAtIso
+                  ? `<div class="muted" style="margin-top:6px;font-size:11px;">Saved ${escapeHtml(measurements.roofAreaRecordedAtIso)}</div>`
+                  : ""
+              }
+              ${
+                measurements.measurementConfidenceBadge
+                  ? `<div class="muted" style="margin-top:4px;font-size:12px;">Trust indicator: ${escapeHtml(measurements.measurementConfidenceBadge)}</div>`
+                  : ""
+              }
+            </div>`
+          : ""
+      }
+      ${
+        measurements.roofStories != null &&
+        Number.isFinite(measurements.roofStories) &&
+        measurements.roofStories > 0
+          ? `<div style="margin-top:12px;"><div class="label">Stories (above grade)</div><div class="value">${escapeHtml(
+              String(measurements.roofStories),
+            )}</div></div>`
+          : ""
+      }
       ${
         measurements.roofPitch
           ? `<div style="margin-top:12px;"><div class="label">Roof Pitch</div><div class="value">${escapeHtml(
@@ -1150,7 +1183,10 @@ export async function exportRoofReportToJson(
   const filename = `RoofReport_${safeExportFilenamePart(report.id)}.json`;
   onProgress?.(8, "Preparing…");
   onProgress?.(25, "Serializing report…");
-  const json = serializeRoofReportToJsonPretty(report);
+  const payload = options?.redactPii
+    ? redactReportPiiForExport(report)
+    : report;
+  const json = serializeRoofReportToJsonPretty(payload);
   onProgress?.(70, "Encoding…");
 
   if (Platform.OS === "web") {

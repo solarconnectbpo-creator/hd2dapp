@@ -420,6 +420,15 @@ class ApiClient {
     );
     return this.handleResponse(response);
   }
+
+  async generateBedtimeStory(payload?: { prompt?: string; model?: string }) {
+    const response = await this.makeRequest(
+      `${this.baseUrl}/api/ai/bedtime-story`,
+      "POST",
+      payload ?? {},
+    );
+    return this.handleResponse(response);
+  }
 }
 
 // Export singleton instance

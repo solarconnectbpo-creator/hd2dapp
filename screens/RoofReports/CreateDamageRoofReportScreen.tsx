@@ -81,7 +81,14 @@ import {
 } from "@/src/roofReports/propertyUseClassification";
 import { getCompanyLogoUrlByName } from "@/src/roofReports/companyBranding";
 import { getDefaultDamageReportCompanyLogoUri } from "@/src/roofReports/coxRoofingLogoAsset";
-import { roofMeasurementsHaveContent } from "@/src/roofReports/eavemeasureIntegration";
+import {
+  flattenMeasurementsForExport,
+  roofMeasurementsHaveContent,
+} from "@/src/roofReports/eavemeasureIntegration";
+import {
+  buildMeasurementAuditFields,
+  formatRoofAreaSourceLabel,
+} from "@/src/roofReports/roofMeasurementAudit";
 import { mergePrecisionSnapshotIntoRoofMeasurements } from "@/src/roofReports/roofPrecisionMeasurement";
 import { buildRoofDiagramSvgDataUrl } from "@/src/roofReports/roofDiagram";
 import {
@@ -434,12 +441,49 @@ export default function CreateDamageRoofReportScreen({
   const [inspectionAiMessage, setInspectionAiMessage] = useState("");
   const [inspectionAiLoading, setInspectionAiLoading] = useState(false);
 
+  const measurementsResolvedForUi = useMemo(
+    () =>
+      flattenMeasurementsForExport(
+        measurements,
+        roofAreaSqFtManual,
+        estimate?.roofAreaSqFt,
+      ),
+    [measurements, roofAreaSqFtManual, estimate?.roofAreaSqFt],
+  );
+
   const measurementValidationSummary = useMemo(
     () =>
-      roofMeasurementsHaveContent(measurements)
-        ? computeMeasurementValidationSummary({ measurements, estimate })
+      roofMeasurementsHaveContent(measurementsResolvedForUi)
+        ? computeMeasurementValidationSummary({
+            measurements: measurementsResolvedForUi,
+            estimate,
+          })
         : null,
-    [measurements, estimate],
+    [measurementsResolvedForUi, estimate],
+  );
+
+  const liveMeasurementAudit = useMemo(
+    () =>
+      buildMeasurementAuditFields({
+        rawMeasurements: {
+          ...measurements,
+          measurementValidationSummary: measurementValidationSummary ?? undefined,
+        },
+        resolvedMeasurements: measurementsResolvedForUi,
+        roofAreaSqFtManual,
+        estimate: estimate ?? undefined,
+        hasRoofTraceGeoJson: !!roofTraceGeoJson,
+        propertyRoofSqFt: property.roofSqFt,
+      }),
+    [
+      measurements,
+      measurementValidationSummary,
+      measurementsResolvedForUi,
+      roofAreaSqFtManual,
+      estimate,
+      roofTraceGeoJson,
+      property.roofSqFt,
+    ],
   );
 
   // Optional non-roof hail items (Fencing & HVAC cheat sheet).
@@ -464,6 +508,7 @@ export default function CreateDamageRoofReportScreen({
 
   const [autoTraceFromFootprintEnabled, setAutoTraceFromFootprintEnabled] =
     useState(true);
+  const [showAdvancedOptional, setShowAdvancedOptional] = useState(false);
 
   const unitHvacReplace = QUICK_PRICE_NON_ROOF.hvacReplaceWithTax;
   const unitFinComb = QUICK_PRICE_NON_ROOF.finCombReplaceWithTax;
@@ -569,13 +614,19 @@ export default function CreateDamageRoofReportScreen({
     if (!damageTypes.length) return null;
     if (!inspectionDate.trim()) return null;
 
+    const measurementsResolved = flattenMeasurementsForExport(
+      measurements,
+      roofAreaSqFtManual,
+      estimate?.roofAreaSqFt,
+    );
+
     const classified = classifyRoofSystem(roofType.trim() || undefined);
     const scopeOfWork = buildRoofScopeOfWork({
       roofType: classified.normalizedRoofType,
       damageTypes,
       severity,
       recommendedAction,
-      roofAreaSqFt: measurements.roofAreaSqFt,
+      roofAreaSqFt: measurementsResolved.roofAreaSqFt,
     });
 
     const roofMaterialType = selectedRoofMaterial;
@@ -621,8 +672,8 @@ export default function CreateDamageRoofReportScreen({
     const roofLidar3dDiagramImageUrl = buildRoofLidar3dPolygonDiagramSvgDataUrl(
       {
         roofTraceGeoJson,
-        roofAreaSqFt: measurements.roofAreaSqFt,
-        roofPerimeterFt: measurements.roofPerimeterFt,
+        roofAreaSqFt: measurementsResolved.roofAreaSqFt,
+        roofPerimeterFt: measurementsResolved.roofPerimeterFt,
         roofPitch: measurements.roofPitch,
         roofType: classified.normalizedRoofType,
       },
@@ -654,23 +705,23 @@ export default function CreateDamageRoofReportScreen({
 
     const lowSlopeMaterialEstimate =
       useLowSlopeSheetPricing &&
-      measurements.roofAreaSqFt &&
-      measurements.roofAreaSqFt > 0
+      measurementsResolved.roofAreaSqFt &&
+      measurementsResolved.roofAreaSqFt > 0
         ? calculateLowSlopeMaterialEstimate({
             roofSystemCategory: classified.category,
-            roofAreaSqFt: measurements.roofAreaSqFt,
-            roofPerimeterFt: measurements.roofPerimeterFt,
+            roofAreaSqFt: measurementsResolved.roofAreaSqFt,
+            roofPerimeterFt: measurementsResolved.roofPerimeterFt,
             recommendedAction,
           })
         : undefined;
 
     const eagleViewEstimate =
       !useLowSlopeSheetPricing &&
-      measurements.roofAreaSqFt &&
-      measurements.roofAreaSqFt > 0
+      measurementsResolved.roofAreaSqFt &&
+      measurementsResolved.roofAreaSqFt > 0
         ? calculateEagleViewLikeEstimate({
-            roofAreaSqFt: measurements.roofAreaSqFt,
-            roofPerimeterFt: measurements.roofPerimeterFt,
+            roofAreaSqFt: measurementsResolved.roofAreaSqFt,
+            roofPerimeterFt: measurementsResolved.roofPerimeterFt,
             roofTraceGeoJson,
             predominantPitch: measurements.roofPitch,
             numberOfStories: measurements.roofStories,
@@ -716,15 +767,31 @@ export default function CreateDamageRoofReportScreen({
         ? reportLogoDataUrl.trim()
         : getCompanyLogoUrlByName(companyName.trim() || undefined),
       creatorName: createdBy?.name,
-      measurements: roofMeasurementsHaveContent(measurements)
-        ? {
+      measurements: (() => {
+        if (!roofMeasurementsHaveContent(measurementsResolved)) return undefined;
+        const measurementValidationSummary = computeMeasurementValidationSummary(
+          {
+            measurements: measurementsResolved,
+            estimate,
+          },
+        );
+        const measurementAudit = buildMeasurementAuditFields({
+          rawMeasurements: {
             ...measurements,
-            measurementValidationSummary: computeMeasurementValidationSummary({
-              measurements,
-              estimate,
-            }),
-          }
-        : undefined,
+            measurementValidationSummary,
+          },
+          resolvedMeasurements: measurementsResolved,
+          roofAreaSqFtManual,
+          estimate,
+          hasRoofTraceGeoJson: !!roofTraceGeoJson,
+          propertyRoofSqFt: property.roofSqFt,
+        });
+        return {
+          ...measurementsResolved,
+          measurementValidationSummary,
+          ...measurementAudit,
+        };
+      })(),
       buildingCode: effectiveBuildingCode,
       images: images.length ? images : undefined,
       roofTraceGeoJson,
@@ -732,13 +799,14 @@ export default function CreateDamageRoofReportScreen({
       propertyImageSource: "Mapbox Satellite",
       roofDiagramImageUrl: buildRoofDiagramSvgDataUrl({
         roofTraceGeoJson,
-        roofAreaSqFt: measurements.roofAreaSqFt,
-        roofPerimeterFt: measurements.roofPerimeterFt,
+        roofAreaSqFt: measurementsResolved.roofAreaSqFt,
+        roofPerimeterFt: measurementsResolved.roofPerimeterFt,
         roofType: roofType.trim() || undefined,
         roofPitch: measurements.roofPitch,
         satelliteImageUrl: getAutoPropertyImageUrl(property.lat, property.lng),
         propertyLat: property.lat,
         propertyLng: property.lng,
+        includeRoofEstimateTakeoff: !!estimate,
       }),
       roofDiagramSource:
         "Satellite + traced roof overlay (EagleView-style edge colors, plan & lineal LF)",
@@ -2013,7 +2081,8 @@ export default function CreateDamageRoofReportScreen({
           </ThemedText>
           <Button
             onPress={() => setRoofToolsModalVisible(true)}
-            style={styles.autoButton}
+            style={[styles.autoButton, { minHeight: 48 }]}
+            accessibilityLabel="Finish and export roof report"
           >
             Finish & export report
           </Button>
@@ -2456,6 +2525,59 @@ export default function CreateDamageRoofReportScreen({
         </Card>
 
         <Card style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.iconBadge}>
+              <Feather name="layers" size={18} color="#fff" />
+            </View>
+            <ThemedText type="h4" style={{ flex: 1 }}>
+              Roof quantities (effective)
+            </ThemedText>
+          </View>
+          <ThemedText type="caption" style={styles.helperText}>
+            Values below match export and the damage estimate after you save.
+            Roofing square: 100 sq ft (not plan ft of edge).
+          </ThemedText>
+          <View style={styles.kvRow}>
+            <ThemedText type="small" style={styles.kvLabel}>
+              Plan area
+            </ThemedText>
+            <ThemedText type="small" style={styles.kvValue}>
+              {measurementsResolvedForUi.roofAreaSqFt
+                ? `${measurementsResolvedForUi.roofAreaSqFt.toLocaleString()} sq ft (${(measurementsResolvedForUi.roofAreaSqFt / 100).toFixed(2)} sq)`
+                : "—"}
+            </ThemedText>
+          </View>
+          <View style={styles.kvRow}>
+            <ThemedText type="small" style={styles.kvLabel}>
+              Plan perimeter
+            </ThemedText>
+            <ThemedText type="small" style={styles.kvValue}>
+              {measurementsResolvedForUi.roofPerimeterFt
+                ? `${measurementsResolvedForUi.roofPerimeterFt.toLocaleString()} LF`
+                : "—"}
+            </ThemedText>
+          </View>
+          <View style={styles.kvRow}>
+            <ThemedText type="small" style={styles.kvLabel}>
+              Primary area source
+            </ThemedText>
+            <ThemedText type="small" style={styles.kvValue}>
+              {formatRoofAreaSourceLabel(
+                liveMeasurementAudit.roofAreaPrimarySource,
+              )}
+            </ThemedText>
+          </View>
+          <View style={styles.kvRow}>
+            <ThemedText type="small" style={styles.kvLabel}>
+              Confidence
+            </ThemedText>
+            <ThemedText type="small" style={styles.kvValue}>
+              {liveMeasurementAudit.measurementConfidenceBadge ?? "—"}
+            </ThemedText>
+          </View>
+        </Card>
+
+        <Card style={styles.sectionCard}>
           <ThemedText type="h4" style={styles.sectionTitle}>
             Damage Types
           </ThemedText>
@@ -2517,6 +2639,38 @@ export default function CreateDamageRoofReportScreen({
           </ThemedText>
         </Card>
 
+        <Card style={styles.sectionCard}>
+          <Pressable
+            onPress={() => setShowAdvancedOptional((v) => !v)}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              opacity: pressed ? 0.85 : 1,
+            })}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle advanced optional sections"
+          >
+            <View style={styles.iconBadge}>
+              <Feather name="sliders" size={18} color="#fff" />
+            </View>
+            <ThemedText type="h4" style={{ flex: 1 }}>
+              Advanced — METAR & field QA
+            </ThemedText>
+            <Feather
+              name={showAdvancedOptional ? "chevron-up" : "chevron-down"}
+              size={22}
+              color={theme.textSecondary}
+            />
+          </Pressable>
+          <ThemedText type="caption" style={styles.helperText}>
+            Optional weather snapshot and on-site checklist. Hidden by default to
+            keep the main measurement and estimate path short.
+          </ThemedText>
+        </Card>
+
+        {showAdvancedOptional ? (
+          <>
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={styles.iconBadge}>
@@ -2660,6 +2814,8 @@ export default function CreateDamageRoofReportScreen({
             })}
           </View>
         </Card>
+          </>
+        ) : null}
 
         <Card style={styles.sectionCard}>
           <View style={styles.sectionHeader}>

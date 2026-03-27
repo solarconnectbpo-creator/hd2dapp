@@ -1,8 +1,8 @@
 /**
  * EagleView REST client (measurement orders / reports).
  *
- * Official docs: https://restdoc.eagleview.com/ — endpoint paths and payloads
- * differ by product tier; adjust `paths` below after your integration is provisioned.
+ * Property-centric roof data (v2): https://developer.eagleview.com/documentation/property-data/v2/api-documentation
+ * Legacy integration: https://restdoc.eagleview.com/ — paths vary by product tier.
  *
  * Security: do **not** ship OAuth client secrets in the mobile/web bundle. Prefer
  * a backend proxy that holds credentials and forwards requests, or inject short‑lived

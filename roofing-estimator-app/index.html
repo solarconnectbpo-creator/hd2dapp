@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roofing Measurements & Estimates</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Roofing Measurements & Estimates</h1>
+      <p>Standalone app for roof measurement, estimate, and carrier comparison.</p>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>Property & Measurement Intake</h2>
+        <div class="grid">
+          <label>
+            Address
+            <input id="address" type="text" placeholder="123 Main St, City, ST" />
+          </label>
+          <label>
+            State
+            <input id="stateCode" type="text" maxlength="2" placeholder="TX" />
+          </label>
+          <label>
+            Latitude
+            <input id="lat" type="number" step="0.000001" placeholder="32.7767" />
+          </label>
+          <label>
+            Longitude
+            <input id="lng" type="number" step="0.000001" placeholder="-96.7970" />
+          </label>
+          <label>
+            Roof Type
+            <select id="roofType">
+              <option>Asphalt Shingle</option>
+              <option>Metal</option>
+              <option>Tile</option>
+              <option>Slate</option>
+              <option>TPO</option>
+              <option>EPDM</option>
+              <option>PVC</option>
+              <option>Modified Bitumen</option>
+              <option>Coating</option>
+              <option>Flat / Low Slope</option>
+            </select>
+          </label>
+          <label>
+            Plan Area (sq ft)
+            <input id="areaSqFt" type="number" min="1" placeholder="2500" />
+          </label>
+          <label>
+            Perimeter (ft)
+            <input id="perimeterFt" type="number" min="1" placeholder="220" />
+          </label>
+          <label>
+            Pitch (rise/12)
+            <input id="roofPitch" type="text" placeholder="6/12" />
+          </label>
+        </div>
+
+        <div class="check-grid">
+          <span>Damage Types</span>
+          <label><input type="checkbox" value="Hail" class="damage" /> Hail</label>
+          <label><input type="checkbox" value="Wind" class="damage" /> Wind</label>
+          <label><input type="checkbox" value="Missing Shingles" class="damage" /> Missing Shingles</label>
+          <label><input type="checkbox" value="Leaks" class="damage" /> Leaks</label>
+          <label><input type="checkbox" value="Flashing" class="damage" /> Flashing</label>
+          <label><input type="checkbox" value="Structural" class="damage" /> Structural</label>
+        </div>
+
+        <label class="severity">
+          Severity (1-5)
+          <input id="severity" type="range" min="1" max="5" value="3" />
+          <strong id="severityValue">3</strong>
+        </label>
+
+        <button id="runEstimate">Generate Measurement + Estimate</button>
+      </section>
+
+      <section class="card">
+        <h2>Carrier Scope Compare</h2>
+        <label>
+          Paste carrier line items (Xactimate style supported)
+          <textarea id="carrierScopeText" rows="8" placeholder="RFG250 Tear Off 42.00 SQ 100.00 4200.00&#10;RCV: 16480 ACV: 13900 Depreciation: 2580"></textarea>
+        </label>
+        <div class="grid">
+          <label>
+            Deductible ($)
+            <input id="deductibleUsd" type="number" min="0" placeholder="2500" />
+          </label>
+          <label>
+            Non-recoverable Depreciation ($)
+            <input id="nonRecDepUsd" type="number" min="0" placeholder="500" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card full">
+        <h2>Results</h2>
+        <div id="results" class="results">
+          <p class="muted">Run estimate to view results.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+  </html>
+

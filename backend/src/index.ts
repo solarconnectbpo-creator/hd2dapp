@@ -8,6 +8,10 @@ import { handleRoofDamageAi } from "./api/roofDamageAi";
 import { handleRoofPitchAi } from "./api/roofPitchAi";
 import { handleRoofReportLanguageAi } from "./api/roofReportLanguageAi";
 import { handleRoofVisionProxy } from "./api/roofVisionProxy";
+import { handleEagleViewPropertyDataProxy } from "./api/eagleviewPropertyDataProxy";
+import { handleMeasurementsHybrid } from "./api/measurementsHybrid";
+import { handlePropertyScraperListingProxy } from "./api/propertyScraperProxy";
+import { handleBedtimeStoryAi } from "./api/bedtimeStoryAi";
 
 interface Env {
   DB: any;
@@ -17,6 +21,10 @@ interface Env {
   /** Base URL of backend/ml-vision-service (FastAPI). */
   ROOF_VISION_SERVICE_URL?: string;
   ROOF_VISION_SERVICE_SECRET?: string;
+  ROOF3D_API_URL?: string;
+  ROOF3D_API_PATH?: string;
+  ROOF3D_API_KEY?: string;
+  PROPERTY_SCRAPER_API_BASE_URL?: string;
 }
 
 export default {
@@ -69,6 +77,14 @@ export default {
         return handleRoofPitchAi(request, env, corsHeaders);
       } else if (path === "/api/ai/roof-vision") {
         return handleRoofVisionProxy(request, env, corsHeaders);
+      } else if (path === "/api/ai/bedtime-story") {
+        return handleBedtimeStoryAi(request, env, corsHeaders);
+      } else if (path === "/api/measurements/hybrid") {
+        return handleMeasurementsHybrid(request, env, corsHeaders);
+      } else if (path === "/api/property-scraper/listing") {
+        return handlePropertyScraperListingProxy(request, env, corsHeaders);
+      } else if (path.startsWith("/api/eagleview/property-data")) {
+        return handleEagleViewPropertyDataProxy(request, env, corsHeaders);
       } else if (path.startsWith("/webhook/")) {
         return handleWebhooks(request, env, path, corsHeaders);
       } else if (path === "/" || path === "/api") {

@@ -15,6 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { BorderRadius, Spacing } from "@/constants/theme";
 import type { ReportsStackParamList } from "@/navigation/ReportsStackNavigator";
+import { openEagleViewPropertyDataV2Docs } from "@/src/roofReports/eagleviewPropertyData";
 
 export type RoofReportToolsModalMode = "report" | "mapPicker" | "preview";
 
@@ -41,6 +42,7 @@ export type RoofReportToolsModalProps = {
 type ToolRow = {
   key: string;
   label: string;
+  subtitle?: string;
   onPress: () => void;
   disabled?: boolean;
 };
@@ -59,12 +61,6 @@ export function RoofReportToolsModal({
 }: RoofReportToolsModalProps) {
   const { theme } = useTheme();
 
-  const navParams = {
-    address: property.address,
-    latitude: property.lat,
-    longitude: property.lng,
-  };
-
   const stlParams = {
     latitude: property.lat,
     longitude: property.lng,
@@ -73,74 +69,32 @@ export function RoofReportToolsModal({
   const rows: ToolRow[] = [];
 
   if (mode === "mapPicker") {
-    rows.push(
-      {
-        key: "stl",
-        label: "St. Louis GIS & storm sources",
-        onPress: () => {
-          onClose();
-          navigation.navigate("StLouisDataSources", stlParams);
-        },
+    rows.push({
+      key: "stl",
+      label: "St. Louis GIS & storm sources",
+      onPress: () => {
+        onClose();
+        navigation.navigate("StLouisDataSources", stlParams);
       },
-      {
-        key: "osm",
-        label: "OSM building footprint",
-        onPress: () => {
-          onClose();
-          navigation.navigate("GISBuildingMap", navParams);
-        },
-      },
-      {
-        key: "full",
-        label: "Full roof assessment (demo)",
-        onPress: () => {
-          onClose();
-          navigation.navigate("ComprehensiveRoof3DAssessment", navParams);
-        },
-      },
-    );
+    });
   } else if (mode === "preview") {
-    rows.push(
-      {
-        key: "osm",
-        label: "OSM building footprint",
-        onPress: () => {
-          onClose();
-          navigation.navigate("GISBuildingMap", navParams);
-        },
+    rows.push({
+      key: "stl",
+      label: "St. Louis GIS & storm sources",
+      onPress: () => {
+        onClose();
+        navigation.navigate("StLouisDataSources", stlParams);
       },
-      {
-        key: "full",
-        label: "Full roof assessment (demo)",
-        onPress: () => {
-          onClose();
-          navigation.navigate("ComprehensiveRoof3DAssessment", navParams);
-        },
-      },
-    );
+    });
   } else {
     rows.push(
       {
-        key: "osm",
-        label: "OSM building footprint",
-        onPress: () => {
-          onClose();
-          navigation.navigate("GISBuildingMap", navParams);
-        },
-      },
-      {
-        key: "full",
-        label: "Full roof assessment (demo)",
-        onPress: () => {
-          onClose();
-          navigation.navigate("ComprehensiveRoof3DAssessment", navParams);
-        },
-      },
-      {
-        key: "precision",
+        key: "measure",
         label: precisionNavLoading
-          ? "Opening precision…"
-          : "Precision measurement",
+          ? "Opening aerial measurements…"
+          : "Aerial roof measurements",
+        subtitle:
+          "EagleView / Nearmap-style run — order or import; aligns with Property Data API workflows.",
         onPress: () => {
           onClose();
           void onPrecisionMeasurement?.();
@@ -183,10 +137,10 @@ export function RoofReportToolsModal({
     mode === "report" && finishReport
       ? "Finish report"
       : mode === "report"
-        ? "Roof tools, GIS & imports"
+        ? "Imports & regional data"
         : mode === "mapPicker"
-          ? "Roof tools & data"
-          : "Roof analysis tools";
+          ? "Regional data"
+          : "Regional data";
 
   return (
     <Modal
@@ -222,31 +176,23 @@ export function RoofReportToolsModal({
 
           {mode === "report" && finishReport ? (
             <ThemedText type="caption" style={styles.sheetHint}>
-              Save the report and open the preview page (export HTML or JSON
-              there). Configure the damage cost estimate in the{" "}
-              <ThemedText type="caption" style={{ fontWeight: "700" }}>
-                Damage Estimate
-              </ThemedText>{" "}
-              section on this screen before saving. Optional GIS and import
-              tools are below.
+              Save to open preview (HTML / JSON export). Trace the roof, enter
+              sq ft, and set pitch on the report screen — that single flow drives
+              measurements and the damage estimate.
             </ThemedText>
           ) : mode === "report" ? (
             <ThemedText type="caption" style={styles.sheetHint}>
-              GIS, demos, and PDF import open from here. Build the damage report
-              and cost estimate (line items & code notes) in the{" "}
-              <ThemedText type="caption" style={{ fontWeight: "700" }}>
-                Damage Estimate
-              </ThemedText>{" "}
-              section on this screen.
+              Optional: aerial measurement orders, bulk import, regional GIS,
+              or CompanyCam. Core roof numbers and estimates are edited on the
+              report screen.
             </ThemedText>
           ) : mode === "preview" ? (
             <ThemedText type="caption" style={styles.sheetHint}>
-              Open footprint or full assessment using this report’s coordinates.
+              Regional St. Louis layers for this report’s coordinates.
             </ThemedText>
           ) : (
             <ThemedText type="caption" style={styles.sheetHint}>
-              STL sources, OSM footprint, and demo assessment for the selected
-              property.
+              Optional regional sources for the selected property.
             </ThemedText>
           )}
 
@@ -288,9 +234,19 @@ export function RoofReportToolsModal({
                   },
                 ]}
               >
-                <ThemedText type="small" style={{ flex: 1 }}>
-                  {row.label}
-                </ThemedText>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="small" style={{ fontWeight: "600" }}>
+                    {row.label}
+                  </ThemedText>
+                  {row.subtitle ? (
+                    <ThemedText
+                      type="caption"
+                      style={{ opacity: 0.78, marginTop: 4, lineHeight: 16 }}
+                    >
+                      {row.subtitle}
+                    </ThemedText>
+                  ) : null}
+                </View>
                 <Feather
                   name="chevron-right"
                   size={20}
@@ -298,6 +254,31 @@ export function RoofReportToolsModal({
                 />
               </Pressable>
             ))}
+
+            <Pressable
+              onPress={() => {
+                void openEagleViewPropertyDataV2Docs();
+              }}
+              style={({ pressed }) => [
+                styles.docRow,
+                {
+                  borderColor: theme.border,
+                  backgroundColor: pressed
+                    ? theme.backgroundSecondary
+                    : theme.backgroundRoot,
+                },
+              ]}
+            >
+              <Feather name="book-open" size={18} color={theme.textSecondary} />
+              <ThemedText type="caption" style={{ flex: 1, marginLeft: 8 }}>
+                EagleView Property Data API v2 (reference)
+              </ThemedText>
+              <Feather
+                name="external-link"
+                size={16}
+                color={theme.textSecondary}
+              />
+            </Pressable>
           </ScrollView>
         </View>
       </View>
@@ -349,5 +330,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 8,
     gap: 8,
+  },
+  docRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+    marginBottom: 8,
   },
 });

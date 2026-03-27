@@ -42,6 +42,10 @@ import {
   fetchStlIntelAtPoint,
   type StlIntelBundle,
 } from "@/services/stlIntelClient";
+import {
+  fetchListingFromPropertyWebScraper,
+  type PropertyScraperListing,
+} from "@/src/roofReports/propertyWebScraperClient";
 
 type Props = NativeStackScreenProps<ReportsStackParamList, "PropertyMapPicker">;
 
@@ -105,6 +109,9 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
   const [stlIntelError, setStlIntelError] = useState<string | null>(null);
   const [stlIntelOutsideMissouri, setStlIntelOutsideMissouri] = useState(false);
   const [roofToolsModalVisible, setRoofToolsModalVisible] = useState(false);
+  const [listingUrl, setListingUrl] = useState("");
+  const [listingImportBusy, setListingImportBusy] = useState(false);
+  const [listingImportDebug, setListingImportDebug] = useState<string>("");
   const tabBarHeight = React.useContext(BottomTabBarHeightContext) ?? 70;
 
   const identifyRoofType = (p: PropertySelection): PropertySelection => {
@@ -544,6 +551,97 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
     setFocusRequest({ lat: lead.lat, lng: lead.lng, key: Date.now() });
   };
 
+  const handleImportListingUrl = async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert(
+        "Listing import",
+        "Listing URL import is currently available in the web build.",
+      );
+      return;
+    }
+    const url = listingUrl.trim();
+    if (!url) {
+      Alert.alert("Listing import", "Paste a listing URL first.");
+      return;
+    }
+    setListingImportBusy(true);
+    setListingImportDebug("");
+    try {
+      const listing: PropertyScraperListing =
+        await fetchListingFromPropertyWebScraper(url);
+      const address =
+        listing.address?.trim() || listing.title?.trim() || "Listing import";
+      let lat = listing.lat;
+      let lng = listing.lng;
+      if (
+        (!Number.isFinite(lat) || !Number.isFinite(lng)) &&
+        address &&
+        address !== "Listing import"
+      ) {
+        const hits = await forwardGeocodeNominatim(address);
+        if (hits.length) {
+          lat = hits[0].lat;
+          lng = hits[0].lng;
+        }
+      }
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error(
+          "Could not resolve listing coordinates. Try another URL or search the address.",
+        );
+      }
+
+      const imported: PropertySelection = {
+        address,
+        lat,
+        lng,
+        clickedAtIso: new Date().toISOString(),
+        roofSqFt:
+          typeof listing.areaSqFt === "number" && listing.areaSqFt > 0
+            ? Math.round(listing.areaSqFt)
+            : undefined,
+      };
+      const merged = findBestMatchingLead(imported, importedLeads);
+      const next = identifyRoofType(
+        merged
+          ? {
+              ...merged,
+              ...imported,
+            }
+          : imported,
+      );
+      setSelected(next);
+      setFocusRequest({ lat: next.lat, lng: next.lng, key: Date.now() });
+      setListingUrl("");
+      setCsvInfo(
+        listing.priceText
+          ? `Listing import: ${address} · ${listing.priceText}`
+          : `Listing import: ${address}`,
+      );
+      if (__DEV__) {
+        const debugBits = [
+          listing.debug?.addressSource
+            ? `address=${listing.debug.addressSource}`
+            : "address=none",
+          listing.debug?.latitudeSource
+            ? `lat=${listing.debug.latitudeSource}`
+            : "lat=none",
+          listing.debug?.longitudeSource
+            ? `lng=${listing.debug.longitudeSource}`
+            : "lng=none",
+        ];
+        setListingImportDebug(`Import debug: ${debugBits.join(" · ")}`);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert(
+        "Listing import failed",
+        e instanceof Error ? e.message : "Could not import listing URL.",
+      );
+    } finally {
+      setListingImportBusy(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={styles.topOverlay}>
@@ -632,6 +730,44 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
           >
             {geocodeLoading ? "Searching…" : "Search address (US)"}
           </Button>
+          <View style={{ height: 10 }} />
+          <ThemedText type="caption" style={styles.searchHint}>
+            Or import from listing URL (PropertyWebScraper source)
+          </ThemedText>
+          <View style={styles.searchRow}>
+            <Feather
+              name="link"
+              size={18}
+              color="#94a3b8"
+              style={{ marginRight: 8 }}
+            />
+            <TextInput
+              value={listingUrl}
+              onChangeText={setListingUrl}
+              placeholder="https://www.zillow.com/... or realtor.com/..."
+              placeholderTextColor="#64748b"
+              style={[styles.searchInput, { color: "#f1f5f9" }]}
+              autoCapitalize="none"
+              autoCorrect={false}
+              onSubmitEditing={handleImportListingUrl}
+            />
+          </View>
+          <View style={{ height: 8 }} />
+          <Button
+            onPress={handleImportListingUrl}
+            style={styles.searchButton}
+            disabled={listingImportBusy}
+          >
+            {listingImportBusy ? "Importing…" : "Import listing URL"}
+          </Button>
+          {__DEV__ && listingImportDebug ? (
+            <ThemedText
+              type="caption"
+              style={[styles.searchHint, { marginTop: 8, color: "#fbbf24" }]}
+            >
+              {listingImportDebug}
+            </ThemedText>
+          ) : null}
           {geocodeLoading ? (
             <View style={styles.geocodeSpinner}>
               <ActivityIndicator color={AppColors.primary} />
@@ -819,7 +955,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
               onPress={() => setRoofToolsModalVisible(true)}
               style={styles.secondaryButton}
             >
-              Roof tools & data
+              Regional data & imports
             </Button>
 
             <RoofReportToolsModal
@@ -892,7 +1028,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
     padding: Spacing.md,
-    maxHeight: 320,
+    maxHeight: 420,
   },
   searchTitle: { color: "#fff", fontWeight: "700" },
   searchHint: { color: "#94a3b8", marginTop: 4 },
@@ -908,7 +1044,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, minHeight: 44, fontSize: 15 },
   searchButton: { minHeight: 42 },
   geocodeSpinner: { marginTop: 10, alignItems: "center" },
-  resultsScroll: { maxHeight: 140, marginTop: 8 },
+  resultsScroll: { maxHeight: 120, marginTop: 8 },
   resultRow: {
     paddingVertical: 8,
     paddingHorizontal: 4,

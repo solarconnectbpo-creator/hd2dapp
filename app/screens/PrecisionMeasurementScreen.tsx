@@ -163,7 +163,7 @@ function PrecisionMeasurementScreen({ route, navigation }: Props) {
       </View>
 
       <ThemedText type="caption" style={styles.lead}>
-        Runs Nearmap / EagleView orchestration via{" "}
+        Runs Roof3D / Nearmap / EagleView orchestration via{" "}
         <ThemedText type="caption" style={{ fontWeight: "700" }}>
           ProductionMeasurementService
         </ThemedText>{" "}
@@ -336,6 +336,21 @@ function PrecisionMeasurementScreen({ route, navigation }: Props) {
                   {result.data.eagleViewStatus
                     ? ` (${result.data.eagleViewStatus})`
                     : ""}
+                </ThemedText>
+              ) : null}
+              {result.data.roofAreaSqFt != null ? (
+                <ThemedText type="caption" style={styles.resultBlock}>
+                  Roof area: {Math.round(result.data.roofAreaSqFt).toLocaleString()} sq ft
+                </ThemedText>
+              ) : null}
+              {result.data.roofPerimeterFt != null ? (
+                <ThemedText type="caption" style={styles.resultBlock}>
+                  Roof perimeter: {Math.round(result.data.roofPerimeterFt).toLocaleString()} ft
+                </ThemedText>
+              ) : null}
+              {result.data.roofPitch ? (
+                <ThemedText type="caption" style={styles.resultBlock}>
+                  Roof pitch: {result.data.roofPitch}
                 </ThemedText>
               ) : null}
             </>

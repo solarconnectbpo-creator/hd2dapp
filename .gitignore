@@ -35,6 +35,8 @@ yarn-error.*
 # local env files
 .env
 .env*.local
+backend/.dev.vars
+backend/.dev.vars.*
 
 # local tooling / Replit
 .config/
@@ -56,3 +58,5 @@ app-example
 # generated native folders
 /ios
 /android
+
+test-results/
