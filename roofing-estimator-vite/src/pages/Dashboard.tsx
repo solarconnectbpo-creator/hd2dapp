@@ -1,11 +1,29 @@
+import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { FileSignature, FileText, Folder, MapPinned, Ruler, Search, TrendingUp } from "lucide-react";
+import {
+  FileSignature,
+  FileText,
+  Folder,
+  HardDriveDownload,
+  MapPinned,
+  Ruler,
+  Search,
+  TrendingUp,
+  Upload,
+} from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  buildRoofingBackupPayload,
+  downloadRoofingBackupJson,
+  parseRoofingBackupJson,
+} from "../lib/roofingBackup";
 
 export function Dashboard() {
-  const { measurements, estimates, contracts } = useRoofing();
+  const { measurements, estimates, contracts, replaceAllRoofingData } = useRoofing();
+  const backupInputRef = useRef<HTMLInputElement>(null);
+  const [backupNote, setBackupNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const stats = [
     { title: "Total Measurements", value: measurements.length, icon: Ruler, color: "bg-blue-500" },
@@ -20,6 +38,50 @@ export function Dashboard() {
   ];
 
   const recentMeasurements = measurements.slice(-5).reverse();
+
+  const onExportBackup = () => {
+    const payload = buildRoofingBackupPayload(measurements, estimates, contracts);
+    const name = `roofing-pro-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    downloadRoofingBackupJson(payload, name);
+    setBackupNote({ kind: "ok", text: "Download started — keep this file somewhere safe." });
+    window.setTimeout(() => setBackupNote(null), 5000);
+  };
+
+  const onPickBackupFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setBackupNote({ kind: "err", text: "Could not read the file." });
+    };
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || ""));
+        const result = parseRoofingBackupJson(parsed);
+        if (!result.ok) {
+          setBackupNote({ kind: "err", text: result.error });
+          return;
+        }
+        const hasExisting =
+          measurements.length > 0 || estimates.length > 0 || contracts.length > 0;
+        if (
+          hasExisting &&
+          !window.confirm(
+            "Replace all measurements, estimates, and contracts in this browser with the backup?",
+          )
+        ) {
+          return;
+        }
+        replaceAllRoofingData(result.data);
+        setBackupNote({
+          kind: "ok",
+          text: "Backup restored. Your data is saved in this browser.",
+        });
+        window.setTimeout(() => setBackupNote(null), 6000);
+      } catch {
+        setBackupNote({ kind: "err", text: "That file is not valid JSON." });
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <div className="p-8">
@@ -130,6 +192,53 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-8 border-blue-100 bg-gradient-to-br from-white to-blue-50/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDriveDownload className="h-5 w-5 text-blue-600" />
+            Backup &amp; restore
+          </CardTitle>
+          <CardDescription>
+            Download a JSON copy of measurements, estimates, and contracts. Restore replaces everything in
+            this browser — use after a new device or if data was cleared.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Button type="button" variant="default" className="gap-2" onClick={onExportBackup}>
+            <HardDriveDownload className="h-4 w-4" />
+            Export backup (.json)
+          </Button>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) onPickBackupFile(f);
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={() => backupInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" />
+            Restore from file
+          </Button>
+          {backupNote ? (
+            <p
+              className={`text-sm ${backupNote.kind === "ok" ? "text-green-700" : "text-red-700"}`}
+              role="status"
+            >
+              {backupNote.text}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }

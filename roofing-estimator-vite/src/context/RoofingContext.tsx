@@ -70,6 +70,12 @@ interface RoofingContextType {
   addMeasurement: (measurement: Measurement) => void;
   addEstimate: (estimate: Estimate) => void;
   addContract: (contract: Contract) => void;
+  /** Replaces all persisted roofing data (used after JSON backup import). */
+  replaceAllRoofingData: (payload: {
+    measurements: Measurement[];
+    estimates: Estimate[];
+    contracts: Contract[];
+  }) => void;
   getMeasurementById: (id: string) => Measurement | undefined;
   getEstimateById: (id: string) => Estimate | undefined;
 }
@@ -85,7 +91,7 @@ function isRoofForm(s: string): s is RoofFormKind {
 }
 
 /** Migrate older saves that stored only structural `roofType` instead of material + form. */
-function normalizeMeasurement(raw: Record<string, unknown>): Measurement | null {
+export function normalizeMeasurement(raw: Record<string, unknown>): Measurement | null {
   const id = raw.id;
   const projectName = raw.projectName;
   const date = raw.date;
@@ -178,6 +184,11 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setMeasurements((prev) => [...prev, measurement]),
       addEstimate: (estimate: Estimate) => setEstimates((prev) => [...prev, estimate]),
       addContract: (contract: Contract) => setContracts((prev) => [...prev, contract]),
+      replaceAllRoofingData: (payload) => {
+        setMeasurements(payload.measurements);
+        setEstimates(payload.estimates);
+        setContracts(payload.contracts);
+      },
       getMeasurementById: (id: string) => measurements.find((m) => m.id === id),
       getEstimateById: (id: string) => estimates.find((e) => e.id === id),
     }),
