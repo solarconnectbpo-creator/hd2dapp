@@ -7,4 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_USE_API_PROXY?: string;
   /** When "true", hides BatchData / Places / PDL UI (CSV-only + manual enrichment). */
   readonly VITE_PROPERTY_SCRAPER_OFFLINE?: string;
+  /** Optional ArcGIS API key for authenticated Feature layer queries (overrides org-stored key). */
+  readonly VITE_ARCGIS_API_KEY?: string;
+  /** Default Feature layer URL for Canvassing overlay (overrides Contacts setting when set). */
+  readonly VITE_ARCGIS_FEATURE_LAYER_URL?: string;
 }

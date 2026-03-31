@@ -14,6 +14,7 @@ Run the Vite app from this directory (`npm run dev` or `npm run preview`). Some 
 | Feature | Requirement |
 |--------|-------------|
 | Mapbox (measurement map, **Canvassing**) | `VITE_MAPBOX_TOKEN` in `.env`, or paste a public `pk.…` token once (stored in `localStorage`) |
+| **ArcGIS overlay** (parcels / zoning on **Canvassing**) | Optional: set Feature layer URL + token under **Contacts & settings**, or `VITE_ARCGIS_FEATURE_LAYER_URL` / `VITE_ARCGIS_API_KEY` in `.env`. Layer must be `…/FeatureServer/{id}` (public services work without a key). |
 | STL / MO parcel intel (`/intel-proxy`) | HD2D Worker: from repo `backend`, run `npm run dev` (Wrangler on **http://127.0.0.1:8787**). Optional: `VITE_INTEL_API_BASE` for a deployed Worker URL |
 | BatchData property records | BatchData API key in the Property Scraper UI. **Dev/preview:** Vite proxy `/batchdata-api`. **Production build:** requests go to the HD2D Worker at `getHd2dApiBase()` → `POST /api/batchdata/property-search` (run Wrangler locally or set `VITE_INTEL_API_BASE` to your deployed Worker) |
 | Property Scraper offline | If `VITE_PROPERTY_SCRAPER_OFFLINE=true`, live enrichment is disabled |

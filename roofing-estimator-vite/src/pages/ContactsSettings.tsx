@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import {
   Building2,
   Download,
+  Layers,
   Loader2,
   MapPin,
   Save,
@@ -106,7 +107,8 @@ export function ContactsSettings() {
       setBanner({ kind: "error", text: r.message });
       return;
     }
-    setBanner({ kind: "success", text: "Company settings saved to this browser." });
+    window.dispatchEvent(new Event("roofing-org-updated"));
+    setBanner({ kind: "success", text: "Settings saved to this browser." });
     window.setTimeout(() => setBanner(null), 5000);
   }, [org]);
 
@@ -367,9 +369,46 @@ export function ContactsSettings() {
                 ) : null}
               </div>
             </div>
+
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <Layers className="h-4 w-4 text-blue-600" />
+                Canvassing map — ArcGIS overlay
+              </h3>
+              <p className="mb-4 text-xs text-gray-500">
+                Draw public (or secured) <strong>Feature Server</strong> polygons/lines on the satellite map. Paste the
+                layer URL through <code className="rounded bg-gray-100 px-1">/FeatureServer/&lt;id&gt;</code> (no{" "}
+                <code className="rounded bg-gray-100 px-1">/query</code>). Optional token for private portals. Env
+                overrides: <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_FEATURE_LAYER_URL</code>,{" "}
+                <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_API_KEY</code>.
+              </p>
+              <div className="space-y-3">
+                <label className="text-sm block">
+                  <span className="text-gray-600 mb-1 block">Feature layer URL</span>
+                  <input
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs"
+                    placeholder="https://services.arcgis.com/.../FeatureServer/0"
+                    value={org.arcgisFeatureLayerUrl}
+                    onChange={(e) => setOrg((o) => ({ ...o, arcgisFeatureLayerUrl: e.target.value }))}
+                  />
+                </label>
+                <label className="text-sm block">
+                  <span className="text-gray-600 mb-1 block">API key / token (optional)</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="If the service requires authentication"
+                    value={org.arcgisApiKey}
+                    onChange={(e) => setOrg((o) => ({ ...o, arcgisApiKey: e.target.value }))}
+                  />
+                </label>
+              </div>
+            </div>
+
             <Button onClick={persistOrg}>
               <Save className="w-4 h-4 mr-2" />
-              Save company &amp; branding
+              Save company &amp; mapping settings
             </Button>
           </CardContent>
         </Card>

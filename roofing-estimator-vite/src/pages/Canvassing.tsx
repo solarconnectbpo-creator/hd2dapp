@@ -6,6 +6,7 @@ import {
   ChevronUp,
   FileJson,
   FileSpreadsheet,
+  Layers,
   MapPin,
   Navigation,
   Ruler,
@@ -42,10 +43,21 @@ import {
   PENDING_PROPERTY_IMPORT_KEY,
   type PropertyImportPayload,
 } from "../lib/propertyScraper";
+import {
+  fetchArcgisLayerAsGeoJson,
+  normalizeArcgisFeatureLayerUrl,
+  resolveArcgisApiKey,
+  resolveArcgisFeatureLayerUrl,
+} from "../lib/arcgisFeatureLayer";
+import { loadOrgSettings } from "../lib/orgSettings";
 
 const MAPBOX_TOKEN_KEY = "roofing-estimator-vite-mapbox-token-v1";
 const LEADS_SOURCE_ID = "canvass-leads";
 const LEADS_LAYER_ID = "canvass-leads-circles";
+const ARCGIS_SOURCE_ID = "canvass-arcgis-overlay";
+const ARCGIS_FILL_LAYER_ID = "canvass-arcgis-fill";
+const ARCGIS_LINE_LAYER_ID = "canvass-arcgis-line";
+const ARCGIS_POINT_LAYER_ID = "canvass-arcgis-points";
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371000;
@@ -135,6 +147,8 @@ export function Canvassing() {
   const [geoBusy, setGeoBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [mapInitError, setMapInitError] = useState("");
+  const [arcgisBusy, setArcgisBusy] = useState(false);
+  const [arcgisHint, setArcgisHint] = useState("");
 
   useEffect(() => {
     saveCanvassLeads(leads);
@@ -320,6 +334,45 @@ export function Canvassing() {
     enrichRef.current = enrichAtLatLng;
   }, [enrichAtLatLng]);
 
+  const syncArcgisLayer = useCallback(async () => {
+    const map = mapInstanceRef.current;
+    if (!map || !styleLoadedRef.current) return;
+    const org = loadOrgSettings();
+    const layerUrl = resolveArcgisFeatureLayerUrl(org.arcgisFeatureLayerUrl);
+    const normalized = normalizeArcgisFeatureLayerUrl(layerUrl);
+    const src = map.getSource(ARCGIS_SOURCE_ID) as
+      | { setData?: (d: GeoJSON.FeatureCollection) => void }
+      | undefined;
+    if (!normalized) {
+      src?.setData?.({ type: "FeatureCollection", features: [] });
+      setArcgisHint("");
+      return;
+    }
+    const token = resolveArcgisApiKey(org.arcgisApiKey);
+    setArcgisBusy(true);
+    try {
+      const fc = await fetchArcgisLayerAsGeoJson(layerUrl, { token: token || undefined });
+      src?.setData?.(fc);
+      setArcgisHint(`${fc.features.length} features from ArcGIS`);
+    } catch (e) {
+      setArcgisHint(e instanceof Error ? e.message : "ArcGIS layer failed");
+    } finally {
+      setArcgisBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onOrg = () => void syncArcgisLayer();
+    window.addEventListener("roofing-org-updated", onOrg);
+    return () => window.removeEventListener("roofing-org-updated", onOrg);
+  }, [syncArcgisLayer]);
+
+  useEffect(() => {
+    if (!arcgisHint) return;
+    const t = window.setTimeout(() => setArcgisHint(""), 8000);
+    return () => window.clearTimeout(t);
+  }, [arcgisHint]);
+
   useLayoutEffect(() => {
     if (!mapboxToken.trim()) {
       setMapInitError("");
@@ -381,6 +434,46 @@ export function Canvassing() {
       map.on("load", () => {
         if (disposed) return;
         scheduleResize();
+
+        map.addSource(ARCGIS_SOURCE_ID, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        map.addLayer({
+          id: ARCGIS_FILL_LAYER_ID,
+          type: "fill",
+          source: ARCGIS_SOURCE_ID,
+          filter: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
+          paint: {
+            "fill-color": "#2563eb",
+            "fill-opacity": 0.14,
+            "fill-outline-color": "#1e40af",
+          },
+        });
+        map.addLayer({
+          id: ARCGIS_LINE_LAYER_ID,
+          type: "line",
+          source: ARCGIS_SOURCE_ID,
+          filter: ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
+          paint: {
+            "line-color": "#1e40af",
+            "line-width": 2,
+            "line-opacity": 0.65,
+          },
+        });
+        map.addLayer({
+          id: ARCGIS_POINT_LAYER_ID,
+          type: "circle",
+          source: ARCGIS_SOURCE_ID,
+          filter: ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false],
+          paint: {
+            "circle-radius": 5,
+            "circle-color": "#1d4ed8",
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+
         map.addSource(LEADS_SOURCE_ID, {
           type: "geojson",
           data: leadsGeoJson,
@@ -444,6 +537,12 @@ export function Canvassing() {
         map.once("idle", () => {
           if (!disposed) scheduleResize();
         });
+
+        if (normalizeArcgisFeatureLayerUrl(resolveArcgisFeatureLayerUrl(loadOrgSettings().arcgisFeatureLayerUrl))) {
+          queueMicrotask(() => {
+            if (!disposed) void syncArcgisLayer();
+          });
+        }
       });
       } catch (e) {
         if (!disposed) {
@@ -462,7 +561,7 @@ export function Canvassing() {
         mapInstanceRef.current = null;
       }
     };
-  }, [mapboxToken, mapContainerEl]);
+  }, [mapboxToken, mapContainerEl, syncArcgisLayer]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -665,6 +764,17 @@ export function Canvassing() {
                   type="button"
                   size="icon"
                   variant="ghost"
+                  disabled={arcgisBusy}
+                  className="h-8 w-8 text-white hover:bg-white/15"
+                  title="Refresh ArcGIS overlay (Contacts & settings)"
+                  onClick={() => void syncArcgisLayer()}
+                >
+                  <Layers className={`h-4 w-4 ${arcgisBusy ? "opacity-50" : ""}`} />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
                   className="h-8 w-8 text-white hover:bg-white/15"
                   title="Mapbox token"
                   onClick={() => setShowTokenRow((v) => !v)}
@@ -686,6 +796,11 @@ export function Canvassing() {
             {mapInitError ? (
               <div className="pointer-events-auto border-b border-amber-500/40 bg-amber-950/90 px-3 py-2 text-xs text-amber-100 backdrop-blur-md">
                 Map: {mapInitError} — check token URL restrictions at account.mapbox.com
+              </div>
+            ) : null}
+            {arcgisHint ? (
+              <div className="pointer-events-none border-b border-white/10 bg-black/50 px-3 py-1.5 text-center text-[11px] text-sky-200/95 backdrop-blur-md">
+                ArcGIS: {arcgisHint}
               </div>
             ) : null}
           </div>

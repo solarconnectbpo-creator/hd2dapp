@@ -15,6 +15,13 @@ export interface OrgSettings {
   /** data:image/...;base64,... or empty */
   logoDataUrl: string;
   defaultTemplateProfile: OrgTemplateProfile;
+  /**
+   * ArcGIS Feature layer REST URL through the layer id, e.g.
+   * `https://…/arcgis/rest/services/MyMap/FeatureServer/0` — used as a Mapbox overlay on Canvassing.
+   */
+  arcgisFeatureLayerUrl: string;
+  /** Optional ArcGIS API token / key for private layers (also settable via VITE_ARCGIS_API_KEY). */
+  arcgisApiKey: string;
 }
 
 export function defaultOrgSettings(): OrgSettings {
@@ -27,6 +34,8 @@ export function defaultOrgSettings(): OrgSettings {
     contactPhone: "(000) 000-0000",
     logoDataUrl: "",
     defaultTemplateProfile: "residential",
+    arcgisFeatureLayerUrl: "",
+    arcgisApiKey: "",
   };
 }
 
