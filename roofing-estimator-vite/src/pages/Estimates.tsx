@@ -62,8 +62,20 @@ export function Estimates() {
                     <p className="text-sm text-gray-600">Tax</p>
                     <p className="text-lg text-gray-900">${estimate.tax.toLocaleString()}</p>
                   </div>
+                  {estimate.rcvBeforeMarkup != null && estimate.estimateMarkup != null ? (
+                    <>
+                      <div>
+                        <p className="text-sm text-gray-600">RCV before +50%</p>
+                        <p className="text-lg text-gray-900">${estimate.rcvBeforeMarkup.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Estimate adjustment (+50%)</p>
+                        <p className="text-lg text-gray-900">${estimate.estimateMarkup.toLocaleString()}</p>
+                      </div>
+                    </>
+                  ) : null}
                   <div className="pt-3 border-t border-gray-200">
-                    <p className="text-sm text-gray-600">Total</p>
+                    <p className="text-sm text-gray-600">Total (RCV)</p>
                     <p className="text-2xl text-blue-600">${estimate.total.toLocaleString()}</p>
                   </div>
                 </div>

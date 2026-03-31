@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { FileSignature, FileText, Ruler, TrendingUp } from "lucide-react";
+import { FileSignature, FileText, MapPinned, Ruler, Search, TrendingUp } from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -60,6 +60,12 @@ export function Dashboard() {
                 New Roof Measurement
               </Button>
             </Link>
+            <Link to="/canvassing">
+              <Button className="w-full justify-start" variant="outline">
+                <MapPinned className="w-4 h-4 mr-2" />
+                Canvassing map
+              </Button>
+            </Link>
             <Link to="/estimates">
               <Button className="w-full justify-start" variant="outline">
                 <FileText className="w-4 h-4 mr-2" />
@@ -70,6 +76,17 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <FileSignature className="w-4 h-4 mr-2" />
                 Contracts / Proposals
+              </Button>
+            </Link>
+            <Link to="/contacts">
+              <Button className="w-full justify-start" variant="outline">
+                Contacts &amp; settings
+              </Button>
+            </Link>
+            <Link to="/property-lookup">
+              <Button className="w-full justify-start" variant="outline">
+                <Search className="w-4 h-4 mr-2" />
+                Property records
               </Button>
             </Link>
           </CardContent>
@@ -90,7 +107,7 @@ export function Dashboard() {
                     <div>
                       <p className="text-sm text-gray-900">{m.projectName}</p>
                       <p className="text-xs text-gray-500">
-                        {m.adjustedArea.toFixed(0)} sq ft • {m.roofType}
+                        {m.adjustedArea.toFixed(0)} sq ft • {m.roofMaterial}
                       </p>
                     </div>
                     <span className="text-xs text-gray-400">{m.date}</span>

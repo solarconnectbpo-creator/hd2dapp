@@ -47,7 +47,7 @@ export function Projects() {
                         </CardDescription>
                       </div>
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        {measurement.roofType}
+                        {measurement.roofMaterial}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -91,7 +91,7 @@ export function Projects() {
 
         {(["gable", "hip", "flat"] as const).map((type) => (
           <TabsContent key={type} value={type} className="space-y-4">
-            {measurements.filter((m) => m.roofType === type).map((measurement) => (
+            {measurements.filter((m) => m.roofForm === type).map((measurement) => (
               <Card key={measurement.id}>
                 <CardHeader>
                   <CardTitle>{measurement.projectName}</CardTitle>
@@ -104,7 +104,7 @@ export function Projects() {
                 </CardContent>
               </Card>
             ))}
-            {measurements.filter((m) => m.roofType === type).length === 0 ? (
+            {measurements.filter((m) => m.roofForm === type).length === 0 ? (
               <p className="text-center text-gray-500 py-8">No {type} roof measurements</p>
             ) : null}
           </TabsContent>

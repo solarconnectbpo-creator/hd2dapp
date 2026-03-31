@@ -92,7 +92,9 @@ export async function handleRoofPitchAi(
   const imageUrl =
     typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
   const b64 =
-    typeof body.imageBase64 === "string" ? body.imageBase64.trim() : "";
+    typeof body.imageBase64 === "string"
+      ? body.imageBase64.replace(/\s/g, "").trim()
+      : "";
   const mimeType =
     typeof body.mimeType === "string" && body.mimeType.trim()
       ? body.mimeType.trim()
@@ -147,7 +149,8 @@ Return ONLY valid JSON (no markdown) with exactly these keys:
 - measurementRationale: string — brief note: why measurements were given or why null (e.g. "no scale visible").
 
 Rules:
-- If the roof is not visible or pitch cannot be judged, set estimatePitch to "unknown" and confidence "low".
+- If no roof is visible in the image, set estimatePitch to "unknown" and confidence "low".
+- If any roof is visible, estimate pitch from roof lines, shadows, or context (e.g. typical residential 4/12–9/12); use confidence "low" when uncertain but still output a numeric slope like "6/12".
 - Never claim legal/engineering certification; approximate visual estimates only.
 - Prefer null measurements over guessing area from a single unscaled photo or satellite without dimensions.
 ${context ? `\nContext from user: ${context}` : ""}`,
@@ -167,26 +170,43 @@ ${context ? `\nContext from user: ${context}` : ""}`,
     });
   }
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You estimate roof pitch and optional scaled measurements from images for internal contractor workflows. Reply with JSON only; use null for measurements when scale is not visible.",
-        },
-        { role: "user", content: userParts },
-      ],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "You estimate roof pitch and optional scaled measurements from images for internal contractor workflows. Reply with JSON only; use null for measurements when scale is not visible. When any roof surface is visible, always output a best-effort estimatePitch as rise/12 (e.g. 6/12); reserve unknown only when no roof appears in the image.",
+          },
+          { role: "user", content: userParts },
+        ],
+      }),
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "OpenAI request failed";
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "OpenAI request timed out or failed",
+        detail: msg.slice(0, 300),
+      }),
+      {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
 
   if (!res.ok) {
     const errText = await res.text();
@@ -208,7 +228,14 @@ ${context ? `\nContext from user: ${context}` : ""}`,
   };
   const content = json.choices?.[0]?.message?.content ?? "";
   const parsed = parseJsonFromModelContent(content);
-  const estimatePitchRaw = String(parsed.estimatePitch ?? "").trim();
+  const epVal = parsed.estimatePitch;
+  let estimatePitchRaw = "";
+  if (typeof epVal === "number" && Number.isFinite(epVal)) {
+    estimatePitchRaw =
+      epVal >= 0 && epVal <= 24 ? `${epVal}/12` : String(epVal).trim();
+  } else {
+    estimatePitchRaw = String(epVal ?? "").trim();
+  }
   if (!estimatePitchRaw || estimatePitchRaw.toLowerCase() === "unknown") {
     return new Response(
       JSON.stringify({

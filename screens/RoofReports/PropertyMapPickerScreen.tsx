@@ -40,7 +40,9 @@ import { persistBulkDamageReportsFromLeads } from "@/src/roofReports/bulkPersist
 import { MISSOURI_BBOX } from "@/constants/stlDataSources";
 import {
   fetchStlIntelAtPoint,
+  fetchStlStormReportsAtPoint,
   type StlIntelBundle,
+  type StlStormBundle,
 } from "@/services/stlIntelClient";
 import {
   fetchListingFromPropertyWebScraper,
@@ -105,6 +107,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
   const [bulkReportsBusy, setBulkReportsBusy] = useState(false);
   const [leadApiHint, setLeadApiHint] = useState<string | null>(null);
   const [stlIntel, setStlIntel] = useState<StlIntelBundle | null>(null);
+  const [stlStorms, setStlStorms] = useState<StlStormBundle | null>(null);
   const [stlIntelLoading, setStlIntelLoading] = useState(false);
   const [stlIntelError, setStlIntelError] = useState<string | null>(null);
   const [stlIntelOutsideMissouri, setStlIntelOutsideMissouri] = useState(false);
@@ -160,6 +163,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
   useEffect(() => {
     if (!selected) {
       setStlIntel(null);
+      setStlStorms(null);
       setStlIntelLoading(false);
       setStlIntelError(null);
       setStlIntelOutsideMissouri(false);
@@ -167,6 +171,7 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
     }
     if (!isInMissouriBbox(selected.lat, selected.lng)) {
       setStlIntel(null);
+      setStlStorms(null);
       setStlIntelLoading(false);
       setStlIntelError(null);
       setStlIntelOutsideMissouri(true);
@@ -177,12 +182,22 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
     setStlIntelLoading(true);
     setStlIntelError(null);
     void fetchStlIntelAtPoint(selected.lat, selected.lng, { signal: ac.signal })
-      .then((bundle) => {
+      .then(async (bundle) => {
         setStlIntel(bundle);
+        try {
+          const storms = await fetchStlStormReportsAtPoint(selected.lat, selected.lng, {
+            days: 14,
+            signal: ac.signal,
+          });
+          setStlStorms(storms);
+        } catch {
+          setStlStorms(null);
+        }
       })
       .catch((e: Error & { name?: string }) => {
         if (e?.name === "AbortError") return;
         setStlIntel(null);
+        setStlStorms(null);
         setStlIntelError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
@@ -599,9 +614,13 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
           typeof listing.areaSqFt === "number" && listing.areaSqFt > 0
             ? Math.round(listing.areaSqFt)
             : undefined,
+        listingLeadScore: listing.listingLeadScore,
+        listingCommercialSignals: listing.commercialSignals?.length
+          ? listing.commercialSignals.join("; ")
+          : undefined,
       };
       const merged = findBestMatchingLead(imported, importedLeads);
-      const next = identifyRoofType(
+      let next = identifyRoofType(
         merged
           ? {
               ...merged,
@@ -609,13 +628,21 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
             }
           : imported,
       );
+      const listingScore = listing.listingLeadScore ?? 0;
+      if (listingScore >= 55 && (!next.propertyUse || next.propertyUse === "unknown")) {
+        next = { ...next, propertyUse: "commercial" };
+      }
       setSelected(next);
       setFocusRequest({ lat: next.lat, lng: next.lng, key: Date.now() });
       setListingUrl("");
+      const scoreHint =
+        listing.listingLeadScore != null
+          ? ` · Commercial lead score ${listing.listingLeadScore}/100`
+          : "";
       setCsvInfo(
         listing.priceText
-          ? `Listing import: ${address} · ${listing.priceText}`
-          : `Listing import: ${address}`,
+          ? `Listing import: ${address} · ${listing.priceText}${scoreHint}`
+          : `Listing import: ${address}${scoreHint}`,
       );
       if (__DEV__) {
         const debugBits = [
@@ -629,6 +656,12 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
             ? `lng=${listing.debug.longitudeSource}`
             : "lng=none",
         ];
+        if (listing.listingLeadScore != null) {
+          debugBits.push(`leadScore=${listing.listingLeadScore}`);
+        }
+        if (listing.commercialSignals?.length) {
+          debugBits.push(`signals=${listing.commercialSignals.slice(0, 3).join("; ")}`);
+        }
         setListingImportDebug(`Import debug: ${debugBits.join(" · ")}`);
       }
     } catch (e) {
@@ -947,6 +980,24 @@ export default function PropertyMapPickerScreen({ navigation }: Props) {
                     {line}
                   </ThemedText>
                 ))}
+                <ThemedText type="caption" style={styles.stlHint}>
+                  NOAA/NWS Local Storm Reports (14-day):{" "}
+                  {Array.isArray(stlStorms?.iemLocalStormReports?.features)
+                    ? stlStorms!.iemLocalStormReports!.features!.length
+                    : 0}
+                </ThemedText>
+                <ThemedText type="caption" style={styles.stlHint}>
+                  SPC Day 1 Reports:{" "}
+                  {Array.isArray(stlStorms?.spcDay1Outlook?.features)
+                    ? stlStorms!.spcDay1Outlook!.features!.length
+                    : 0}
+                </ThemedText>
+                <ThemedText type="caption" style={styles.stlHint}>
+                  NWS Active Alerts:{" "}
+                  {Array.isArray(stlStorms?.nwsActiveAlerts?.features)
+                    ? stlStorms!.nwsActiveAlerts!.features!.length
+                    : 0}
+                </ThemedText>
               </View>
             ) : null}
 

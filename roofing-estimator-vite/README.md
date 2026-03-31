@@ -7,6 +7,19 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
+## Local development services
+
+Run the Vite app from this directory (`npm run dev` or `npm run preview`). Some features need extra processes or env vars:
+
+| Feature | Requirement |
+|--------|-------------|
+| Mapbox (measurement map, **Canvassing**) | `VITE_MAPBOX_TOKEN` in `.env`, or paste a public `pk.…` token once (stored in `localStorage`) |
+| STL / MO parcel intel (`/intel-proxy`) | HD2D Worker: from repo `backend`, run `npm run dev` (Wrangler on **http://127.0.0.1:8787**). Optional: `VITE_INTEL_API_BASE` for a deployed Worker URL |
+| BatchData property records | BatchData API key in the Property Scraper UI. **Dev/preview:** Vite proxy `/batchdata-api`. **Production build:** requests go to the HD2D Worker at `getHd2dApiBase()` → `POST /api/batchdata/property-search` (run Wrangler locally or set `VITE_INTEL_API_BASE` to your deployed Worker) |
+| Property Scraper offline | If `VITE_PROPERTY_SCRAPER_OFFLINE=true`, live enrichment is disabled |
+
+Proxies are configured in `vite.config.ts` for **dev** and **preview** (`/intel-proxy`, `/batchdata-api`, `/google-places-api`, `/pdl-api`).
+
 ## React Compiler
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).

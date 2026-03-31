@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Large local open-data CSV (regenerate with npm run data:mo-parcels)
+/data/mo-stl-kc-open-data-import.csv
+/data/mo-commercial-pm-candidates-50k.csv
+# Synthetic load-test list (regenerate: npm run data:leads-10k)
+/data/leads-sample-10000.csv

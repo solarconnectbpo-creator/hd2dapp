@@ -13,6 +13,7 @@ import {
 } from "./arcgisFeatureQuery";
 
 const DEFAULT_NEAR_M = 75;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8787";
 
 export type StlIntelBundle = {
   parcel?: Record<string, unknown> | null;
@@ -23,6 +24,13 @@ export type StlIntelBundle = {
   demolitionParcel?: Record<string, unknown> | null;
 };
 
+export type StlStormBundle = {
+  days: number;
+  iemLocalStormReports?: { features?: Array<Record<string, unknown>> };
+  spcDay1Outlook?: { features?: Array<Record<string, unknown>> };
+  nwsActiveAlerts?: { features?: Array<Record<string, unknown>> };
+};
+
 export async function fetchStlIntelAtPoint(
   lat: number,
   lng: number,
@@ -30,6 +38,21 @@ export async function fetchStlIntelAtPoint(
 ): Promise<StlIntelBundle> {
   const near = opts?.nearMeters ?? DEFAULT_NEAR_M;
   const signal = opts?.signal;
+
+  // Prefer backend aggregator when available (CORS-safe + single request).
+  try {
+    const u = new URL(`${API_BASE_URL}/api/stl/intel`);
+    u.searchParams.set("lat", String(lat));
+    u.searchParams.set("lng", String(lng));
+    u.searchParams.set("nearMeters", String(near));
+    const res = await fetch(u.toString(), { signal });
+    if (res.ok) {
+      const json = (await res.json()) as { data?: StlIntelBundle };
+      if (json?.data) return json.data;
+    }
+  } catch {
+    // Fall through to direct ArcGIS calls.
+  }
 
   const [parcelRes, bldRes, tradeRes, lraRes, taxRes, demoRes] =
     await Promise.all([
@@ -57,6 +80,24 @@ export async function fetchStlIntelAtPoint(
     taxSaleParcel: taxRes.features?.[0]?.attributes ?? null,
     demolitionParcel: demoRes.features?.[0]?.attributes ?? null,
   };
+}
+
+export async function fetchStlStormReportsAtPoint(
+  lat: number,
+  lng: number,
+  opts?: { days?: number; signal?: AbortSignal },
+): Promise<StlStormBundle> {
+  const days = opts?.days ?? 14;
+  const signal = opts?.signal;
+  const u = new URL(`${API_BASE_URL}/api/stl/storm-reports`);
+  u.searchParams.set("lat", String(lat));
+  u.searchParams.set("lng", String(lng));
+  u.searchParams.set("days", String(days));
+  const res = await fetch(u.toString(), { signal });
+  if (!res.ok) throw new Error(`STL storm reports failed: ${res.status}`);
+  const json = (await res.json()) as { data?: StlStormBundle; error?: string };
+  if (!json?.data) throw new Error(json?.error || "STL storm reports missing payload");
+  return json.data;
 }
 
 /** IEM Local Storm Reports GeoJSON for MO, last `hours` (e.g. 336 ≈ 14 days). */

@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router";
-import { FileSignature, FileText, Folder, Home, Ruler } from "lucide-react";
+import { FileSignature, FileText, Folder, Home, MapPinned, Ruler, Search, Users } from "lucide-react";
 
 export function Root() {
   const location = useLocation();
@@ -9,6 +9,9 @@ export function Root() {
     { path: "/estimates", label: "Estimates", icon: FileText },
     { path: "/contracts", label: "Contracts", icon: FileSignature },
     { path: "/projects", label: "Projects", icon: Folder },
+    { path: "/contacts", label: "Contacts & settings", icon: Users },
+    { path: "/property-lookup", label: "Property records", icon: Search },
+    { path: "/canvassing", label: "Canvassing", icon: MapPinned },
   ];
 
   return (
@@ -37,7 +40,7 @@ export function Root() {
           })}
         </nav>
       </aside>
-      <main className="flex-1 overflow-auto">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
         <Outlet />
       </main>
     </div>

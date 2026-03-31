@@ -195,6 +195,8 @@ textarea {
 .mapbox-canvas {
   width: 100%;
   height: 320px;
+  min-height: 200px;
+  position: relative;
 }
 
 .file-label {
@@ -558,6 +560,21 @@ ul {
   color: #fbbf24;
   background: #111827;
   padding: 10px;
+}
+
+.result-diagram-wrap {
+  text-align: center;
+  margin: 8px 0 16px;
+  padding: 12px;
+  background: #111827;
+  border: 1px solid #263043;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.result-diagram-wrap svg {
+  max-width: 100%;
+  height: auto;
 }
 
 .warning-list {

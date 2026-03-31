@@ -429,6 +429,22 @@ class ApiClient {
     );
     return this.handleResponse(response);
   }
+
+  async getStlIntel(lat: number, lng: number, nearMeters: number = 75) {
+    const response = await this.makeRequest(
+      `${this.baseUrl}/api/stl/intel?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&nearMeters=${encodeURIComponent(String(nearMeters))}`,
+      "GET",
+    );
+    return this.handleResponse(response);
+  }
+
+  async getStlStormReports(lat: number, lng: number, days: number = 14) {
+    const response = await this.makeRequest(
+      `${this.baseUrl}/api/stl/storm-reports?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&days=${encodeURIComponent(String(days))}`,
+      "GET",
+    );
+    return this.handleResponse(response);
+  }
 }
 
 // Export singleton instance

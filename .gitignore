@@ -36,7 +36,8 @@ yarn-error.*
 .env
 .env*.local
 backend/.dev.vars
-backend/.dev.vars.*
+backend/.dev.vars.local
+!backend/.dev.vars.example
 
 # local tooling / Replit
 .config/

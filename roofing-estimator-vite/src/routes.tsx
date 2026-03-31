@@ -4,7 +4,10 @@ import { Dashboard } from "./pages/Dashboard";
 import { Estimates } from "./pages/Estimates";
 import { Contracts } from "./pages/Contracts";
 import { Projects } from "./pages/Projects";
+import { ContactsSettings } from "./pages/ContactsSettings";
 import { NotFound } from "./pages/NotFound";
+import { PropertyScraper } from "./pages/PropertyScraper";
+import { Canvassing } from "./pages/Canvassing";
 import EstimatorApp from "./App";
 
 export const router = createBrowserRouter([
@@ -17,6 +20,9 @@ export const router = createBrowserRouter([
       { path: "estimates", Component: Estimates },
       { path: "contracts", Component: Contracts },
       { path: "projects", Component: Projects },
+      { path: "contacts", Component: ContactsSettings },
+      { path: "property-lookup", Component: PropertyScraper },
+      { path: "canvassing", Component: Canvassing },
       { path: "*", Component: NotFound },
     ],
   },

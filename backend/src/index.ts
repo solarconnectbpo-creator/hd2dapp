@@ -12,6 +12,8 @@ import { handleEagleViewPropertyDataProxy } from "./api/eagleviewPropertyDataPro
 import { handleMeasurementsHybrid } from "./api/measurementsHybrid";
 import { handlePropertyScraperListingProxy } from "./api/propertyScraperProxy";
 import { handleBedtimeStoryAi } from "./api/bedtimeStoryAi";
+import { handleBatchDataPropertySearchProxy } from "./api/batchDataProxy";
+import { handleStlIntel, handleStlStormReports } from "./api/stlIntel";
 
 interface Env {
   DB: any;
@@ -85,6 +87,12 @@ export default {
         return handlePropertyScraperListingProxy(request, env, corsHeaders);
       } else if (path.startsWith("/api/eagleview/property-data")) {
         return handleEagleViewPropertyDataProxy(request, env, corsHeaders);
+      } else if (path === "/api/stl/intel") {
+        return handleStlIntel(request, env, corsHeaders);
+      } else if (path === "/api/stl/storm-reports") {
+        return handleStlStormReports(request, env, corsHeaders);
+      } else if (path === "/api/batchdata/property-search") {
+        return handleBatchDataPropertySearchProxy(request, corsHeaders);
       } else if (path.startsWith("/webhook/")) {
         return handleWebhooks(request, env, path, corsHeaders);
       } else if (path === "/" || path === "/api") {

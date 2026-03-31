@@ -49,6 +49,10 @@ export interface PropertySelection {
   roofType?: string;
   /** User override or inferred from address / roof system (see `inferPropertyUseType`). */
   propertyUse?: PropertyUseType;
+  /** From PropertyWebScraper listing import (commercial-roofing heuristic). */
+  listingLeadScore?: number;
+  /** Semicolon-separated hints from listing import */
+  listingCommercialSignals?: string;
 }
 
 export interface RoofReportCreatedBy {
