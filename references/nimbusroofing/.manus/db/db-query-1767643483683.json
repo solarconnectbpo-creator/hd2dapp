@@ -1,0 +1,75 @@
+{
+  "query": "SELECT * FROM backlinks LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Vqx4SDKYST7k6m.root --database Da8Aqq7vdypxzx6Gdf6sLN --execute SELECT * FROM backlinks LIMIT 5",
+  "rows": [
+    {
+      "id": "1",
+      "sourceUrl": "Facebook Reviews",
+      "targetUrl": "https://nimbusroofing.com",
+      "anchorText": "NULL",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL",
+      "notes": "NULL",
+      "lastChecked": "NULL",
+      "createdAt": "2026-01-05 19:46:13",
+      "updatedAt": "2026-01-05 19:46:13"
+    },
+    {
+      "id": "2",
+      "sourceUrl": "BBB Listings",
+      "targetUrl": "https://nimbusroofing.com",
+      "anchorText": "NULL",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL",
+      "notes": "NULL",
+      "lastChecked": "NULL",
+      "createdAt": "2026-01-05 19:46:13",
+      "updatedAt": "2026-01-05 19:46:13"
+    },
+    {
+      "id": "3",
+      "sourceUrl": "LinkedIn Profile",
+      "targetUrl": "https://nimbusroofing.com",
+      "anchorText": "NULL",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL",
+      "notes": "NULL",
+      "lastChecked": "NULL",
+      "createdAt": "2026-01-05 19:46:13",
+      "updatedAt": "2026-01-05 19:46:13"
+    },
+    {
+      "id": "4",
+      "sourceUrl": "MapQuest & Civic Listings",
+      "targetUrl": "https://nimbusroofing.com",
+      "anchorText": "NULL",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL",
+      "notes": "NULL",
+      "lastChecked": "NULL",
+      "createdAt": "2026-01-05 19:46:13",
+      "updatedAt": "2026-01-05 19:46:13"
+    },
+    {
+      "id": "5",
+      "sourceUrl": "Owens Corning University & Partner Profiles",
+      "targetUrl": "https://nimbusroofing.com",
+      "anchorText": "NULL",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL",
+      "notes": "NULL",
+      "lastChecked": "NULL",
+      "createdAt": "2026-01-05 19:46:13",
+      "updatedAt": "2026-01-05 19:46:13"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsourceUrl\ttargetUrl\tanchorText\tplatform\tstatus\tdomainAuthority\tnotes\tlastChecked\tcreatedAt\tupdatedAt\n1\tFacebook Reviews\thttps://nimbusroofing.com\tNULL\tGoogle Reviews\tactive\tNULL\tNULL\tNULL\t2026-01-05 19:46:13\t2026-01-05 19:46:13\n2\tBBB Listings\thttps://nimbusroofing.com\tNULL\tGoogle Reviews\tactive\tNULL\tNULL\tNULL\t2026-01-05 19:46:13\t2026-01-05 19:46:13\n3\tLinkedIn Profile\thttps://nimbusroofing.com\tNULL\tGoogle Reviews\tactive\tNULL\tNULL\tNULL\t2026-01-05 19:46:13\t2026-01-05 19:46:13\n4\tMapQuest & Civic Listings\thttps://nimbusroofing.com\tNULL\tGoogle Reviews\tactive\tNULL\tNULL\tNULL\t2026-01-05 19:46:13\t2026-01-05 19:46:13\n5\tOwens Corning University & Partner Profiles\thttps://nimbusroofing.com\tNULL\tGoogle Reviews\tactive\tNULL\tNULL\tNULL\t2026-01-05 19:46:13\t2026-01-05 19:46:13\n",
+  "stderr": "",
+  "execution_time_ms": 483
+}

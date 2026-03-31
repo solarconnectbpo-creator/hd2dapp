@@ -1,0 +1,20 @@
+CREATE TABLE `sovereignAuditLogs` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int,
+	`propertyAddress` text,
+	`claimNumber` varchar(100),
+	`insuranceCarrier` varchar(255),
+	`inputType` varchar(50) NOT NULL,
+	`totalLineItems` int NOT NULL DEFAULT 0,
+	`missingLineItems` int NOT NULL DEFAULT 0,
+	`codeViolations` int NOT NULL DEFAULT 0,
+	`originalEstimate` int NOT NULL DEFAULT 0,
+	`recoveryEstimate` int NOT NULL DEFAULT 0,
+	`auditResult` text,
+	`reasoningTrace` text,
+	`status` enum('pending','running','completed','failed') NOT NULL DEFAULT 'pending',
+	`durationMs` int,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `sovereignAuditLogs_id` PRIMARY KEY(`id`)
+);

@@ -1,0 +1,41 @@
+# Nimbus Roofing - Robots.txt
+# Updated: 2026-01-06
+# Purpose: Allow search engines to index all public pages
+
+User-agent: *
+Allow: /
+
+# Disallow admin and automation pages
+Disallow: /admin/
+Disallow: /automation/
+
+# Allow important pages explicitly
+Allow: /services/
+Allow: /neighborhoods/
+Allow: /projects
+Allow: /certifications
+Allow: /contact
+Allow: /blog/
+Allow: /technology
+Allow: /ai-info
+
+# Crawl-delay for polite crawling (optional)
+Crawl-delay: 1
+
+# Sitemaps - Update these to your production domain
+Sitemap: https://www.nimbusroofing.com/sitemap.xml
+Sitemap: https://www.nimbusroofing.com/sitemap-blog.xml
+
+# Special rules for specific bots
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /automation/
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /automation/

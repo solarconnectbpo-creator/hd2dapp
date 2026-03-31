@@ -61,3 +61,8 @@ app-example
 /android
 
 test-results/
+
+# Local dev / tooling (do not commit)
+backend/.wrangler/
+roofing-estimator-vite/scripts/.cache/
+roofing-estimator-vite/.cursor/

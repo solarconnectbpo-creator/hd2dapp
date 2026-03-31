@@ -1,0 +1,100 @@
+{
+  "complianceScore": 45,
+  "status": "non-compliant",
+  "discrepancies": [
+    {
+      "category": "Materials - Shingles",
+      "issue": "No shingle specification provided. Cannot verify compliance with minimum 240 lb/sq requirement.",
+      "severity": "high",
+      "codeReference": "IRC R905.2.4.1 - Asphalt Shingles",
+      "recommendation": "Specify GAF Timberline HDZ (Class 4 IR, 130 mph wind rating) or equivalent meeting Texas wind/hail requirements."
+    },
+    {
+      "category": "Materials - Underlayment",
+      "issue": "No underlayment specification provided. Cannot verify ASTM D226 Type II or ASTM D4869 compliance.",
+      "severity": "high",
+      "codeReference": "IRC R905.2.3 - Underlayment",
+      "recommendation": "Specify synthetic underlayment (ASTM D4869) or felt (ASTM D226 Type II) for entire roof deck."
+    },
+    {
+      "category": "Materials - Ice & Water Shield",
+      "issue": "No ice & water shield specification for 296 linear feet of valleys. Texas code requires minimum 36\" width in valleys and eaves.",
+      "severity": "high",
+      "codeReference": "IRC R905.2.7.1 - Ice Barrier",
+      "recommendation": "Add 296 LF of ice & water shield for valleys plus eave protection (minimum 36\" from wall line)."
+    },
+    {
+      "category": "Ventilation",
+      "issue": "No ventilation specification provided. With 3,181 sq ft attic space, requires minimum 21.2 sq ft NFA (1:150 ratio).",
+      "severity": "medium",
+      "codeReference": "IRC R806.2 - Minimum Vent Area",
+      "recommendation": "Specify ridge vent system (471 LF ridges) plus soffit vents to achieve 1:150 ratio or balanced 1:300 with proper intake/exhaust."
+    },
+    {
+      "category": "Materials - Flashing",
+      "issue": "No flashing material specification for 10 LF flashing and 57 LF step flashing. Cannot verify minimum 26 gauge galvanized steel compliance.",
+      "severity": "medium",
+      "codeReference": "IRC R903.2 - Flashing",
+      "recommendation": "Specify 26 gauge galvanized steel or aluminum flashing for all penetrations and wall intersections."
+    },
+    {
+      "category": "Wind Rating",
+      "issue": "No wind rating specification provided. McKinney requires 115 mph wind resistance per ASCE 7-16.",
+      "severity": "high",
+      "codeReference": "ASCE 7-16 Wind Speed Maps - 115 mph",
+      "recommendation": "Specify shingles with minimum 115 mph wind rating (preferably 130 mph for insurance discounts)."
+    },
+    {
+      "category": "Hail Rating",
+      "issue": "No impact resistance rating specified. Class 4 IR strongly recommended for Texas hail zones and insurance discounts.",
+      "severity": "medium",
+      "codeReference": "UL 2218 - Impact Resistance",
+      "recommendation": "Specify Class 4 Impact Resistant shingles (GAF Timberline HDZ, Owens Corning Duration Storm, etc.)."
+    },
+    {
+      "category": "Fasteners",
+      "issue": "No fastener specification provided. Cannot verify minimum 1-1/4\" roofing nail compliance with 4-nail pattern.",
+      "severity": "medium",
+      "codeReference": "IRC R905.2.5 - Attachment",
+      "recommendation": "Specify 1-1/4\" minimum roofing nails, 4 per shingle, with 6-nail pattern in high-wind zones."
+    }
+  ],
+  "codeUpgrades": [
+    {
+      "item": "Upgrade to Class 4 IR Shingles",
+      "currentSpec": "No specification (standard 3-tab assumed)",
+      "recommendedSpec": "GAF Timberline HDZ (Class 4 IR, 130 mph wind rating)",
+      "costImpact": "+$2,500-$3,500 (42.44 squares)",
+      "justification": "Class 4 IR provides superior hail protection, qualifies for 20-35% insurance premium discounts, and offers better wind resistance (130 mph vs 90 mph). ROI typically 3-5 years through insurance savings."
+    },
+    {
+      "item": "Synthetic Underlayment Upgrade",
+      "currentSpec": "No specification (felt assumed)",
+      "recommendedSpec": "Synthetic underlayment (ASTM D4869) - GAF FeltBuster or equivalent",
+      "costImpact": "+$800-$1,200",
+      "justification": "Synthetic underlayment offers superior tear resistance, longer exposure time during installation, and better moisture protection compared to traditional felt. Critical for Texas weather conditions."
+    },
+    {
+      "item": "Enhanced Valley Protection",
+      "currentSpec": "No specification",
+      "recommendedSpec": "Ice & water shield in all valleys (296 LF) - GAF WeatherWatch or equivalent",
+      "costImpact": "+$600-$900",
+      "justification": "Valleys are high-stress areas prone to leaks. Ice & water shield provides waterproof barrier and extends roof lifespan. Required by most manufacturers for warranty compliance."
+    },
+    {
+      "item": "Ridge Vent System",
+      "currentSpec": "No specification",
+      "recommendedSpec": "Ridge vent (471 LF) + soffit vents for balanced ventilation",
+      "costImpact": "+$1,400-$2,000",
+      "justification": "Proper ventilation reduces attic temperatures by 20-40°F, extends shingle life by 20-30%, prevents ice dams, and reduces cooling costs. Essential for Texas heat."
+    },
+    {
+      "item": "6-Nail High-Wind Pattern",
+      "currentSpec": "No specification (4-nail assumed)",
+      "recommendedSpec": "6-nail pattern in high-wind zones (perimeter 3 rows)",
+      "costImpact": "+$400-$600",
+      "justification": "6-nail pattern significantly improves wind uplift resistance in edge zones where wind forces are highest. Recommended for 115+ mph wind zones."
+    }
+  ],
+  "summary": "This EagleView measurement report provides accurate dimensional data but lacks ALL material specifications required for building code compliance. Current compliance score is 45/100 (non-compliant) due to missing shingle specs, underlayment, ice & water shield, ventilation, flashing materials, wind ratings, and fastener specifications. Recommended upgrades to Class 4 IR shingles, synthetic underlayment, enhanced valley protection, and proper ventilation would bring compliance to 95/100 while adding $5,700-$8,200 in material costs—justified by insurance discounts, extended lifespan, and superior storm protection."
+}

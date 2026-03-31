@@ -85,9 +85,15 @@ function raybevelDiagramPlugin(): Plugin {
 }
 
 /** HTTP proxies: keep browser same-origin to Cloudflare Worker (intel) and third-party APIs (BatchData, Places, PDL). See README.md "Local development services". */
+const allowGeolocationHeader = {
+  /** Lets the browser prompt for Geolocation API (Mapbox Geolocate control). */
+  "Permissions-Policy": "geolocation=(self)",
+};
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), raybevelDiagramPlugin()],
   server: {
+    headers: allowGeolocationHeader,
     proxy: {
       // Same-origin in dev → avoids CORS / mixed-content when the SPA is https or another host.
       "/intel-proxy": {
@@ -122,6 +128,7 @@ export default defineConfig({
     },
   },
   preview: {
+    headers: allowGeolocationHeader,
     proxy: {
       "/intel-proxy": {
         target: "http://127.0.0.1:8787",

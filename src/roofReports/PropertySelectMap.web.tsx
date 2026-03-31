@@ -126,6 +126,15 @@ export default function PropertySelectMap({
         mapRef.current = map;
 
         map.addControl(new mapboxgl.NavigationControl(), "top-right");
+        map.addControl(
+          new mapboxgl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 },
+            trackUserLocation: true,
+            showUserLocation: true,
+            showAccuracyCircle: true,
+          }),
+          "top-right",
+        );
 
         map.on("load", () => {
           if (hasMapboxToken) {

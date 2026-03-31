@@ -1,0 +1,68 @@
+{
+  "filename": "DonaldOjieagleview.PDF",
+  "fileType": "pdf",
+  "documentType": "EagleView Roof Measurement Report",
+  "extractedData": {
+    "address": "7813 Saint Clair Dr, Mckinney, TX 75071",
+    "reportId": "65786768",
+    "date": "6/10/2025",
+    "contractor": {
+      "name": "Nimbus General Contractors, LLC",
+      "contact": "Dustin Moore",
+      "phone": "214-612-6696",
+      "email": "dustin@nimbusroofing.com",
+      "address": "1308 Caney Creek Lane, McKinney, TX 75071"
+    },
+    "measurements": {
+      "totalRoofArea": "4,244 sq ft",
+      "totalRoofFacets": 44,
+      "predominantPitch": "8/12",
+      "numberOfStories": ">1",
+      "totalRidgesHips": "471 ft",
+      "totalValleys": "296 ft",
+      "totalRakes": "117 ft",
+      "totalEaves": "218 ft",
+      "estimatedAttic": "3,181 sq ft",
+      "flashing": "10 ft",
+      "stepFlashing": "57 ft"
+    },
+    "lineItems": [
+      {
+        "category": "Ridges/Hips",
+        "quantity": 471,
+        "unit": "linear feet"
+      },
+      {
+        "category": "Valleys",
+        "quantity": 296,
+        "unit": "linear feet"
+      },
+      {
+        "category": "Rakes",
+        "quantity": 117,
+        "unit": "linear feet"
+      },
+      {
+        "category": "Eaves",
+        "quantity": 218,
+        "unit": "linear feet"
+      },
+      {
+        "category": "Flashing",
+        "quantity": 10,
+        "unit": "linear feet"
+      },
+      {
+        "category": "Step Flashing",
+        "quantity": 57,
+        "unit": "linear feet"
+      }
+    ]
+  },
+  "metadata": {
+    "address": "7813 Saint Clair Dr, Mckinney, TX 75071",
+    "projectId": "65786768",
+    "date": "6/10/2025",
+    "contractor": "Nimbus General Contractors, LLC"
+  }
+}

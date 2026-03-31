@@ -1,0 +1,13 @@
+Nimbus iQ AI - MVP Demo Page Review
+=====================================
+- Sovereign Dark theme rendering correctly
+- Top nav: Nimbus iQ AI logo, ALPHA v5.1 badge, MVP Demo / Pitch Deck / Back to Site links
+- Hero: "Sovereign Audit Terminal" heading with Sovereign Infrastructure + Architecture Lock badges
+- System Status panel: Vertex AI ONLINE, IRC Vector DB SYNCED, Xactimate Parser READY, PII Masking ACTIVE
+- Left panel: Xactimate Estimate card with claim details and 7 line items
+- Right panel: Reasoning Feed / Findings / IRC Codes tabs
+- Initialize Live Audit button is prominent cyan gradient
+- Sovereign Compliance Rules footer visible
+- Overall: Clean, professional, industrial dark UI
+
+Pitch Deck page: Need to verify next

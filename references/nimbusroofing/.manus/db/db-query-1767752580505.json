@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE backlinks SET platform = \n  CASE \n    WHEN sourceUrl LIKE '%google.com/maps%' THEN 'Google Maps Pack'\n    WHEN sourceUrl LIKE '%facebook.com%' THEN 'Social Media'\n    WHEN sourceUrl LIKE '%linkedin.com%' THEN 'Social Media'\n    WHEN sourceUrl LIKE '%bbb.org%' THEN 'Business Directory'\n    WHEN sourceUrl LIKE '%yelp.com%' THEN 'Review Platform'\n    WHEN sourceUrl LIKE '%angi.com%' THEN 'Review Platform'\n    WHEN sourceUrl LIKE '%mapquest.com%' THEN 'Business Directory'\n    WHEN sourceUrl LIKE '%owenscorning.com%' THEN 'Industry Partner'\n    WHEN sourceUrl LIKE '%dnb.com%' THEN 'Business Directory'\n    WHEN sourceUrl LIKE '%buildzoom.com%' THEN 'Contractor Directory'\n    ELSE platform\n  END\nWHERE sourceUrl IS NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Vqx4SDKYST7k6m.root --database Da8Aqq7vdypxzx6Gdf6sLN --execute UPDATE backlinks SET platform = \n  CASE \n    WHEN sourceUrl LIKE '%google.com/maps%' THEN 'Google Maps Pack'\n    WHEN sourceUrl LIKE '%facebook.com%' THEN 'Social Media'\n    WHEN sourceUrl LIKE '%linkedin.com%' THEN 'Social Media'\n    WHEN sourceUrl LIKE '%bbb.org%' THEN 'Business Directory'\n    WHEN sourceUrl LIKE '%yelp.com%' THEN 'Review Platform'\n    WHEN sourceUrl LIKE '%angi.com%' THEN 'Review Platform'\n    WHEN sourceUrl LIKE '%mapquest.com%' THEN 'Business Directory'\n    WHEN sourceUrl LIKE '%owenscorning.com%' THEN 'Industry Partner'\n    WHEN sourceUrl LIKE '%dnb.com%' THEN 'Business Directory'\n    WHEN sourceUrl LIKE '%buildzoom.com%' THEN 'Contractor Directory'\n    ELSE platform\n  END\nWHERE sourceUrl IS NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 53
+}

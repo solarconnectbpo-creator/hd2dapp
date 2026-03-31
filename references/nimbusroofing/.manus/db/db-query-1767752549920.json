@@ -1,0 +1,170 @@
+{
+  "query": "SELECT id, sourceUrl, targetUrl, platform, status, domainAuthority FROM backlinks ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Vqx4SDKYST7k6m.root --database Da8Aqq7vdypxzx6Gdf6sLN --execute SELECT id, sourceUrl, targetUrl, platform, status, domainAuthority FROM backlinks ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "sourceUrl": "Facebook Reviews",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "2",
+      "sourceUrl": "BBB Listings",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "3",
+      "sourceUrl": "LinkedIn Profile",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "4",
+      "sourceUrl": "MapQuest & Civic Listings",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "5",
+      "sourceUrl": "Owens Corning University & Partner Profiles",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "6",
+      "sourceUrl": "Yelp",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "7",
+      "sourceUrl": "Dun & Bradstreet (DNB) Profile",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "8",
+      "sourceUrl": "HomeFex and BuildZoom Listings",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "9",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "10",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "11",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "12",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "13",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "14",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "15",
+      "sourceUrl": "same url",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "16",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "17",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "18",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "19",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "20",
+      "sourceUrl": "nan",
+      "targetUrl": "https://nimbusroofing.com",
+      "platform": "Google Reviews",
+      "status": "active",
+      "domainAuthority": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsourceUrl\ttargetUrl\tplatform\tstatus\tdomainAuthority\n1\tFacebook Reviews\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n2\tBBB Listings\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n3\tLinkedIn Profile\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n4\tMapQuest & Civic Listings\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n5\tOwens Corning University & Partner Profiles\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n6\tYelp\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n7\tDun & Bradstreet (DNB) Profile\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n8\tHomeFex and BuildZoom Listings\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n9\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n10\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n11\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n12\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n13\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n14\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n15\tsame url\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n16\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n17\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n18\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n19\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n20\tnan\thttps://nimbusroofing.com\tGoogle Reviews\tactive\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 1351
+}

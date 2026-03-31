@@ -1,0 +1,235 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Google Material Design - Roboto Font */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: 2px; /* Material Design: 2px for small components */
+  --radius-md: 4px; /* Material Design: 4px standard */
+  --radius-lg: 8px; /* Material Design: 8px for cards */
+  --radius-xl: 16px; /* Material Design: 16px for dialogs */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  /* Nimbus Roofing - Dark Navy, Cyan & Gold Theme */
+  /* Primary: Bright Cyan (#00d9ff) */
+  --primary: 190 100% 50%; /* #00d9ff */
+  --primary-foreground: 210 100% 10%; /* Dark navy for contrast */
+  
+  /* Secondary: Electric Blue (#0ea5e9) */
+  --secondary: 199 89% 48%; /* #0ea5e9 */
+  --secondary-foreground: 0 0% 100%;
+  
+  /* Accent: Luxurious Gold (#d4af37) */
+  --accent: 43 65% 53%; /* #d4af37 */
+  --accent-foreground: 210 100% 10%; /* Dark navy for contrast */
+  
+  /* Sidebar: Deep Navy (#0d1b2a) */
+  --sidebar-primary: 210 50% 10%; /* #0d1b2a */
+  --sidebar-primary-foreground: 190 100% 50%; /* Cyan */
+  
+  /* Charts: Cyan & Gold Palette */
+  --chart-1: 190 100% 50%; /* Cyan #00d9ff */
+  --chart-2: 43 65% 53%; /* Gold #d4af37 */
+  --chart-3: 199 89% 48%; /* Electric Blue #0ea5e9 */
+  --chart-4: 38 92% 50%; /* Amber Gold #f59e0b */
+  --chart-5: 210 50% 25%; /* Medium Navy */
+  
+  /* Material Design Standard Radius */
+  --radius: 4px;
+  
+  /* Dark Theme - Nimbus Roofing */
+  --background: oklch(0.15 0.02 240); /* Deep navy #0a1628 */
+  --foreground: oklch(0.97 0 0); /* Silver white #f8fafc */
+  --card: oklch(0.18 0.02 240); /* Slightly lighter navy */
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.16 0.02 240);
+  --popover-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.25 0.02 240); /* Muted navy */
+  --muted-foreground: oklch(0.65 0 0); /* Slate gray #94a3b8 */
+  --destructive: 4 90% 58%; /* Red for errors */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.30 0.02 240); /* Subtle navy border */
+  --input: oklch(0.22 0.02 240);
+  --ring: 190 100% 50%; /* Cyan for focus rings */
+  --sidebar: oklch(0.16 0.02 240);
+  --sidebar-foreground: oklch(0.90 0 0);
+  --sidebar-accent: oklch(0.22 0.02 240);
+  --sidebar-accent-foreground: oklch(0.97 0 0);
+  --sidebar-border: oklch(0.25 0.02 240);
+  --sidebar-ring: 190 100% 50%;
+}
+
+.dark {
+  /* Dark Theme - Material Design Dark */
+  --primary: 207 90% 54%; /* Blue 500 #2196F3 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 199 98% 48%; /* Light Blue 500 */
+  --secondary-foreground: 0 0% 100%;
+  --accent: 211 100% 50%; /* Blue 600 */
+  --accent-foreground: 0 0% 100%;
+  --sidebar-primary: 207 90% 54%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  
+  --background: oklch(0.15 0 0); /* Dark background #121212 */
+  --foreground: oklch(0.95 0 0); /* Near white text */
+  --card: oklch(0.18 0 0); /* Elevated surface #1E1E1E */
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.25 0 0); /* Muted surface */
+  --muted-foreground: oklch(0.7 0 0); /* Muted text */
+  --destructive: 4 90% 58%; /* Material Red 500 */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.3 0 0); /* Dark border */
+  --input: oklch(0.3 0 0);
+  --ring: 207 90% 54%;
+  
+  --chart-1: 207 90% 54%; /* Blue 500 */
+  --chart-2: 199 98% 48%; /* Light Blue 500 */
+  --chart-3: 211 100% 50%; /* Blue 600 */
+  --chart-4: 199 92% 56%; /* Light Blue 400 */
+  --chart-5: 207 90% 61%; /* Blue 400 */
+  
+  --sidebar: oklch(0.18 0 0);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-accent: oklch(0.25 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.3 0 0);
+  --sidebar-ring: 207 90% 54%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Material Design Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  
+  h1 {
+    @apply text-4xl md:text-5xl;
+    font-weight: 300;
+    letter-spacing: -0.015em;
+  }
+  
+  h2 {
+    @apply text-3xl md:text-4xl;
+    font-weight: 400;
+  }
+  
+  h3 {
+    @apply text-2xl md:text-3xl;
+  }
+  
+  h4 {
+    @apply text-xl md:text-2xl;
+  }
+  
+  h5 {
+    @apply text-lg md:text-xl;
+  }
+  
+  h6 {
+    @apply text-base md:text-lg;
+  }
+  
+  code, pre {
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+  }
+  
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+  
+
+}
+
+@layer components {
+  /**
+   * Custom container utility that centers content and adds responsive padding.
+   * Material Design: 16dp mobile, 24dp tablet, 32dp desktop margins
+   */
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem; /* 16px - Material Design mobile margin */
+    padding-right: 1rem;
+  }
+
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      padding-left: 1.5rem; /* 24px - Material Design tablet margin */
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem; /* 32px - Material Design desktop margin */
+      padding-right: 2rem;
+      max-width: 1280px;
+    }
+  }
+  
+
+}

@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE backlinks SET \n  sourceUrl = CASE\n    WHEN sourceUrl LIKE '%facebook%' THEN 'https://facebook.com'\n    WHEN sourceUrl LIKE '%bbb%' THEN 'https://bbb.org'\n    WHEN sourceUrl LIKE '%linkedin%' THEN 'https://linkedin.com'\n    WHEN sourceUrl LIKE '%yelp%' THEN 'https://yelp.com'\n    WHEN sourceUrl LIKE '%mapquest%' THEN 'https://mapquest.com'\n    WHEN sourceUrl LIKE '%owens%' OR sourceUrl LIKE '%corning%' THEN 'https://owenscorning.com'\n    WHEN sourceUrl LIKE '%dun%' OR sourceUrl LIKE '%dnb%' THEN 'https://dnb.com'\n    WHEN sourceUrl LIKE '%buildzoom%' THEN 'https://buildzoom.com'\n    WHEN sourceUrl LIKE '%homefex%' THEN 'https://homefex.com'\n    WHEN sourceUrl LIKE '%angi%' THEN 'https://angi.com'\n    ELSE sourceUrl\n  END\nWHERE sourceUrl NOT LIKE 'https://%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Vqx4SDKYST7k6m.root --database Da8Aqq7vdypxzx6Gdf6sLN --execute UPDATE backlinks SET \n  sourceUrl = CASE\n    WHEN sourceUrl LIKE '%facebook%' THEN 'https://facebook.com'\n    WHEN sourceUrl LIKE '%bbb%' THEN 'https://bbb.org'\n    WHEN sourceUrl LIKE '%linkedin%' THEN 'https://linkedin.com'\n    WHEN sourceUrl LIKE '%yelp%' THEN 'https://yelp.com'\n    WHEN sourceUrl LIKE '%mapquest%' THEN 'https://mapquest.com'\n    WHEN sourceUrl LIKE '%owens%' OR sourceUrl LIKE '%corning%' THEN 'https://owenscorning.com'\n    WHEN sourceUrl LIKE '%dun%' OR sourceUrl LIKE '%dnb%' THEN 'https://dnb.com'\n    WHEN sourceUrl LIKE '%buildzoom%' THEN 'https://buildzoom.com'\n    WHEN sourceUrl LIKE '%homefex%' THEN 'https://homefex.com'\n    WHEN sourceUrl LIKE '%angi%' THEN 'https://angi.com'\n    ELSE sourceUrl\n  END\nWHERE sourceUrl NOT LIKE 'https://%';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 163
+}

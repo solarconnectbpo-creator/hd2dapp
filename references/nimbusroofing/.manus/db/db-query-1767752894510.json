@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, sourceUrl, platform, domainAuthority FROM backlinks LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Vqx4SDKYST7k6m.root --database Da8Aqq7vdypxzx6Gdf6sLN --execute SELECT id, sourceUrl, platform, domainAuthority FROM backlinks LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "sourceUrl": "Facebook Reviews",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "2",
+      "sourceUrl": "BBB Listings",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "3",
+      "sourceUrl": "LinkedIn Profile",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "4",
+      "sourceUrl": "MapQuest & Civic Listings",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "5",
+      "sourceUrl": "Owens Corning University & Partner Profiles",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "6",
+      "sourceUrl": "Yelp",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "7",
+      "sourceUrl": "Dun & Bradstreet (DNB) Profile",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "8",
+      "sourceUrl": "HomeFex and BuildZoom Listings",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "9",
+      "sourceUrl": "nan",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    },
+    {
+      "id": "10",
+      "sourceUrl": "nan",
+      "platform": "Google Reviews",
+      "domainAuthority": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsourceUrl\tplatform\tdomainAuthority\n1\tFacebook Reviews\tGoogle Reviews\tNULL\n2\tBBB Listings\tGoogle Reviews\tNULL\n3\tLinkedIn Profile\tGoogle Reviews\tNULL\n4\tMapQuest & Civic Listings\tGoogle Reviews\tNULL\n5\tOwens Corning University & Partner Profiles\tGoogle Reviews\tNULL\n6\tYelp\tGoogle Reviews\tNULL\n7\tDun & Bradstreet (DNB) Profile\tGoogle Reviews\tNULL\n8\tHomeFex and BuildZoom Listings\tGoogle Reviews\tNULL\n9\tnan\tGoogle Reviews\tNULL\n10\tnan\tGoogle Reviews\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}
