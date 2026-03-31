@@ -16,7 +16,12 @@
     "test": "vitest run",
     "test:export": "vitest run src/roofReports/exportRoofReportSerialize.test.ts",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install"
+    "test:e2e:install": "playwright install",
+    "eas:build:ios": "eas build --platform ios --profile production",
+    "eas:build:android": "eas build --platform android --profile production",
+    "eas:build:preview": "eas build --profile preview",
+    "eas:submit:ios": "eas submit --platform ios --profile production",
+    "eas:submit:android": "eas submit --platform android --profile production"
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20251202.0",

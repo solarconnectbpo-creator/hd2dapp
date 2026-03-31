@@ -1,0 +1,11 @@
+# Speed up EAS uploads — app code lives at repo root; exclude heavy non-app trees.
+backend/
+references/
+roofing-estimator-vite/
+dist-web-verify/
+dist-web-test/
+**/dist/
+**/coverage/
+**/.git/
+**/*.zip
+**/*.tar.gz

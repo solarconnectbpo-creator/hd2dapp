@@ -24,4 +24,5 @@ Copy `.env.example` to `.env` / `.env.local` for Mapbox, Supabase, etc.
 
 ## Deployment
 
-See `README_DEPLOYMENT.md` if present.
+- **App Store / Play Store (EAS)** — [docs/APP_STORE_DEPLOYMENT.md](docs/APP_STORE_DEPLOYMENT.md) (Supabase env, `eas build`, submit).
+- **Supabase schema** — [supabase/README.md](supabase/README.md).

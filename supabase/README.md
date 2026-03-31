@@ -21,3 +21,5 @@ In `.env.local` (not committed), set:
 Optional: `EXPO_PUBLIC_SUPABASE_LEADS_TABLE` — defaults to `roof_leads`.
 
 After saving leads from the map or CSV, the app **upserts** rows to this table and **merges** on load. RLS policies in the migration are permissive for prototyping; tighten them before production.
+
+For **EAS cloud builds**, set the same `EXPO_PUBLIC_SUPABASE_*` variables as [EAS Environment Variables](https://docs.expo.dev/eas/environment-variables/) so they are available at bundle time (see `docs/APP_STORE_DEPLOYMENT.md`).

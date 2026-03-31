@@ -2,18 +2,32 @@
  * Supabase browser/native client. Requires EXPO_PUBLIC_SUPABASE_URL and
  * EXPO_PUBLIC_SUPABASE_ANON_KEY from the project dashboard (Settings → API).
  *
+ * Values are read from `process.env` (Metro / EAS) first, then `app.config.js` → `extra`
+ * so production builds work when env is injected at build time into `extra`.
+ *
  * Note: A personal access token (sbp_…) is for the CLI/Management API only — not for createClient.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
+function extraRecord(): Record<string, unknown> {
+  const e = Constants.expoConfig?.extra;
+  return e && typeof e === "object" ? (e as Record<string, unknown>) : {};
+}
+
+function strFromExtra(key: string): string {
+  const v = extraRecord()[key];
+  return typeof v === "string" ? v.trim() : "";
+}
+
 function readUrl(): string {
-  return (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").trim();
+  return (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").trim() || strFromExtra("supabaseUrl");
 }
 
 function readAnonKey(): string {
-  return (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+  return (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "").trim() || strFromExtra("supabaseAnonKey");
 }
 
 /** True when URL + anon key look configured (not placeholders). */
@@ -47,7 +61,10 @@ export function getSupabaseClient(): SupabaseClient | null {
   return client;
 }
 
-/** Default table for CSV leads (override via EXPO_PUBLIC_SUPABASE_LEADS_TABLE). */
+/** Default table for CSV leads (override via EXPO_PUBLIC_SUPABASE_LEADS_TABLE or extra.supabaseLeadsTable). */
 export function getSupabaseLeadsTable(): string {
-  return process.env.EXPO_PUBLIC_SUPABASE_LEADS_TABLE?.trim() || "roof_leads";
+  const fromEnv = process.env.EXPO_PUBLIC_SUPABASE_LEADS_TABLE?.trim();
+  if (fromEnv) return fromEnv;
+  const fromExtra = strFromExtra("supabaseLeadsTable");
+  return fromExtra || "roof_leads";
 }

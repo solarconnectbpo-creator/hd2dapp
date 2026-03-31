@@ -12,11 +12,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hardcoredoortodoorclosers.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Location centers the property map and lets you select the roof you are standing at."
       }
     },
     "android": {
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/icon.png"
