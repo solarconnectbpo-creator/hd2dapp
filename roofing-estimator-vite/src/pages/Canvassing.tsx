@@ -24,8 +24,11 @@ import { fetchStlIntelAtPoint, isInMissouriBbox } from "../lib/canvassingIntel";
 import {
   buildParcelHandoffNotes,
   extractOwnerFromParcel,
+  extractParcelAutoFill,
   extractParcelIdFromParcel,
   extractSiteAddressFromParcel,
+  debugLogParcelEnrichment,
+  mergeParcelAttributes,
   parcelRowsForDisplay,
 } from "../lib/canvassingParcelOwner";
 import {
@@ -220,104 +223,138 @@ export function Canvassing() {
     }));
   }, []);
 
-  const enrichAtLatLng = useCallback(async (lat: number, lng: number, pref?: ContactRecord | null) => {
-    setPanelBusy(true);
-    setPanelHint("");
-    setAddressLine("");
-    setOwnerDisplay("");
-    setParcelIdDisplay("");
-    setStlParcel(null);
-    setLastPayload(null);
-    setFocusLatLng({ lat, lng });
-    setSheetOpen(true);
-    try {
-      const url =
-        "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" +
-        encodeURIComponent(String(lat)) +
-        "&lon=" +
-        encodeURIComponent(String(lng));
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error("Could not resolve address for this point.");
-      const data = (await res.json()) as { display_name?: string };
-      const line = data.display_name?.trim() || "";
-      setAddressLine(line);
+  const enrichAtLatLng = useCallback(
+    async (lat: number, lng: number, pref?: ContactRecord | null, arcgisFeatureProps?: Record<string, unknown> | null) => {
+      setPanelBusy(true);
+      setPanelHint("");
+      setAddressLine("");
+      setOwnerDisplay("");
+      setParcelIdDisplay("");
+      setStlParcel(null);
+      setLastPayload(null);
+      setFocusLatLng({ lat, lng });
+      setSheetOpen(true);
+      try {
+        const url =
+          "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" +
+          encodeURIComponent(String(lat)) +
+          "&lon=" +
+          encodeURIComponent(String(lng));
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("Could not resolve address for this point.");
+        const data = (await res.json()) as { display_name?: string };
+        const line = data.display_name?.trim() || "";
+        setAddressLine(line);
 
-      let parcel: Record<string, unknown> | null = null;
-      if (isInMissouriBbox(lat, lng)) {
-        const stl = await fetchStlIntelAtPoint(lat, lng);
-        parcel = stl?.parcel ?? null;
-      }
+        let intelParcel: Record<string, unknown> | null = null;
+        if (isInMissouriBbox(lat, lng)) {
+          const stl = await fetchStlIntelAtPoint(lat, lng);
+          intelParcel = stl?.parcel ?? null;
+        }
 
-      setStlParcel(parcel);
-      const owner = extractOwnerFromParcel(parcel);
-      const siteFromParcel = extractSiteAddressFromParcel(parcel);
-      const pid = extractParcelIdFromParcel(parcel);
-      setOwnerDisplay(owner);
-      setParcelIdDisplay(pid);
+        const parcel = mergeParcelAttributes(intelParcel, arcgisFeatureProps ?? null);
+        setStlParcel(parcel);
 
-      const addrPrimary = siteFromParcel || line;
-      const st = inferStateCodeFromAddressLine(addrPrimary);
+        const auto = extractParcelAutoFill(parcel);
+        debugLogParcelEnrichment({
+          lat,
+          lng,
+          intelParcel,
+          arcgisFeatureProps: arcgisFeatureProps ?? null,
+          merged: parcel,
+          autoFill: auto,
+        });
+        const owner = auto.ownerName || extractOwnerFromParcel(parcel);
+        const siteFromParcel = extractSiteAddressFromParcel(parcel);
+        const pid = extractParcelIdFromParcel(parcel);
+        setOwnerDisplay(owner);
+        setParcelIdDisplay(pid);
 
-      let base: PropertyImportPayload = pref
-        ? contactToImportBase(pref)
-        : emptyPropertyImportPayload("import", {
-            address: addrPrimary,
-            latitude: String(lat),
-            longitude: String(lng),
-          });
+        const addrPrimary = siteFromParcel || line;
+        const st = inferStateCodeFromAddressLine(addrPrimary);
 
-      const typeHint = parcel
-        ? String(
-            parcel.LAND_USE ??
-              parcel.land_use ??
-              parcel.PropClass ??
-              parcel.prop_class ??
-              parcel.CLASS ??
-              parcel.class_desc ??
-              "",
-          ).trim()
-        : "";
+        let base: PropertyImportPayload = pref
+          ? contactToImportBase(pref)
+          : emptyPropertyImportPayload("import", {
+              address: addrPrimary,
+              latitude: String(lat),
+              longitude: String(lng),
+            });
 
-      const parcelNotes = parcel ? buildParcelHandoffNotes(parcel) : "";
-      base = {
-        ...base,
-        latitude: String(lat),
-        longitude: String(lng),
-        address: addrPrimary || base.address,
-        stateCode: st || base.stateCode,
-        ownerName: owner.trim() || base.ownerName.trim(),
-        propertyType: typeHint ? mapPropertyType(typeHint) : base.propertyType,
-        notes: [base.notes, parcelNotes].filter(Boolean).join("\n\n"),
-      };
+        const typeHint = parcel
+          ? String(
+              parcel.LAND_USE ??
+                parcel.land_use ??
+                parcel.PropClass ??
+                parcel.prop_class ??
+                parcel.CLASS ??
+                parcel.class_desc ??
+                parcel.ZONING ??
+                parcel.Zoning ??
+                "",
+            ).trim()
+          : "";
 
-      if (pref) {
+        const parcelNotes = parcel ? buildParcelHandoffNotes(parcel) : "";
         base = {
           ...base,
-          ownerName: base.ownerName.trim() || pref.name.trim(),
-          ownerPhone: base.ownerPhone.trim() || pref.phone.trim(),
-          ownerEmail: base.ownerEmail.trim() || pref.email.trim(),
-          contactPersonName: base.contactPersonName.trim() || pref.name.trim(),
+          latitude: String(lat),
+          longitude: String(lng),
+          address: addrPrimary || base.address,
+          stateCode: st || base.stateCode,
+          ownerName: owner.trim() || base.ownerName.trim(),
+          ownerPhone: (auto.ownerPhone || base.ownerPhone).trim(),
+          ownerEmail: (auto.ownerEmail || base.ownerEmail).trim(),
+          ownerMailingAddress: (auto.ownerMailingAddress || base.ownerMailingAddress).trim(),
+          areaSqFt: auto.areaSqFt || base.areaSqFt,
+          yearBuilt: auto.yearBuilt || base.yearBuilt,
+          lotSizeSqFt: auto.lotSizeSqFt || base.lotSizeSqFt,
+          propertyType: typeHint ? mapPropertyType(typeHint) : base.propertyType,
+          notes: [base.notes, parcelNotes].filter(Boolean).join("\n\n"),
         };
-      }
 
-      setLastPayload(base);
+        if (pref) {
+          base = {
+            ...base,
+            ownerName: base.ownerName.trim() || pref.name.trim(),
+            ownerPhone: base.ownerPhone.trim() || pref.phone.trim(),
+            ownerEmail: base.ownerEmail.trim() || pref.email.trim(),
+            contactPersonName: base.contactPersonName.trim() || pref.name.trim(),
+          };
+        }
 
-      if (isInMissouriBbox(lat, lng) && !parcel) {
-        setPanelHint("No parcel record at this pin — try the building center or a different spot.");
-      } else if (!isInMissouriBbox(lat, lng)) {
-        setPanelHint(
-          "Owner lookup uses Missouri public parcel layers. Outside MO you still get the map address; verify owner locally.",
-        );
-      } else if (!owner) {
-        setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");
+        setLastPayload(base);
+
+        const fromGis = arcgisFeatureProps && Object.keys(arcgisFeatureProps).length > 0;
+        const intelHit = intelParcel && Object.keys(intelParcel).length > 0;
+        if (fromGis && owner && intelHit) {
+          setPanelHint(
+            "Owner and fields use Missouri parcel intel when present; map layer fills any gaps. Always confirm before quoting.",
+          );
+        } else if (fromGis && owner) {
+          setPanelHint("Owner and property details pulled from the map layer you clicked. Verify before quoting.");
+        } else if (fromGis && !owner) {
+          setPanelHint("Map layer attributes loaded — owner name not in this layer; check parcel details.");
+        } else if (intelHit && owner) {
+          setPanelHint("Missouri parcel intel loaded. Confirm owner and building details on the assessor before quoting.");
+        } else if (isInMissouriBbox(lat, lng) && !parcel) {
+          setPanelHint("No parcel record at this pin — try the building center or a different spot.");
+        } else if (!isInMissouriBbox(lat, lng) && !fromGis) {
+          setPanelHint(
+            "Owner lookup uses Missouri public parcel layers. Outside MO you still get the map address; verify owner locally.",
+          );
+        } else if (!owner) {
+          setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");
+        }
+      } catch (e) {
+        setPanelHint(e instanceof Error ? e.message : "Lookup failed.");
+        setAddressLine("");
+      } finally {
+        setPanelBusy(false);
       }
-    } catch (e) {
-      setPanelHint(e instanceof Error ? e.message : "Lookup failed.");
-      setAddressLine("");
-    } finally {
-      setPanelBusy(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const flyTo = useCallback((lat: number, lng: number, zoom = 17.5) => {
     const map = mapInstanceRef.current;
@@ -500,6 +537,8 @@ export function Canvassing() {
           },
         });
 
+        const arcgisLayerIds = [ARCGIS_FILL_LAYER_ID, ARCGIS_LINE_LAYER_ID, ARCGIS_POINT_LAYER_ID];
+
         map.on("click", LEADS_LAYER_ID, (e: any) => {
           const f = e.features?.[0];
           const id = f?.properties?.id as string | undefined;
@@ -507,23 +546,27 @@ export function Canvassing() {
           setSelectedId(id);
           const lead = leadsRef.current.find((l) => l.id === id);
           if (lead?.lat != null && lead.lng != null) {
-            void enrichRef.current(lead.lat, lead.lng, lead);
+            const under = map.queryRenderedFeatures(e.point, { layers: arcgisLayerIds });
+            const gis = (under?.[0]?.properties as Record<string, unknown> | undefined) ?? null;
+            void enrichRef.current(lead.lat, lead.lng, lead, gis);
           }
         });
 
         map.on("click", (e: any) => {
           const feats = map.queryRenderedFeatures(e.point, { layers: [LEADS_LAYER_ID] });
           if (feats?.length) return;
+          const gisFeats = map.queryRenderedFeatures(e.point, { layers: arcgisLayerIds });
+          const gisProps = (gisFeats?.[0]?.properties as Record<string, unknown> | undefined) ?? null;
           const { lng, lat } = e.lngLat;
           const list = leadsRef.current;
           const near = findNearestLead(list, lat, lng);
           if (near?.lat != null && near.lng != null) {
             setSelectedId(near.id);
-            void enrichRef.current(near.lat, near.lng, near);
+            void enrichRef.current(near.lat, near.lng, near, gisProps);
             return;
           }
           setSelectedId(null);
-          void enrichRef.current(lat, lng, null);
+          void enrichRef.current(lat, lng, null, gisProps);
         });
 
         map.on("mouseenter", LEADS_LAYER_ID, () => {
@@ -532,6 +575,14 @@ export function Canvassing() {
         map.on("mouseleave", LEADS_LAYER_ID, () => {
           map.getCanvas().style.cursor = "";
         });
+        for (const lid of arcgisLayerIds) {
+          map.on("mouseenter", lid, () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+          map.on("mouseleave", lid, () => {
+            map.getCanvas().style.cursor = "";
+          });
+        }
 
         styleLoadedRef.current = true;
         map.once("idle", () => {
@@ -844,9 +895,58 @@ export function Canvassing() {
                 ) : null}
 
                 <div>
-                  <div className="text-xs font-medium text-gray-500">Owner (assessor / open parcel)</div>
+                  <div className="text-xs font-medium text-gray-500">Owner (assessor / map layer)</div>
                   <div className="text-base font-semibold text-gray-900">{ownerDisplay || "—"}</div>
                 </div>
+
+                {lastPayload &&
+                (lastPayload.ownerPhone ||
+                  lastPayload.ownerEmail ||
+                  lastPayload.areaSqFt ||
+                  lastPayload.yearBuilt ||
+                  lastPayload.ownerMailingAddress) ? (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-gray-800">
+                    <div className="mb-1.5 font-semibold text-blue-900">Auto-filled for estimator</div>
+                    <ul className="space-y-1">
+                      {lastPayload.ownerPhone ? (
+                        <li>
+                          <span className="text-gray-500">Phone: </span>
+                          {lastPayload.ownerPhone}
+                        </li>
+                      ) : null}
+                      {lastPayload.ownerEmail ? (
+                        <li>
+                          <span className="text-gray-500">Email: </span>
+                          {lastPayload.ownerEmail}
+                        </li>
+                      ) : null}
+                      {lastPayload.ownerMailingAddress ? (
+                        <li>
+                          <span className="text-gray-500">Mailing: </span>
+                          {lastPayload.ownerMailingAddress}
+                        </li>
+                      ) : null}
+                      {lastPayload.areaSqFt ? (
+                        <li>
+                          <span className="text-gray-500">Area: </span>
+                          {lastPayload.areaSqFt} sq ft
+                        </li>
+                      ) : null}
+                      {lastPayload.yearBuilt ? (
+                        <li>
+                          <span className="text-gray-500">Year built: </span>
+                          {lastPayload.yearBuilt}
+                        </li>
+                      ) : null}
+                      {lastPayload.lotSizeSqFt ? (
+                        <li>
+                          <span className="text-gray-500">Lot: </span>
+                          {lastPayload.lotSizeSqFt} sq ft
+                        </li>
+                      ) : null}
+                    </ul>
+                  </div>
+                ) : null}
 
                 {parcelIdDisplay ? (
                   <div className="text-xs text-gray-600">
