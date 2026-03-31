@@ -557,7 +557,7 @@ export function Canvassing() {
   const parcelDetailRows = stlParcel ? parcelRowsForDisplay(stlParcel, 14) : [];
 
   return (
-    <div className="relative flex h-[100dvh] min-h-[100dvh] w-full shrink-0 flex-col overflow-hidden bg-black">
+    <div className="relative flex h-[calc(100dvh-3.5rem)] min-h-[calc(100dvh-3.5rem)] w-full shrink-0 flex-col overflow-hidden bg-black lg:h-[100dvh] lg:min-h-[100dvh]">
       <input
         ref={csvInputRef}
         type="file"

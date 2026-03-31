@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { FileSignature, FileText, MapPinned, Ruler, Search, TrendingUp } from "lucide-react";
+import { FileSignature, FileText, Folder, MapPinned, Ruler, Search, TrendingUp } from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -24,8 +24,10 @@ export function Dashboard() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl mb-2 text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome to your roofing management system</p>
+        <h1 className="mb-2 text-3xl font-semibold tracking-tight text-gray-900">Dashboard</h1>
+        <p className="text-gray-600">
+          Measurements, estimates, and field tools — data stays in this browser unless you export.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -76,6 +78,12 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <FileSignature className="w-4 h-4 mr-2" />
                 Contracts / Proposals
+              </Button>
+            </Link>
+            <Link to="/projects">
+              <Button className="w-full justify-start" variant="outline">
+                <Folder className="w-4 h-4 mr-2" />
+                Projects
               </Button>
             </Link>
             <Link to="/contacts">

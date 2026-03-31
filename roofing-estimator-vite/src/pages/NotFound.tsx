@@ -4,13 +4,16 @@ import { Button } from "../components/ui/button";
 
 export function NotFound() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="flex min-h-[min(560px,85dvh)] flex-1 flex-col items-center justify-center bg-gray-50 px-4 py-16">
       <div className="text-center">
-        <h1 className="text-6xl mb-4 text-gray-900">404</h1>
-        <p className="text-xl text-gray-600 mb-8">Page not found</p>
+        <p className="text-sm font-medium uppercase tracking-wide text-gray-400">Error</p>
+        <h1 className="mb-2 text-6xl font-bold text-gray-900">404</h1>
+        <p className="mb-8 max-w-sm text-gray-600">
+          That page does not exist or was moved. Use the menu to pick a section.
+        </p>
         <Link to="/">
           <Button>
-            <Home className="w-4 h-4 mr-2" />
+            <Home className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
         </Link>
