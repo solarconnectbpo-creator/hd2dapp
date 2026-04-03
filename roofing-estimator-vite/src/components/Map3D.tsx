@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getHd2dApiBase } from "../lib/hd2dApiBase";
+
+export type Map3DHandle = {
+  getCanvas: () => HTMLCanvasElement | null;
+};
 
 export type Map3DPoint = {
   id: string;
@@ -78,7 +82,7 @@ function perimeterM(ring: [number, number][]): number {
   return total;
 }
 
-export function Map3D({
+export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
   center,
   zoom = 17,
   pitch = 60,
@@ -97,7 +101,7 @@ export function Map3D({
   onFeaturesCleared,
   className,
   style: styleProp,
-}: Props) {
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -109,6 +113,10 @@ export function Map3D({
   const drawMarkersRef = useRef<maplibregl.Marker[]>([]);
   const [drawInfo, setDrawInfo] = useState("");
   const [autoTraceBusy, setAutoTraceBusy] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    getCanvas: () => mapRef.current?.getCanvas() ?? null,
+  }), []);
 
   const onClickRef = useRef(onMapClick);
   const onPointClickRef = useRef(onPointClick);
@@ -797,4 +805,4 @@ export function Map3D({
       ) : null}
     </div>
   );
-}
+});

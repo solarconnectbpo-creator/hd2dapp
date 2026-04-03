@@ -64,7 +64,7 @@ import {
 import { buildFootprintDxfFromPolygons, type FootprintFeature } from "./lib/roofDxfExport";
 import { compareDrawnVsHeuristic, type TakeoffComparisonRow } from "./lib/roofTakeoffComparison";
 import { useMapProvider } from "./lib/useMapProvider";
-import { Map3D } from "./components/Map3D";
+import { Map3D, type Map3DHandle } from "./components/Map3D";
 import {
   computeCarrierBenchmark,
   getCarrierBenchmarkProfiles,
@@ -2942,6 +2942,7 @@ function App() {
   const [searchParams, setSearchParams] = useSearchParams();
   /** Captured once for /measurement/new?auto=1 instant estimate (avoid stale searchParams in one-shot import effect). */
   const measurementAutoFromQueryRef = useRef(searchParams.get("auto") === "1");
+  const map3dRef = useRef<Map3DHandle>(null);
   const mapboxContainerRef = useRef<HTMLDivElement | null>(null);
   /** EagleView Embedded Explorer map handle (legacy name kept to limit churn). */
   const mapboxMapRef = useRef<EmbeddedExplorerMapHandle | null>(null);
@@ -4100,6 +4101,119 @@ function App() {
           ? `${msg} — Start the Intel Worker (e.g. wrangler dev on port 8787) or set VITE_INTEL_API_BASE.`
           : msg,
       );
+    } finally {
+      setAiMeasureBusy(false);
+    }
+  };
+
+  const handleAiMeasureFromMap = async () => {
+    const canvas = map3dRef.current?.getCanvas();
+    if (!canvas) {
+      setAiMeasureNote("Map not ready — wait for satellite tiles to load, then try again.");
+      return;
+    }
+    if (!isHd2dApiConfigured()) {
+      setAiMeasureNote("AI measure requires the backend Worker. Set VITE_INTEL_API_BASE or run wrangler dev.");
+      return;
+    }
+    setAiMeasureBusy(true);
+    setAiMeasureNote("Capturing map view and analyzing roof...");
+    try {
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      const imageBase64 = dataUrl.split(",")[1];
+      if (!imageBase64 || imageBase64.length < 100) {
+        setAiMeasureNote("Could not capture map — try zooming in closer to the roof.");
+        return;
+      }
+      const contextParts: string[] = [];
+      if (form.address.trim()) contextParts.push(`Job address: ${form.address.trim()}`);
+      const res = await fetch(`${INTEL_API_BASE}/api/ai/roof-pitch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64,
+          mimeType: "image/jpeg",
+          ...(contextParts.length ? { context: contextParts.join("\n") } : {}),
+        }),
+      });
+      const rawText = await res.text();
+      let json: {
+        success?: boolean;
+        error?: string;
+        rationale?: string;
+        detail?: string;
+        data?: {
+          estimatePitch: string;
+          confidence?: string;
+          rationale?: string;
+          estimateRoofAreaSqFt: number | null;
+          estimateRoofPerimeterFt: number | null;
+          measurementConfidence?: string | null;
+          measurementRationale?: string;
+        };
+      };
+      try {
+        json = JSON.parse(rawText);
+      } catch {
+        setAiMeasureNote(res.ok ? "Invalid response from server." : `Server error (${res.status}).`);
+        return;
+      }
+      const rawPitch = json.data?.estimatePitch;
+      const hasPitch = rawPitch != null && String(rawPitch).trim() !== "" && String(rawPitch).trim().toLowerCase() !== "unknown";
+      if (!json.success || !hasPitch) {
+        setAiMeasureNote(json.error || json.rationale || "Could not estimate from this map view. Try zooming in closer.");
+        return;
+      }
+      const d = json.data!;
+      const pitchForForm = canonicalPitchRiseOver12(rawPitch as string | number);
+      const pitchRise = parsePitchRise(pitchForForm) ?? 6;
+      const pitchFactor = Math.sqrt(1 + (pitchRise / 12) ** 2);
+      const areaN = typeof d.estimateRoofAreaSqFt === "number" && d.estimateRoofAreaSqFt > 0 ? d.estimateRoofAreaSqFt : null;
+      const perimN = typeof d.estimateRoofPerimeterFt === "number" && d.estimateRoofPerimeterFt > 0 ? d.estimateRoofPerimeterFt : null;
+      let planForGeo = areaN != null ? areaN / pitchFactor : null;
+      if (planForGeo == null || planForGeo <= 0) {
+        const fp = parseFloat(form.areaSqFt);
+        if (Number.isFinite(fp) && fp > 0) planForGeo = fp;
+      }
+      const geo = planForGeo != null && planForGeo > 0
+        ? computeRoofGeometryFromPlanInputs(planForGeo, perimN, form.roofType, form.roofStructure, pitchForForm)
+        : null;
+      setForm((curr) => {
+        const next = { ...curr, roofPitch: pitchForForm };
+        if (areaN !== null) {
+          next.measuredSquares = (areaN / 100).toFixed(2);
+          next.areaSqFt = (areaN / pitchFactor).toFixed(2);
+        }
+        if (perimN !== null) {
+          next.perimeterFt = perimN.toFixed(2);
+        } else if (geo) {
+          next.perimeterFt = geo.floorPerimeterFt.toFixed(2);
+        }
+        if (geo) {
+          if (areaN == null) {
+            next.areaSqFt = geo.planAreaSqFt.toFixed(2);
+            next.measuredSquares = (geo.surfaceAreaSqFt / 100).toFixed(2);
+          }
+          const f = fmtLengthFeetInches;
+          next.ridgesFt = f(geo.ridgeFt);
+          next.eavesFt = f(geo.eaveFt);
+          next.rakesFt = f(geo.rakeFt);
+          next.valleysFt = f(geo.valleyFt);
+          next.hipsFt = f(geo.hipFt);
+          next.wallFlashingFt = f(geo.wallFlashFt);
+          next.stepFlashingFt = f(geo.stepFlashFt);
+        }
+        return next;
+      });
+      const bits = [`Pitch ${pitchForForm} (${d.confidence || "low"})`];
+      if (d.rationale) bits.push(d.rationale);
+      if (areaN != null) bits.push(`~${areaN} SF surface`);
+      if (perimN != null) bits.push(`perimeter ~${perimN} LF`);
+      setAiMeasureNote(bits.join(" · "));
+      setRunId((n) => n + 1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setAiMeasureNote(msg);
     } finally {
       setAiMeasureBusy(false);
     }
@@ -5293,11 +5407,19 @@ function App() {
             />
             <button
               type="button"
+              className="run-btn"
+              disabled={aiMeasureBusy}
+              onClick={() => void handleAiMeasureFromMap()}
+            >
+              {aiMeasureBusy ? "AI analyzing…" : "AI Auto Measure"}
+            </button>
+            <button
+              type="button"
               className="secondary-btn"
               disabled={aiMeasureBusy}
               onClick={() => aiMeasureFileRef.current?.click()}
             >
-              {aiMeasureBusy ? "AI analyzing…" : "AI auto measure (optional photo)"}
+              Upload Photo Instead
             </button>
             <span className="muted" style={{ fontSize: 11 }}>
               {mapProvider === "osm-fallback" || mapProvider === "checking"
@@ -5324,6 +5446,7 @@ function App() {
           {mapProvider === "osm-fallback" || mapProvider === "checking" ? (
             <>
               <Map3D
+                ref={map3dRef}
                 center={{
                   lat: Number.parseFloat(form.latitude) || 44.86,
                   lng: Number.parseFloat(form.longitude) || -93.53,
