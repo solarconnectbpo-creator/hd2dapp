@@ -5275,7 +5275,7 @@ function App() {
             <button
               type="button"
               className="secondary-btn"
-              disabled={mapProvider === "eagleview" ? !mapReady : false}
+              disabled={mapProvider === "eagleview" && !mapReady}
               onClick={() => {
                 const { lat, lon } = eeViewCenterRef.current;
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
@@ -5300,7 +5300,7 @@ function App() {
               {aiMeasureBusy ? "AI analyzing…" : "AI auto measure (optional photo)"}
             </button>
             <span className="muted" style={{ fontSize: 11 }}>
-              {mapProvider === "osm-fallback"
+              {mapProvider === "osm-fallback" || mapProvider === "checking"
                 ? "Use the polygon tool (top-right) to trace the roof outline. Draw lines for ridge/eave/rake/etc. Measurements auto-fill the estimate form."
                 : "No photo required: trace the roof in EagleView, then use Apply All Measurements To Estimate. Optional AI photo can fill pitch and surface area when the model sees scale."}
             </span>
@@ -5321,7 +5321,7 @@ function App() {
               </span>
             ))}
           </div>
-          {mapProvider === "osm-fallback" ? (
+          {mapProvider === "osm-fallback" || mapProvider === "checking" ? (
             <>
               <Map3D
                 center={{

@@ -174,14 +174,6 @@ export function LeadsMap({ contacts, selectedId, onSelectContact, onOpenContact 
     [onSelectContact],
   );
 
-  if (mapProvider === "checking") {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-black">
-        Loading map...
-      </div>
-    );
-  }
-
   if (withCoords.length === 0) {
     return (
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-black">
@@ -192,7 +184,7 @@ export function LeadsMap({ contacts, selectedId, onSelectContact, onOpenContact 
 
   const selected = selectedId ? withCoords.find((c) => c.id === selectedId) : null;
 
-  if (mapProvider === "osm-fallback") {
+  if (mapProvider === "osm-fallback" || mapProvider === "checking") {
     return (
       <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
         <FallbackMap

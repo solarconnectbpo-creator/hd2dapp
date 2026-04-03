@@ -379,6 +379,27 @@ export function Map3D({
       style: {
         version: 8,
         sources: {
+          "google-sat": {
+            type: "raster",
+            tiles: [
+              `https://maps.googleapis.com/maps/api/staticmap?maptype=satellite&center={y},{x}&zoom={z}&size=256x256&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""}`,
+            ],
+            tileSize: 256,
+            maxzoom: 21,
+            attribution: "Imagery &copy; Google",
+          },
+          "google-session": {
+            type: "raster",
+            tiles: [
+              "https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+              "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+              "https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+              "https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+            ],
+            tileSize: 256,
+            maxzoom: 22,
+            attribution: "Imagery &copy; Google",
+          },
           "esri-sat": {
             type: "raster",
             tiles: [
@@ -399,7 +420,7 @@ export function Map3D({
           },
         },
         layers: [
-          { id: "satellite-layer", type: "raster", source: "esri-sat", paint: {} },
+          { id: "satellite-layer", type: "raster", source: "google-session", paint: {} },
           { id: "labels-layer", type: "raster", source: "esri-labels", paint: { "raster-opacity": 0.7 } },
         ],
       },

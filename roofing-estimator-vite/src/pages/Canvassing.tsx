@@ -932,7 +932,7 @@ export function Canvassing() {
 
       <>
           <div className="relative min-h-0 w-full flex-1">
-            {mapProvider === "osm-fallback" ? (
+            {mapProvider === "osm-fallback" || mapProvider === "checking" ? (
               <Map3D
                 center={viewCenterRef.current ? { lat: viewCenterRef.current.lat, lng: viewCenterRef.current.lon } : undefined}
                 zoom={16}
