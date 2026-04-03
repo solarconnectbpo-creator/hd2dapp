@@ -397,26 +397,11 @@ export function Map3D({
             maxzoom: 20,
             attribution: "",
           },
-          terrain: {
-            type: "raster-dem",
-            tiles: ["https://demotiles.maplibre.org/terrain-tiles/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            maxzoom: 14,
-          },
         },
         layers: [
           { id: "satellite-layer", type: "raster", source: "esri-sat", paint: {} },
           { id: "labels-layer", type: "raster", source: "esri-labels", paint: { "raster-opacity": 0.7 } },
         ],
-        terrain: { source: "terrain", exaggeration: 1.5 },
-        sky: {
-          "sky-color": "#199EF3",
-          "sky-horizon-blend": 0.5,
-          "horizon-color": "#ffffff",
-          "horizon-fog-blend": 0.2,
-          "fog-color": "#0000ff",
-          "fog-ground-blend": 0.5,
-        },
       },
       center: [lng, lat],
       zoom,
@@ -428,7 +413,6 @@ export function Map3D({
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 200, unit: "imperial" }), "bottom-left");
-    map.addControl(new maplibregl.TerrainControl({ source: "terrain" }), "top-left");
     map.addControl(
       new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
