@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
@@ -84,26 +84,30 @@ function raybevelDiagramPlugin(): Plugin {
   };
 }
 
-/** HTTP proxies: keep browser same-origin to Cloudflare Worker (intel) and third-party APIs (BatchData, Places, PDL). See README.md "Local development services". */
+/** HTTP proxies: same-origin to HD2D Worker (intel + EagleView API Center) and third-party APIs. EagleView TrueDesign uses `/intel-proxy` → Worker `/api/eagleview/apicenter/*`. */
 const allowGeolocationHeader = {
   /** Lets the browser prompt for Geolocation API (Mapbox Geolocate control). */
   "Permissions-Policy": "geolocation=(self)",
 };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const intelProxyTarget = (env.INTEL_PROXY_TARGET || "http://127.0.0.1:8787").replace(/\/$/, "");
+  const intelProxy = {
+    target: intelProxyTarget,
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/intel-proxy/, ""),
+    timeout: 120_000,
+    proxyTimeout: 120_000,
+  } as const;
+
+  return {
   plugins: [react(), tailwindcss(), raybevelDiagramPlugin()],
   server: {
     headers: allowGeolocationHeader,
     proxy: {
       // Same-origin in dev → avoids CORS / mixed-content when the SPA is https or another host.
-      "/intel-proxy": {
-        target: "http://127.0.0.1:8787",
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/intel-proxy/, ""),
-        // Vision + OpenAI round-trip can exceed default proxy timeouts
-        timeout: 120_000,
-        proxyTimeout: 120_000,
-      },
+      "/intel-proxy": intelProxy,
       /** Google Places API (New) — browser sends X-Goog-Api-Key; dev-only CORS workaround. */
       "/google-places-api": {
         target: "https://places.googleapis.com",
@@ -130,13 +134,7 @@ export default defineConfig({
   preview: {
     headers: allowGeolocationHeader,
     proxy: {
-      "/intel-proxy": {
-        target: "http://127.0.0.1:8787",
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/intel-proxy/, ""),
-        timeout: 120_000,
-        proxyTimeout: 120_000,
-      },
+      "/intel-proxy": intelProxy,
       "/google-places-api": {
         target: "https://places.googleapis.com",
         changeOrigin: true,
@@ -163,4 +161,5 @@ export default defineConfig({
     },
   },
   assetsInclude: ["**/*.svg", "**/*.csv"],
+  };
 });

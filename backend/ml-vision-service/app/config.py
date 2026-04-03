@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     roboflow_api_key: str = ""
     roboflow_model_path: str = ""  # e.g. workspace/project/version
 
+    # --- SAM (Segment Anything) for click-to-trace roof segmentation ---
+    sam_checkpoint_path: str = ""
+    sam_model_type: str = "vit_b"
+
     # --- Any managed API that accepts JSON and returns JSON you map below ---
     http_json_url: str = ""
     http_json_bearer: str = ""

@@ -5,7 +5,7 @@
  * Comply with https://batchdata.io terms and your account limits.
  */
 
-import { getHd2dApiBase } from "./hd2dApiBase";
+import { getHd2dApiBase, isHd2dApiConfigured } from "./hd2dApiBase";
 import { mapRecordToImportPayload, type PropertyImportPayload } from "./propertyScraper";
 import { isViteDevProxyOrigin } from "./viteApiProxy";
 
@@ -298,6 +298,13 @@ export async function fetchBatchDataPropertyByAddress(
   if (!key) return { ok: false, message: "BatchData API key is empty." };
   if (!criteria.street_address || !criteria.city || !criteria.state) {
     return { ok: false, message: "Street, city, and state are required for BatchData search." };
+  }
+  if (!isViteDevProxyOrigin() && !isHd2dApiConfigured()) {
+    return {
+      ok: false,
+      message:
+        "BatchData property search needs the HD2D Worker in production/preview. Set VITE_INTEL_API_BASE to your deployed Worker URL (see .env.example).",
+    };
   }
 
   const url = batchdataPropertySearchUrl();

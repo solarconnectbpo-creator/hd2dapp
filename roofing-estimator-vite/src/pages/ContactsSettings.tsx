@@ -207,8 +207,8 @@ export function ContactsSettings() {
   return (
     <div className="p-8 max-w-5xl">
       <div className="mb-8">
-        <h1 className="text-3xl mb-2 text-gray-900">Contacts &amp; settings</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl mb-2 text-black">Contacts &amp; settings</h1>
+        <p className="text-black">
           Upload a contact list (CSV), set company branding and report defaults. Everything is stored locally in your
           browser.
         </p>
@@ -238,7 +238,7 @@ export function ContactsSettings() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="text-sm">
-                <span className="text-gray-600 block mb-1">Company name</span>
+                <span className="text-black block mb-1">Company name</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.companyName}
@@ -246,7 +246,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-gray-600 block mb-1">Prepared by</span>
+                <span className="text-black block mb-1">Prepared by</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.preparedBy}
@@ -254,7 +254,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm md:col-span-2">
-                <span className="text-gray-600 block mb-1">Company address</span>
+                <span className="text-black block mb-1">Company address</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="Street, City, ST ZIP"
@@ -263,7 +263,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-gray-600 block mb-1">Website</span>
+                <span className="text-black block mb-1">Website</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="https://"
@@ -272,7 +272,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-gray-600 block mb-1">Estimator email</span>
+                <span className="text-black block mb-1">Estimator email</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.contactEmail}
@@ -280,7 +280,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-gray-600 block mb-1">Estimator phone</span>
+                <span className="text-black block mb-1">Estimator phone</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.contactPhone}
@@ -288,7 +288,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-gray-600 block mb-1">Default report template</span>
+                <span className="text-black block mb-1">Default report template</span>
                 <select
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.defaultTemplateProfile}
@@ -302,12 +302,12 @@ export function ContactsSettings() {
               </label>
             </div>
             <div>
-              <span className="text-gray-600 text-sm block mb-2">Logo (PNG/JPG, shown on proposals)</span>
+              <span className="text-black text-sm block mb-2">Logo (PNG/JPG, shown on proposals)</span>
               <div className="flex flex-wrap items-center gap-4">
                 {org.logoDataUrl ? (
                   <img src={org.logoDataUrl} alt="Logo" className="h-16 w-auto max-w-[200px] object-contain border rounded" />
                 ) : (
-                  <span className="text-sm text-gray-400">No logo uploaded</span>
+                  <span className="text-sm text-black">No logo uploaded</span>
                 )}
                 <input
                   ref={logoInputRef}
@@ -371,20 +371,24 @@ export function ContactsSettings() {
             </div>
 
             <div className="border-t border-gray-100 pt-6">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                <Layers className="h-4 w-4 text-blue-600" />
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-black">
+                <Layers className="h-4 w-4 text-black" />
                 Canvassing map — ArcGIS overlay
               </h3>
-              <p className="mb-4 text-xs text-gray-500">
+              <p className="mb-4 text-xs text-black">
                 Draw public (or secured) <strong>Feature Server</strong> polygons/lines on the satellite map. Paste the
                 layer URL through <code className="rounded bg-gray-100 px-1">/FeatureServer/&lt;id&gt;</code> (no{" "}
                 <code className="rounded bg-gray-100 px-1">/query</code>). Optional token for private portals. Env
                 overrides: <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_FEATURE_LAYER_URL</code>,{" "}
-                <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_API_KEY</code>.
+                <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_API_KEY</code>. Canvassing also runs an
+                ArcGIS REST <strong>point-in-parcel</strong> query on the same layer so owner fields can load even when
+                you click off the drawn polygon. Some county servers block browser CORS from localhost — use a public
+                layer on <code className="rounded bg-gray-100 px-1">arcgis.com</code> or deploy behind a same-origin
+                proxy if needed.
               </p>
               <div className="space-y-3">
                 <label className="text-sm block">
-                  <span className="text-gray-600 mb-1 block">Feature layer URL</span>
+                  <span className="text-black mb-1 block">Feature layer URL</span>
                   <input
                     className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs"
                     placeholder="https://services.arcgis.com/.../FeatureServer/0"
@@ -393,7 +397,14 @@ export function ContactsSettings() {
                   />
                 </label>
                 <label className="text-sm block">
-                  <span className="text-gray-600 mb-1 block">API key / token (optional)</span>
+                  <span className="text-black mb-1 block">API key / token (optional)</span>
+                  {import.meta.env.VITE_ARCGIS_API_KEY ? (
+                    <p className="mb-2 text-xs text-emerald-800">
+                      <strong>Saved for this app:</strong> <code className="rounded bg-emerald-50 px-1">VITE_ARCGIS_API_KEY</code> is set
+                      in <code className="rounded bg-emerald-50 px-1">.env.local</code> and is copied into browser storage here on first
+                      load (if this field was empty). Restart the dev server after changing the env file.
+                    </p>
+                  ) : null}
                   <input
                     type="password"
                     autoComplete="off"
@@ -456,23 +467,23 @@ export function ContactsSettings() {
                 {geocodeBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MapPin className="w-4 h-4 mr-2" />}
                 Geocode addresses
               </Button>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
                 <input type="checkbox" checked={replaceOnImport} onChange={(e) => setReplaceOnImport(e.target.checked)} />
                 Replace all contacts (otherwise append)
               </label>
-              <span className="text-sm text-gray-500">{contacts.length} saved</span>
+              <span className="text-sm text-black">{contacts.length} saved</span>
             </div>
 
             {contactRows.length === 0 ? (
-              <p className="text-sm text-gray-500">No contacts yet. Upload a CSV or add rows from the estimator map page.</p>
+              <p className="text-sm text-black">No contacts yet. Upload a CSV or add rows from the estimator map page.</p>
             ) : (
               <>
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-black flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     Leads map
                   </h3>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-black">
                     Click a marker or a table row to highlight a lead. Popups can open the estimator for that property.
                   </p>
                   <LeadsMap
@@ -485,7 +496,7 @@ export function ContactsSettings() {
 
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-gray-600">
+                    <thead className="bg-gray-50 text-left text-black">
                       <tr>
                         <th className="p-2 font-medium">Name</th>
                         <th className="p-2 font-medium">Location</th>
@@ -501,13 +512,13 @@ export function ContactsSettings() {
                           onClick={() => setSelectedLeadId(c.id)}
                         >
                           <td className="p-2">
-                            <div className="font-medium text-gray-900">{c.name || "—"}</div>
-                            <div className="text-gray-500 text-xs">{c.email || c.phone || ""}</div>
+                            <div className="font-medium text-black">{c.name || "—"}</div>
+                            <div className="text-black text-xs">{c.email || c.phone || ""}</div>
                           </td>
-                          <td className="p-2 text-gray-700">
+                          <td className="p-2 text-black">
                             {[c.address, c.city, c.state].filter(Boolean).join(", ") || "—"}
                           </td>
-                          <td className="p-2 text-gray-700">
+                          <td className="p-2 text-black">
                             {c.areaSqFt ? `${c.areaSqFt} SF` : "—"}
                             {c.measuredSquares ? ` · ${c.measuredSquares} SQ` : ""}
                           </td>
@@ -547,9 +558,9 @@ export function ContactsSettings() {
               </>
             )}
 
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-black">
               Tip: Use <strong>Geocode addresses</strong> above (or bulk geocode on{" "}
-              <Link className="text-blue-600 underline" to="/measurement/new">
+              <Link className="text-black underline" to="/measurement/new">
                 New Measurement
               </Link>
               ) so leads appear on the map.

@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "label": "Benchmark (non-Xactimate proprietary feed)",
+    "version": "2026-04-02",
+    "notes": "Carrier-oriented benchmark profiles used for estimating alignment only."
+  },
+  "profiles": [
+    {
+      "id": "carrier-standard",
+      "name": "Carrier Standard",
+      "description": "Balanced benchmark profile for mainstream residential carrier reviews.",
+      "baseMultiplier": 1,
+      "defaultRegionFactor": 1,
+      "defaultComplexityFactor": 1,
+      "requiredLineCategories": [
+        "tear-off and disposal",
+        "starter and ridge accessory",
+        "drip edge and flashing",
+        "underlayment and leak barrier"
+      ],
+      "optionalLineCategories": [
+        "high roof or steep charge",
+        "permit and supervision",
+        "code-upgrade accessories"
+      ]
+    },
+    {
+      "id": "carrier-conservative",
+      "name": "Carrier Conservative",
+      "description": "Slightly conservative benchmark for tighter initial scopes.",
+      "baseMultiplier": 0.95,
+      "defaultRegionFactor": 1,
+      "defaultComplexityFactor": 1,
+      "requiredLineCategories": [
+        "tear-off and disposal",
+        "primary field material",
+        "flashing and edge metal"
+      ],
+      "optionalLineCategories": [
+        "detailing upgrades",
+        "overhead and profit",
+        "special access charges"
+      ]
+    },
+    {
+      "id": "carrier-robust",
+      "name": "Carrier Robust",
+      "description": "Expanded benchmark profile for supplement-forward negotiations.",
+      "baseMultiplier": 1.08,
+      "defaultRegionFactor": 1,
+      "defaultComplexityFactor": 1,
+      "requiredLineCategories": [
+        "tear-off and disposal",
+        "primary material + accessories",
+        "flashing and transition details",
+        "ventilation and safety setup"
+      ],
+      "optionalLineCategories": [
+        "high roof and slope complexity",
+        "project supervision",
+        "permit, engineering, and code contingencies"
+      ]
+    }
+  ]
+}

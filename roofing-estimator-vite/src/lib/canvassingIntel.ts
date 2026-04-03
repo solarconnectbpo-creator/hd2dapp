@@ -27,6 +27,7 @@ export type StlIntelLite = {
 export async function fetchStlIntelAtPoint(lat: number, lng: number): Promise<StlIntelLite | null> {
   if (!isInMissouriBbox(lat, lng)) return null;
   const base = getIntelApiBase();
+  if (!base) return null;
   try {
     const res = await fetch(
       `${base}/api/stl/intel?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`,

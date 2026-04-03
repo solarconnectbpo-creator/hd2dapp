@@ -3,39 +3,74 @@ main = "src/index.ts"
 compatibility_date = "2024-12-02"
 compatibility_flags = ["nodejs_compat"]
 
+# Public EagleView API Center defaults (override with secrets if needed).
+[vars]
+EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token"
+EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com"
+
 # D1 Database Binding
 [[d1_databases]]
 binding = "DB"
-database_name = "hd2d"
-database_id = "local-dev"
+database_name = "d2d"
+database_id = "2a9b7931-181f-4b19-b963-97d00e9b6d5a"
 
 # KV Namespace for real-time call state
 [[kv_namespaces]]
 binding = "HD2D_CACHE"
-id = "hd2d-cache"
-preview_id = "hd2d-cache-preview"
+id = "c534b1528e46480eab0979236a4b63ef"
+preview_id = "d5629502b89544fd80f3e0880b352832"
 
 # Environment variables
 [env.development]
-vars = { ENVIRONMENT = "development" }
+vars = { ENVIRONMENT = "development", EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token", EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com" }
 
 [env.production]
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token", EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com" }
 
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "hd2d"
-database_id = "local-dev"
+database_name = "d2d"
+database_id = "2a9b7931-181f-4b19-b963-97d00e9b6d5a"
 
 [[env.production.kv_namespaces]]
 binding = "HD2D_CACHE"
-id = "hd2d-cache"
-preview_id = "hd2d-cache-preview"
+id = "c534b1528e46480eab0979236a4b63ef"
+preview_id = "d5629502b89544fd80f3e0880b352832"
 
 # Configure runtime secrets via Wrangler:
 # - wrangler secret put OPENAI_API_KEY --env production --config backend/wrangler.toml
 # - wrangler secret put SESSION_SECRET --env production --config backend/wrangler.toml
+#
+# EagleView API Center (TrueDesign) — /api/eagleview/apicenter/* on this Worker:
+# - wrangler secret put EAGLEVIEW_CLIENT_SECRET
+# - wrangler secret put EAGLEVIEW_CLIENT_ID   (or EAGLEVIEW_OAUTH_CLIENT_ID if it differs from the app URL slug)
+# Optional secrets: EAGLEVIEW_TOKEN_URL (default https://apicenter.eagleview.com/oauth2/v1/token),
+#   EAGLEVIEW_API_BASE (default https://apicenter.eagleview.com), EAGLEVIEW_SCOPE, EAGLEVIEW_ACCESS_TOKEN (static Bearer; dev only)
+# EagleView Embedded Explorer token bootstrap — /api/eagleview/embedded/token on this Worker:
+# - wrangler secret put EAGLEVIEW_EMBEDDED_CLIENT_ID
+# - wrangler secret put EAGLEVIEW_EMBEDDED_CLIENT_SECRET
+# Optional: EAGLEVIEW_EMBEDDED_TOKEN_URL (default https://api.eagleview.com/auth-service/v1/token), EAGLEVIEW_EMBEDDED_SCOPE
+# Fallback if omitted: shared EAGLEVIEW_CLIENT_ID / EAGLEVIEW_CLIENT_SECRET are used.
+# Local dev: create backend/.dev.vars (gitignored) with the same KEY=value lines, then `npm run dev` in backend.
+
+routes = [
+  { pattern = "hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" }
+]
 
 # Build configuration
 [build]
 command = "npm install"
+
+# Custom domain routing (recommended):
+# 1) Frontend app on root domain (e.g. https://hardcoredoortodoorclosers.com)
+# 2) Worker API on same domain path /api/*, or API subdomain.
+#
+# Option A: same-origin API path (best for CORS simplicity)
+# routes = [
+#   { pattern = "hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" }
+# ]
+#
+# Option B: API subdomain
+# routes = [
+#   { pattern = "api.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" }
+# ]

@@ -8,13 +8,13 @@ export function Contracts() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl mb-2 text-gray-900">Contracts & Proposals</h1>
-        <p className="text-gray-600">Generated proposals from your estimates</p>
+        <h1 className="text-3xl mb-2 text-black">Contracts & Proposals</h1>
+        <p className="text-black">Generated proposals from your estimates</p>
       </div>
 
       {contracts.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center text-gray-600">
+          <CardContent className="py-16 text-center text-black">
             No proposals yet. Create one from the Measurement page.
           </CardContent>
         </Card>
@@ -34,9 +34,9 @@ export function Contracts() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="text-sm text-gray-600">Client</div>
-                <div className="text-gray-900">{c.clientName || "N/A"}</div>
-                <div className="text-gray-900">${c.totalAmount.toLocaleString()}</div>
+                <div className="text-sm text-black">Client</div>
+                <div className="text-black">{c.clientName || "N/A"}</div>
+                <div className="text-black">${c.totalAmount.toLocaleString()}</div>
               </CardContent>
             </Card>
           ))}

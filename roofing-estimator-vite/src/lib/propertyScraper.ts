@@ -5,6 +5,8 @@
  */
 
 export const PENDING_PROPERTY_IMPORT_KEY = "roofing-pending-property-import-v1";
+/** Mirrors pending import JSON so a remount (e.g. React Strict Mode) can still consume it after localStorage was cleared. */
+export const PENDING_PROPERTY_IMPORT_SESSION_KEY = "roofing-pending-property-import-session-v1";
 
 /** `rentcast` kept only for decoding older saved payloads / JSON. */
 export type PropertyImportSource = "csv-upload" | "json-paste" | "import" | "rentcast" | "batchdata";
@@ -47,7 +49,34 @@ export interface PropertyImportPayload {
   ownerPortfolioCount?: number;
 }
 
+export interface PendingPropertyImportOptions {
+  autoEstimate?: boolean;
+  importFootprint?: boolean;
+}
+
+export interface PendingPropertyImportEnvelope {
+  payload: PropertyImportPayload;
+  options?: PendingPropertyImportOptions;
+}
+
 /** Default row for CSV / manual assembly. */
+/**
+ * Assessor/BatchData payloads sometimes populate `contactPersonName` / `ownerPmEntityLabel` or
+ * `contactPersonPhone` without mirroring them into `ownerName` / `ownerPhone`. Copy across so
+ * Canvassing owner-lock and proposal client fields stay consistent.
+ */
+export function normalizePropertyImportPayloadContacts(p: PropertyImportPayload): PropertyImportPayload {
+  let ownerName = p.ownerName.trim();
+  if (!ownerName) {
+    ownerName = p.contactPersonName.trim() || (p.ownerPmEntityLabel ?? "").trim();
+  }
+  let ownerPhone = p.ownerPhone.trim();
+  if (!ownerPhone) {
+    ownerPhone = p.contactPersonPhone.trim();
+  }
+  return { ...p, ownerName, ownerPhone };
+}
+
 export function emptyPropertyImportPayload(
   source: PropertyImportSource,
   overrides: Partial<PropertyImportPayload> = {},
@@ -347,9 +376,35 @@ export function parsePropertyJsonPaste(text: string): PropertyImportPayload | nu
   return null;
 }
 
-export function stashPendingPropertyImport(payload: PropertyImportPayload): void {
+export function parsePendingPropertyImport(raw: string): PendingPropertyImportEnvelope | null {
   try {
-    window.localStorage.setItem(PENDING_PROPERTY_IMPORT_KEY, JSON.stringify(payload));
+    const parsed = JSON.parse(raw) as Partial<PendingPropertyImportEnvelope> | PropertyImportPayload;
+    if (parsed && typeof parsed === "object" && "payload" in parsed) {
+      const env = parsed as PendingPropertyImportEnvelope;
+      if (env.payload?.address) return env;
+      return null;
+    }
+    const legacy = parsed as PropertyImportPayload;
+    if (legacy?.address) return { payload: legacy };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function stashPendingPropertyImport(
+  payload: PropertyImportPayload,
+  options?: PendingPropertyImportOptions,
+): void {
+  try {
+    const envelope: PendingPropertyImportEnvelope = { payload, options };
+    const json = JSON.stringify(envelope);
+    window.localStorage.setItem(PENDING_PROPERTY_IMPORT_KEY, json);
+    try {
+      window.sessionStorage.setItem(PENDING_PROPERTY_IMPORT_SESSION_KEY, json);
+    } catch {
+      /* private mode */
+    }
   } catch {
     /* quota */
   }

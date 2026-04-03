@@ -86,8 +86,8 @@ export function Dashboard() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-semibold tracking-tight text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">
+        <h1 className="mb-2 text-3xl font-semibold tracking-tight text-black">Dashboard</h1>
+        <p className="text-black">
           Measurements, estimates, and field tools — data stays in this browser unless you export.
         </p>
       </div>
@@ -98,13 +98,13 @@ export function Dashboard() {
           return (
             <Card key={stat.title}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm text-gray-600">{stat.title}</CardTitle>
+                <CardTitle className="text-sm text-black">{stat.title}</CardTitle>
                 <div className={`${stat.color} p-2 rounded-lg`}>
                   <Icon className="w-4 h-4 text-white" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl text-gray-900">{stat.value}</div>
+                <div className="text-2xl text-black">{stat.value}</div>
               </CardContent>
             </Card>
           );
@@ -175,17 +175,17 @@ export function Dashboard() {
                 {recentMeasurements.map((m) => (
                   <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
-                      <p className="text-sm text-gray-900">{m.projectName}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm text-black">{m.projectName}</p>
+                      <p className="text-xs text-black">
                         {m.adjustedArea.toFixed(0)} sq ft • {m.roofMaterial}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">{m.date}</span>
+                    <span className="text-xs text-black">{m.date}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
+              <p className="text-sm text-black text-center py-4">
                 Start by creating your first measurement
               </p>
             )}
@@ -196,7 +196,7 @@ export function Dashboard() {
       <Card className="mb-8 border-blue-100 bg-gradient-to-br from-white to-blue-50/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <HardDriveDownload className="h-5 w-5 text-blue-600" />
+            <HardDriveDownload className="h-5 w-5 text-black" />
             Backup &amp; restore
           </CardTitle>
           <CardDescription>

@@ -14,14 +14,17 @@ const OWNER_KEY_REGEXES = [
   /^owner_?name_?1$/i,
   /^owner_?name_?2$/i,
   /^owner_?name_?full$/i,
+  /^prop_?owner_?name$/i,
+  /^prop_?owner$/i,
+  /^property_?owner_?name$/i,
   /^tax_?name$/i,
   /^taxname$/i,
-  /^prop_?owner$/i,
   /^property_?owner$/i,
   /^deed_?hold$/i,
   /^deed_?name$/i,
   /^mail_?name$/i,
   /^mailing_?name$/i,
+  /^mail_?to_?name$/i,
   /^primary_?owner$/i,
   /^own_?name$/i,
   /^owner$/i,
@@ -33,6 +36,7 @@ const OWNER_KEY_REGEXES = [
   /^PARCEL_OWNER$/i,
   /^DEEDHOLDER$/i,
   /^FULLNAME$/i,
+  /^PNAME$/i,
 ];
 
 /** Keys that look like site/mail/parcel location — never use as owner name. */
@@ -45,10 +49,14 @@ const OWNER_PRIORITY_KEYS = [
   "OWNERNAME",
   "OWNER_NAME_1",
   "OWNER1_NAME",
+  "OWNER_NAME_FULL",
+  "OWNERFULLNAME",
   "OWN_NAME",
   "PARCEL_OWNER",
   "PROP_OWNER",
+  "PROP_OWNER_NAME",
   "PROPERTY_OWNER",
+  "PROPERTY_OWNER_NAME",
   "TAX_NAME",
   "TAXPAYER_NAME",
   "DEEDHOLDER",
@@ -59,6 +67,10 @@ const OWNER_PRIORITY_KEYS = [
   "OWNER_NAME_2",
   "MAIL_NAME",
   "MAILING_NAME",
+  "MAIL_TO_NAME",
+  "PNAME",
+  "OWNERCURRENT",
+  "OWNER_CURRENT",
 ];
 
 function getKeyCaseInsensitive(parcel: Record<string, unknown>, key: string): unknown {
@@ -98,10 +110,19 @@ export function extractOwnerFromParcel(parcel: Record<string, unknown> | null): 
   for (const [k, v] of entries) {
     if (OWNER_KEY_EXCLUDE.test(k)) continue;
     if (/owner|taxpayer|deed|grantee/i.test(k) && typeof v === "string") {
+      if (/address|addr|street|situs|location|parcel|apn|pin|lat|lon|coord/i.test(k) && !/mail/i.test(k)) {
+        continue;
+      }
       const s = v.trim();
       if (isPlausibleOwnerName(s)) return s;
     }
   }
+
+  const first = str(getKeyCaseInsensitive(parcel, "OWNER_FIRST_NAME"));
+  const last = str(getKeyCaseInsensitive(parcel, "OWNER_LAST_NAME"));
+  const combined = [first, last].filter(Boolean).join(" ").trim();
+  if (isPlausibleOwnerName(combined)) return combined;
+
   return "";
 }
 
@@ -148,7 +169,8 @@ export function extractParcelIdFromParcel(parcel: Record<string, unknown> | null
 /** Sorted key-value rows for UI (skip huge blobs). */
 export function parcelRowsForDisplay(
   parcel: Record<string, unknown>,
-  maxRows = 18,
+  maxRows = 100,
+  maxValueChars = 520,
 ): Array<{ key: string; value: string }> {
   const out: Array<{ key: string; value: string }> = [];
   const keys = Object.keys(parcel).sort((a, b) => a.localeCompare(b));
@@ -157,7 +179,7 @@ export function parcelRowsForDisplay(
     const v = parcel[key];
     if (v != null && typeof v === "object" && !Array.isArray(v)) continue;
     const value = str(v);
-    if (!value || value.length > 280) continue;
+    if (!value || value.length > maxValueChars) continue;
     out.push({ key, value });
   }
   return out;
@@ -165,7 +187,7 @@ export function parcelRowsForDisplay(
 
 /** Compact notes block for estimator handoff / record-keeping. */
 export function buildParcelHandoffNotes(parcel: Record<string, unknown>): string {
-  const rows = parcelRowsForDisplay(parcel, 24);
+  const rows = parcelRowsForDisplay(parcel, 48);
   if (!rows.length) return "";
   return ["Missouri open parcel (public assessor extract)", ...rows.map((r) => `${r.key}: ${r.value}`)].join("\n");
 }
@@ -184,8 +206,9 @@ export function mergeParcelAttributes(
   return { ...featureAttributes, ...intelParcel };
 }
 
-const PHONE_KEY_RX = /phone|tel|mobile|cell|voice|dayphone|evephone|homephone|workphone/i;
-const EMAIL_KEY_RX = /e-?mail|emailaddr|contactemail/i;
+const PHONE_KEY_RX =
+  /phone|tel|mobile|cell|voice|dayphone|evephone|homephone|workphone|fax|owner_?phone|phone_?num|phonenumber|day_?phone|night_?phone|cell_?phone|contact_?phone|res_?phone|bus_?phone|primary_?phone/i;
+const EMAIL_KEY_RX = /e-?mail|emailaddr|contactemail|owner_?email|email_?1/i;
 const MAIL_ADDR_RX = /mail(ing)?_?(addr|address|line)|owner_?mail|tax_?mail|mail_?addr|sit_?mail/i;
 /** Avoid bare "square" (e.g. price per square) and generic "area" without building context. */
 const SQFT_KEY_RX =
@@ -237,22 +260,66 @@ function firstStringField(parcel: Record<string, unknown>, rx: RegExp, minLen = 
 
 /** Build mailing line from common split assessor fields. */
 function buildMailingAddress(parcel: Record<string, unknown>): string {
-  const line1 = String(
-    parcel.MAIL_ADDR1 ??
-      parcel.MAIL_ADDRESS1 ??
-      parcel.MAIL_LINE1 ??
-      parcel.MAIL_STREET ??
-      parcel.OWNER_MAILING_LINE1 ??
-      "",
-  ).trim();
-  const line2 = String(parcel.MAIL_ADDR2 ?? parcel.MAIL_LINE2 ?? "").trim();
-  const city = String(parcel.MAIL_CITY ?? parcel.OWNER_MAIL_CITY ?? parcel.PROP_MAIL_CITY ?? "").trim();
-  const st = String(parcel.MAIL_STATE ?? parcel.OWNER_MAIL_STATE ?? "").trim();
-  const zip = String(parcel.MAIL_ZIP ?? parcel.OWNER_MAIL_ZIP ?? parcel.ZIP ?? "").trim();
+  const line1 = str(
+    getKeyCaseInsensitive(parcel, "MAIL_ADDR1") ??
+      getKeyCaseInsensitive(parcel, "MAIL_ADDRESS1") ??
+      getKeyCaseInsensitive(parcel, "MAIL_LINE1") ??
+      getKeyCaseInsensitive(parcel, "MAIL_STREET") ??
+      getKeyCaseInsensitive(parcel, "OWNER_MAILING_LINE1") ??
+      getKeyCaseInsensitive(parcel, "MADDR1") ??
+      getKeyCaseInsensitive(parcel, "MAIL_ADDRESS_LINE1") ??
+      getKeyCaseInsensitive(parcel, "OWNER_MAIL_ADDR1"),
+  );
+  const line2 = str(
+    getKeyCaseInsensitive(parcel, "MAIL_ADDR2") ??
+      getKeyCaseInsensitive(parcel, "MAIL_LINE2") ??
+      getKeyCaseInsensitive(parcel, "MADDR2"),
+  );
+  const city = str(
+    getKeyCaseInsensitive(parcel, "MAIL_CITY") ??
+      getKeyCaseInsensitive(parcel, "OWNER_MAIL_CITY") ??
+      getKeyCaseInsensitive(parcel, "PROP_MAIL_CITY") ??
+      getKeyCaseInsensitive(parcel, "MCITY"),
+  );
+  const st = str(getKeyCaseInsensitive(parcel, "MAIL_STATE") ?? getKeyCaseInsensitive(parcel, "OWNER_MAIL_STATE"));
+  const zip = str(
+    getKeyCaseInsensitive(parcel, "MAIL_ZIP") ??
+      getKeyCaseInsensitive(parcel, "OWNER_MAIL_ZIP") ??
+      getKeyCaseInsensitive(parcel, "ZIP") ??
+      getKeyCaseInsensitive(parcel, "MZIP"),
+  );
   const combined = [line1, line2, [city, st, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   if (combined.length > 5) return combined;
   const single = firstStringField(parcel, MAIL_ADDR_RX, 8);
   return single;
+}
+
+/** When field names omit "phone", scan short string values for US phone patterns. */
+function phoneFromParcelScan(parcel: Record<string, unknown>): string {
+  const fromKeys = formatAssessorPhone(firstStringField(parcel, PHONE_KEY_RX, 7));
+  if (fromKeys) return fromKeys;
+  const us10 = /\b(\d{3})\s*[-.]?\s*(\d{3})\s*[-.]?\s*(\d{4})\b/;
+  for (const v of Object.values(parcel)) {
+    const s = str(v);
+    if (s.length > 96) continue;
+    const m = s.match(us10);
+    if (m) return formatAssessorPhone(m[0]);
+  }
+  return "";
+}
+
+/** When field names omit "email", scan short values for @ addresses. */
+function emailFromParcelScan(parcel: Record<string, unknown>): string {
+  const fromKeys = firstStringField(parcel, EMAIL_KEY_RX, 4).trim();
+  if (fromKeys) return fromKeys;
+  const at = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  for (const v of Object.values(parcel)) {
+    const s = str(v);
+    if (s.length > 160) continue;
+    const m = s.match(at);
+    if (m) return m[0];
+  }
+  return "";
 }
 
 /** Auto-fill fields for PropertyImportPayload from merged parcel / GIS attributes. */
@@ -277,8 +344,8 @@ export function extractParcelAutoFill(parcel: Record<string, unknown> | null): {
     };
   }
   const ownerName = extractOwnerFromParcel(parcel);
-  const ownerPhone = formatAssessorPhone(firstStringField(parcel, PHONE_KEY_RX, 7));
-  const ownerEmail = firstStringField(parcel, EMAIL_KEY_RX, 4).trim();
+  const ownerPhone = phoneFromParcelScan(parcel);
+  const ownerEmail = emailFromParcelScan(parcel);
   const ownerMailingAddress = buildMailingAddress(parcel);
   let areaSqFt = firstNumericField(parcel, SQFT_KEY_RX);
   if (!areaSqFt) {

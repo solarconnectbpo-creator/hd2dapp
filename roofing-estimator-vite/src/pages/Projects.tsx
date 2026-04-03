@@ -10,8 +10,8 @@ export function Projects() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl mb-2 text-gray-900">Projects & Reports</h1>
-        <p className="text-gray-600">View all measurements and project data</p>
+        <h1 className="text-3xl mb-2 text-black">Projects & Reports</h1>
+        <p className="text-black">View all measurements and project data</p>
       </div>
 
       <Tabs defaultValue="all" className="space-y-6">
@@ -26,9 +26,9 @@ export function Projects() {
           {measurements.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
-                <Ruler className="w-16 h-16 text-gray-300 mb-4" />
-                <h3 className="text-xl mb-2 text-gray-900">No measurements yet</h3>
-                <p className="text-gray-600">Create your first measurement to see it here</p>
+                <Ruler className="w-16 h-16 text-black mb-4" />
+                <h3 className="text-xl mb-2 text-black">No measurements yet</h3>
+                <p className="text-black">Create your first measurement to see it here</p>
               </CardContent>
             </Card>
           ) : (
@@ -46,7 +46,7 @@ export function Projects() {
                           {measurement.date}
                         </CardDescription>
                       </div>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      <Badge variant="outline" className="border-gray-200 bg-gray-100 text-black">
                         {measurement.roofMaterial}
                       </Badge>
                     </div>
@@ -54,33 +54,33 @@ export function Projects() {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Dimensions</p>
-                        <p className="text-lg text-gray-900">
+                        <p className="text-sm text-black mb-1">Dimensions</p>
+                        <p className="text-lg text-black">
                           {measurement.length}' × {measurement.width}'
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-black">
                           {(measurement.length * measurement.width).toFixed(0)} sq ft base
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Roof Pitch</p>
-                        <p className="text-lg text-gray-900">{measurement.pitch}/12</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-black mb-1">Roof Pitch</p>
+                        <p className="text-lg text-black">{measurement.pitch}/12</p>
+                        <p className="text-sm text-black">
                           {(Math.atan(measurement.pitch / 12) * (180 / Math.PI)).toFixed(1)}° angle
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Adjusted Area</p>
-                        <p className="text-lg text-gray-900">{measurement.adjustedArea.toFixed(0)} sq ft</p>
-                        <p className="text-sm text-gray-500">+{measurement.wastePercentage}% waste factor</p>
+                        <p className="text-sm text-black mb-1">Adjusted Area</p>
+                        <p className="text-lg text-black">{measurement.adjustedArea.toFixed(0)} sq ft</p>
+                        <p className="text-sm text-black">+{measurement.wastePercentage}% waste factor</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
+                        <p className="text-sm text-black mb-1 flex items-center gap-1">
                           <Layers className="w-4 h-4" />
                           Roofing Squares
                         </p>
-                        <p className="text-2xl text-blue-600">{(measurement.adjustedArea / 100).toFixed(2)}</p>
-                        <p className="text-sm text-gray-500">100 sq ft = 1 square</p>
+                        <p className="text-2xl text-black">{(measurement.adjustedArea / 100).toFixed(2)}</p>
+                        <p className="text-sm text-black">100 sq ft = 1 square</p>
                       </div>
                     </div>
                   </CardContent>
@@ -98,14 +98,14 @@ export function Projects() {
                   <CardDescription>{measurement.date}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-900">
+                  <p className="text-black">
                     Area: {measurement.adjustedArea.toFixed(0)} sq ft ({(measurement.adjustedArea / 100).toFixed(2)} squares)
                   </p>
                 </CardContent>
               </Card>
             ))}
             {measurements.filter((m) => m.roofForm === type).length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No {type} roof measurements</p>
+              <p className="text-center text-black py-8">No {type} roof measurements</p>
             ) : null}
           </TabsContent>
         ))}

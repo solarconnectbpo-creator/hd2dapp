@@ -11,4 +11,10 @@ interface ImportMetaEnv {
   readonly VITE_ARCGIS_API_KEY?: string;
   /** Default Feature layer URL for Canvassing overlay (overrides Contacts setting when set). */
   readonly VITE_ARCGIS_FEATURE_LAYER_URL?: string;
+  /**
+   * Optional override for EagleView TrueDesign base (default: `{VITE_INTEL_API_BASE}/api/eagleview/apicenter`).
+   */
+  readonly VITE_EAGLEVIEW_API_BASE?: string;
+  /** Only with VITE_EAGLEVIEW_API_BASE — direct Bearer from the browser (discouraged). */
+  readonly VITE_EAGLEVIEW_ACCESS_TOKEN?: string;
 }

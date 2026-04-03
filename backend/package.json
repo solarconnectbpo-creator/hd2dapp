@@ -8,19 +8,22 @@
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
     "build": "wrangler build",
+    "preflight:eagleview-embedded": "node scripts/eagleview-embedded-preflight.mjs",
+    "smoke:eagleview-token": "node scripts/eagleview-token-smoke.mjs",
     "report-server": "node server.js",
     "secret:openai:prod": "wrangler secret put OPENAI_API_KEY --config wrangler.toml --env production --from-env OPENAI_API_KEY",
+    "secret:eagleview:prod": "wrangler secret put EAGLEVIEW_CLIENT_ID --config wrangler.toml --env production && wrangler secret put EAGLEVIEW_CLIENT_SECRET --config wrangler.toml --env production",
     "deploy:prod": "wrangler deploy --config wrangler.toml --env production"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "openai": "^4.28.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.0"
   },
   "devDependencies": {
-    "wrangler": "^3.29.0",
     "@cloudflare/workers-types": "^4.20240620.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "wrangler": "^4.80.0"
   }
 }

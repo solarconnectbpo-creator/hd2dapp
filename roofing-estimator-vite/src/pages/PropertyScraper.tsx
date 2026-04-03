@@ -566,8 +566,8 @@ export function PropertyScraper() {
 
   const sendToMeasurement = useCallback(() => {
     if (!preview) return;
-    stashPendingPropertyImport(preview);
-    navigate("/measurement/new");
+    stashPendingPropertyImport(preview, { autoEstimate: true, importFootprint: true });
+    navigate("/measurement/new?auto=1");
   }, [navigate, preview]);
 
   const onDownloadCampaignCsv = useCallback(() => {
@@ -712,7 +712,7 @@ export function PropertyScraper() {
           <strong>FastPeopleSearch</strong> (
           <a
             href="https://www.fastpeoplesearch.com/?lang=en"
-            className="text-blue-600 underline"
+            className="text-black underline"
             target="_blank"
             rel="noreferrer"
           >
@@ -783,7 +783,7 @@ export function PropertyScraper() {
                 <code className="text-xs bg-white px-1 rounded">VITE_BATCHDATA_API_KEY</code>). For{" "}
               <a
                 href={FAST_PEOPLE_SEARCH_HOME_LANG_EN}
-                className="underline text-blue-700"
+                className="underline text-black"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -1150,7 +1150,7 @@ export function PropertyScraper() {
             <p className="text-xs text-neutral-700">
               <strong>FastPeopleSearch</strong> (manual): open{" "}
               <a
-                className="text-blue-600 underline"
+                className="text-black underline"
                 href={FAST_PEOPLE_SEARCH_HOME_LANG_EN}
                 target="_blank"
                 rel="noreferrer noopener"

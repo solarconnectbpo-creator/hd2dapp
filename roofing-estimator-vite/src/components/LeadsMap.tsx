@@ -1,24 +1,9 @@
-import { useEffect, useMemo } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ContactRecord } from "../lib/contactsCsv";
-
-// Default marker icons break under bundlers; fix paths.
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-const DefaultIcon = L.icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+import { loadEmbeddedExplorerScript, type EmbeddedExplorerMapHandle } from "../lib/embeddedExplorer";
+import { getEagleViewEmbeddedAuthToken } from "../lib/eagleViewEmbeddedAuth";
+import { useMapProvider } from "../lib/useMapProvider";
+import { FallbackMap, type FallbackMapPoint } from "./FallbackMap";
 
 type Props = {
   contacts: ContactRecord[];
@@ -27,81 +12,250 @@ type Props = {
   onOpenContact?: (id: string) => void;
 };
 
-function FitBounds({ points }: { points: [number, number][] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (points.length === 0) return;
-    if (points.length === 1) {
-      map.setView(points[0], 14);
-      return;
-    }
-    const b = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
-    map.fitBounds(b, { padding: [40, 40], maxZoom: 16 });
-  }, [map, points]);
-  return null;
-}
-
 export function LeadsMap({ contacts, selectedId, onSelectContact, onOpenContact }: Props) {
+  const mapProvider = useMapProvider();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<EmbeddedExplorerMapHandle | null>(null);
+  const withCoordsRef = useRef<ContactRecord[]>([]);
+  const [eeReady, setEeReady] = useState(false);
+  const [mapError, setMapError] = useState("");
+  const [eeId] = useState(() =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? `ee-leads-${crypto.randomUUID().replace(/-/g, "")}`
+      : `ee-leads-${Date.now()}`,
+  );
+
   const withCoords = useMemo(
-    () => contacts.filter((c) => typeof c.lat === "number" && typeof c.lng === "number" && !Number.isNaN(c.lat) && !Number.isNaN(c.lng)),
+    () =>
+      contacts.filter(
+        (c) => typeof c.lat === "number" && typeof c.lng === "number" && !Number.isNaN(c.lat) && !Number.isNaN(c.lng),
+      ),
     [contacts],
   );
+  withCoordsRef.current = withCoords;
+
   const points = useMemo(() => withCoords.map((c) => [c.lat!, c.lng!] as [number, number]), [withCoords]);
-  const center: [number, number] = points[0] ?? [39.8283, -98.5795];
+
+  const onSelectRef = useRef(onSelectContact);
+  useEffect(() => {
+    onSelectRef.current = onSelectContact;
+  }, [onSelectContact]);
+
+  useLayoutEffect(() => {
+    if (mapProvider !== "eagleview") return;
+    if (!containerRef.current) return;
+    if (mapRef.current) return;
+
+    let disposed = false;
+    const el = containerRef.current;
+    el.id = eeId;
+    setMapError("");
+
+    void (async () => {
+      try {
+        await loadEmbeddedExplorerScript();
+        if (disposed || !containerRef.current) return;
+        const Ev = window.ev?.EmbeddedExplorer;
+        if (!Ev) return;
+
+        const wc = withCoordsRef.current;
+        const lat = wc[0]?.lat ?? 39.8283;
+        const lon = wc[0]?.lng ?? -98.5795;
+        const authToken = await getEagleViewEmbeddedAuthToken();
+        const map = new Ev().mount(eeId, {
+          authToken,
+          view: { lonLat: { lon, lat, z: wc.length <= 1 ? 15 : 5 } },
+        }) as EmbeddedExplorerMapHandle;
+        mapRef.current = map;
+
+        let once = false;
+        const ready = () => {
+          if (disposed || once) return;
+          once = true;
+          try {
+            map.enableMeasurementPanel(false);
+            map.enableSearchBar(true);
+          } catch {
+            /* ignore */
+          }
+          setEeReady(true);
+        };
+
+        map.on("onMapReady", ready);
+        map.on("featureClick", (raw: unknown) => {
+          const arr = Array.isArray(raw) ? raw : [];
+          for (const item of arr) {
+            const props = (item as GeoJSON.Feature).properties as Record<string, unknown> | undefined;
+            if (props?.["__leadsMap"] != null && props["id"] != null) {
+              onSelectRef.current(String(props["id"]));
+              return;
+            }
+          }
+        });
+        map.on("Errors", (err: unknown) => {
+          console.error("LeadsMap EagleView:", err);
+        });
+        window.setTimeout(() => {
+          if (!disposed && !once) ready();
+        }, 2500);
+      } catch (e) {
+        setMapError(e instanceof Error ? e.message : "Could not start EagleView map.");
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      setEeReady(false);
+      try {
+        mapRef.current?.off?.("onMapReady");
+        mapRef.current?.off?.("featureClick");
+        mapRef.current?.off?.("Errors");
+      } catch {
+        /* ignore */
+      }
+      mapRef.current = null;
+      el.innerHTML = "";
+      el.removeAttribute("id");
+    };
+  }, [eeId, mapProvider]);
+
+  useEffect(() => {
+    if (mapProvider !== "eagleview") return;
+    const map = mapRef.current;
+    if (!map?.addFeatures || !eeReady) return;
+    try {
+      map.removeFeatures?.({
+        geoJson: (f) => Boolean((f.properties as Record<string, unknown> | undefined)?.__leadsMap),
+      });
+    } catch {
+      /* ignore */
+    }
+    const feats: GeoJSON.Feature[] = withCoords.map((c) => ({
+      type: "Feature",
+      properties: {
+        __leadsMap: true,
+        id: c.id,
+        name: c.name || "Lead",
+        selected: c.id === selectedId,
+      },
+      geometry: { type: "Point", coordinates: [c.lng!, c.lat!] },
+    }));
+    if (feats.length) map.addFeatures({ geoJson: feats });
+
+    if (points.length === 1) {
+      map.setLonLat?.({ lat: points[0][0], lon: points[0][1], z: 16 });
+    } else if (points.length > 1) {
+      const avgLat = points.reduce((s, p) => s + p[0], 0) / points.length;
+      const avgLon = points.reduce((s, p) => s + p[1], 0) / points.length;
+      map.setLonLat?.({ lat: avgLat, lon: avgLon, z: 6 });
+    }
+  }, [withCoords, points, eeReady, selectedId, mapProvider]);
+
+  const osmPoints = useMemo<FallbackMapPoint[]>(
+    () =>
+      withCoords.map((c) => ({
+        id: c.id,
+        lat: c.lat!,
+        lng: c.lng!,
+        label: c.name || "Lead",
+      })),
+    [withCoords],
+  );
+
+  const osmCenter = useMemo(() => {
+    if (!withCoords.length) return { lat: 39.8283, lng: -98.5795 };
+    const avgLat = withCoords.reduce((s, c) => s + c.lat!, 0) / withCoords.length;
+    const avgLng = withCoords.reduce((s, c) => s + c.lng!, 0) / withCoords.length;
+    return { lat: avgLat, lng: avgLng };
+  }, [withCoords]);
+
+  const handleOsmPointClick = useCallback(
+    (id: string) => onSelectContact(id),
+    [onSelectContact],
+  );
+
+  if (mapProvider === "checking") {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-black">
+        Loading map...
+      </div>
+    );
+  }
 
   if (withCoords.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-black">
         No leads with map coordinates yet. Use &quot;Geocode addresses&quot; or ensure CSV includes latitude/longitude columns.
+      </div>
+    );
+  }
+
+  const selected = selectedId ? withCoords.find((c) => c.id === selectedId) : null;
+
+  if (mapProvider === "osm-fallback") {
+    return (
+      <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
+        <FallbackMap
+          center={osmCenter}
+          zoom={withCoords.length <= 1 ? 15 : 5}
+          points={osmPoints}
+          height={380}
+          enableGps
+          onPointClick={handleOsmPointClick}
+        />
+        {selected ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2 text-sm text-black">
+            <div className="min-w-0">
+              <div className="font-semibold truncate">{selected.name || "Lead"}</div>
+              <div className="text-xs text-slate-600 truncate">
+                {[selected.address, selected.city, selected.state, selected.zip].filter(Boolean).join(", ")}
+              </div>
+            </div>
+            {onOpenContact ? (
+              <button
+                type="button"
+                className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-black hover:bg-slate-50"
+                onClick={() => onOpenContact(selected.id)}
+              >
+                Open in estimator
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (mapError) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-black">
+        Leads map unavailable: {mapError}
       </div>
     );
   }
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
-      <MapContainer center={center} zoom={points.length === 1 ? 14 : 4} style={{ height: 380, width: "100%" }} scrollWheelZoom>
-        <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <FitBounds points={points} />
-        {withCoords.map((c) => (
-          <Marker
-            key={c.id}
-            position={[c.lat!, c.lng!]}
-            eventHandlers={{
-              click: () => onSelectContact(c.id),
-            }}
-            opacity={selectedId === c.id ? 1 : 0.85}
-          >
-            <Popup>
-              <div className="min-w-[200px] text-sm">
-                <div className="font-semibold text-slate-900">{c.name || "Lead"}</div>
-                {(c.address || c.city) && (
-                  <div className="mt-1 text-slate-600">
-                    {[c.address, c.city, c.state, c.zip].filter(Boolean).join(", ")}
-                  </div>
-                )}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="rounded bg-slate-900 px-2 py-1 text-xs text-white"
-                    onClick={() => onSelectContact(c.id)}
-                  >
-                    Select
-                  </button>
-                  {onOpenContact && (
-                    <button
-                      type="button"
-                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800"
-                      onClick={() => onOpenContact(c.id)}
-                    >
-                      Open in estimator
-                    </button>
-                  )}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      <div ref={containerRef} style={{ height: 380, width: "100%" }} />
+      {selected ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2 text-sm text-black">
+          <div className="min-w-0">
+            <div className="font-semibold truncate">{selected.name || "Lead"}</div>
+            <div className="text-xs text-slate-600 truncate">
+              {[selected.address, selected.city, selected.state, selected.zip].filter(Boolean).join(", ")}
+            </div>
+          </div>
+          {onOpenContact ? (
+            <button
+              type="button"
+              className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-black hover:bg-slate-50"
+              onClick={() => onOpenContact(selected.id)}
+            >
+              Open in estimator
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

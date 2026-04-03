@@ -1,0 +1,2849 @@
+{
+  "sourceWorkbook": "C:\\Users\\sethk\\OneDrive\\Desktop\\AIcheatsheet_f69bb308.xlsx",
+  "importedAtIso": "2026-03-31T19:54:48.341Z",
+  "priceList": "MOSL8X_OCT25",
+  "sheets": {
+    "TPO": [
+      {
+        "description": "Additional charge – steep slope (4:12 to 6:12 pitch)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (7:12 to 9:12 pitch)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 32,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (10:12 and above)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 55,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (2 stories / 16-20 ft)",
+        "unit": "SQ",
+        "remove": 8.1,
+        "replace": 8.1,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (3 stories / 21-30 ft)",
+        "unit": "SQ",
+        "remove": 15.5,
+        "replace": 15.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (4+ stories / 31+ ft)",
+        "unit": "SQ",
+        "remove": 24,
+        "replace": 24,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Rooftop equipment / HVAC obstruction surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Confined space / limited access surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 22,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Prepare deck for new membrane – clean & prime",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.25,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 1/2\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 4.85,
+        "tax": 0.38,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 5/8\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 5.45,
+        "tax": 0.42,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – OSB 7/16\"",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 3.95,
+        "tax": 0.31,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – OSB 5/8\"",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 4.55,
+        "tax": 0.36,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – pressure treated 2x6",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.75,
+        "tax": 0.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – pressure treated 2x8",
+        "unit": "LF",
+        "remove": null,
+        "replace": 10.5,
+        "tax": 0.78,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof deck primer – galvanized metal",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 24,
+        "tax": 1.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Structural concrete deck repair – per SF",
+        "unit": "SF",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) insulation – 1\" (R-6)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.25,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) insulation – 1.5\" (R-9)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 118,
+        "tax": 9,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) insulation – 2\" (R-12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 142,
+        "tax": 10.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) insulation – 2.5\" (R-15)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 168,
+        "tax": 12.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) insulation – 3\" (R-18)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.9,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) insulation – 3.5\" (R-21)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 218,
+        "tax": 16.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Tapered Polyiso insulation – crickets/saddles (avg depth)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 245,
+        "tax": 18.75,
+        "oAndP": 0
+      },
+      {
+        "description": "EPS (Expanded Polystyrene) insulation – 2\"",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 88,
+        "tax": 6.75,
+        "oAndP": 0
+      },
+      {
+        "description": "EPS insulation – 4\"",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 145,
+        "tax": 11.1,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" HD polyiso (cover board / recovery board)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 65,
+        "tax": 4.97,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" glass mat gypsum (DensDeck)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 78,
+        "tax": 5.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" perlite board",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 58,
+        "tax": 4.43,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 45-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 285,
+        "tax": 21.78,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 45-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 340,
+        "tax": 25.99,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 45-mil – induction welded (RhinoBond/OMG)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 315,
+        "tax": 24.08,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 45-mil – ballasted",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 265,
+        "tax": 20.27,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 60-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 345,
+        "tax": 26.37,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 60-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 415,
+        "tax": 31.72,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 60-mil – induction welded (RhinoBond/OMG)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 385,
+        "tax": 29.43,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 60-mil – ballasted",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 320,
+        "tax": 24.47,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 80-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 445,
+        "tax": 34.02,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 80-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 525,
+        "tax": 40.14,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 80-mil – induction welded",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 495,
+        "tax": 37.85,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 90-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 520,
+        "tax": 39.77,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 90-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 615,
+        "tax": 47.02,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO membrane 90-mil – induction welded",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 580,
+        "tax": 44.35,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO flashing – base flashing at walls/parapets",
+        "unit": "LF",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO flashing – inside corner",
+        "unit": "EA",
+        "remove": null,
+        "replace": 42,
+        "tax": 3.21,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO flashing – outside corner",
+        "unit": "EA",
+        "remove": null,
+        "replace": 42,
+        "tax": 3.21,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO flashing – T-joint patch",
+        "unit": "EA",
+        "remove": null,
+        "replace": 28.5,
+        "tax": 2.18,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO pipe boot – standard (1\"-3\" pipe)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.26,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO pipe boot – large (4\"-6\" pipe)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 135,
+        "tax": 10.32,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO pitch pocket / pipe jack – fabricated",
+        "unit": "EA",
+        "remove": null,
+        "replace": 185,
+        "tax": 14.14,
+        "oAndP": 0
+      },
+      {
+        "description": "TPO walkway pads (per LF of walkway)",
+        "unit": "LF",
+        "remove": null,
+        "replace": 22,
+        "tax": 1.68,
+        "oAndP": 0
+      },
+      {
+        "description": "Termination bar – aluminum (membrane termination)",
+        "unit": "LF",
+        "remove": null,
+        "replace": 5.85,
+        "tax": 0.45,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 12\" wide",
+        "unit": "LF",
+        "remove": null,
+        "replace": 28.5,
+        "tax": 2.18,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 18\" wide",
+        "unit": "LF",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 24\" wide",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 4\" face",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 6\" face",
+        "unit": "LF",
+        "remove": null,
+        "replace": 16.75,
+        "tax": 1.28,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof drain replacement – 4\" cast iron",
+        "unit": "EA",
+        "remove": null,
+        "replace": 485,
+        "tax": 37.1,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof drain replacement – 6\" cast iron",
+        "unit": "EA",
+        "remove": null,
+        "replace": 625,
+        "tax": 47.79,
+        "oAndP": 0
+      },
+      {
+        "description": "Overflow drain / scupper – fabricated",
+        "unit": "EA",
+        "remove": null,
+        "replace": 285,
+        "tax": 21.8,
+        "oAndP": 0
+      },
+      {
+        "description": "Equipment curb flashing – HVAC unit (per curb)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 325,
+        "tax": 24.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Skylight flashing – TPO (per unit)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 245,
+        "tax": 18.74,
+        "oAndP": 0
+      },
+      {
+        "description": "Expansion joint cover – preformed",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "Ballast – washed river stone (for ballasted systems)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 85,
+        "tax": 6.5,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 5\"",
+        "unit": "LF",
+        "remove": 0.65,
+        "replace": 10.85,
+        "tax": 0.83,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 6\"",
+        "unit": "LF",
+        "remove": 0.78,
+        "replace": 12.77,
+        "tax": 0.98,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 7\" K-style commercial",
+        "unit": "LF",
+        "remove": 0.95,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Downspout – round aluminum – 4\"",
+        "unit": "LF",
+        "remove": 0.55,
+        "replace": 8.25,
+        "tax": 0.63,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Downspout – round aluminum – 6\"",
+        "unit": "LF",
+        "remove": 0.75,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Gutter guard / screen",
+        "unit": "LF",
+        "remove": 0.57,
+        "replace": 3.86,
+        "tax": 0.3,
+        "oAndP": 0
+      },
+      {
+        "description": "Two ladders with jacks and plank (per day)",
+        "unit": "DA",
+        "remove": null,
+        "replace": 135.74,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Soffit & Fascia installer – per hour (ladder jack setup)",
+        "unit": "HR",
+        "remove": null,
+        "replace": 101.53,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Telehandler / forklift and operator",
+        "unit": "HR",
+        "remove": null,
+        "replace": 156.3,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Crane – boom truck (material lift to roof)",
+        "unit": "HR",
+        "remove": null,
+        "replace": 285,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Residential / commercial supervision – per hour",
+        "unit": "HR",
+        "remove": null,
+        "replace": 78.52,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Safety: fall protection system setup",
+        "unit": "EA",
+        "remove": null,
+        "replace": 385,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Temporary waterproofing / tarp during installation",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 2.14,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof moisture survey / infrared scan",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 0.85,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Permit fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 296,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Engineering fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 4056,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Taxes, insurance, permits & fees",
+        "unit": "EA",
+        "remove": null,
+        "replace": 296,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Material only – plywood sheathing 1/2\" CDX (staging/driveway protection)",
+        "unit": "SF",
+        "remove": null,
+        "replace": 0.89,
+        "tax": 0.08615,
+        "oAndP": 0
+      },
+      {
+        "description": "Final cleaning – construction – commercial",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 4.5,
+        "tax": 0,
+        "oAndP": 0
+      }
+    ],
+    "Modified Bitumen": [
+      {
+        "description": "Additional charge – steep slope (4:12 to 6:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (7:12 to 9:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 32,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (10:12 and above)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 55,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (2 stories / 16-20 ft)",
+        "unit": "SQ",
+        "remove": 8.1,
+        "replace": 8.1,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (3 stories / 21-30 ft)",
+        "unit": "SQ",
+        "remove": 15.5,
+        "replace": 15.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (4+ stories / 31+ ft)",
+        "unit": "SQ",
+        "remove": 24,
+        "replace": 24,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Rooftop equipment / HVAC obstruction surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Confined space / limited access surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 22,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Torch-applied fire watch surcharge (hot work permit areas)",
+        "unit": "HR",
+        "remove": null,
+        "replace": 85,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Prepare deck – clean & prime for mod bit",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 1/2\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 4.85,
+        "tax": 0.38,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 5/8\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 5.45,
+        "tax": 0.42,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – OSB 7/16\"",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 3.95,
+        "tax": 0.31,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – PT 2x6",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.75,
+        "tax": 0.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – PT 2x8",
+        "unit": "LF",
+        "remove": null,
+        "replace": 10.5,
+        "tax": 0.78,
+        "oAndP": 0
+      },
+      {
+        "description": "Base sheet – glass mat (mechanically fastened)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 55,
+        "tax": 4.21,
+        "oAndP": 0
+      },
+      {
+        "description": "Base sheet – polyester (mechanically fastened)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 62,
+        "tax": 4.74,
+        "oAndP": 0
+      },
+      {
+        "description": "Base sheet – #43 organic felt (hot mopped)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 45,
+        "tax": 3.44,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 1\" (R-6)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.25,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 1.5\" (R-9)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 118,
+        "tax": 9,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 2\" (R-12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 142,
+        "tax": 10.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 2.5\" (R-15)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 168,
+        "tax": 12.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 3\" (R-18)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.9,
+        "oAndP": 0
+      },
+      {
+        "description": "Tapered Polyiso – crickets/saddles",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 245,
+        "tax": 18.75,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" HD polyiso",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 65,
+        "tax": 4.97,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" DensDeck (glass mat gypsum)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 78,
+        "tax": 5.96,
+        "oAndP": 0
+      },
+      {
+        "description": "APP Modified Bitumen – torch-applied base ply (smooth)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 145,
+        "tax": 11.09,
+        "oAndP": 0
+      },
+      {
+        "description": "APP Modified Bitumen – torch-applied cap sheet – granulated",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.91,
+        "oAndP": 0
+      },
+      {
+        "description": "APP Modified Bitumen – torch-applied 2-ply system (base + cap)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 335,
+        "tax": 25.62,
+        "oAndP": 0
+      },
+      {
+        "description": "APP Modified Bitumen – torch-applied cap sheet – aluminum faced",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 215,
+        "tax": 16.44,
+        "oAndP": 0
+      },
+      {
+        "description": "APP Modified Bitumen – torch-applied cap sheet – white granule (cool roof)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 225,
+        "tax": 17.21,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – self-adhered base sheet",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 138,
+        "tax": 10.55,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – self-adhered cap sheet – granulated",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 188,
+        "tax": 14.37,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – self-adhered 2-ply system (base + cap)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 320,
+        "tax": 24.47,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – cold adhesive / mopping asphalt",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 42,
+        "tax": 3.21,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – heat-welded base ply",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 150,
+        "tax": 11.47,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – heat-welded cap sheet – granulated",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 198,
+        "tax": 15.14,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – heat-welded 2-ply system",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 342,
+        "tax": 26.15,
+        "oAndP": 0
+      },
+      {
+        "description": "SBS Modified Bitumen – heat-welded cap – aluminum faced reflective",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 218,
+        "tax": 16.67,
+        "oAndP": 0
+      },
+      {
+        "description": "Mod bit base flashing – walls/parapets",
+        "unit": "LF",
+        "remove": null,
+        "replace": 22.5,
+        "tax": 1.72,
+        "oAndP": 0
+      },
+      {
+        "description": "Mod bit inside corner strip",
+        "unit": "EA",
+        "remove": null,
+        "replace": 48,
+        "tax": 3.67,
+        "oAndP": 0
+      },
+      {
+        "description": "Mod bit outside corner strip",
+        "unit": "EA",
+        "remove": null,
+        "replace": 48,
+        "tax": 3.67,
+        "oAndP": 0
+      },
+      {
+        "description": "Pipe boot / pipe flashing – standard",
+        "unit": "EA",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.26,
+        "oAndP": 0
+      },
+      {
+        "description": "Pipe boot / pipe flashing – large",
+        "unit": "EA",
+        "remove": null,
+        "replace": 135,
+        "tax": 10.32,
+        "oAndP": 0
+      },
+      {
+        "description": "Pitch pocket – lead/aluminum fabricated",
+        "unit": "EA",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.91,
+        "oAndP": 0
+      },
+      {
+        "description": "HVAC equipment curb flashing",
+        "unit": "EA",
+        "remove": null,
+        "replace": 325,
+        "tax": 24.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 12\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 28.5,
+        "tax": 2.18,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 18\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 24\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 4\" face",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 6\" face",
+        "unit": "LF",
+        "remove": null,
+        "replace": 16.75,
+        "tax": 1.28,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof drain replacement – 4\" cast iron",
+        "unit": "EA",
+        "remove": null,
+        "replace": 485,
+        "tax": 37.1,
+        "oAndP": 0
+      },
+      {
+        "description": "Overflow drain / scupper",
+        "unit": "EA",
+        "remove": null,
+        "replace": 285,
+        "tax": 21.8,
+        "oAndP": 0
+      },
+      {
+        "description": "Termination bar – aluminum",
+        "unit": "LF",
+        "remove": null,
+        "replace": 5.85,
+        "tax": 0.45,
+        "oAndP": 0
+      },
+      {
+        "description": "Walkway pads – granulated surface",
+        "unit": "LF",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "Expansion joint cover – preformed",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 5\"",
+        "unit": "LF",
+        "remove": 0.65,
+        "replace": 10.85,
+        "tax": 0.83,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 6\"",
+        "unit": "LF",
+        "remove": 0.78,
+        "replace": 12.77,
+        "tax": 0.98,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 7\" K-style commercial",
+        "unit": "LF",
+        "remove": 0.95,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "Two ladders with jacks and plank (per day)",
+        "unit": "DA",
+        "remove": null,
+        "replace": 135.74,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Soffit & Fascia installer – per hour",
+        "unit": "HR",
+        "remove": null,
+        "replace": 101.53,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Telehandler / forklift and operator",
+        "unit": "HR",
+        "remove": null,
+        "replace": 156.3,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Commercial supervision / project management – per hour",
+        "unit": "HR",
+        "remove": null,
+        "replace": 78.52,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Safety: fall protection system setup",
+        "unit": "EA",
+        "remove": null,
+        "replace": 385,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Hot work permit fee",
+        "unit": "EA",
+        "remove": null,
+        "replace": 125,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Temporary waterproofing / tarp during installation",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 2.14,
+        "oAndP": 0
+      },
+      {
+        "description": "Permit fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 296,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Engineering fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 4056,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Final cleaning – construction – commercial",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 4.5,
+        "tax": 0,
+        "oAndP": 0
+      }
+    ],
+    "EPDM": [
+      {
+        "description": "Additional charge – steep slope (4:12 to 6:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (7:12 to 9:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 32,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (10:12 and above)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 55,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (2 stories / 16-20 ft)",
+        "unit": "SQ",
+        "remove": 8.1,
+        "replace": 8.1,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (3 stories / 21-30 ft)",
+        "unit": "SQ",
+        "remove": 15.5,
+        "replace": 15.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (4+ stories / 31+ ft)",
+        "unit": "SQ",
+        "remove": 24,
+        "replace": 24,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Rooftop equipment / HVAC obstruction surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Confined space / limited access surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 22,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Prepare deck – clean & prime for EPDM",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 1/2\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 4.85,
+        "tax": 0.38,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 5/8\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 5.45,
+        "tax": 0.42,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – OSB 7/16\"",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 3.95,
+        "tax": 0.31,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – PT 2x6",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.75,
+        "tax": 0.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – PT 2x8",
+        "unit": "LF",
+        "remove": null,
+        "replace": 10.5,
+        "tax": 0.78,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 1\" (R-6)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.25,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 1.5\" (R-9)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 118,
+        "tax": 9,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 2\" (R-12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 142,
+        "tax": 10.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 2.5\" (R-15)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 168,
+        "tax": 12.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 3\" (R-18)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.9,
+        "oAndP": 0
+      },
+      {
+        "description": "Tapered Polyiso – crickets / saddles",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 245,
+        "tax": 18.75,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" HD polyiso",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 65,
+        "tax": 4.97,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" DensDeck (glass mat gypsum)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 78,
+        "tax": 5.96,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 45-mil – fully adhered (bonded adhesive)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 295,
+        "tax": 22.57,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 45-mil – mechanically attached",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 265,
+        "tax": 20.27,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 45-mil – ballasted",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 235,
+        "tax": 17.97,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 60-mil – fully adhered (bonded adhesive)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 365,
+        "tax": 27.91,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 60-mil – mechanically attached",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 328,
+        "tax": 25.08,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 60-mil – ballasted",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 298,
+        "tax": 22.79,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 90-mil – fully adhered (bonded adhesive)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 485,
+        "tax": 37.1,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 90-mil – mechanically attached",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 435,
+        "tax": 33.27,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM 90-mil – ballasted",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 398,
+        "tax": 30.44,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM base flashing – walls / parapets",
+        "unit": "LF",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM inside corner piece",
+        "unit": "EA",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM outside corner piece",
+        "unit": "EA",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM pipe boot – standard (1\"-3\" pipe)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 88,
+        "tax": 6.73,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM pipe boot – large (4\"-6\" pipe)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 125,
+        "tax": 9.56,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM pitch pocket – fabricated",
+        "unit": "EA",
+        "remove": null,
+        "replace": 185,
+        "tax": 14.14,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM seam tape (for splices)",
+        "unit": "LF",
+        "remove": null,
+        "replace": 4.25,
+        "tax": 0.33,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM lap sealant",
+        "unit": "LF",
+        "remove": null,
+        "replace": 2.85,
+        "tax": 0.22,
+        "oAndP": 0
+      },
+      {
+        "description": "EPDM walkway pads",
+        "unit": "LF",
+        "remove": null,
+        "replace": 22,
+        "tax": 1.68,
+        "oAndP": 0
+      },
+      {
+        "description": "Termination bar – aluminum",
+        "unit": "LF",
+        "remove": null,
+        "replace": 5.85,
+        "tax": 0.45,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 12\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 28.5,
+        "tax": 2.18,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 18\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 24\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 4\" face",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 6\" face",
+        "unit": "LF",
+        "remove": null,
+        "replace": 16.75,
+        "tax": 1.28,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof drain replacement – 4\" cast iron",
+        "unit": "EA",
+        "remove": null,
+        "replace": 485,
+        "tax": 37.1,
+        "oAndP": 0
+      },
+      {
+        "description": "Overflow drain / scupper",
+        "unit": "EA",
+        "remove": null,
+        "replace": 285,
+        "tax": 21.8,
+        "oAndP": 0
+      },
+      {
+        "description": "HVAC equipment curb flashing",
+        "unit": "EA",
+        "remove": null,
+        "replace": 325,
+        "tax": 24.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Ballast – washed river stone (ballasted systems only)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 85,
+        "tax": 6.5,
+        "oAndP": 0
+      },
+      {
+        "description": "Expansion joint cover – preformed",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 5\"",
+        "unit": "LF",
+        "remove": 0.65,
+        "replace": 10.85,
+        "tax": 0.83,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 6\"",
+        "unit": "LF",
+        "remove": 0.78,
+        "replace": 12.77,
+        "tax": 0.98,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 7\" commercial",
+        "unit": "LF",
+        "remove": 0.95,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "Two ladders with jacks and plank (per day)",
+        "unit": "DA",
+        "remove": null,
+        "replace": 135.74,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Soffit & Fascia installer – per hour",
+        "unit": "HR",
+        "remove": null,
+        "replace": 101.53,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Telehandler / forklift and operator",
+        "unit": "HR",
+        "remove": null,
+        "replace": 156.3,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Commercial supervision / project management – per hour",
+        "unit": "HR",
+        "remove": null,
+        "replace": 78.52,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Safety: fall protection system setup",
+        "unit": "EA",
+        "remove": null,
+        "replace": 385,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Temporary waterproofing / tarp during installation",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 2.14,
+        "oAndP": 0
+      },
+      {
+        "description": "Permit fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 296,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Engineering fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 4056,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Final cleaning – construction – commercial",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 4.5,
+        "tax": 0,
+        "oAndP": 0
+      }
+    ],
+    "PVC": [
+      {
+        "description": "Additional charge – steep slope (4:12 to 6:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (7:12 to 9:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 32,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope (10:12 and above)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 55,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (2 stories / 16-20 ft)",
+        "unit": "SQ",
+        "remove": 8.1,
+        "replace": 8.1,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (3 stories / 21-30 ft)",
+        "unit": "SQ",
+        "remove": 15.5,
+        "replace": 15.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (4+ stories / 31+ ft)",
+        "unit": "SQ",
+        "remove": 24,
+        "replace": 24,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Rooftop equipment / HVAC obstruction surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Confined space / limited access surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 22,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Prepare deck – clean & prime for PVC",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 1/2\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 4.85,
+        "tax": 0.38,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Roof deck sheathing – plywood 5/8\" CDX",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 5.45,
+        "tax": 0.42,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – PT 2x6",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.75,
+        "tax": 0.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Wood nailer / blocking – PT 2x8",
+        "unit": "LF",
+        "remove": null,
+        "replace": 10.5,
+        "tax": 0.78,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof deck primer – galvanized metal deck",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 24,
+        "tax": 1.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 1\" (R-6)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.25,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 1.5\" (R-9)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 118,
+        "tax": 9,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 2\" (R-12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 142,
+        "tax": 10.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 2.5\" (R-15)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 168,
+        "tax": 12.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyisocyanurate (Polyiso) – 3\" (R-18)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.9,
+        "oAndP": 0
+      },
+      {
+        "description": "Tapered Polyiso – crickets / saddles",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 245,
+        "tax": 18.75,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" HD polyiso",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 65,
+        "tax": 4.97,
+        "oAndP": 0
+      },
+      {
+        "description": "Coverboard – 1/2\" DensDeck (glass mat gypsum)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 78,
+        "tax": 5.96,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 40-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 310,
+        "tax": 23.71,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 40-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 375,
+        "tax": 28.68,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 50-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 365,
+        "tax": 27.91,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 50-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 435,
+        "tax": 33.27,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 50-mil – heat-welded seams (standard)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 395,
+        "tax": 30.21,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 60-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 425,
+        "tax": 32.5,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 60-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 505,
+        "tax": 38.63,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 60-mil – heat-welded seams",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 465,
+        "tax": 35.56,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 80-mil – mechanically attached (MA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 545,
+        "tax": 41.68,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 80-mil – fully adhered (FA)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 635,
+        "tax": 48.57,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC membrane 80-mil – heat-welded seams",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 595,
+        "tax": 45.51,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC base flashing – walls / parapets",
+        "unit": "LF",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC inside corner piece",
+        "unit": "EA",
+        "remove": null,
+        "replace": 42,
+        "tax": 3.21,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC outside corner piece",
+        "unit": "EA",
+        "remove": null,
+        "replace": 42,
+        "tax": 3.21,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC pipe boot – standard (1\"-3\" pipe)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 98,
+        "tax": 7.49,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC pipe boot – large (4\"-6\" pipe)",
+        "unit": "EA",
+        "remove": null,
+        "replace": 138,
+        "tax": 10.56,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC pitch pocket – fabricated",
+        "unit": "EA",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.91,
+        "oAndP": 0
+      },
+      {
+        "description": "PVC walkway pads",
+        "unit": "LF",
+        "remove": null,
+        "replace": 22,
+        "tax": 1.68,
+        "oAndP": 0
+      },
+      {
+        "description": "Termination bar – aluminum",
+        "unit": "LF",
+        "remove": null,
+        "replace": 5.85,
+        "tax": 0.45,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 12\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 28.5,
+        "tax": 2.18,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 18\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 24\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 4\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal gravel stop / edge metal – 6\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 16.75,
+        "tax": 1.28,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof drain replacement – 4\" cast iron",
+        "unit": "EA",
+        "remove": null,
+        "replace": 485,
+        "tax": 37.1,
+        "oAndP": 0
+      },
+      {
+        "description": "Overflow drain / scupper",
+        "unit": "EA",
+        "remove": null,
+        "replace": 285,
+        "tax": 21.8,
+        "oAndP": 0
+      },
+      {
+        "description": "HVAC equipment curb flashing",
+        "unit": "EA",
+        "remove": null,
+        "replace": 325,
+        "tax": 24.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Expansion joint cover – preformed",
+        "unit": "LF",
+        "remove": null,
+        "replace": 48.5,
+        "tax": 3.71,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 5\"",
+        "unit": "LF",
+        "remove": 0.65,
+        "replace": 10.85,
+        "tax": 0.83,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 6\"",
+        "unit": "LF",
+        "remove": 0.78,
+        "replace": 12.77,
+        "tax": 0.98,
+        "oAndP": 0
+      },
+      {
+        "description": "R&R Gutter / downspout – aluminum – 7\" commercial",
+        "unit": "LF",
+        "remove": 0.95,
+        "replace": 18.5,
+        "tax": 1.41,
+        "oAndP": 0
+      },
+      {
+        "description": "Two ladders with jacks and plank (per day)",
+        "unit": "DA",
+        "remove": null,
+        "replace": 135.74,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Soffit & Fascia installer – per hour",
+        "unit": "HR",
+        "remove": null,
+        "replace": 101.53,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Telehandler / forklift and operator",
+        "unit": "HR",
+        "remove": null,
+        "replace": 156.3,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Commercial supervision / project management",
+        "unit": "HR",
+        "remove": null,
+        "replace": 78.52,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Safety: fall protection system setup",
+        "unit": "EA",
+        "remove": null,
+        "replace": 385,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Temporary waterproofing / tarp during installation",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 2.14,
+        "oAndP": 0
+      },
+      {
+        "description": "Permit fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 296,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Engineering fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 4056,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Final cleaning – construction – commercial",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 4.5,
+        "tax": 0,
+        "oAndP": 0
+      }
+    ],
+    "Roof Coatings": [
+      {
+        "description": "Roof moisture survey / infrared thermographic scan",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 0.85,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Remove and replace wet insulation – polyiso 2\"",
+        "unit": "SQ",
+        "remove": 22,
+        "replace": 142,
+        "tax": 10.85,
+        "oAndP": 0
+      },
+      {
+        "description": "Seam repair – re-adhere lifting seams (mod bit/EPDM/TPO)",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Blister / bubble repair – membrane",
+        "unit": "EA",
+        "remove": null,
+        "replace": 85,
+        "tax": 6.5,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof deck repair – plywood 1/2\" CDX (replace damaged sections)",
+        "unit": "SF",
+        "remove": 0.65,
+        "replace": 4.85,
+        "tax": 0.38,
+        "oAndP": 0
+      },
+      {
+        "description": "Caulking / sealant – roof penetrations",
+        "unit": "EA",
+        "remove": null,
+        "replace": 45,
+        "tax": 3.44,
+        "oAndP": 0
+      },
+      {
+        "description": "Caulking – perimeter / flashing details",
+        "unit": "LF",
+        "remove": null,
+        "replace": 4.5,
+        "tax": 0.34,
+        "oAndP": 0
+      },
+      {
+        "description": "Pressure wash / clean existing roof surface",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Chemical cleaning / degreasing",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 22,
+        "tax": 1.68,
+        "oAndP": 0
+      },
+      {
+        "description": "Mechanical scarification / abrading surface",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope surface prep (4:12 to 6:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof surface prep (2 stories)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 8.1,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof surface prep (3 stories)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 15.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof surface prep (4+ stories)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 24,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Rooftop equipment / obstruction surcharge",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone primer coat (adhesion promoter)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 42,
+        "tax": 3.21,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone coating – base coat (20 mils wet / 10 mils dry)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.26,
+        "oAndP": 0
+      },
+      {
+        "description": "Reinforcing polyester fabric – embedded in base coat",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone coating – top coat (20 mils wet / 10 mils dry)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 95,
+        "tax": 7.26,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone coating – 2-coat system total (base + top, 40 mils)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 185,
+        "tax": 14.14,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone coating – 3-coat system total (primer + 2 coats, 60 mils)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 268,
+        "tax": 20.49,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone – granule surfacing (reflective)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 35,
+        "tax": 2.68,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone – detail coating at flashings / penetrations",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.5,
+        "tax": 0.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic primer coat",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 35,
+        "tax": 2.68,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic coating – base coat (20 mils wet)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 72,
+        "tax": 5.51,
+        "oAndP": 0
+      },
+      {
+        "description": "Reinforcing polyester fabric – seams & flashings",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic coating – top coat (20 mils wet)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 72,
+        "tax": 5.51,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic coating – 2-coat system total (base + top, 40 mils)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 142,
+        "tax": 10.86,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic coating – 3-coat system total (primer + 2 coats)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 210,
+        "tax": 16.06,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic elastomeric – white (Energy Star cool roof)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 148,
+        "tax": 11.32,
+        "oAndP": 0
+      },
+      {
+        "description": "Acrylic – detail coating at flashings / penetrations",
+        "unit": "LF",
+        "remove": null,
+        "replace": 7.5,
+        "tax": 0.57,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF spray foam – 1\" thickness (R-6)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 145,
+        "tax": 11.09,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF spray foam – 1.5\" thickness (R-9)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 198,
+        "tax": 15.14,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF spray foam – 2\" thickness (R-12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 248,
+        "tax": 18.97,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF spray foam – 3\" thickness (R-18)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 345,
+        "tax": 26.38,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF spray foam – 4\" thickness (R-24)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 445,
+        "tax": 34.03,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF – tapered foam for positive drainage",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 295,
+        "tax": 22.57,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone top coat over SPF – base coat (15 mils)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 78,
+        "tax": 5.97,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone top coat over SPF – top coat (15 mils)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 78,
+        "tax": 5.97,
+        "oAndP": 0
+      },
+      {
+        "description": "Silicone top coat over SPF – 2-coat system (30 mils total)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 152,
+        "tax": 11.62,
+        "oAndP": 0
+      },
+      {
+        "description": "Polyurethane top coat over SPF (alternative to silicone)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 138,
+        "tax": 10.55,
+        "oAndP": 0
+      },
+      {
+        "description": "Granule surfacing (broadcast into wet coat – SPF systems)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 35,
+        "tax": 2.68,
+        "oAndP": 0
+      },
+      {
+        "description": "SPF – detail spray at flashings / parapets / penetrations",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12,
+        "tax": 0.92,
+        "oAndP": 0
+      },
+      {
+        "description": "Butyl primer / surface conditioner",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Butyl rubber coating – base coat (25 mils wet)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 115,
+        "tax": 8.8,
+        "oAndP": 0
+      },
+      {
+        "description": "Reinforcing polyester fabric – seams & flashings",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Butyl rubber coating – top coat (25 mils wet)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 115,
+        "tax": 8.8,
+        "oAndP": 0
+      },
+      {
+        "description": "Butyl coating – 2-coat system (base + top, 50 mils)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 225,
+        "tax": 17.21,
+        "oAndP": 0
+      },
+      {
+        "description": "Butyl – detail coating at flashings",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.5,
+        "tax": 0.65,
+        "oAndP": 0
+      },
+      {
+        "description": "Aluminum fibrated roof coating – single coat (5 mils dry)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 48,
+        "tax": 3.67,
+        "oAndP": 0
+      },
+      {
+        "description": "Aluminum fibrated roof coating – 2-coat system (10 mils dry)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 88,
+        "tax": 6.73,
+        "oAndP": 0
+      },
+      {
+        "description": "Non-fibered aluminum coating – 2 coats",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 75,
+        "tax": 5.74,
+        "oAndP": 0
+      },
+      {
+        "description": "Reinforcing fabric at seams / flashings",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Aluminum detail coating at flashings / edges",
+        "unit": "LF",
+        "remove": null,
+        "replace": 5.5,
+        "tax": 0.42,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope coating application (4:12 to 6:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 18.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope coating application (7:12 to 9:12)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 32,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – steep slope coating application (10:12+)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 55,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (2 stories / 16-20 ft)",
+        "unit": "SQ",
+        "remove": 8.1,
+        "replace": 8.1,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (3 stories / 21-30 ft)",
+        "unit": "SQ",
+        "remove": 15.5,
+        "replace": 15.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Additional charge – high roof (4+ stories / 31+ ft)",
+        "unit": "SQ",
+        "remove": 24,
+        "replace": 24,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "HVAC / rooftop equipment obstruction surcharge – coatings",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 12\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 28.5,
+        "tax": 2.18,
+        "oAndP": 0
+      },
+      {
+        "description": "Coping cap – prefinished aluminum – 18\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 38,
+        "tax": 2.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal edge metal / gravel stop – 4\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 12.5,
+        "tax": 0.96,
+        "oAndP": 0
+      },
+      {
+        "description": "Sheet metal edge metal / gravel stop – 6\"",
+        "unit": "LF",
+        "remove": null,
+        "replace": 16.75,
+        "tax": 1.28,
+        "oAndP": 0
+      },
+      {
+        "description": "Roof drain – replace / reseal",
+        "unit": "EA",
+        "remove": null,
+        "replace": 285,
+        "tax": 21.8,
+        "oAndP": 0
+      },
+      {
+        "description": "Pipe boot / penetration flashing – coated",
+        "unit": "EA",
+        "remove": null,
+        "replace": 85,
+        "tax": 6.5,
+        "oAndP": 0
+      },
+      {
+        "description": "Termination bar – aluminum (at walls)",
+        "unit": "LF",
+        "remove": null,
+        "replace": 5.85,
+        "tax": 0.45,
+        "oAndP": 0
+      },
+      {
+        "description": "HVAC curb flashing – recoat / reseal",
+        "unit": "EA",
+        "remove": null,
+        "replace": 195,
+        "tax": 14.91,
+        "oAndP": 0
+      },
+      {
+        "description": "Pressure washer rental / setup",
+        "unit": "DA",
+        "remove": null,
+        "replace": 285,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Spray equipment / airless sprayer setup",
+        "unit": "DA",
+        "remove": null,
+        "replace": 185,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Commercial supervision / project management",
+        "unit": "HR",
+        "remove": null,
+        "replace": 78.52,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Safety: fall protection system setup",
+        "unit": "EA",
+        "remove": null,
+        "replace": 385,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Dew point / environmental monitoring",
+        "unit": "DA",
+        "remove": null,
+        "replace": 85,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Permit fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 296,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Engineering fees (Bid Item) ★ PENDING",
+        "unit": "EA",
+        "remove": null,
+        "replace": 4056,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Final cleaning – construction – commercial",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 4.5,
+        "tax": 0,
+        "oAndP": 0
+      }
+    ]
+  }
+}

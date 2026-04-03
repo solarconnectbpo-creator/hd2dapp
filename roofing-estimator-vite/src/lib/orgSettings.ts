@@ -4,6 +4,7 @@ export const CONTACTS_STORAGE_KEY = "roofing-estimator-vite-contacts-v1";
 export const ORG_SETTINGS_STORAGE_KEY = "roofing-estimator-vite-org-v1";
 
 export type OrgTemplateProfile = "residential" | "commercial";
+export type OwnerFallbackProvider = "none" | "batchdata-relaxed";
 
 export interface OrgSettings {
   companyName: string;
@@ -22,6 +23,10 @@ export interface OrgSettings {
   arcgisFeatureLayerUrl: string;
   /** Optional ArcGIS API token / key for private layers (also settable via VITE_ARCGIS_API_KEY). */
   arcgisApiKey: string;
+  /** Optional non-MO owner/contact fallback provider. */
+  ownerFallbackProvider: OwnerFallbackProvider;
+  /** Optional API key specifically for fallback provider; if empty, app falls back to BatchData key. */
+  ownerFallbackApiKey: string;
 }
 
 export function defaultOrgSettings(): OrgSettings {
@@ -36,6 +41,8 @@ export function defaultOrgSettings(): OrgSettings {
     defaultTemplateProfile: "residential",
     arcgisFeatureLayerUrl: "",
     arcgisApiKey: "",
+    ownerFallbackProvider: "none",
+    ownerFallbackApiKey: "",
   };
 }
 
@@ -53,6 +60,20 @@ export function loadOrgSettings(): OrgSettings {
 export function saveOrgSettings(org: OrgSettings): void {
   const r = saveOrgSettingsSafe(org);
   if (!r.ok) throw new Error(r.message);
+}
+
+/**
+ * If `VITE_ARCGIS_API_KEY` is set but org storage has no key yet, copy env → localStorage
+ * so the token appears under Contacts & settings and survives without re-reading `.env` in some flows.
+ * Does not overwrite a key already saved in the browser.
+ */
+export function syncArcgisApiKeyFromEnvToOrgIfNeeded(): void {
+  if (typeof window === "undefined") return;
+  const env = import.meta.env.VITE_ARCGIS_API_KEY?.trim();
+  if (!env) return;
+  const org = loadOrgSettings();
+  if (org.arcgisApiKey?.trim()) return;
+  saveOrgSettingsSafe({ ...org, arcgisApiKey: env });
 }
 
 /** Returns an error message when quota exceeded or payload too large. */

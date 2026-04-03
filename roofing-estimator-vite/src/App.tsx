@@ -8,8 +8,6 @@ import {
   useState,
 } from "react";
 import { Link, useSearchParams } from "react-router";
-import "mapbox-gl/dist/mapbox-gl.css";
-import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { useRoofing } from "./context/RoofingContext";
 import { type ContactRecord, parseContactsCsv } from "./lib/contactsCsv";
 import {
@@ -18,7 +16,10 @@ import {
   saveContactsToStorageSafe,
 } from "./lib/orgSettings";
 import {
+  normalizePropertyImportPayloadContacts,
   PENDING_PROPERTY_IMPORT_KEY,
+  PENDING_PROPERTY_IMPORT_SESSION_KEY,
+  parsePendingPropertyImport,
   type PropertyImportPayload,
 } from "./lib/propertyScraper";
 import {
@@ -28,6 +29,7 @@ import {
   nominatimReverseToBatchDataCriteria,
   parseUsAddressLineForBatchData,
 } from "./lib/propertyBatchDataLookup";
+import { buildParcelHandoffNotes, extractParcelAutoFill } from "./lib/canvassingParcelOwner";
 import {
   computePolygonRoofGeometry,
   computeRoofGeometryFromPlanInputs,
@@ -39,8 +41,37 @@ import {
   exteriorRingLngLatFromPolygonFeature,
   fetchRaybevelSkeletonSvg,
 } from "./lib/raybevelDiagramClient";
-import { getHd2dApiBase } from "./lib/hd2dApiBase";
-import { applyMapboxCspWorker } from "./lib/mapboxViteWorker";
+import { getHd2dApiBase, isHd2dApiConfigured } from "./lib/hd2dApiBase";
+import {
+  collectGeoJsonFeatures,
+  loadEmbeddedExplorerScript,
+  type EmbeddedExplorerMapHandle,
+} from "./lib/embeddedExplorer";
+import { getEagleViewEmbeddedAuthToken } from "./lib/eagleViewEmbeddedAuth";
+import {
+  isTrueDesignApiConfigured,
+  mapEagleViewSystemRoofToFormPatch,
+  trueDesignFetch,
+  type EagleViewSystemRoofData,
+} from "./lib/trueDesignApi";
+import {
+  AHJ_COMPLIANCE_DISCLAIMER,
+  getComplianceReferencesForCategory,
+  ICC_IBC2018_CHAPTER15_ROOF_URL,
+  ICC_IRC2024_URL,
+  MEASUREMENT_METHODOLOGY_BLURB,
+} from "./lib/roofComplianceReferences";
+import { buildFootprintDxfFromPolygons, type FootprintFeature } from "./lib/roofDxfExport";
+import { compareDrawnVsHeuristic, type TakeoffComparisonRow } from "./lib/roofTakeoffComparison";
+import { useMapProvider } from "./lib/useMapProvider";
+import { Map3D } from "./components/Map3D";
+import {
+  computeCarrierBenchmark,
+  getCarrierBenchmarkProfiles,
+  getCarrierBenchmarkSourceLabel,
+  getDefaultCarrierBenchmarkProfileId,
+} from "./lib/carrierBenchmarkPricing";
+import pricingCatalog from "./data/ai-cheatsheet-pricing.json";
 
 type DamageType = "Hail" | "Wind" | "Missing Shingles" | "Leaks" | "Flashing" | "Structural";
 type ParserConfidence = "low" | "medium" | "high";
@@ -63,18 +94,12 @@ const DAMAGE_PHOTO_TAGS = [
   "gutter-damage",
   "collateral",
 ] as const;
+
 const STORAGE_KEY = "roofing-estimator-vite-jobs-v1";
-const MAPBOX_TOKEN_STORAGE_KEY = "roofing-estimator-vite-mapbox-token-v1";
+const EAGLEV_REPORT_ID_STORAGE_KEY = "roofing-estimator-vite-eagleview-report-id-v1";
 const PROPERTY_DB_KEY = "roofing-estimator-vite-property-db-v1";
 
 const INTEL_API_BASE = getHd2dApiBase();
-/**
- * Esri vector tiles for [Microsoft US Building Footprints](https://github.com/microsoft/USBuildingFootprints) (ODbL).
- * Source-layer id matches Esri style `root.json`.
- */
-const MS_BUILDING_FOOTPRINT_TILES =
-  "https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/Microsoft_Building_Footprints/VectorTileServer/tile/{z}/{y}/{x}.pbf";
-const MS_BUILDING_FOOTPRINT_SOURCE_LAYER = "MSBFLow";
 /** Applied per effective square (after waste) in scope; scaled by regional multiplier like other lines. */
 const LABOR_PER_SQUARE_USD = 350;
 
@@ -100,10 +125,36 @@ interface DrawnRoofLine {
   geometry: any;
 }
 
+type PricingPreset = "standard" | "premium" | "commercial";
+
+const PRICING_PRESETS: Record<PricingPreset, { label: string; wastePercent: string; severity: number; note: string }> = {
+  standard: {
+    label: "Standard",
+    wastePercent: "12",
+    severity: 2,
+    note: "Balanced suburban residential assumptions.",
+  },
+  premium: {
+    label: "Premium",
+    wastePercent: "18",
+    severity: 3,
+    note: "Steeper complexity, higher handling and finish assumptions.",
+  },
+  commercial: {
+    label: "Commercial",
+    wastePercent: "10",
+    severity: 2,
+    note: "Lower waste profile tuned for larger repetitive roof sections.",
+  },
+};
+
 const STATE_MULTIPLIER: Record<string, number> = {
   AK: 1.34, CA: 1.28, CO: 1.09, CT: 1.12, DC: 1.2, FL: 1.03, HI: 1.36, MA: 1.16,
   MD: 1.1, NJ: 1.16, NY: 1.2, OR: 1.07, WA: 1.12, TX: 0.96, MO: 0.94, MN: 1.05,
 };
+const CARRIER_BENCHMARK_SOURCE_LABEL = getCarrierBenchmarkSourceLabel();
+const CARRIER_BENCHMARK_PROFILES = getCarrierBenchmarkProfiles();
+const DEFAULT_CARRIER_BENCHMARK_PROFILE_ID = getDefaultCarrierBenchmarkProfileId();
 
 interface FormState {
   address: string;
@@ -130,10 +181,21 @@ interface FormState {
   severity: number;
   damageTypes: DamageType[];
   carrierScopeText: string;
+  carrierBenchmarkProfileId: string;
+  carrierBenchmarkRegionFactor: string;
+  carrierBenchmarkComplexityFactor: string;
   deductibleUsd: string;
   nonRecDepUsd: string;
   /** Year built, lot size, etc. from property record import (Property records page). */
   propertyRecordNotes: string;
+}
+
+interface MeasurementSection {
+  id: string;
+  label: string;
+  areaSqFt: string;
+  perimeterFt: string;
+  measuredSquares: string;
 }
 
 interface CarrierParsed {
@@ -203,6 +265,20 @@ interface EstimateResult {
   quality: number;
   warnings: string[];
   carrier: CarrierParsed;
+  carrierBenchmark: {
+    sourceLabel: string;
+    profileId: string;
+    profileName: string;
+    regionFactor: number;
+    complexityFactor: number;
+    blendedMultiplier: number;
+    baseRcv: number;
+    adjustedRcv: number;
+    adjustedDelta: number;
+    adjustedDeltaDirection: DeltaDirection;
+    requiredLineCategories: string[];
+    optionalLineCategories: string[];
+  };
   delta: number;
   deltaDirection: DeltaDirection;
   settlement: {
@@ -212,6 +288,8 @@ interface EstimateResult {
     finalProjected: number;
     outOfPocket: number;
   };
+  /** Drawn/entered LF vs heuristic model from plan geometry (QC). */
+  takeoffComparison?: TakeoffComparisonRow[];
 }
 
 interface SavedJob {
@@ -382,45 +460,6 @@ async function buildAiFootprintPolygonFeature(
   };
 }
 
-/** Largest polygon from a Mapbox query hit (Microsoft footprints are Polygon or MultiPolygon). */
-async function msFootprintFeatureForDraw(mapFeature: {
-  geometry?: { type?: string; coordinates?: unknown };
-}): Promise<{ type: "Feature"; id: string; geometry: { type: "Polygon"; coordinates: number[][][] }; properties: Record<string, string> } | null> {
-  const turf = await import("@turf/turf");
-  const g = mapFeature.geometry;
-  if (!g || !g.coordinates) return null;
-  if (g.type === "Polygon") {
-    const coords = g.coordinates as number[][][];
-    return {
-      type: "Feature",
-      id: `ms-footprint-${Date.now()}`,
-      geometry: { type: "Polygon", coordinates: coords },
-      properties: { source: "microsoft-us-building-footprints" },
-    };
-  }
-  if (g.type === "MultiPolygon") {
-    const polys = g.coordinates as number[][][][];
-    let best: number[][][] | null = null;
-    let bestA = -1;
-    for (const rings of polys) {
-      const poly = turf.polygon(rings);
-      const a = turf.area(poly);
-      if (a > bestA) {
-        bestA = a;
-        best = rings;
-      }
-    }
-    if (!best) return null;
-    return {
-      type: "Feature",
-      id: `ms-footprint-${Date.now()}`,
-      geometry: { type: "Polygon", coordinates: best },
-      properties: { source: "microsoft-us-building-footprints" },
-    };
-  }
-  return null;
-}
-
 function parseLengthFeet(value?: string): number {
   if (!value?.trim()) return 0;
   const text = value.trim().toLowerCase();
@@ -432,6 +471,12 @@ function parseLengthFeet(value?: string): number {
   }
   const n = Number.parseFloat(text.replace(/[^\d.]/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+function parseBenchmarkFactor(input: string, fallback: number): number {
+  const n = Number.parseFloat(input);
+  if (!Number.isFinite(n)) return fallback;
+  return clamp(n, 0.75, 1.4);
 }
 
 /** Line lengths for diagrams — same source as `buildResult` (parsed from form), not re-parsed from formatted DRW strings. */
@@ -631,37 +676,11 @@ function money(n: number): string {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
-/** Applied after line items + reference material sales tax to produce RCV / proposal total (50% added → ×1.5). */
-const ESTIMATE_TOTAL_MARKUP_MULTIPLIER = 1.5;
-
-/** IBC 2018 Ch. 15 — roof assemblies & rooftop structures (ICC Digital Codes). */
-const ICC_IBC2018_CHAPTER15_ROOF_URL =
-  "https://codes.iccsafe.org/content/IBC2018P6/chapter-15-roof-assemblies-and-rooftop-structures#IBC2018P6_Ch15";
-
-/** 2024 IRC — ICC Digital Codes (https://codes.iccsafe.org/content/IRC2024P2); confirm adopted edition with AHJ. */
-const ICC_IRC2024_URL = "https://codes.iccsafe.org/content/IRC2024P2";
-
 /**
- * IRC / IBC / ASTM references for proposals (material-appropriate; verify against adopted code year / AHJ).
- * Replaces vague pairings (e.g. “R905/R908”) with chapter/section-level citations used on typical roofing bids.
+ * Applied after line items + reference material sales tax to produce RCV / proposal total.
+ * Default 1.5 = 50% markup on RCV subtotal (adjust only with pricing policy review).
  */
-const ROOFING_COMPLIANCE_REFERENCES: readonly string[] = [
-  "IRC R903 — Weather protection (flashing, drainage)",
-  "IRC R904 — Materials (roof covering)",
-  "IRC R905 — Roof coverings (R905.2 asphalt shingles, R905.3 slate, R905.4 tile, R905.5 metal; low-slope / single-ply per adopted edition subsections)",
-  "IRC R806 — Roof ventilation",
-  "IBC Chapter 15 — Roof assemblies & rooftop structures; §1504 weather protection; §1507 roof coverings (confirm adopted IBC edition)",
-  "ASTM D3462 — Asphalt shingles (glass mat)",
-  "ASTM D7158 — Asphalt shingles (wind-resistance classification)",
-  "ASTM D3161 — Asphalt shingles (fan-induced wind)",
-  "ASTM D1970 — Self-adhering polymer-modified bituminous underlayment (ice & water shield)",
-  "ASTM D6757 / D4869 / D228 — Underlayments used with steep-slope roofing",
-  "ASTM D6878 — TPO sheet roofing",
-  "ASTM D4434 — PVC sheet roofing",
-  "ASTM D4637 — EPDM sheet roofing",
-  "ASTM D6162 — SBS-modified bituminous sheet (modified bitumen)",
-  "ASTM E96 — Water vapor transmission of materials",
-];
+const ESTIMATE_TOTAL_MARKUP_MULTIPLIER = 1.5;
 
 // ── MOSL8X_OCT25 Material Pricing Database (from AI cheat sheet CSVs) ──
 
@@ -693,6 +712,12 @@ interface MaterialProfile {
   tearOffRate: number;
   items: MaterialLineItem[];
 }
+
+type PricingCatalogLine = {
+  description: string;
+  replace: number;
+  tax: number;
+};
 
 const STEEP_SURCHARGE: Record<string, number> = { "4-6": 18.50, "7-9": 32.00, "10+": 55.00 };
 const HEIGHT_SURCHARGE: Record<string, number> = { "2story": 8.10, "3story": 15.50, "4story": 24.00 };
@@ -1147,6 +1172,53 @@ const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
   },
 };
 
+function normalizePricingText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function getPricingCatalogSheetName(roofType: string): string | null {
+  const t = roofType.toLowerCase();
+  if (t.includes("tpo")) return "TPO";
+  if (t.includes("pvc")) return "PVC";
+  if (t.includes("epdm")) return "EPDM";
+  if (t.includes("modified") || t.includes("mod bit") || t.includes("sbs") || t.includes("app")) {
+    return "Modified Bitumen";
+  }
+  if (t.includes("coating") || t.includes("silicone") || t.includes("acrylic") || t.includes("spf") || t.includes("butyl") || t.includes("aluminum")) {
+    return "Roof Coatings";
+  }
+  return null;
+}
+
+function applyCheatSheetPricing(roofType: string, profile: MaterialProfile): MaterialProfile {
+  const sheetName = getPricingCatalogSheetName(roofType);
+  if (!sheetName) return profile;
+
+  const sheetLines = (pricingCatalog as { sheets?: Record<string, PricingCatalogLine[]> }).sheets?.[sheetName];
+  if (!Array.isArray(sheetLines) || sheetLines.length === 0) return profile;
+
+  const normalizedCatalog = sheetLines
+    .filter((line) => typeof line.description === "string" && Number.isFinite(line.replace))
+    .map((line) => ({ ...line, normalized: normalizePricingText(line.description) }));
+
+  const items = profile.items.map((item) => {
+    const normalizedItem = normalizePricingText(item.description);
+    const match = normalizedCatalog.find(
+      (line) =>
+        normalizedItem.includes(line.normalized) ||
+        line.normalized.includes(normalizedItem),
+    );
+    if (!match) return item;
+    return {
+      ...item,
+      replace: match.replace,
+      tax: Number.isFinite(match.tax) ? match.tax : item.tax,
+    };
+  });
+
+  return { ...profile, items };
+}
+
 function classifyRoofType(roofType: string): string {
   const t = roofType.toLowerCase();
   if (t.includes("tpo")) return "tpo";
@@ -1163,24 +1235,25 @@ function classifyRoofType(roofType: string): string {
 }
 
 function getMaterialProfile(roofType: string): MaterialProfile {
-  if (MATERIAL_PROFILES[roofType]) return MATERIAL_PROFILES[roofType];
+  const withCatalog = (profile: MaterialProfile) => applyCheatSheetPricing(roofType, profile);
+  if (MATERIAL_PROFILES[roofType]) return withCatalog(MATERIAL_PROFILES[roofType]);
   const t = roofType.toLowerCase();
-  if (t === "tpo") return MATERIAL_PROFILES["TPO 60-mil MA"];
-  if (t.includes("tpo 45")) return MATERIAL_PROFILES["TPO 45-mil MA"];
-  if (t.includes("tpo 80")) return MATERIAL_PROFILES["TPO 80-mil MA"];
-  if (t.includes("tpo")) return MATERIAL_PROFILES["TPO 60-mil MA"];
-  if (t.includes("pvc 80")) return MATERIAL_PROFILES["PVC 80-mil MA"];
-  if (t.includes("pvc")) return MATERIAL_PROFILES["PVC 60-mil MA"];
-  if (t.includes("epdm 90")) return MATERIAL_PROFILES["EPDM 90-mil FA"];
-  if (t.includes("epdm")) return MATERIAL_PROFILES["EPDM 60-mil FA"];
-  if (t.includes("sbs") || (t.includes("modified") && t.includes("sbs"))) return MATERIAL_PROFILES["Modified Bitumen (SBS)"];
-  if (t.includes("modified") || t.includes("mod bit") || t.includes("app")) return MATERIAL_PROFILES["Modified Bitumen (APP)"];
-  if (t.includes("spf") || t.includes("spray foam")) return MATERIAL_PROFILES["Coating (SPF)"];
-  if (t.includes("acrylic")) return MATERIAL_PROFILES["Coating (Acrylic)"];
-  if (t.includes("butyl")) return MATERIAL_PROFILES["Coating (Butyl)"];
-  if (t.includes("aluminum fibr")) return MATERIAL_PROFILES["Coating (Aluminum)"];
-  if (t.includes("silicone") || t.includes("coating")) return MATERIAL_PROFILES["Coating (Silicone)"];
-  return SHINGLE_PROFILE;
+  if (t === "tpo") return withCatalog(MATERIAL_PROFILES["TPO 60-mil MA"]);
+  if (t.includes("tpo 45")) return withCatalog(MATERIAL_PROFILES["TPO 45-mil MA"]);
+  if (t.includes("tpo 80")) return withCatalog(MATERIAL_PROFILES["TPO 80-mil MA"]);
+  if (t.includes("tpo")) return withCatalog(MATERIAL_PROFILES["TPO 60-mil MA"]);
+  if (t.includes("pvc 80")) return withCatalog(MATERIAL_PROFILES["PVC 80-mil MA"]);
+  if (t.includes("pvc")) return withCatalog(MATERIAL_PROFILES["PVC 60-mil MA"]);
+  if (t.includes("epdm 90")) return withCatalog(MATERIAL_PROFILES["EPDM 90-mil FA"]);
+  if (t.includes("epdm")) return withCatalog(MATERIAL_PROFILES["EPDM 60-mil FA"]);
+  if (t.includes("sbs") || (t.includes("modified") && t.includes("sbs"))) return withCatalog(MATERIAL_PROFILES["Modified Bitumen (SBS)"]);
+  if (t.includes("modified") || t.includes("mod bit") || t.includes("app")) return withCatalog(MATERIAL_PROFILES["Modified Bitumen (APP)"]);
+  if (t.includes("spf") || t.includes("spray foam")) return withCatalog(MATERIAL_PROFILES["Coating (SPF)"]);
+  if (t.includes("acrylic")) return withCatalog(MATERIAL_PROFILES["Coating (Acrylic)"]);
+  if (t.includes("butyl")) return withCatalog(MATERIAL_PROFILES["Coating (Butyl)"]);
+  if (t.includes("aluminum fibr")) return withCatalog(MATERIAL_PROFILES["Coating (Aluminum)"]);
+  if (t.includes("silicone") || t.includes("coating")) return withCatalog(MATERIAL_PROFILES["Coating (Silicone)"]);
+  return withCatalog(SHINGLE_PROFILE);
 }
 
 function round2(n: number): number {
@@ -1570,6 +1643,7 @@ function parseCarrierScope(text: string): CarrierParsed {
 
 function buildInsuranceSupplementNotes(form: FormState, result: EstimateResult): string {
   const c = result.carrier;
+  const b = result.carrierBenchmark;
   const linesOut: string[] = [];
   linesOut.push(
     `Carrier scope: ${c.parsedLineCount} priced line item(s) parsed. Valuation basis: ${c.valuationBasis}. Parser confidence: ${c.parserConfidence}.`,
@@ -1593,6 +1667,15 @@ function buildInsuranceSupplementNotes(form: FormState, result: EstimateResult):
   linesOut.push(
     `${deltaNote} Delta: ${money(result.delta)} (estimator ${money(result.replacementCostValue)} vs carrier basis ${money(c.total)}).`,
   );
+  linesOut.push(
+    `${b.sourceLabel}: ${b.profileName} profile applied (multiplier ×${b.blendedMultiplier.toFixed(3)} from base × region × complexity). Adjusted benchmark ${money(b.adjustedRcv)} vs carrier ${money(c.total)} (delta ${money(b.adjustedDelta)}; ${b.adjustedDeltaDirection}).`,
+  );
+  if (b.requiredLineCategories.length > 0) {
+    linesOut.push(`Required benchmark scope checks: ${b.requiredLineCategories.join("; ")}.`);
+  }
+  if (b.optionalLineCategories.length > 0) {
+    linesOut.push(`Optional benchmark scope checks: ${b.optionalLineCategories.join("; ")}.`);
+  }
   if (c.likelyMissingItems.length > 0) {
     linesOut.push(`Common scope gaps to verify in the field: ${c.likelyMissingItems.join("; ")}.`);
   }
@@ -1649,9 +1732,22 @@ function defaultFormState(): FormState {
     severity: 3,
     damageTypes: ["Wind", "Leaks"],
     carrierScopeText: "",
+    carrierBenchmarkProfileId: DEFAULT_CARRIER_BENCHMARK_PROFILE_ID,
+    carrierBenchmarkRegionFactor: "1.00",
+    carrierBenchmarkComplexityFactor: "1.00",
     deductibleUsd: "2500",
     nonRecDepUsd: "500",
     propertyRecordNotes: "",
+  };
+}
+
+function buildMeasurementSectionFromForm(form: FormState, label = "Section 1"): MeasurementSection {
+  return {
+    id: `sec_${Math.random().toString(36).slice(2, 10)}`,
+    label,
+    areaSqFt: form.areaSqFt,
+    perimeterFt: form.perimeterFt,
+    measuredSquares: form.measuredSquares,
   };
 }
 
@@ -1851,9 +1947,35 @@ function buildResult(form: FormState): EstimateResult | null {
     quality -= 8;
     warnings.push("Coordinates missing; map context reduced.");
   }
+  const takeoffCmp = compareDrawnVsHeuristic({
+    areaSqFt: form.areaSqFt,
+    perimeterFt: form.perimeterFt,
+    roofType: form.roofType,
+    roofStructure: form.roofStructure,
+    roofPitch: form.roofPitch,
+    ridgesFt: form.ridgesFt,
+    eavesFt: form.eavesFt,
+    rakesFt: form.rakesFt,
+    valleysFt: form.valleysFt,
+    hipsFt: form.hipsFt,
+  });
+  const takeoffComparison = takeoffCmp.rows.filter((r) => r.drawnLf > 0 || r.heuristicLf > 0);
+  for (const w of takeoffCmp.warnings) {
+    warnings.push(w);
+    quality -= 3;
+  }
   quality = clamp(quality, 35, 100);
 
   const carrier = parseCarrierScope(form.carrierScopeText);
+  const benchmarkComputation = computeCarrierBenchmark({
+    profileId: form.carrierBenchmarkProfileId,
+    baseRcv: replacementCostValue,
+    regionFactor: parseBenchmarkFactor(form.carrierBenchmarkRegionFactor, 1),
+    complexityFactor: parseBenchmarkFactor(form.carrierBenchmarkComplexityFactor, 1),
+  });
+  const adjustedDelta = benchmarkComputation.adjustedRcv - carrier.total;
+  const adjustedDeltaDirection: DeltaDirection =
+    adjustedDelta > 1500 ? "under-scoped" : adjustedDelta < -1500 ? "over-scoped" : "aligned";
   const dep = Math.max(0, carrier.dep != null ? carrier.dep : carrier.rcv != null && carrier.acv != null ? carrier.rcv - carrier.acv : 0);
   const deductible = Math.max(0, Math.round(Number.parseFloat(form.deductibleUsd) || 0));
   const nonRec = Math.max(0, Math.min(Math.round(Number.parseFloat(form.nonRecDepUsd) || 0), Math.round(dep)));
@@ -1897,9 +2019,24 @@ function buildResult(form: FormState): EstimateResult | null {
     quality,
     warnings,
     carrier,
+    carrierBenchmark: {
+      sourceLabel: benchmarkComputation.sourceLabel,
+      profileId: benchmarkComputation.profile.id,
+      profileName: benchmarkComputation.profile.name,
+      regionFactor: benchmarkComputation.regionFactor,
+      complexityFactor: benchmarkComputation.complexityFactor,
+      blendedMultiplier: benchmarkComputation.blendedMultiplier,
+      baseRcv: benchmarkComputation.baseRcv,
+      adjustedRcv: benchmarkComputation.adjustedRcv,
+      adjustedDelta,
+      adjustedDeltaDirection,
+      requiredLineCategories: benchmarkComputation.profile.requiredLineCategories,
+      optionalLineCategories: benchmarkComputation.profile.optionalLineCategories,
+    },
     delta,
     deltaDirection,
     settlement: { deductible, recoverableDep, initialPayment, finalProjected, outOfPocket },
+    takeoffComparison,
   };
 }
 
@@ -1934,6 +2071,21 @@ function buildReportText(form: FormState, result: EstimateResult): string {
     `  Roof material .... ${form.roofType}`,
     `  Pitch ............ ${form.roofPitch || "N/A"}`,
     "",
+    "▸ MEASUREMENT METHODOLOGY",
+    `  ${MEASUREMENT_METHODOLOGY_BLURB}`,
+    "",
+    ...(result.takeoffComparison?.length
+      ? [
+          "▸ DRAWN VS MODELED LINEAR (QC)",
+          `  ${"Edge".padEnd(10)} ${"Drawn LF".padStart(10)} ${"Modeled LF".padStart(12)} ${"Delta".padStart(10)}`,
+          ...result.takeoffComparison.map((r) => {
+            const d =
+              r.deltaPct != null ? `${(r.deltaPct * 100).toFixed(1)}%` : "—";
+            return `  ${r.edge.padEnd(10)} ${String(r.drawnLf).padStart(10)} ${String(r.heuristicLf).padStart(12)} ${d.padStart(10)}`;
+          }),
+          "",
+        ]
+      : []),
     "▸ ROOF MEASUREMENTS",
     "  RFS* = roof structure takeoff (walls, perimeter, surface, squares, ridge/hip/valley LF, roof-edge total). DRW/LEN = plan detail.",
     `  ${"Code".padEnd(10)} ${"Measurement".padEnd(30)} Value`,
@@ -1960,10 +2112,18 @@ function buildReportText(form: FormState, result: EstimateResult): string {
     `  Effective squares ........ ${result.effectiveSquares} SQ (incl. ${result.wastePct}% waste)`,
     `  Regional Multiplier ...... ×${result.regional.toFixed(2)} (${form.stateCode})`,
     `  RCV (after +50% adjustment) ${money(result.replacementCostValue)}`,
+    `  Carrier benchmark ........ ${money(result.carrierBenchmark.adjustedRcv)} (${result.carrierBenchmark.profileName}, ×${result.carrierBenchmark.blendedMultiplier.toFixed(3)})`,
     `  Less Depreciation ........ (${money(result.depreciation)})`,
     `  ACV ...................... ${money(result.actualCashValue)}`,
     `  Confidence ............... ${result.confidence}`,
     `  Measurement Score ........ ${result.quality}/100`,
+    `  QC Grade ................. ${result.quality >= 85 ? "A" : result.quality >= 70 ? "B" : result.quality >= 55 ? "C" : "D"}`,
+    ...(result.warnings.length
+      ? [
+          "  QC Flags ...............",
+          ...result.warnings.map((w) => `    - ${w}`),
+        ]
+      : ["  QC Flags ............... none"]),
     "",
     `  ┌─────────────────────────────────────────┐`,
     `  │  FINAL COST: ${money(result.finalCost).padEnd(27)}│`,
@@ -2025,6 +2185,21 @@ function buildProposalText(form: FormState, result: EstimateResult, proposal: Pr
     `  Squares .......... ${form.measuredSquares || "N/A"}`,
     `  Waste Factor ..... ${form.wastePercent || "N/A"}%`,
     "",
+    "▸ MEASUREMENT METHODOLOGY",
+    `  ${MEASUREMENT_METHODOLOGY_BLURB}`,
+    "",
+    ...(result.takeoffComparison?.length
+      ? [
+          "▸ DRAWN VS MODELED LINEAR (QC)",
+          `  ${"Edge".padEnd(10)} ${"Drawn LF".padStart(10)} ${"Modeled LF".padStart(12)} ${"Delta".padStart(10)}`,
+          ...result.takeoffComparison.map((r) => {
+            const d =
+              r.deltaPct != null ? `${(r.deltaPct * 100).toFixed(1)}%` : "—";
+            return `  ${r.edge.padEnd(10)} ${String(r.drawnLf).padStart(10)} ${String(r.heuristicLf).padStart(12)} ${d.padStart(10)}`;
+          }),
+          "",
+        ]
+      : []),
     "▸ ROOF MEASUREMENTS",
     "  RFS* = roof structure takeoff (walls, perimeter, surface, squares, ridge/hip/valley LF, roof-edge total). DRW/LEN = plan detail.",
     `  ${"Code".padEnd(10)} ${"Measurement".padEnd(30)} Value`,
@@ -2047,6 +2222,9 @@ function buildProposalText(form: FormState, result: EstimateResult, proposal: Pr
     `  RCV (after +50% adjustment) ${money(result.replacementCostValue)}`,
     `  Less Depreciation ........ (${money(result.depreciation)})`,
     `  ACV ...................... ${money(result.actualCashValue)}`,
+    `  Confidence ............... ${result.confidence} (${result.quality}/100)`,
+    ...(result.warnings.length ? ["  QC Flags:"] : ["  QC Flags: none"]),
+    ...result.warnings.map((w) => `    - ${w}`),
     "",
     `  ┌─────────────────────────────────────────┐`,
     `  │  PROPOSAL TOTAL: ${money(result.finalCost).padEnd(23)}│`,
@@ -2081,7 +2259,8 @@ function buildProposalText(form: FormState, result: EstimateResult, proposal: Pr
     `  ${proposal.financingNotes}`,
     "",
     "▸ IRC / IBC / ASTM COMPLIANCE REFERENCES",
-    ...ROOFING_COMPLIANCE_REFERENCES.map((s) => `  - ${s}`),
+    `  ${AHJ_COMPLIANCE_DISCLAIMER}`,
+    ...getComplianceReferencesForCategory(classifyRoofType(form.roofType)).map((s) => `  - ${s}`),
     `  - ICC Digital Codes — 2024 IRC (reference): ${ICC_IRC2024_URL}`,
     `  - ICC Digital Codes — IBC 2018 Chapter 15 (reference): ${ICC_IBC2018_CHAPTER15_ROOF_URL}`,
     "",
@@ -2114,8 +2293,8 @@ function buildRoofDiagramSvg(
   const H = opts?.height ?? 340;
   const dark = opts?.dark ?? false;
   const bg = dark ? "#111827" : "#fff";
-  const fg = dark ? "#e5e7eb" : "#1a1a1a";
-  const muted = dark ? "#64748b" : "#999";
+  const fg = dark ? "#e5e7eb" : "#000000";
+  const muted = dark ? "#64748b" : "#000000";
   const outline = dark ? "#334155" : "#bbb";
 
   const form = inferRoofFormType(roofType, roofStructure);
@@ -2334,6 +2513,226 @@ function buildRoofDiagramSvg(
 </svg>`;
 }
 
+function buildAccurateDiagramSvg(
+  polygonFeature: GeoJSON.Feature<GeoJSON.Polygon> | null,
+  drawnLines: DrawnRoofLine[],
+  roofType: string,
+  pitch: string,
+  areaSqFt: number,
+  perimeterFt: number,
+  measuredSquares: number,
+  opts?: { width?: number; height?: number },
+): string {
+  const W = opts?.width ?? 600;
+  const H = opts?.height ?? 440;
+  const PAD = 40;
+
+  if (!polygonFeature?.geometry?.coordinates?.[0]?.length) return "";
+
+  const ring = polygonFeature.geometry.coordinates[0] as [number, number][];
+  if (ring.length < 4) return "";
+
+  const centLng = ring.reduce((s, p) => s + p[0], 0) / ring.length;
+  const centLat = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+  const toR = (d: number) => (d * Math.PI) / 180;
+  const cosLat = Math.cos(toR(centLat));
+  const FT_PER_DEG_LAT = 364567.2;
+  const FT_PER_DEG_LNG = FT_PER_DEG_LAT * cosLat;
+
+  type Pt = { x: number; y: number };
+  const localPts: Pt[] = ring.map(([lng, lat]) => ({
+    x: (lng - centLng) * FT_PER_DEG_LNG,
+    y: (lat - centLat) * FT_PER_DEG_LAT,
+  }));
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of localPts) {
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+  }
+
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+  const availW = W - PAD * 2;
+  const availH = H - PAD * 2 - 60;
+  const scale = Math.min(availW / rangeX, availH / rangeY);
+  const offX = PAD + (availW - rangeX * scale) / 2;
+  const offY = PAD + 20 + (availH - rangeY * scale) / 2;
+
+  const toSvg = (p: Pt): Pt => ({
+    x: offX + (p.x - minX) * scale,
+    y: offY + (maxY - p.y) * scale,
+  });
+
+  const c = {
+    ridge: "#ef4444", hip: "#f97316", valley: "#22c55e",
+    eave: "#3b82f6", rake: "#a855f7", wflash: "#eab308", sflash: "#06b6d4",
+    outline: "#ffffff", vertex: "#ffffff", bg: "#111827", fg: "#e5e7eb",
+    dim: "#94a3b8",
+  };
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+  svg += `<rect width="${W}" height="${H}" fill="${c.bg}" rx="8"/>`;
+  svg += `<text x="${W / 2}" y="22" fill="${c.fg}" font-size="14" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="700">Roof Measurement Diagram — ${roofType}</text>`;
+
+  const svgPts = localPts.map(toSvg);
+  const polyPoints = svgPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  svg += `<polygon points="${polyPoints}" fill="rgba(59,130,246,0.1)" stroke="${c.outline}" stroke-width="2"/>`;
+
+  for (let i = 0; i < svgPts.length - 1; i++) {
+    const a = svgPts[i];
+    const b = svgPts[i + 1];
+    const aGeo = ring[i];
+    const bGeo = ring[i + 1];
+    const dLat = toR(bGeo[1] - aGeo[1]);
+    const dLng = toR(bGeo[0] - aGeo[0]);
+    const sinHalfLat = Math.sin(dLat / 2);
+    const sinHalfLng = Math.sin(dLng / 2);
+    const hav = sinHalfLat * sinHalfLat + Math.cos(toR(aGeo[1])) * Math.cos(toR(bGeo[1])) * sinHalfLng * sinHalfLng;
+    const distFt = 2 * 6371000 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav)) * 3.28084;
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = len > 0 ? -dy / len * 10 : 0;
+    const ny = len > 0 ? dx / len * 10 : 10;
+    const label = distFt >= 1000 ? `${(distFt / 1000).toFixed(1)}k` : `${Math.round(distFt)}'`;
+    svg += `<text x="${(mx + nx).toFixed(1)}" y="${(my + ny).toFixed(1)}" fill="${c.dim}" font-size="11" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${label}</text>`;
+  }
+
+  for (const p of svgPts.slice(0, -1)) {
+    svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${c.vertex}" stroke="${c.outline}" stroke-width="1"/>`;
+  }
+
+  const lineTypeColors: Record<string, string> = {
+    ridge: c.ridge, hip: c.hip, valley: c.valley,
+    eave: c.eave, rake: c.rake, "wall-flashing": c.wflash, "step-flashing": c.sflash,
+  };
+  for (const line of drawnLines) {
+    const coords = line.geometry?.coordinates as [number, number][] | undefined;
+    if (!coords || coords.length < 2) continue;
+    const color = lineTypeColors[line.type] || "#999";
+    const linePts = coords.map(([lng, lat]) =>
+      toSvg({ x: (lng - centLng) * FT_PER_DEG_LNG, y: (lat - centLat) * FT_PER_DEG_LAT }),
+    );
+    const points = linePts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+    svg += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="6,3"/>`;
+    const mid = { x: (linePts[0].x + linePts[linePts.length - 1].x) / 2, y: (linePts[0].y + linePts[linePts.length - 1].y) / 2 };
+    svg += `<text x="${mid.x.toFixed(1)}" y="${(mid.y - 6).toFixed(1)}" fill="${color}" font-size="10" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${line.type}: ${line.lengthFt.toFixed(1)}'</text>`;
+  }
+
+  const legendItems = [
+    { color: c.ridge, name: "Ridge" }, { color: c.hip, name: "Hip" },
+    { color: c.valley, name: "Valley" }, { color: c.eave, name: "Eave" },
+    { color: c.rake, name: "Rake" }, { color: c.wflash, name: "Wall Flash" },
+  ];
+  let legendX = 10;
+  for (const it of legendItems) {
+    svg += `<line x1="${legendX}" y1="${H - 52}" x2="${legendX + 14}" y2="${H - 52}" stroke="${it.color}" stroke-width="3"/>`;
+    svg += `<text x="${legendX + 18}" y="${H - 48}" fill="${c.fg}" font-size="9" font-family="Segoe UI,Arial,sans-serif">${it.name}</text>`;
+    legendX += 70;
+  }
+
+  const dataY = H - 30;
+  const dataItems = [
+    `Area: ${areaSqFt > 0 ? `${Math.round(areaSqFt).toLocaleString()} SF` : "—"}`,
+    `Perimeter: ${perimeterFt > 0 ? `${Math.round(perimeterFt)} LF` : "—"}`,
+    `Pitch: ${pitch || "N/A"}`,
+    `Squares: ${measuredSquares > 0 ? measuredSquares.toFixed(2) : "—"} SQ`,
+  ];
+  svg += `<text x="${W / 2}" y="${dataY}" fill="${c.fg}" font-size="12" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${dataItems.join("  |  ")}</text>`;
+
+  svg += `</svg>`;
+  return svg;
+}
+
+function buildPropertyOutlineDiagramSvg(
+  polygons: Array<{ geometry?: { type?: string; coordinates?: unknown } }>,
+  lines: DrawnRoofLine[],
+  opts?: { width?: number; height?: number },
+): string {
+  const W = opts?.width ?? 560;
+  const H = opts?.height ?? 360;
+  const PAD = 22;
+
+  type Pt = [number, number];
+  const rings: Pt[][] = [];
+  for (const f of polygons) {
+    const g = f.geometry;
+    if (!g || !g.coordinates) continue;
+    if (g.type === "Polygon") {
+      const c = g.coordinates as unknown as Pt[][];
+      if (Array.isArray(c) && c[0]?.length) rings.push(c[0]);
+    } else if (g.type === "MultiPolygon") {
+      const c = g.coordinates as unknown as Pt[][][];
+      if (Array.isArray(c)) {
+        for (const poly of c) {
+          if (poly?.[0]?.length) rings.push(poly[0]);
+        }
+      }
+    }
+  }
+  if (!rings.length) return "";
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const ring of rings) {
+    for (const [x, y] of ring) {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return "";
+
+  const spanX = Math.max(1e-9, maxX - minX);
+  const spanY = Math.max(1e-9, maxY - minY);
+  const scale = Math.min((W - PAD * 2) / spanX, (H - PAD * 2) / spanY);
+
+  const project = (p: Pt): Pt => {
+    const x = PAD + (p[0] - minX) * scale;
+    const y = H - (PAD + (p[1] - minY) * scale);
+    return [x, y];
+  };
+
+  const paths = rings
+    .map((ring) => {
+      const pts = ring.map(project).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+      if (pts.length < 3) return "";
+      const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+      return `${d} Z`;
+    })
+    .filter(Boolean)
+    .join(" ");
+
+  const labels = lines
+    .map((line) => {
+      const coords = line.geometry?.coordinates as unknown;
+      if (!Array.isArray(coords) || coords.length < 2) return "";
+      const first = coords[0] as Pt;
+      const last = coords[coords.length - 1] as Pt;
+      if (!Array.isArray(first) || !Array.isArray(last)) return "";
+      const mid: Pt = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2];
+      const [x, y] = project(mid);
+      const label = `${line.type.toUpperCase()} ${line.lengthFt.toFixed(1)} LF`;
+      return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="10" font-weight="700" fill="#111827" text-anchor="middle">${label}</text>`;
+    })
+    .filter(Boolean)
+    .join("");
+
+  return `
+<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Property roof outline">
+  <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
+  <path d="${paths}" fill="#e5e7eb" stroke="#111827" stroke-width="2" />
+  ${labels}
+</svg>`;
+}
+
 function buildProposalHtml(
   form: FormState,
   result: EstimateResult,
@@ -2372,6 +2771,8 @@ function buildProposalHtml(
             Number.isFinite(diagramPerim) && diagramPerim > 0 ? diagramPerim : undefined,
         });
   const pickMeas = (code: string) => result.drawingMeasurements.find((m) => m.code === code)?.value ?? "—";
+  const codeRefs = getComplianceReferencesForCategory(classifyRoofType(form.roofType));
+  const takeoffCmpRows = result.takeoffComparison ?? [];
   const structureRows = [
     ["Roof structure — surface area", pickMeas("RFS-SURF")],
     ["Roof structure — number of squares", pickMeas("RFS-SQ")],
@@ -2392,24 +2793,24 @@ function buildProposalHtml(
   <title>${esc(proposal.proposalTitle)}</title>
   <style>
     *{box-sizing:border-box}
-    body{font-family:'Segoe UI',Arial,sans-serif;padding:32px 40px;color:#1a1a1a;line-height:1.45;max-width:900px;margin:0 auto}
-    h1{margin:0 0 4px;font-size:22px;color:#1e3a5f}
-    h2{margin:24px 0 8px;font-size:15px;color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
-    .subtitle{color:#666;font-size:13px;margin-bottom:16px}
+    body{font-family:'Segoe UI',Arial,sans-serif;padding:32px 40px;color:#000000;line-height:1.45;max-width:900px;margin:0 auto}
+    h1{margin:0 0 4px;font-size:22px;color:#000000}
+    h2{margin:24px 0 8px;font-size:15px;color:#000000;border-bottom:2px solid #000000;padding-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+    .subtitle{color:#000000;font-size:13px;margin-bottom:16px}
     .row{display:flex;gap:32px;margin-top:12px}
     .col{flex:1}
     .col p{margin:2px 0;font-size:13px}
     .col strong{font-size:13px}
-    .label{color:#777;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .label{color:#000000;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
     table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}
     th,td{padding:5px 8px;border:1px solid #d0d0d0}
-    th{background:#f0f4f8;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#444}
+    th{background:#f0f4f8;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#000000}
     .r{text-align:right}
-    .total-row td{font-weight:700;background:#f8fafc;border-top:2px solid #1e3a5f}
+    .total-row td{font-weight:700;background:#f8fafc;border-top:2px solid #000000}
     .highlight{background:#fffde7;font-weight:700;font-size:14px;padding:10px;border:2px solid #d4af37;margin-top:12px;text-align:center}
     .terms{margin-top:8px;font-size:12px;line-height:1.5}
     .terms h2{font-size:13px}
-    .footer{margin-top:24px;text-align:center;color:#999;font-size:11px;border-top:1px solid #ddd;padding-top:10px}
+    .footer{margin-top:24px;text-align:center;color:#000000;font-size:11px;border-top:1px solid #ddd;padding-top:10px}
     @media print{body{padding:16px 20px}}
   </style>
 </head>
@@ -2444,7 +2845,22 @@ function buildProposalHtml(
   </div>
 
   <h2>Roof Measurements</h2>
-  <p class="subtitle" style="margin:0 0 10px;font-size:11px;color:#666">RFS codes are takeoff-style roof structure (walls, perimeters, surface, squares, ridge/hip/valley lengths, roof-edge total). The table below includes RFS rows first, then DRW/LEN plan detail.</p>
+  <p class="subtitle" style="margin:0 0 10px;font-size:11px;color:#000000">${esc(MEASUREMENT_METHODOLOGY_BLURB)}</p>
+  <p class="subtitle" style="margin:0 0 10px;font-size:11px;color:#000000">RFS codes are takeoff-style roof structure (walls, perimeters, surface, squares, ridge/hip/valley lengths, roof-edge total). The table below includes RFS rows first, then DRW/LEN plan detail.</p>
+  ${
+    takeoffCmpRows.length
+      ? `<h3 style="font-size:13px;margin:16px 0 6px;color:#000000">Drawn vs modeled linear (QC)</h3>
+  <table>
+    <thead><tr><th>Edge</th><th class="r">Drawn LF</th><th class="r">Modeled LF</th><th class="r">Delta</th></tr></thead>
+    <tbody>${takeoffCmpRows
+      .map(
+        (r) =>
+          `<tr><td>${esc(r.edge)}</td><td class="r">${esc(String(r.drawnLf))}</td><td class="r">${esc(String(r.heuristicLf))}</td><td class="r">${esc(r.deltaPct != null ? `${(r.deltaPct * 100).toFixed(1)}%` : "—")}</td></tr>`,
+      )
+      .join("")}</tbody>
+  </table>`
+      : ""
+  }
   <div style="text-align:center;margin:12px 0">${diagramSvg}</div>
   <table>
     <thead><tr><th colspan="2">Dwelling Roof Structure</th></tr></thead>
@@ -2476,19 +2892,24 @@ function buildProposalHtml(
       <tr><td>Replacement Cost Value (RCV, after +50% adjustment)</td><td class="r">${money(result.replacementCostValue)}</td></tr>
       <tr><td>Less Depreciation</td><td class="r">(${money(result.depreciation)})</td></tr>
       <tr><td>Actual Cash Value (ACV)</td><td class="r">${money(result.actualCashValue)}</td></tr>
+      <tr><td>Confidence</td><td class="r">${result.confidence} (${result.quality}/100)</td></tr>
+      <tr><td>QC Grade</td><td class="r">${result.quality >= 85 ? "A" : result.quality >= 70 ? "B" : result.quality >= 55 ? "C" : "D"}</td></tr>
     </tbody>
   </table>
+  <p class="subtitle" style="margin-top:8px">
+    ${result.warnings.length ? `QC flags: ${esc(result.warnings.join(" | "))}` : "QC flags: none"}
+  </p>
 
   <div class="highlight">PROPOSAL TOTAL: ${money(result.finalCost)}</div>
 
   <h2>Insurance supplement &amp; carrier comparison</h2>
-  <p class="subtitle" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.55">${esc(
+  <p class="subtitle" style="white-space:pre-wrap;font-size:12px;color:#000000;line-height:1.55">${esc(
     proposal.insuranceSupplementNotes.trim() ||
       "Run Generate Estimate after pasting carrier line items (RCV/ACV/Depreciation, supplement totals) to auto-fill this section.",
   )}</p>
 
   <h2>Estimated insurance payout</h2>
-  <p class="subtitle" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.55">${esc(
+  <p class="subtitle" style="white-space:pre-wrap;font-size:12px;color:#000000;line-height:1.55">${esc(
     proposal.estimatedInsurancePayout.trim() ||
       "Run Generate Estimate to populate initial ACV payment, projected final payment, and out-of-pocket from the settlement model.",
   )}</p>
@@ -2501,14 +2922,14 @@ function buildProposalHtml(
     <h2>Alternates</h2><p style="white-space:pre-wrap">${esc(proposal.alternates)}</p>
     <h2>Financing</h2><p style="white-space:pre-wrap">${esc(proposal.financingNotes)}</p>
     <h2>Assembly notes</h2>
-    <p class="subtitle" style="margin:0 0 10px;font-size:11px;color:#666;line-height:1.5">
+    <p class="subtitle" style="margin:0 0 10px;font-size:11px;color:#000000;line-height:1.5">
       Verify full system layers (decking, ice &amp; water, underlayment, field covering, ridge/vent) against manufacturer data and the scope above. Proposal line items and totals use this application&apos;s material profiles, measurements, and regional multipliers.
     </p>
     <h2>IRC / IBC / ASTM References</h2>
-    <p class="subtitle" style="margin:0 0 8px;font-size:11px;color:#666">Verify against the code edition adopted by your AHJ; section numbers follow the International Residential / Building Code family.</p>
+    <p class="subtitle" style="margin:0 0 8px;font-size:11px;color:#000000">${esc(AHJ_COMPLIANCE_DISCLAIMER)}</p>
     <p class="subtitle" style="margin:0 0 6px;font-size:11px"><a href="${ICC_IRC2024_URL}" target="_blank" rel="noreferrer">2024 International Residential Code (IRC) — ICC Digital Codes</a></p>
     <p class="subtitle" style="margin:0 0 10px;font-size:11px"><a href="${ICC_IBC2018_CHAPTER15_ROOF_URL}" target="_blank" rel="noreferrer">IBC Chapter 15 — Roof Assemblies and Rooftop Structures (ICC Digital Codes, 2018)</a></p>
-    <ul>${ROOFING_COMPLIANCE_REFERENCES.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+    <ul>${codeRefs.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
   </div>
 
   <div class="footer">${esc(proposal.companyName)} | ${esc(proposal.contactEmail)} | ${esc(proposal.contactPhone)}</div>
@@ -2517,45 +2938,58 @@ function buildProposalHtml(
 }
 
 function App() {
+  const mapProvider = useMapProvider();
   const [searchParams, setSearchParams] = useSearchParams();
+  /** Captured once for /measurement/new?auto=1 instant estimate (avoid stale searchParams in one-shot import effect). */
+  const measurementAutoFromQueryRef = useRef(searchParams.get("auto") === "1");
   const mapboxContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapboxMapRef = useRef<any>(null);
+  /** EagleView Embedded Explorer map handle (legacy name kept to limit churn). */
+  const mapboxMapRef = useRef<EmbeddedExplorerMapHandle | null>(null);
   const mapboxDrawRef = useRef<any>(null);
   const refreshMapboxFromDrawRef = useRef<(() => void) | null>(null);
+  const eeViewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 44.86, lon: -93.53 });
   const pendingAiFootprintRef = useRef<{ lat: number; lng: number; L: number; W: number } | null>(null);
   const [aiMapFootprintTick, setAiMapFootprintTick] = useState(0);
   /** Mapbox style `load` fired — Draw features are reliable after this. */
   const mapboxStyleLoadedRef = useRef(false);
-  const mapboxglModuleRef = useRef<any>(null);
   const turfModuleRef = useRef<any>(null);
-  const propertyMarkerRef = useRef<any>(null);
-  const contactMarkersRef = useRef<any[]>([]);
   const mapClickHandlerRef = useRef<(lat: number, lng: number) => void>(() => {});
   const applyContactHandlerRef = useRef<(c: ContactRecord) => void>(() => {});
   const lineTypeRef = useRef<RoofLineType>("ridge");
   const addRoofLineRef = useRef<(line: DrawnRoofLine) => void>(() => {});
   const autoCalcRef = useRef<(polygons: any[]) => void>(() => {});
+  const autoCalcTimerRef = useRef<number | null>(null);
+  const roofGeometryWorkerRef = useRef<Worker | null>(null);
+  const autoCalcRequestIdRef = useRef(0);
   const aiMeasureFileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(defaultFormState());
+  const [measurementSections, setMeasurementSections] = useState<MeasurementSection[]>(() => [
+    buildMeasurementSectionFromForm(defaultFormState(), "Section 1"),
+  ]);
   const [proposal, setProposal] = useState<ProposalState>(defaultProposalState("residential"));
   const [contacts, setContacts] = useState<ContactRecord[]>(() => loadContactsFromStorage());
   const [selectedContactId, setSelectedContactId] = useState("");
   const [contactSearch, setContactSearch] = useState("");
   const [contactsGeocodeBusy, setContactsGeocodeBusy] = useState(false);
-  const [mapboxToken, setMapboxToken] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = window.localStorage.getItem(MAPBOX_TOKEN_STORAGE_KEY);
-      if (saved?.trim()) return saved;
-    }
-    return import.meta.env.VITE_MAPBOX_TOKEN ?? "";
-  });
+  const [eeContainerId] = useState(() =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? `ee-${crypto.randomUUID().replace(/-/g, "")}`
+      : `ee-${Date.now()}`,
+  );
   const [mapboxAreaSqFt, setMapboxAreaSqFt] = useState(0);
   const [mapboxFeatures, setMapboxFeatures] = useState<any[]>([]);
   const [mapboxStatus, setMapboxStatus] = useState("");
+  const [eagleViewReportId, setEagleViewReportId] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem(EAGLEV_REPORT_ID_STORAGE_KEY);
+      if (saved?.trim()) return saved.trim();
+    }
+    return "";
+  });
+  const [trueDesignBusy, setTrueDesignBusy] = useState(false);
+  const [trueDesignNote, setTrueDesignNote] = useState("");
+  const [trueDesignIframeHtml, setTrueDesignIframeHtml] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [msFootprintsVisible, setMsFootprintsVisible] = useState(true);
-  const msFootprintsVisibleRef = useRef(true);
-  const [importMsFootprintBusy, setImportMsFootprintBusy] = useState(false);
   const [raybevelDiagramSvg, setRaybevelDiagramSvg] = useState<string | null>(null);
   const [raybevelDiagramBusy, setRaybevelDiagramBusy] = useState(false);
   const [raybevelDiagramNote, setRaybevelDiagramNote] = useState("");
@@ -2566,17 +3000,20 @@ function App() {
   const flushPendingAiFootprint = useCallback(async () => {
     const p = pendingAiFootprintRef.current;
     if (!p) return;
-    const draw = mapboxDrawRef.current;
+    const ee = mapboxMapRef.current;
     const refresh = refreshMapboxFromDrawRef.current;
-    if (!draw || !refresh || !mapboxStyleLoadedRef.current) return;
+    if (!ee || !refresh || !mapboxStyleLoadedRef.current) return;
 
     try {
-      const data = draw.getAll() as { features?: { id: string; geometry?: { type?: string } }[] };
-      for (const f of data.features ?? []) {
-        if (f.geometry?.type === "Polygon") draw.delete(f.id);
+      try {
+        ee.removeFeatures?.({
+          geoJson: (f: GeoJSON.Feature) => f.geometry?.type === "Polygon",
+        });
+      } catch {
+        /* ignore */
       }
       const feat = await buildAiFootprintPolygonFeature(p.lng, p.lat, p.L, p.W);
-      draw.add(feat as any);
+      ee.addFeatures({ geoJson: [feat as GeoJSON.Feature] });
       refresh();
       pendingAiFootprintRef.current = null;
       setAutoCalcInfo(
@@ -2587,65 +3024,6 @@ function App() {
       setMapboxStatus((s) => (s ? `${s} (AI map footprint skipped.)` : "AI map footprint skipped."));
     }
   }, []);
-
-  const importMsBuildingFootprintAtPin = useCallback(async () => {
-    const map = mapboxMapRef.current;
-    const draw = mapboxDrawRef.current;
-    const refresh = refreshMapboxFromDrawRef.current;
-    if (!map || !draw || !refresh || !mapboxStyleLoadedRef.current) {
-      window.alert("Map is still loading. Wait a moment and try again.");
-      return;
-    }
-    if (!map.getLayer?.("ms-buildings-fill")) {
-      window.alert(
-        "Microsoft building footprints are not on the map. Wait for the map to finish loading or check the browser console for tile errors.",
-      );
-      return;
-    }
-    const lat = Number.parseFloat(form.latitude);
-    const lng = Number.parseFloat(form.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      window.alert("Set property latitude and longitude in Property intake first.");
-      return;
-    }
-    setImportMsFootprintBusy(true);
-    try {
-      const pt = map.project([lng, lat]);
-      let feats = map.queryRenderedFeatures(pt, { layers: ["ms-buildings-fill"] });
-      if (!feats.length) {
-        const pad = 16;
-        const bbox: [[number, number], [number, number]] = [
-          [pt.x - pad, pt.y - pad],
-          [pt.x + pad, pt.y + pad],
-        ];
-        feats = map.queryRenderedFeatures(bbox, { layers: ["ms-buildings-fill"] });
-      }
-      if (!feats.length) {
-        window.alert(
-          "No building footprint under this pin. Zoom to 17–19 so footprints render, center on the roof, then try again.",
-        );
-        return;
-      }
-      const drawFeat = await msFootprintFeatureForDraw(feats[0] as { geometry?: { type?: string; coordinates?: unknown } });
-      if (!drawFeat) {
-        window.alert("Could not use this footprint geometry.");
-        return;
-      }
-      const data = draw.getAll() as { features?: { id: string; geometry?: { type?: string } }[] };
-      for (const f of data.features ?? []) {
-        const t = f.geometry?.type;
-        if (t === "Polygon" || t === "MultiPolygon") draw.delete(f.id);
-      }
-      draw.add(drawFeat as any);
-      refresh();
-      setAutoCalcInfo(
-        "Imported Microsoft US Building Footprint at property pin — plan area and edge lengths follow roof type, structure & pitch.",
-      );
-      setRunId((n) => n + 1);
-    } finally {
-      setImportMsFootprintBusy(false);
-    }
-  }, [form.latitude, form.longitude]);
 
   const [aiMeasureBusy, setAiMeasureBusy] = useState(false);
   const [aiMeasureNote, setAiMeasureNote] = useState("");
@@ -2658,6 +3036,7 @@ function App() {
   const [propertyEnrichBusy, setPropertyEnrichBusy] = useState(false);
   const [runId, setRunId] = useState(0);
   const [lastEstimateId, setLastEstimateId] = useState<string>("");
+  const [pricingPreset, setPricingPreset] = useState<PricingPreset>("standard");
   const [propertyDb, setPropertyDb] = useState<PropertyOwnerRecord[]>([]);
   const [activeProperty, setActiveProperty] = useState<PropertyOwnerRecord | null>(null);
   const [propertyDbSearch, setPropertyDbSearch] = useState("");
@@ -2671,6 +3050,21 @@ function App() {
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"all" | "residential" | "commercial" | "other">("all");
   const [damagePhotos, setDamagePhotos] = useState<TaggedDamagePhoto[]>([]);
   const { addContract, addEstimate, addMeasurement } = useRoofing();
+
+  const measurementSectionTotals = useMemo(() => {
+    const toNum = (value: string) => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    return measurementSections.reduce(
+      (acc, section) => ({
+        areaSqFt: acc.areaSqFt + toNum(section.areaSqFt),
+        perimeterFt: acc.perimeterFt + toNum(section.perimeterFt),
+        measuredSquares: acc.measuredSquares + toNum(section.measuredSquares),
+      }),
+      { areaSqFt: 0, perimeterFt: 0, measuredSquares: 0 },
+    );
+  }, [measurementSections]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -2724,26 +3118,24 @@ function App() {
   }, []);
 
   useEffect(() => {
-    msFootprintsVisibleRef.current = msFootprintsVisible;
-  }, [msFootprintsVisible]);
-
-  useEffect(() => {
     fetchSavedReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!mapboxToken.trim()) {
-      window.localStorage.removeItem(MAPBOX_TOKEN_STORAGE_KEY);
+    if (!eagleViewReportId.trim()) {
+      window.localStorage.removeItem(EAGLEV_REPORT_ID_STORAGE_KEY);
       return;
     }
-    window.localStorage.setItem(MAPBOX_TOKEN_STORAGE_KEY, mapboxToken.trim());
-  }, [mapboxToken]);
+    window.localStorage.setItem(EAGLEV_REPORT_ID_STORAGE_KEY, eagleViewReportId.trim());
+  }, [eagleViewReportId]);
 
   useLayoutEffect(() => {
-    if (!mapboxToken.trim()) {
-      setMapboxStatus("Add Mapbox token to enable map.");
+    if (!isHd2dApiConfigured()) {
+      setMapboxStatus(
+        "Map unavailable: set VITE_INTEL_API_BASE (or run local /intel-proxy) so EagleView auth token can be requested from backend.",
+      );
       return;
     }
     const container = mapboxContainerRef.current;
@@ -2752,240 +3144,141 @@ function App() {
 
     let disposed = false;
     mapboxStyleLoadedRef.current = false;
-    let resizeObserver: ResizeObserver | null = null;
+    mapboxDrawRef.current = null;
+    let pollId: number | null = null;
+
     const init = async () => {
       try {
-        const [{ default: mapboxgl }, { default: MapboxDraw }, turf] = await Promise.all([
-          import("mapbox-gl"),
-          import("@mapbox/mapbox-gl-draw"),
-          import("@turf/turf"),
-        ]);
+        const turf = await import("@turf/turf");
+        if (disposed || !mapboxContainerRef.current) return;
+        turfModuleRef.current = turf;
+
+        await loadEmbeddedExplorerScript();
         if (disposed || !mapboxContainerRef.current) return;
 
-        applyMapboxCspWorker(mapboxgl);
-        mapboxglModuleRef.current = mapboxgl;
-        turfModuleRef.current = turf;
-        const token = mapboxToken.trim();
-        mapboxgl.accessToken = token;
-
-        const lat = Number.parseFloat(form.latitude);
-        const lng = Number.parseFloat(form.longitude);
-        const center: [number, number] =
-          Number.isFinite(lat) && Number.isFinite(lng) ? [lng, lat] : [-93.53, 44.86];
-
-        const map = new mapboxgl.Map({
-          container: mapboxContainerRef.current,
-          style: "mapbox://styles/mapbox/satellite-streets-v12",
-          center,
-          zoom: 18,
-        });
-
-        const scheduleResize = () => {
-          if (disposed) return;
-          map.resize();
-          requestAnimationFrame(() => {
-            if (!disposed) map.resize();
-          });
-        };
-        if (typeof ResizeObserver !== "undefined") {
-          resizeObserver = new ResizeObserver(() => scheduleResize());
-          resizeObserver.observe(mapboxContainerRef.current);
+        const Ev = window.ev?.EmbeddedExplorer;
+        if (!Ev) {
+          setMapboxStatus("EagleView Embedded Explorer failed to load (check network / ad blockers).");
+          return;
         }
 
-        map.on("error", (e: { error?: Error }) => {
-          const msg = e?.error?.message ?? "Map error";
-          setMapboxStatus((s) => (s ? `${s} (${msg})` : msg));
-        });
-        const draw = new MapboxDraw({
-          displayControlsDefault: false,
-          controls: { polygon: true, line_string: true, trash: true },
-        });
-        map.addControl(draw);
-        map.addControl(new mapboxgl.NavigationControl(), "top-right");
-        map.addControl(
-          new mapboxgl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 },
-            trackUserLocation: true,
-            showUserLocation: true,
-            showAccuracyCircle: true,
-          }),
-          "top-right",
-        );
+        mapboxContainerRef.current.id = eeContainerId;
+        const lat0 = Number.parseFloat(form.latitude);
+        const lng0 = Number.parseFloat(form.longitude);
+        const lat = Number.isFinite(lat0) ? lat0 : 44.86;
+        const lng = Number.isFinite(lng0) ? lng0 : -93.53;
+        eeViewCenterRef.current = { lat, lon: lng };
+
+        const authToken = await getEagleViewEmbeddedAuthToken();
+        const map = new Ev().mount(eeContainerId, {
+          authToken,
+          view: { lonLat: { lon: lng, lat } },
+        }) as EmbeddedExplorerMapHandle;
+
         mapboxMapRef.current = map;
-        mapboxDrawRef.current = draw;
 
-        const updateArea = () => {
-          const data = draw.getAll() as any;
-          const polygons = Array.isArray(data?.features)
-            ? data.features.filter((f: any) => f.geometry?.type === "Polygon")
-            : [];
-          setMapboxFeatures(polygons);
-          if (!polygons.length) {
-            setMapboxAreaSqFt(0);
-            setAutoCalcInfo("");
-            return;
-          }
-          const totalSqM = polygons.reduce(
-            (sum: number, f: any) => sum + turf.area(f as any),
-            0,
-          );
-          setMapboxAreaSqFt(totalSqM * 10.7639);
-          autoCalcRef.current(polygons);
-        };
-        refreshMapboxFromDrawRef.current = updateArea;
-
-        const handleDrawCreate = (e: any) => {
-          const features = Array.isArray(e?.features) ? e.features : [];
-          for (const feature of features) {
-            if (feature.geometry?.type === "LineString") {
-              const lengthFt = turf.length(feature, { units: "feet" });
-              addRoofLineRef.current({
-                id: feature.id || `line_${Date.now()}`,
-                type: lineTypeRef.current,
-                lengthFt: Math.round(lengthFt * 100) / 100,
-                geometry: feature.geometry,
-              });
-              draw.delete(feature.id);
-            }
-          }
-          updateArea();
-        };
-
-        map.on("draw.create", handleDrawCreate);
-        map.on("draw.update", updateArea);
-        map.on("draw.delete", updateArea);
-
-        map.on("click", (e: any) => {
-          const mode = draw.getMode();
-          if (mode === "draw_polygon" || mode === "draw_line_string" || mode === "draw_point") return;
-          mapClickHandlerRef.current(e.lngLat.lat, e.lngLat.lng);
-        });
-
-        map.on("load", () => {
+        const syncFromEe = () => {
           if (disposed) return;
-          scheduleResize();
-          mapboxStyleLoadedRef.current = true;
-          const msVis = msFootprintsVisibleRef.current ? "visible" : "none";
           try {
-            if (!map.getSource("ms-building-footprints")) {
-              map.addSource("ms-building-footprints", {
-                type: "vector",
-                tiles: [MS_BUILDING_FOOTPRINT_TILES],
-                minzoom: 0,
-                maxzoom: 16,
-              });
+            const raw = map.getFeatures();
+            const feats = collectGeoJsonFeatures(raw);
+            const polygons = feats.filter((f) => f.geometry?.type === "Polygon") as GeoJSON.Feature<
+              GeoJSON.Polygon | GeoJSON.MultiPolygon
+            >[];
+            setMapboxFeatures(polygons);
+            if (!polygons.length) {
+              setMapboxAreaSqFt(0);
+            } else {
+              const totalSqM = polygons.reduce((sum, f) => sum + turf.area(f as any), 0);
+              setMapboxAreaSqFt(totalSqM * 10.7639);
+              autoCalcRef.current(polygons);
             }
-            if (!map.getLayer("ms-buildings-fill")) {
-              map.addLayer({
-                id: "ms-buildings-fill",
-                type: "fill",
-                source: "ms-building-footprints",
-                "source-layer": MS_BUILDING_FOOTPRINT_SOURCE_LAYER,
-                layout: { visibility: msVis },
-                paint: {
-                  "fill-color": "#fbbf24",
-                  "fill-opacity": 0.14,
-                },
-              });
-            }
-            if (!map.getLayer("ms-buildings-outline")) {
-              map.addLayer({
-                id: "ms-buildings-outline",
-                type: "line",
-                source: "ms-building-footprints",
-                "source-layer": MS_BUILDING_FOOTPRINT_SOURCE_LAYER,
-                layout: { visibility: msVis },
-                paint: {
-                  "line-color": "#d97706",
-                  "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.4, 19, 2],
-                  "line-opacity": 0.85,
-                },
-              });
+            const lineFeats = feats.filter((f) => f.geometry?.type === "LineString") as GeoJSON.Feature<
+              GeoJSON.LineString
+            >[];
+            if (lineFeats.length) {
+              const lt = lineTypeRef.current;
+              setDrawnRoofLines(
+                lineFeats.map((f, i) => ({
+                  id: `ee-line-${i}`,
+                  type: lt,
+                  lengthFt: Math.round(turf.length(f as any, { units: "feet" }) * 100) / 100,
+                  geometry: f.geometry,
+                })),
+              );
             }
           } catch {
-            setMapboxStatus((s) =>
-              s
-                ? `${s} (Microsoft footprint tiles unavailable in this browser/session.)`
-                : "Microsoft footprint tiles unavailable.",
-            );
+            /* EE may return unexpected shape while editing */
           }
-          map.addSource("roof-lines", {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] },
-          });
-          map.addLayer({
-            id: "roof-lines-layer",
-            type: "line",
-            source: "roof-lines",
-            paint: {
-              "line-color": [
-                "match", ["get", "lineType"],
-                "ridge", "#ef4444",
-                "hip", "#f97316",
-                "valley", "#22c55e",
-                "eave", "#3b82f6",
-                "rake", "#a855f7",
-                "wall-flashing", "#eab308",
-                "step-flashing", "#06b6d4",
-                "#ffffff",
-              ] as any,
-              "line-width": 3,
-              "line-opacity": 0.95,
-            },
-          });
-          map.addLayer({
-            id: "roof-lines-labels",
-            type: "symbol",
-            source: "roof-lines",
-            layout: {
-              "text-field": ["concat", ["get", "label"], "  ", ["get", "lengthFt"], " ft"] as any,
-              "text-size": 11,
-              "text-offset": [0, -0.8] as [number, number],
-              "symbol-placement": "line-center" as const,
-              "text-allow-overlap": true,
-            },
-            paint: {
-              "text-color": "#ffffff",
-              "text-halo-color": "#000000",
-              "text-halo-width": 1.5,
-            },
-          });
-          setMapReady(true);
-          void flushPendingAiFootprint();
-          map.once("idle", () => {
-            if (!disposed) scheduleResize();
-          });
-        });
+        };
+        refreshMapboxFromDrawRef.current = syncFromEe;
 
-        setMapboxStatus("Click map to set property. Polygon = area. Line = measure ridges/hips/valleys/eaves.");
+        const onReady = () => {
+          if (disposed) return;
+          try {
+            map.enableMeasurementPanel(true);
+            map.enableSearchBar(true);
+          } catch {
+            /* optional UI toggles */
+          }
+          mapboxStyleLoadedRef.current = true;
+          setMapReady(true);
+          setMapboxStatus(
+            "EagleView imagery: use the viewer’s measurement tools. Estimator syncs polygons/lines every 2s. Use “Set property from map center” for intake pin.",
+          );
+          void flushPendingAiFootprint();
+          syncFromEe();
+          pollId = window.setInterval(syncFromEe, 2000);
+        };
+
+        map.on("onMapReady", onReady);
+        map.on("onViewUpdate", (u: unknown) => {
+          const v = u as { lonLat?: { lat: number; lon: number } };
+          if (v?.lonLat) eeViewCenterRef.current = v.lonLat;
+        });
+        map.on("Errors", (err: unknown) => {
+          console.error("EagleView Embedded Explorer:", err);
+          const msg =
+            err && typeof err === "object" && "message" in err && typeof (err as Error).message === "string"
+              ? (err as Error).message
+              : String(err);
+          setMapboxStatus(`EagleView map error: ${msg || "unknown error"}`);
+        });
+        window.setTimeout(() => {
+          if (disposed || mapboxStyleLoadedRef.current) return;
+          onReady();
+        }, 2500);
       } catch (error) {
         setMapboxStatus(
-          error instanceof Error ? `Mapbox init failed: ${error.message}` : "Mapbox init failed.",
+          error instanceof Error ? `EagleView map init failed: ${error.message}` : "EagleView map init failed.",
         );
       }
     };
-    init();
+    void init();
 
     return () => {
       disposed = true;
-      resizeObserver?.disconnect();
-      resizeObserver = null;
+      if (pollId != null) window.clearInterval(pollId);
       mapboxStyleLoadedRef.current = false;
       setMapReady(false);
-      propertyMarkerRef.current?.remove();
-      propertyMarkerRef.current = null;
-      contactMarkersRef.current.forEach((m: any) => m.remove());
-      contactMarkersRef.current = [];
-      mapboxglModuleRef.current = null;
-      if (mapboxMapRef.current) {
-        mapboxMapRef.current.remove();
-        mapboxMapRef.current = null;
-        mapboxDrawRef.current = null;
+      try {
+        const m = mapboxMapRef.current;
+        m?.off?.("onMapReady");
+        m?.off?.("onViewUpdate");
+        m?.off?.("Errors");
+      } catch {
+        /* ignore */
       }
+      mapboxMapRef.current = null;
+      mapboxDrawRef.current = null;
       refreshMapboxFromDrawRef.current = null;
+      if (mapboxContainerRef.current) {
+        mapboxContainerRef.current.innerHTML = "";
+        mapboxContainerRef.current.removeAttribute("id");
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapboxToken, flushPendingAiFootprint]);
+  }, [eeContainerId, flushPendingAiFootprint]);
 
   useEffect(() => {
     if (aiMapFootprintTick === 0) return;
@@ -2994,71 +3287,43 @@ function App() {
 
   useEffect(() => {
     if (!mapReady) return;
-    const map = mapboxMapRef.current;
-    if (!map?.getLayer?.("ms-buildings-fill")) return;
-    const v = msFootprintsVisible ? "visible" : "none";
+    const ee = mapboxMapRef.current;
+    if (!ee?.addFeatures) return;
+
     try {
-      map.setLayoutProperty("ms-buildings-fill", "visibility", v);
-      map.setLayoutProperty("ms-buildings-outline", "visibility", v);
+      ee.removeFeatures?.({
+        geoJson: (f: GeoJSON.Feature) => Boolean((f.properties as Record<string, unknown> | undefined)?.__roofingApp),
+      });
     } catch {
-      /* layers may be missing during map rebuild */
+      /* ignore */
     }
-  }, [msFootprintsVisible, mapReady]);
 
-  useEffect(() => {
-    if (!mapReady) return;
-    const map = mapboxMapRef.current;
-    const mapboxgl = mapboxglModuleRef.current;
-    if (!map || !mapboxgl) return;
-
-    if (propertyMarkerRef.current) {
-      propertyMarkerRef.current.remove();
-      propertyMarkerRef.current = null;
-    }
-    contactMarkersRef.current.forEach((m: any) => m.remove());
-    contactMarkersRef.current = [];
-
+    const feats: GeoJSON.Feature[] = [];
     const lat = Number.parseFloat(form.latitude);
     const lng = Number.parseFloat(form.longitude);
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      const el = document.createElement("div");
-      el.style.cssText =
-        "width:18px;height:18px;background:#ef4444;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,.4);cursor:pointer;";
-      propertyMarkerRef.current = new mapboxgl.Marker({ element: el })
-        .setLngLat([lng, lat])
-        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML("<strong>Selected Property</strong>"))
-        .addTo(map);
-    }
-
-    contacts
-      .filter((c) => c.lat != null && c.lng != null)
-      .slice(0, 200)
-      .forEach((c) => {
-        const el = document.createElement("div");
-        el.style.cssText =
-          "width:14px;height:14px;background:#3b82f6;border:2px solid #fff;border-radius:50%;cursor:pointer;box-shadow:0 0 3px rgba(0,0,0,.3);";
-        const marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([c.lng!, c.lat!])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 10 }).setHTML(
-              `<strong>${c.name || "Contact"}</strong><br/>${c.address || "No address"}`,
-            ),
-          )
-          .addTo(map);
-        marker.getElement().addEventListener("click", () => {
-          setSelectedContactId(c.id);
-          applyContactHandlerRef.current(c);
-        });
-        contactMarkersRef.current.push(marker);
+      feats.push({
+        type: "Feature",
+        properties: { __roofingApp: true, kind: "property" },
+        geometry: { type: "Point", coordinates: [lng, lat] },
       });
+    }
+    for (const c of contacts.filter((x) => x.lat != null && x.lng != null).slice(0, 200)) {
+      feats.push({
+        type: "Feature",
+        properties: { __roofingApp: true, kind: "contact", contactId: c.id, name: c.name || "Contact" },
+        geometry: { type: "Point", coordinates: [c.lng!, c.lat!] },
+      });
+    }
+    if (feats.length) ee.addFeatures({ geoJson: feats });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, form.latitude, form.longitude, contacts]);
 
   useEffect(() => {
-    const map = mapboxMapRef.current;
-    if (!map || !mapReady) return;
-    const source = map.getSource("roof-lines") as any;
-    if (!source) return;
+    const map = mapboxMapRef.current as unknown as { getSource?: (id: string) => { setData?: (d: unknown) => void } };
+    if (!map?.getSource?.("roof-lines") || !mapReady) return;
+    const source = map.getSource("roof-lines") as { setData: (d: unknown) => void };
     source.setData({
       type: "FeatureCollection",
       features: drawnRoofLines.map((line) => ({
@@ -3097,6 +3362,68 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.roofType, form.roofPitch, autoCalcEnabled]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (roofGeometryWorkerRef.current) return;
+    const worker = new Worker(new URL("./workers/roofGeometry.worker.ts", import.meta.url), { type: "module" });
+    roofGeometryWorkerRef.current = worker;
+    worker.onmessage = (ev: MessageEvent<any>) => {
+      const msg = ev.data;
+      if (!msg || typeof msg !== "object") return;
+      if (msg.requestId !== autoCalcRequestIdRef.current) return;
+      if (msg.type === "error") {
+        setAutoCalcInfo(`Auto-calc worker error: ${msg.message}`);
+        return;
+      }
+      if (msg.type !== "result" || !msg.geo) return;
+      const geo = msg.geo;
+      const manualSums = (msg.manualSums ?? {}) as Record<string, number>;
+      const fmt = (ft: number) => {
+        if (ft <= 0) return "0ft 0in";
+        const w = Math.floor(ft);
+        const inches = Math.round((ft - w) * 12);
+        return `${w}ft ${inches}in`;
+      };
+      const squares = geo.surfaceAreaSqFt / 100;
+      setForm((curr) => ({
+        ...curr,
+        areaSqFt: geo.planAreaSqFt.toFixed(2),
+        measuredSquares: squares.toFixed(2),
+        perimeterFt: geo.floorPerimeterFt.toFixed(2),
+        ridgesFt: (manualSums["ridge"] ?? 0) > 0 ? fmt(manualSums["ridge"] ?? 0) : fmt(geo.ridgeFt),
+        eavesFt: (manualSums["eave"] ?? 0) > 0 ? fmt(manualSums["eave"] ?? 0) : fmt(geo.eaveFt),
+        rakesFt: (manualSums["rake"] ?? 0) > 0 ? fmt(manualSums["rake"] ?? 0) : fmt(geo.rakeFt),
+        valleysFt: (manualSums["valley"] ?? 0) > 0 ? fmt(manualSums["valley"] ?? 0) : fmt(geo.valleyFt),
+        hipsFt: (manualSums["hip"] ?? 0) > 0 ? fmt(manualSums["hip"] ?? 0) : fmt(geo.hipFt),
+        wallFlashingFt:
+          (manualSums["wall-flashing"] ?? 0) > 0 ? fmt(manualSums["wall-flashing"] ?? 0) : fmt(geo.wallFlashFt),
+        stepFlashingFt:
+          (manualSums["step-flashing"] ?? 0) > 0 ? fmt(manualSums["step-flashing"] ?? 0) : fmt(geo.stepFlashFt),
+      }));
+      setAutoCalcInfo(
+        `Auto: ${geo.roofForm} roof | ${geo.buildingL.toFixed(0)}×${geo.buildingW.toFixed(0)} ft | ` +
+          `Plan ${geo.planAreaSqFt.toFixed(0)} SF → ${squares.toFixed(2)} SQ surface (pitch ×${geo.pitchFactor.toFixed(2)}) | ` +
+          `Ridge ${fmt(geo.ridgeFt)} | Eaves ${fmt(geo.eaveFt)}` +
+          (geo.rakeFt > 0 ? ` | Rakes ${fmt(geo.rakeFt)}` : "") +
+          (geo.hipFt > 0 ? ` | Hips ${fmt(geo.hipFt)}` : "") +
+          (geo.valleyFt > 0 ? ` | Valleys ${fmt(geo.valleyFt)}` : "") +
+          ` | Roof edge total ${geo.totalRoofEdgeLf.toFixed(1)} LF`,
+      );
+    };
+    return () => {
+      worker.terminate();
+      roofGeometryWorkerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoCalcTimerRef.current != null) {
+        window.clearTimeout(autoCalcTimerRef.current);
+      }
+    };
+  }, []);
+
   const persistJobs = (jobs: SavedJob[]) => {
     setSavedJobs(jobs);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
@@ -3107,11 +3434,126 @@ function App() {
     return buildResult(form);
   }, [runId, form]);
 
+  const scoreEstimateReadiness = useCallback((preparedForm: FormState) => {
+    let score = 0;
+    const reasons: string[] = [];
+    const area = Number.parseFloat(preparedForm.areaSqFt);
+    const sq = Number.parseFloat(preparedForm.measuredSquares);
+    const hasArea = (Number.isFinite(area) && area > 0) || (Number.isFinite(sq) && sq > 0);
+    if (hasArea) score += 35;
+    else reasons.push("Missing measured area");
+
+    if (preparedForm.address.trim()) score += 15;
+    else reasons.push("Missing property address");
+
+    const lat = Number.parseFloat(preparedForm.latitude);
+    const lng = Number.parseFloat(preparedForm.longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) score += 10;
+    else reasons.push("Missing property coordinates");
+
+    const rise = parsePitchRise(preparedForm.roofPitch);
+    if (rise != null && rise > 0) score += 10;
+    else reasons.push("Roof pitch not set");
+
+    if (drawnRoofLines.length > 0 || mapboxFeatures.some((f: any) => f.geometry?.type === "Polygon")) score += 20;
+    else reasons.push("No roof lines or footprint drawn/imported");
+
+    if (proposal.clientName.trim() || proposal.clientCompany.trim()) score += 10;
+    else reasons.push("Missing owner/contact name");
+
+    return { score: Math.max(0, Math.min(100, score)), reasons };
+  }, [drawnRoofLines.length, mapboxFeatures, proposal.clientCompany, proposal.clientName]);
+
+  function toFtIn(ft: number) {
+    if (!Number.isFinite(ft) || ft <= 0) return "0ft 0in";
+    const wholeFt = Math.floor(ft);
+    const inches = Math.round((ft - wholeFt) * 12);
+    return `${wholeFt}ft ${inches}in`;
+  }
+
+  function prepareFormFromMapMeasurements(base: FormState): FormState {
+    const next = { ...base };
+
+    const manualSums: Record<RoofLineType, number> = {
+      ridge: 0,
+      hip: 0,
+      valley: 0,
+      eave: 0,
+      rake: 0,
+      "wall-flashing": 0,
+      "step-flashing": 0,
+    };
+    for (const line of drawnRoofLines) manualSums[line.type] += line.lengthFt;
+
+    // Always apply explicit map area when available.
+    if (mapboxAreaSqFt > 0) {
+      next.areaSqFt = mapboxAreaSqFt.toFixed(2);
+      next.measuredSquares = (mapboxAreaSqFt / 100).toFixed(2);
+    }
+
+    // Apply manual line measurements first (they should override auto-calc dimensions).
+    if (manualSums.ridge > 0) next.ridgesFt = toFtIn(manualSums.ridge);
+    if (manualSums.eave > 0) next.eavesFt = toFtIn(manualSums.eave);
+    if (manualSums.rake > 0) next.rakesFt = toFtIn(manualSums.rake);
+    if (manualSums.valley > 0) next.valleysFt = toFtIn(manualSums.valley);
+    if (manualSums.hip > 0) next.hipsFt = toFtIn(manualSums.hip);
+    if (manualSums["wall-flashing"] > 0) next.wallFlashingFt = toFtIn(manualSums["wall-flashing"]);
+    if (manualSums["step-flashing"] > 0) next.stepFlashingFt = toFtIn(manualSums["step-flashing"]);
+    const manualPerim = manualSums.eave + manualSums.rake;
+    if (manualPerim > 0) next.perimeterFt = manualPerim.toFixed(2);
+
+    // Auto-calculate from polygons when available (shared geometry module).
+    const polygons = mapboxFeatures.filter((f: any) => f.geometry?.type === "Polygon");
+    if (!autoCalcEnabled || polygons.length === 0) return next;
+
+    const geo = computePolygonRoofGeometry(polygons, next.roofType, next.roofStructure, next.roofPitch);
+    if (!geo) return next;
+
+    next.areaSqFt = geo.planAreaSqFt.toFixed(2);
+    if (geo.floorPerimeterFt > 0 && manualPerim <= 0) next.perimeterFt = geo.floorPerimeterFt.toFixed(2);
+    next.measuredSquares = (geo.surfaceAreaSqFt / 100).toFixed(2);
+
+    if (manualSums.ridge <= 0 && geo.ridgeFt > 0) next.ridgesFt = toFtIn(geo.ridgeFt);
+    if (manualSums.eave <= 0 && geo.eaveFt > 0) next.eavesFt = toFtIn(geo.eaveFt);
+    if (manualSums.rake <= 0 && geo.rakeFt > 0) next.rakesFt = toFtIn(geo.rakeFt);
+    if (manualSums.valley <= 0 && geo.valleyFt > 0) next.valleysFt = toFtIn(geo.valleyFt);
+    if (manualSums.hip <= 0 && geo.hipFt > 0) next.hipsFt = toFtIn(geo.hipFt);
+    if (manualSums["wall-flashing"] <= 0 && geo.wallFlashFt > 0) next.wallFlashingFt = toFtIn(geo.wallFlashFt);
+    if (manualSums["step-flashing"] <= 0 && geo.stepFlashFt > 0) next.stepFlashingFt = toFtIn(geo.stepFlashFt);
+
+    return next;
+  }
+
+  const instantPreparedForm = useMemo(() => prepareFormFromMapMeasurements(form), [form, mapboxFeatures, drawnRoofLines, autoCalcEnabled, mapboxAreaSqFt]);
+  const instantReadiness = useMemo(() => scoreEstimateReadiness(instantPreparedForm), [instantPreparedForm, scoreEstimateReadiness]);
+  const instantPreview = useMemo(() => buildResult(instantPreparedForm), [instantPreparedForm]);
+
   const roofDiagramPreviewHtml = useMemo(() => {
     if (!result) return "";
     if (raybevelDiagramSvg?.includes("<svg")) {
       return `<div style="max-width:100%;overflow:auto;border-radius:8px;background:#fff;padding:4px">${raybevelDiagramSvg}</div>`;
     }
+
+    const drawnPoly = mapboxFeatures.find(
+      (f: any) => f?.geometry?.type === "Polygon",
+    ) as GeoJSON.Feature<GeoJSON.Polygon> | undefined;
+    if (drawnPoly) {
+      const areaN = Number.parseFloat(form.areaSqFt) || 0;
+      const perimN = Number.parseFloat(form.perimeterFt) || 0;
+      const sqN = Number.parseFloat(form.measuredSquares) || 0;
+      const accurate = buildAccurateDiagramSvg(
+        drawnPoly,
+        drawnRoofLines,
+        form.roofType,
+        form.roofPitch,
+        areaN,
+        perimN,
+        sqN,
+        { width: 600, height: 440 },
+      );
+      if (accurate) return accurate;
+    }
+
     const previewPerim = Number.parseFloat(form.perimeterFt);
     return buildRoofDiagramSvg(
       form.roofType,
@@ -3131,10 +3573,13 @@ function App() {
   }, [
     raybevelDiagramSvg,
     result,
+    mapboxFeatures,
+    drawnRoofLines,
     form.roofType,
     form.roofStructure,
     form.areaSqFt,
     form.perimeterFt,
+    form.measuredSquares,
     form.roofPitch,
     form.ridgesFt,
     form.eavesFt,
@@ -3144,6 +3589,14 @@ function App() {
     form.wallFlashingFt,
     form.stepFlashingFt,
   ]);
+
+  const proposalPropertyDiagramSvg = useMemo(() => {
+    const polygons = mapboxFeatures.filter(
+      (f: any) => f?.geometry?.type === "Polygon" || f?.geometry?.type === "MultiPolygon",
+    );
+    if (!polygons.length) return "";
+    return buildPropertyOutlineDiagramSvg(polygons, drawnRoofLines, { width: 560, height: 360 });
+  }, [mapboxFeatures, drawnRoofLines]);
 
   const generateRaybevelDiagramFromMap = async () => {
     const poly = mapboxFeatures.find((f: any) => f.geometry?.type === "Polygon");
@@ -3234,9 +3687,16 @@ function App() {
     }
   };
 
-  const fetchStlIntelAtPoint = async (lat: number, lng: number) => {
+  const fetchStlIntelAtPoint = async (lat: number, lng: number): Promise<StlIntelData | null> => {
     setIntelBusy(true);
     setIntelError("");
+    if (!isHd2dApiConfigured()) {
+      setIntelError(
+        "Intel Worker is not configured. For production/preview, set VITE_INTEL_API_BASE to your deployed HD2D Worker URL. For local dev, run wrangler on port 8787 or set INTEL_PROXY_TARGET to a deployed Worker.",
+      );
+      setIntelBusy(false);
+      return null;
+    }
     try {
       const [intelRes, stormsRes] = await Promise.all([
         fetch(`${INTEL_API_BASE}/api/stl/intel?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`),
@@ -3246,10 +3706,13 @@ function App() {
       if (!stormsRes.ok) throw new Error(`Storm report request failed (${stormsRes.status})`);
       const intelJson = (await intelRes.json()) as { data?: StlIntelData };
       const stormJson = (await stormsRes.json()) as { data?: StlStormData };
-      setStlIntel(intelJson.data ?? null);
+      const intel = intelJson.data ?? null;
+      setStlIntel(intel);
       setStlStorms(stormJson.data ?? null);
+      return intel;
     } catch (e) {
       setIntelError(e instanceof Error ? e.message : "Failed to load STL intel data");
+      return null;
     } finally {
       setIntelBusy(false);
     }
@@ -3268,10 +3731,15 @@ function App() {
   ): PropertyOwnerRecord => {
     const taxLine = taxSummary.trim();
     const nextNotes = [base.notes.trim(), payload.notes.trim()].filter(Boolean).join("\n");
+    const resolvedOwnerName =
+      payload.ownerName.trim() ||
+      payload.ownerPmEntityLabel?.trim() ||
+      payload.contactPersonName.trim() ||
+      base.ownerName;
     return {
       ...base,
       address: payload.address.trim() || base.address,
-      ownerName: payload.ownerName.trim() || base.ownerName,
+      ownerName: resolvedOwnerName,
       ownerPhone: payload.ownerPhone.trim() || payload.contactPersonPhone.trim() || base.ownerPhone,
       ownerEmail: payload.ownerEmail.trim() || base.ownerEmail,
       propertyType: payload.propertyType || base.propertyType,
@@ -3297,6 +3765,25 @@ function App() {
     }
     const taxSummary = formatTaxSummaryFromBatchDataRecord(r.rawRecord);
     return mergeBatchPayloadIntoProperty(base, r.payload, taxSummary);
+  };
+
+  const applyParcelAutoFillToProperty = (
+    base: PropertyOwnerRecord,
+    parcel: Record<string, unknown> | null,
+  ): PropertyOwnerRecord => {
+    if (!parcel) return base;
+    const auto = extractParcelAutoFill(parcel);
+    const parcelNotes = buildParcelHandoffNotes(parcel);
+    return {
+      ...base,
+      ownerName: auto.ownerName.trim() || base.ownerName,
+      ownerPhone: auto.ownerPhone.trim() || base.ownerPhone,
+      ownerEmail: auto.ownerEmail.trim() || base.ownerEmail,
+      yearBuilt: auto.yearBuilt.trim() || base.yearBuilt,
+      lotSizeSqFt: auto.lotSizeSqFt.trim() || base.lotSizeSqFt,
+      notes: [base.notes.trim(), parcelNotes].filter(Boolean).join("\n\n"),
+      updatedAt: new Date().toISOString(),
+    };
   };
 
   const addDamagePhotos = (files: FileList | null) => {
@@ -3332,7 +3819,6 @@ function App() {
     }));
 
     const existing = findNearbyProperty(lat, lng);
-    fetchStlIntelAtPoint(lat, lng);
     if (existing) {
       setActiveProperty(existing);
       setShowPropertyPanel(true);
@@ -3360,7 +3846,9 @@ function App() {
         address: resolvedAddress || curr.address,
         stateCode,
       }));
-      const blank = newBlankProperty(resolvedAddress, lat, lng);
+      let blank = newBlankProperty(resolvedAddress, lat, lng);
+      const intel = await fetchStlIntelAtPoint(lat, lng);
+      blank = applyParcelAutoFillToProperty(blank, intel?.parcel ?? null);
       const criteria =
         nominatimReverseToBatchDataCriteria({
           display_name: data.display_name,
@@ -3369,12 +3857,18 @@ function App() {
       const enriched = await enrichPropertyFromBatchData(blank, criteria);
       setActiveProperty(enriched);
       setShowPropertyPanel(true);
+      applyPropertyToForm(enriched);
       const hasTax = enriched.taxSummary.trim().length > 0;
       const hasContact = Boolean(enriched.ownerName || enriched.ownerPhone || enriched.ownerEmail);
       if (hasTax || hasContact) {
         setGeoStatus("Property loaded with assessor/tax and owner contact details.");
       } else {
-        setGeoStatus("Property loaded. Add owner details and save.");
+        const key = resolveBatchDataKey();
+        if (!key) {
+          setGeoStatus("Property loaded. Add a BatchData API key in settings to pull owner/contact details on click.");
+        } else {
+          setGeoStatus("Property loaded. Add owner details and save.");
+        }
       }
     } catch (e) {
       const blank = newBlankProperty("", lat, lng);
@@ -3402,7 +3896,8 @@ function App() {
   const flyMapTo = (lat: number, lng: number) => {
     const map = mapboxMapRef.current;
     if (!map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    map.flyTo({ center: [lng, lat], zoom: 18, duration: 1200 });
+    eeViewCenterRef.current = { lat, lon: lng };
+    map.setLonLat?.({ lat, lon: lng });
   };
 
   const applyContactToProposal = (contact: ContactRecord) => {
@@ -3426,6 +3921,7 @@ function App() {
     try {
       const enriched = await enrichPropertyFromBatchData(base, criteria);
       setActiveProperty(enriched);
+      applyPropertyToForm(enriched);
       const hasTax = enriched.taxSummary.trim().length > 0;
       const hasContact = Boolean(enriched.ownerName || enriched.ownerPhone || enriched.ownerEmail);
       if (hasTax || hasContact) {
@@ -3456,6 +3952,13 @@ function App() {
     }
     setAiMeasureBusy(true);
     setAiMeasureNote("");
+    if (!isHd2dApiConfigured()) {
+      setAiMeasureNote(
+        "Roof pitch AI requires the HD2D Worker. Set VITE_INTEL_API_BASE (production/preview) or run the dev server with Intel available (wrangler on 8787 or INTEL_PROXY_TARGET).",
+      );
+      setAiMeasureBusy(false);
+      return;
+    }
     try {
       const { imageBase64, mimeType } = await prepareImageForRoofPitchAi(file);
       if (imageBase64.length > 5_500_000) {
@@ -3612,51 +4115,54 @@ function App() {
   autoCalcRef.current = (polygons: any[]) => {
     if (!autoCalcEnabled) return;
     if (!polygons.length) return;
-
-    const geo = computePolygonRoofGeometry(polygons, form.roofType, form.roofStructure, form.roofPitch);
-    if (!geo) return;
-
-    const fmt = (ft: number) => {
-      if (ft <= 0) return "0ft 0in";
-      const w = Math.floor(ft);
-      const inches = Math.round((ft - w) * 12);
-      return `${w}ft ${inches}in`;
-    };
-
-    const manualSums: Record<string, number> = {};
-    for (const line of drawnRoofLines) manualSums[line.type] = (manualSums[line.type] || 0) + line.lengthFt;
-
-    const squares = geo.surfaceAreaSqFt / 100;
-
-    setForm((curr) => ({
-      ...curr,
-      areaSqFt: geo.planAreaSqFt.toFixed(2),
-      measuredSquares: squares.toFixed(2),
-      perimeterFt: geo.floorPerimeterFt.toFixed(2),
-      ridgesFt: (manualSums["ridge"] ?? 0) > 0 ? fmt(manualSums["ridge"] ?? 0) : fmt(geo.ridgeFt),
-      eavesFt: (manualSums["eave"] ?? 0) > 0 ? fmt(manualSums["eave"] ?? 0) : fmt(geo.eaveFt),
-      rakesFt: (manualSums["rake"] ?? 0) > 0 ? fmt(manualSums["rake"] ?? 0) : fmt(geo.rakeFt),
-      valleysFt: (manualSums["valley"] ?? 0) > 0 ? fmt(manualSums["valley"] ?? 0) : fmt(geo.valleyFt),
-      hipsFt: (manualSums["hip"] ?? 0) > 0 ? fmt(manualSums["hip"] ?? 0) : fmt(geo.hipFt),
-      wallFlashingFt:
-        (manualSums["wall-flashing"] ?? 0) > 0
-          ? fmt(manualSums["wall-flashing"] ?? 0)
-          : fmt(geo.wallFlashFt),
-      stepFlashingFt:
-        (manualSums["step-flashing"] ?? 0) > 0
-          ? fmt(manualSums["step-flashing"] ?? 0)
-          : fmt(geo.stepFlashFt),
-    }));
-
-    setAutoCalcInfo(
-      `Auto: ${geo.roofForm} roof | ${geo.buildingL.toFixed(0)}×${geo.buildingW.toFixed(0)} ft | ` +
-      `Plan ${geo.planAreaSqFt.toFixed(0)} SF → ${squares.toFixed(2)} SQ surface (pitch ×${geo.pitchFactor.toFixed(2)}) | ` +
-      `Ridge ${fmt(geo.ridgeFt)} | Eaves ${fmt(geo.eaveFt)}` +
-      (geo.rakeFt > 0 ? ` | Rakes ${fmt(geo.rakeFt)}` : "") +
-      (geo.hipFt > 0 ? ` | Hips ${fmt(geo.hipFt)}` : "") +
-      (geo.valleyFt > 0 ? ` | Valleys ${fmt(geo.valleyFt)}` : "") +
-      ` | Roof edge total ${geo.totalRoofEdgeLf.toFixed(1)} LF`,
-    );
+    if (autoCalcTimerRef.current != null) {
+      window.clearTimeout(autoCalcTimerRef.current);
+    }
+    autoCalcTimerRef.current = window.setTimeout(() => {
+      const manualSums: Record<string, number> = {};
+      for (const line of drawnRoofLines) manualSums[line.type] = (manualSums[line.type] || 0) + line.lengthFt;
+      const worker = roofGeometryWorkerRef.current;
+      if (worker) {
+        const requestId = autoCalcRequestIdRef.current + 1;
+        autoCalcRequestIdRef.current = requestId;
+        worker.postMessage({
+          type: "compute",
+          requestId,
+          polygons,
+          roofType: form.roofType,
+          roofStructure: form.roofStructure,
+          roofPitch: form.roofPitch,
+          manualSums,
+        });
+        return;
+      }
+      // Fallback path when worker cannot initialize.
+      const geo = computePolygonRoofGeometry(polygons, form.roofType, form.roofStructure, form.roofPitch);
+      if (!geo) return;
+      const fmt = (ft: number) => {
+        if (ft <= 0) return "0ft 0in";
+        const w = Math.floor(ft);
+        const inches = Math.round((ft - w) * 12);
+        return `${w}ft ${inches}in`;
+      };
+      const squares = geo.surfaceAreaSqFt / 100;
+      setForm((curr) => ({
+        ...curr,
+        areaSqFt: geo.planAreaSqFt.toFixed(2),
+        measuredSquares: squares.toFixed(2),
+        perimeterFt: geo.floorPerimeterFt.toFixed(2),
+        ridgesFt: (manualSums["ridge"] ?? 0) > 0 ? fmt(manualSums["ridge"] ?? 0) : fmt(geo.ridgeFt),
+        eavesFt: (manualSums["eave"] ?? 0) > 0 ? fmt(manualSums["eave"] ?? 0) : fmt(geo.eaveFt),
+        rakesFt: (manualSums["rake"] ?? 0) > 0 ? fmt(manualSums["rake"] ?? 0) : fmt(geo.rakeFt),
+        valleysFt: (manualSums["valley"] ?? 0) > 0 ? fmt(manualSums["valley"] ?? 0) : fmt(geo.valleyFt),
+        hipsFt: (manualSums["hip"] ?? 0) > 0 ? fmt(manualSums["hip"] ?? 0) : fmt(geo.hipFt),
+        wallFlashingFt:
+          (manualSums["wall-flashing"] ?? 0) > 0 ? fmt(manualSums["wall-flashing"] ?? 0) : fmt(geo.wallFlashFt),
+        stepFlashingFt:
+          (manualSums["step-flashing"] ?? 0) > 0 ? fmt(manualSums["step-flashing"] ?? 0) : fmt(geo.stepFlashFt),
+      }));
+      setAutoCalcInfo(`Auto (fallback): ${geo.roofForm} roof | ${squares.toFixed(2)} SQ surface`);
+    }, 120);
   };
 
   const persistPropertyDb = (records: PropertyOwnerRecord[]) => {
@@ -3721,6 +4227,7 @@ function App() {
   };
 
   const applyPropertyToForm = (prop: PropertyOwnerRecord) => {
+    const orgLike = /\b(llc|inc|corp|company|co\.|properties|holdings|trust|partners?)\b/i.test(prop.ownerName);
     setForm((curr) => ({
       ...curr,
       address: prop.address || curr.address,
@@ -3730,7 +4237,8 @@ function App() {
     }));
     setProposal((curr) => ({
       ...curr,
-      clientName: prop.ownerName || curr.clientName,
+      clientName: orgLike ? curr.clientName : prop.ownerName || curr.clientName,
+      clientCompany: orgLike ? prop.ownerName || curr.clientCompany : curr.clientCompany,
       clientEmail: prop.ownerEmail || curr.clientEmail,
       clientPhone: prop.ownerPhone || curr.clientPhone,
     }));
@@ -3884,7 +4392,9 @@ function App() {
         status: "draft",
       });
     }
-    const html = buildProposalHtml(form, result, proposal, { diagramSvgOverride: raybevelDiagramSvg });
+    const html = buildProposalHtml(form, result, proposal, {
+      diagramSvgOverride: proposalPropertyDiagramSvg || raybevelDiagramSvg,
+    });
     const win = window.open("", "_blank", "width=980,height=900");
     if (!win) return;
     win.document.write(html);
@@ -3893,88 +4403,210 @@ function App() {
     setTimeout(() => win.print(), 250);
   };
 
-  const toFtIn = (ft: number) => {
-    if (!Number.isFinite(ft) || ft <= 0) return "0ft 0in";
-    const wholeFt = Math.floor(ft);
-    const inches = Math.round((ft - wholeFt) * 12);
-    return `${wholeFt}ft ${inches}in`;
-  };
-
-  const prepareFormFromMapMeasurements = (base: FormState): FormState => {
-    const next = { ...base };
-
-    const manualSums: Record<RoofLineType, number> = {
-      ridge: 0,
-      hip: 0,
-      valley: 0,
-      eave: 0,
-      rake: 0,
-      "wall-flashing": 0,
-      "step-flashing": 0,
-    };
-    for (const line of drawnRoofLines) manualSums[line.type] += line.lengthFt;
-
-    // Always apply explicit map area when available.
-    if (mapboxAreaSqFt > 0) {
-      next.areaSqFt = mapboxAreaSqFt.toFixed(2);
-      next.measuredSquares = (mapboxAreaSqFt / 100).toFixed(2);
+  const exportFootprintDxf = useCallback(() => {
+    const polys = mapboxFeatures.filter((f: { geometry?: { type?: string } }) => f.geometry?.type === "Polygon");
+    if (!polys.length) {
+      window.alert("Draw or import a building footprint polygon on the map first.");
+      return;
     }
+    const dxf = buildFootprintDxfFromPolygons(polys as FootprintFeature[]);
+    const blob = new Blob([dxf], { type: "application/dxf" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `roof-footprint-${Date.now()}.dxf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [mapboxFeatures]);
 
-    // Apply manual line measurements first (they should override auto-calc dimensions).
-    if (manualSums.ridge > 0) next.ridgesFt = toFtIn(manualSums.ridge);
-    if (manualSums.eave > 0) next.eavesFt = toFtIn(manualSums.eave);
-    if (manualSums.rake > 0) next.rakesFt = toFtIn(manualSums.rake);
-    if (manualSums.valley > 0) next.valleysFt = toFtIn(manualSums.valley);
-    if (manualSums.hip > 0) next.hipsFt = toFtIn(manualSums.hip);
-    if (manualSums["wall-flashing"] > 0) next.wallFlashingFt = toFtIn(manualSums["wall-flashing"]);
-    if (manualSums["step-flashing"] > 0) next.stepFlashingFt = toFtIn(manualSums["step-flashing"]);
-    const manualPerim = manualSums.eave + manualSums.rake;
-    if (manualPerim > 0) next.perimeterFt = manualPerim.toFixed(2);
+  const loadEagleViewRoofIntoForm = useCallback(async () => {
+    if (!isTrueDesignApiConfigured()) {
+      window.alert(
+        "EagleView API is not configured. Run the HD2D Worker (wrangler dev in backend) and point Vite at it, or set VITE_INTEL_API_BASE / VITE_EAGLEVIEW_API_BASE. Configure EagleView secrets on the Worker (see backend/wrangler.toml).",
+      );
+      return;
+    }
+    const id = Number.parseInt(eagleViewReportId.trim(), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      window.alert("Enter a valid numeric EagleView report ID.");
+      return;
+    }
+    setTrueDesignBusy(true);
+    setTrueDesignNote("");
+    try {
+      const res = await trueDesignFetch(`/solar/v1/truedesign/systemRoof?reportId=${id}`);
+      const text = await res.text();
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error(
+            "HTTP 401 — EagleView or the Worker rejected the request. Check EAGLEVIEW_* secrets on the Worker (.dev.vars locally) and that your OAuth Client ID matches developer.eagleview.com.",
+          );
+        }
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      const data = JSON.parse(text) as EagleViewSystemRoofData;
+      const patch = mapEagleViewSystemRoofToFormPatch(data);
+      setForm((curr) => ({
+        ...curr,
+        ...patch,
+        propertyRecordNotes: [
+          curr.propertyRecordNotes,
+          `EagleView TrueDesign systemRoof (reportId=${id})`,
+        ]
+          .filter((s) => typeof s === "string" && s.trim() !== "")
+          .join("\n"),
+      }));
+      setTrueDesignNote(`Loaded roof summary from EagleView report ${id}.`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTrueDesignNote(msg);
+      window.alert(`EagleView systemRoof failed: ${msg}`);
+    } finally {
+      setTrueDesignBusy(false);
+    }
+  }, [eagleViewReportId]);
 
-    // Auto-calculate from polygons when available (shared geometry module).
-    const polygons = mapboxFeatures.filter((f: any) => f.geometry?.type === "Polygon");
-    if (!autoCalcEnabled || polygons.length === 0) return next;
+  const launchTrueDesignSession = useCallback(async () => {
+    if (!isTrueDesignApiConfigured()) {
+      window.alert(
+        "EagleView API is not configured. Run the HD2D Worker (wrangler dev in backend) and point Vite at it, or set VITE_INTEL_API_BASE / VITE_EAGLEVIEW_API_BASE. Configure EagleView secrets on the Worker (see backend/wrangler.toml).",
+      );
+      return;
+    }
+    const id = Number.parseInt(eagleViewReportId.trim(), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      window.alert("Enter a valid numeric EagleView report ID.");
+      return;
+    }
+    setTrueDesignBusy(true);
+    setTrueDesignNote("");
+    setTrueDesignIframeHtml(null);
+    try {
+      const res = await trueDesignFetch(`/solar/v1/truedesign/init?reportId=${id}`, {
+        method: "POST",
+        body: JSON.stringify({
+          reportId: id,
+          customScope: [],
+          featureConfig: [],
+          configuration: { defaultVersion: "", hideVersion: [] },
+        }),
+      });
+      const html = await res.text();
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error(
+            "HTTP 401 — EagleView or the Worker rejected the request. Check EAGLEVIEW_* secrets on the Worker (.dev.vars locally) and that your OAuth Client ID matches developer.eagleview.com.",
+          );
+        }
+        throw new Error(html || `HTTP ${res.status}`);
+      }
+      if (html.includes("<") && html.includes(">")) {
+        setTrueDesignIframeHtml(html);
+        setTrueDesignNote("TrueDesign session HTML loaded below (embedded).");
+      } else {
+        setTrueDesignNote(`TrueDesign init response: ${html.trim() || "(empty)"}`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTrueDesignNote(msg);
+      window.alert(`TrueDesign init failed: ${msg}`);
+    } finally {
+      setTrueDesignBusy(false);
+    }
+  }, [eagleViewReportId]);
 
-    const geo = computePolygonRoofGeometry(polygons, next.roofType, next.roofStructure, next.roofPitch);
-    if (!geo) return next;
-
-    next.areaSqFt = geo.planAreaSqFt.toFixed(2);
-    if (geo.floorPerimeterFt > 0 && manualPerim <= 0) next.perimeterFt = geo.floorPerimeterFt.toFixed(2);
-    next.measuredSquares = (geo.surfaceAreaSqFt / 100).toFixed(2);
-
-    if (manualSums.ridge <= 0 && geo.ridgeFt > 0) next.ridgesFt = toFtIn(geo.ridgeFt);
-    if (manualSums.eave <= 0 && geo.eaveFt > 0) next.eavesFt = toFtIn(geo.eaveFt);
-    if (manualSums.rake <= 0 && geo.rakeFt > 0) next.rakesFt = toFtIn(geo.rakeFt);
-    if (manualSums.valley <= 0 && geo.valleyFt > 0) next.valleysFt = toFtIn(geo.valleyFt);
-    if (manualSums.hip <= 0 && geo.hipFt > 0) next.hipsFt = toFtIn(geo.hipFt);
-    if (manualSums["wall-flashing"] <= 0 && geo.wallFlashFt > 0) next.wallFlashingFt = toFtIn(geo.wallFlashFt);
-    if (manualSums["step-flashing"] <= 0 && geo.stepFlashFt > 0) next.stepFlashingFt = toFtIn(geo.stepFlashFt);
-
-    return next;
+  const addMeasurementSection = () => {
+    setMeasurementSections((prev) => [
+      ...prev,
+      {
+        id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        label: `Section ${prev.length + 1}`,
+        areaSqFt: "",
+        perimeterFt: "",
+        measuredSquares: "",
+      },
+    ]);
   };
 
-  const runEstimatePipeline = (preparedForm: FormState) => {
-    const area = Number.parseFloat(preparedForm.areaSqFt);
-    const sq = Number.parseFloat(preparedForm.measuredSquares);
+  const removeMeasurementSection = (id: string) => {
+    setMeasurementSections((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  };
+
+  const updateMeasurementSection = (
+    id: string,
+    key: keyof Omit<MeasurementSection, "id">,
+    value: string,
+  ) => {
+    setMeasurementSections((prev) =>
+      prev.map((section) => (section.id === id ? { ...section, [key]: value } : section)),
+    );
+  };
+
+  const applyMeasurementSectionsToForm = () => {
+    setForm((curr) => ({
+      ...curr,
+      areaSqFt:
+        measurementSectionTotals.areaSqFt > 0 ? measurementSectionTotals.areaSqFt.toFixed(2) : curr.areaSqFt,
+      perimeterFt:
+        measurementSectionTotals.perimeterFt > 0
+          ? measurementSectionTotals.perimeterFt.toFixed(2)
+          : curr.perimeterFt,
+      measuredSquares:
+        measurementSectionTotals.measuredSquares > 0
+          ? measurementSectionTotals.measuredSquares.toFixed(2)
+          : curr.measuredSquares,
+    }));
+  };
+
+  const runEstimatePipeline = (preparedForm: FormState, opts?: { forceLowReadiness?: boolean }) => {
+    const preparedWithSectionTotals: FormState =
+      measurementSectionTotals.areaSqFt > 0 ||
+      measurementSectionTotals.perimeterFt > 0 ||
+      measurementSectionTotals.measuredSquares > 0
+        ? {
+            ...preparedForm,
+            areaSqFt:
+              measurementSectionTotals.areaSqFt > 0
+                ? measurementSectionTotals.areaSqFt.toFixed(2)
+                : preparedForm.areaSqFt,
+            perimeterFt:
+              measurementSectionTotals.perimeterFt > 0
+                ? measurementSectionTotals.perimeterFt.toFixed(2)
+                : preparedForm.perimeterFt,
+            measuredSquares:
+              measurementSectionTotals.measuredSquares > 0
+                ? measurementSectionTotals.measuredSquares.toFixed(2)
+                : preparedForm.measuredSquares,
+          }
+        : preparedForm;
+    const readiness = scoreEstimateReadiness(preparedWithSectionTotals);
+    if (readiness.score < 45 && !opts?.forceLowReadiness) {
+      window.alert(
+        `Estimate readiness is ${readiness.score}/100. Add missing inputs first:\n- ${readiness.reasons.join("\n- ")}`,
+      );
+      setMapboxStatus(`Estimate paused: readiness ${readiness.score}/100.`);
+      return;
+    }
+    const area = Number.parseFloat(preparedWithSectionTotals.areaSqFt);
+    const sq = Number.parseFloat(preparedWithSectionTotals.measuredSquares);
     if ((!Number.isFinite(area) || area <= 0) && (!Number.isFinite(sq) || sq <= 0)) {
       window.alert("Enter plan area or measured squares before generating.");
       return;
     }
 
-    const computed = buildResult(preparedForm);
+    const computed = buildResult(preparedWithSectionTotals);
     if (computed) {
       const measurementId = `m_${Date.now()}`;
-      const roofForm = inferRoofFormType(preparedForm.roofType, preparedForm.roofStructure);
-      const pitchRise = parsePitchRise(preparedForm.roofPitch) ?? 6;
-      const waste = Number.parseFloat(preparedForm.wastePercent) || computed.wastePct;
+      const roofForm = inferRoofFormType(preparedWithSectionTotals.roofType, preparedWithSectionTotals.roofStructure);
+      const pitchRise = parsePitchRise(preparedWithSectionTotals.roofPitch) ?? 6;
+      const waste = Number.parseFloat(preparedWithSectionTotals.wastePercent) || computed.wastePct;
       const adjustedArea = computed.effectiveSquares * 100;
       const approxSide = Math.sqrt(adjustedArea);
 
       addMeasurement({
         id: measurementId,
-        projectName: preparedForm.address || "Roof Project",
+        projectName: preparedWithSectionTotals.address || "Roof Project",
         date: new Date().toLocaleDateString(),
-        roofMaterial: preparedForm.roofType,
+        roofMaterial: preparedWithSectionTotals.roofType,
         roofForm,
         length: Number.isFinite(approxSide) ? round2(approxSide) : 0,
         width: Number.isFinite(approxSide) ? round2(approxSide) : 0,
@@ -4007,7 +4639,7 @@ function App() {
       addEstimate({
         id: estimateId,
         measurementId,
-        projectName: preparedForm.address || "Roof Project",
+        projectName: preparedWithSectionTotals.address || "Roof Project",
         date: new Date().toLocaleDateString(),
         materials,
         labor,
@@ -4020,7 +4652,11 @@ function App() {
 
       setProposal((curr) => ({
         ...curr,
-        insuranceSupplementNotes: buildInsuranceSupplementNotes(preparedForm, computed),
+        insuranceSupplementNotes:
+          `Estimate readiness: ${readiness.score}/100` +
+          (readiness.reasons.length ? ` (${readiness.reasons.join("; ")})` : "") +
+          "\n\n" +
+          buildInsuranceSupplementNotes(preparedWithSectionTotals, computed),
         estimatedInsurancePayout: buildEstimatedInsurancePayoutSummary(computed),
       }));
     }
@@ -4050,7 +4686,7 @@ function App() {
       const next = formStateWithContact(curr, c);
       if (auto) {
         const pf = prepareFormFromMapMeasurements(next);
-        queueMicrotask(() => runEstimatePipeline(pf));
+        queueMicrotask(() => runEstimatePipeline(pf, { forceLowReadiness: true }));
         return pf;
       }
       return next;
@@ -4062,45 +4698,63 @@ function App() {
     }
   }, [searchParams]);
 
-  // One-shot import from Property records page (localStorage handoff).
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount; flyMapTo is stable enough for map fly
+  // One-shot import from Property records / Canvassing (localStorage + sessionStorage handoff).
+  // Must run once per mount: do not depend on `form` (re-runs would miss the stash after first removal).
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally mount-only; uses defaultFormState() as base
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem(PENDING_PROPERTY_IMPORT_KEY);
+      const raw =
+        window.localStorage.getItem(PENDING_PROPERTY_IMPORT_KEY) ??
+        window.sessionStorage.getItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
       if (!raw) return;
+
+      const parsed = parsePendingPropertyImport(raw);
+      if (!parsed) {
+        window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
+        window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        return;
+      }
+      const payload = normalizePropertyImportPayloadContacts(parsed.payload as PropertyImportPayload);
+      if (!payload?.address) {
+        window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
+        window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        return;
+      }
+
       window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
-      const payload = JSON.parse(raw) as PropertyImportPayload;
-      if (!payload?.address) return;
+      window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
 
-      setForm((curr) => {
-        const plan = Number.parseFloat(payload.areaSqFt || "");
-        const rise = parsePitchRise(curr.roofPitch) ?? 6;
-        const pitchFactor = Math.sqrt(1 + (rise / 12) ** 2);
-        const measSq =
-          Number.isFinite(plan) && plan > 0 ? ((plan * pitchFactor) / 100).toFixed(2) : curr.measuredSquares;
+      const shouldAutoEstimate = Boolean(parsed.options?.autoEstimate || measurementAutoFromQueryRef.current);
 
-        const metaBits: string[] = [];
-        if (payload.yearBuilt) metaBits.push(`Year built: ${payload.yearBuilt}`);
-        if (payload.lotSizeSqFt) metaBits.push(`Lot: ${payload.lotSizeSqFt} SF`);
-        metaBits.push(`Property type: ${payload.propertyType}`);
-        if (payload.ownerEntityType) metaBits.push(`Owner entity: ${payload.ownerEntityType}`);
-        if (payload.ownerMailingAddress) metaBits.push(`Owner mailing: ${payload.ownerMailingAddress}`);
-        if (payload.notes) metaBits.push(payload.notes);
+      const base = defaultFormState();
+      const plan = Number.parseFloat(payload.areaSqFt || "");
+      const rise = parsePitchRise(base.roofPitch) ?? 6;
+      const pitchFactor = Math.sqrt(1 + (rise / 12) ** 2);
+      const measSq =
+        Number.isFinite(plan) && plan > 0 ? ((plan * pitchFactor) / 100).toFixed(2) : base.measuredSquares;
 
-        const st = (payload.stateCode || curr.stateCode).toUpperCase().slice(0, 2);
+      const metaBits: string[] = [];
+      if (payload.yearBuilt) metaBits.push(`Year built: ${payload.yearBuilt}`);
+      if (payload.lotSizeSqFt) metaBits.push(`Lot: ${payload.lotSizeSqFt} SF`);
+      metaBits.push(`Property type: ${payload.propertyType}`);
+      if (payload.ownerEntityType) metaBits.push(`Owner entity: ${payload.ownerEntityType}`);
+      if (payload.ownerMailingAddress) metaBits.push(`Owner mailing: ${payload.ownerMailingAddress}`);
+      if (payload.notes) metaBits.push(payload.notes);
 
-        return {
-          ...curr,
-          address: payload.address,
-          stateCode: st || curr.stateCode,
-          latitude: payload.latitude || curr.latitude,
-          longitude: payload.longitude || curr.longitude,
-          areaSqFt: payload.areaSqFt || curr.areaSqFt,
-          measuredSquares: payload.areaSqFt ? measSq : curr.measuredSquares,
-          propertyRecordNotes: metaBits.join("\n"),
-        };
-      });
+      const st = (payload.stateCode || base.stateCode).toUpperCase().slice(0, 2);
+      const importedForm: FormState = {
+        ...base,
+        address: payload.address,
+        stateCode: st || base.stateCode,
+        latitude: payload.latitude || base.latitude,
+        longitude: payload.longitude || base.longitude,
+        areaSqFt: payload.areaSqFt || base.areaSqFt,
+        measuredSquares: payload.areaSqFt ? measSq : base.measuredSquares,
+        propertyRecordNotes: metaBits.join("\n"),
+      };
+
+      setForm(importedForm);
 
       setProposal((curr) => {
         const org = (payload.ownerEntityType ?? "").toLowerCase() === "organization";
@@ -4125,19 +4779,49 @@ function App() {
       }
 
       setMapboxStatus(`Imported property record (${payload.source}).`);
-    } catch {
-      /* ignore */
+      if (shouldAutoEstimate) {
+        queueMicrotask(async () => {
+          try {
+            const prepared = prepareFormFromMapMeasurements(importedForm);
+            setForm(prepared);
+            runEstimatePipeline(prepared, { forceLowReadiness: true });
+          } catch (e) {
+            console.error("[measurement] instant estimate after property import failed", e);
+          }
+        });
+      }
+    } catch (e) {
+      console.error("[measurement] pending property import failed", e);
+      try {
+        window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
+        window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
     }
   }, []);
 
   const applyDrawnAreaToEstimate = () => {
     if (mapboxAreaSqFt <= 0 && drawnRoofLines.length === 0) {
       window.alert(
-        "Draw a roof polygon on the map, import a Microsoft footprint at the property pin, or add measurement lines first.",
+        "Draw a roof polygon in EagleView, or add measurement lines / dimensions first.",
       );
       return;
     }
     setForm((curr) => prepareFormFromMapMeasurements(curr));
+  };
+
+  const applyPricingPreset = (preset: PricingPreset) => {
+    const cfg = PRICING_PRESETS[preset];
+    setPricingPreset(preset);
+    setForm((curr) => ({
+      ...curr,
+      wastePercent: cfg.wastePercent,
+      severity: cfg.severity,
+      propertyRecordNotes: [curr.propertyRecordNotes, `Pricing preset: ${cfg.label} — ${cfg.note}`]
+        .filter(Boolean)
+        .join("\n"),
+    }));
   };
 
   const deleteRoofLine = (id: string) => {
@@ -4156,6 +4840,18 @@ function App() {
     for (const line of drawnRoofLines) sums[line.type] += line.lengthFt;
     return sums;
   }, [drawnRoofLines]);
+  const mapInitFailed = useMemo(() => {
+    if (mapReady) return false;
+    const text = mapboxStatus.trim().toLowerCase();
+    if (!text) return false;
+    return (
+      text.includes("init failed") ||
+      text.includes("map unavailable") ||
+      text.includes("map error") ||
+      text.includes("credentials") ||
+      text.includes("auth")
+    );
+  }, [mapReady, mapboxStatus]);
 
   const saveMapboxReport = async () => {
     if (!mapboxFeatures.length || mapboxAreaSqFt <= 0) {
@@ -4410,6 +5106,44 @@ function App() {
             <label>Pitch (rise/12)<input value={form.roofPitch} onChange={(e) => setForm((curr) => ({ ...curr, roofPitch: e.target.value }))} placeholder="6/12" /></label>
             <label>Measured Squares (surface SQ ÷ 100 when auto)<input value={form.measuredSquares} onChange={(e) => setForm((curr) => ({ ...curr, measuredSquares: e.target.value }))} placeholder="38.38" /></label>
             <label>Waste %<input value={form.wastePercent} onChange={(e) => setForm((curr) => ({ ...curr, wastePercent: e.target.value }))} placeholder="12" /></label>
+            <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                <strong>Separate Measurements (sections)</strong>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="secondary-btn" onClick={addMeasurementSection}>Add Section</button>
+                  <button type="button" className="secondary-btn" onClick={applyMeasurementSectionsToForm}>Apply Totals to Inputs</button>
+                </div>
+              </div>
+              <p className="muted" style={{ marginTop: 0, marginBottom: 8, fontSize: 12 }}>
+                Enter each roof section separately; totals are used when generating the estimate.
+              </p>
+              <div style={{ display: "grid", gap: 8 }}>
+                {measurementSections.map((section, idx) => (
+                  <div key={section.id} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+                      <label>Label<input value={section.label} onChange={(e) => updateMeasurementSection(section.id, "label", e.target.value)} placeholder={`Section ${idx + 1}`} /></label>
+                      <label>Area (sq ft)<input type="number" min={0} value={section.areaSqFt} onChange={(e) => updateMeasurementSection(section.id, "areaSqFt", e.target.value)} placeholder="1200" /></label>
+                      <label>Perimeter (ft)<input type="number" min={0} value={section.perimeterFt} onChange={(e) => updateMeasurementSection(section.id, "perimeterFt", e.target.value)} placeholder="180" /></label>
+                      <label>Squares<input type="number" min={0} value={section.measuredSquares} onChange={(e) => updateMeasurementSection(section.id, "measuredSquares", e.target.value)} placeholder="14.5" /></label>
+                      <button type="button" className="secondary-btn" onClick={() => removeMeasurementSection(section.id)} disabled={measurementSections.length === 1}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="muted" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+                Section totals: {measurementSectionTotals.areaSqFt.toFixed(2)} sq ft, {measurementSectionTotals.perimeterFt.toFixed(2)} ft perimeter, {measurementSectionTotals.measuredSquares.toFixed(2)} SQ.
+              </p>
+            </div>
+            <label>
+              Pricing preset
+              <select value={pricingPreset} onChange={(e) => applyPricingPreset(e.target.value as PricingPreset)}>
+                <option value="standard">Standard</option>
+                <option value="premium">Premium</option>
+                <option value="commercial">Commercial</option>
+              </select>
+            </label>
             <label>Stories (optional, wall SF auto)<input type="number" min={1} step={1} value={form.stories} onChange={(e) => setForm((curr) => ({ ...curr, stories: e.target.value }))} placeholder="2" /></label>
             <label>Wall height override (ft)<input type="number" min={0.5} step={0.5} value={form.exteriorWallHeightFt} onChange={(e) => setForm((curr) => ({ ...curr, exteriorWallHeightFt: e.target.value }))} placeholder="empty = auto" /></label>
             <p className="muted" style={{ gridColumn: "1 / -1", fontSize: 12, margin: 0 }}>
@@ -4442,6 +5176,9 @@ function App() {
             ) : null}
           </div>
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+            Active pricing preset: <strong>{PRICING_PRESETS[pricingPreset].label}</strong> — {PRICING_PRESETS[pricingPreset].note}
+          </p>
+          <p className="muted" style={{ marginTop: 2, fontSize: 12 }}>
             Structure suggestion ({roofStructureSuggestion.confidence}, {roofStructureSuggestion.score}/100): {roofStructureSuggestion.reason}
           </p>
           <p className="muted" style={{ marginTop: 4, fontSize: 11 }}>
@@ -4489,8 +5226,8 @@ function App() {
                           style={{
                             padding: "2px 6px",
                             fontSize: 10,
-                            borderColor: photo.tags.includes(tag) ? "#d4af37" : "#334155",
-                            color: photo.tags.includes(tag) ? "#fcd34d" : undefined,
+                            borderColor: photo.tags.includes(tag) ? "#d4af37" : "#d1d5db",
+                            color: photo.tags.includes(tag) ? "#000000" : undefined,
                           }}
                           onClick={() => toggleDamagePhotoTag(photo.id, tag)}
                         >
@@ -4511,14 +5248,6 @@ function App() {
         <section className="panel full" id="section-map-contacts">
           <h2>Property Map & Roof Measurement</h2>
           <div className="form-grid">
-            <label>
-              Mapbox Token
-              <input
-                value={mapboxToken}
-                onChange={(e) => setMapboxToken(e.target.value)}
-                placeholder="pk.eyJ..."
-              />
-            </label>
             <label>
               Line Measurement Type
               <select
@@ -4543,21 +5272,17 @@ function App() {
             </span>
           </div>
           <div className="auto-calc-row" style={{ flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <label className="check" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={msFootprintsVisible}
-                onChange={(e) => setMsFootprintsVisible(e.target.checked)}
-              />
-              Show Microsoft US building footprints
-            </label>
             <button
               type="button"
               className="secondary-btn"
-              disabled={importMsFootprintBusy || !mapReady}
-              onClick={() => void importMsBuildingFootprintAtPin()}
+              disabled={mapProvider === "eagleview" ? !mapReady : false}
+              onClick={() => {
+                const { lat, lon } = eeViewCenterRef.current;
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+                void mapClickSetProperty(lat, lon);
+              }}
             >
-              {importMsFootprintBusy ? "Importing…" : "Import footprint at property pin"}
+              Set property from map center
             </button>
             <input
               ref={aiMeasureFileRef}
@@ -4575,13 +5300,9 @@ function App() {
               {aiMeasureBusy ? "AI analyzing…" : "AI auto measure (optional photo)"}
             </button>
             <span className="muted" style={{ fontSize: 11 }}>
-              <strong>No photo required:</strong> draw a roof polygon on the map, or import an open-data footprint at your
-              lat/lng pin, then use <strong>Apply All Measurements To Estimate</strong>. AI photo upload is optional —
-              it can fill pitch and surface area when the model sees scale. Footprint data:{" "}
-              <a href="https://github.com/microsoft/USBuildingFootprints" target="_blank" rel="noreferrer">
-                Microsoft US Building Footprints
-              </a>{" "}
-              (ODbL) via Esri vector tiles.
+              {mapProvider === "osm-fallback"
+                ? "Use the polygon tool (top-right) to trace the roof outline. Draw lines for ridge/eave/rake/etc. Measurements auto-fill the estimate form."
+                : "No photo required: trace the roof in EagleView, then use Apply All Measurements To Estimate. Optional AI photo can fill pitch and surface area when the model sees scale."}
             </span>
           </div>
           {aiMeasureNote ? (
@@ -4600,10 +5321,250 @@ function App() {
               </span>
             ))}
           </div>
-          <div className="map-wrap mapbox-wrap" style={{ minHeight: 520 }}>
-            <div ref={mapboxContainerRef} className="mapbox-canvas" style={{ height: 520 }} />
+          {mapProvider === "osm-fallback" ? (
+            <>
+              <Map3D
+                center={{
+                  lat: Number.parseFloat(form.latitude) || 44.86,
+                  lng: Number.parseFloat(form.longitude) || -93.53,
+                }}
+                zoom={18}
+                pitch={60}
+                bearing={-20}
+                height={580}
+                enableGps
+                enableDraw
+                polylineColor={ROOF_LINE_TYPES.find((lt) => lt.type === currentLineType)?.color ?? "#ef4444"}
+                points={
+                  Number.isFinite(Number.parseFloat(form.latitude)) && Number.isFinite(Number.parseFloat(form.longitude))
+                    ? [{ id: "property", lat: Number.parseFloat(form.latitude), lng: Number.parseFloat(form.longitude), label: form.address || "Property", color: "#ef4444" }]
+                    : []
+                }
+                onMapClick={(lat, lng) => {
+                  setForm((curr) => ({ ...curr, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
+                }}
+                onMoveEnd={(lat, lng) => {
+                  eeViewCenterRef.current = { lat, lon: lng };
+                }}
+                onPolygonDrawn={(feature) => {
+                  void (async () => {
+                    try {
+                      const turf = await import("@turf/turf");
+                      const areaSqM = turf.area(feature as any);
+                      const areaSqFt = areaSqM * 10.7639;
+                      const perimFt = turf.length(feature as any, { units: "feet" });
+                      const pitchRise = parsePitchRise(form.roofPitch) ?? 6;
+                      const pitchFactor = Math.sqrt(1 + (pitchRise / 12) ** 2);
+                      const surfaceSqFt = areaSqFt * pitchFactor;
+                      const measuredSquares = surfaceSqFt / 100;
+                      setForm((curr) => ({
+                        ...curr,
+                        areaSqFt: areaSqFt.toFixed(2),
+                        perimeterFt: perimFt.toFixed(2),
+                        measuredSquares: measuredSquares.toFixed(2),
+                      }));
+                      setMapboxFeatures([feature as any]);
+                      setMapboxAreaSqFt(areaSqFt);
+                      autoCalcRef.current([feature as any]);
+                      setMapboxStatus(
+                        `Area: ${Math.round(areaSqFt).toLocaleString()} sq ft | Perimeter: ${Math.round(perimFt)} ft | ${measuredSquares.toFixed(2)} SQ`,
+                      );
+                    } catch (e) {
+                      console.error("Polygon measurement failed", e);
+                    }
+                  })();
+                }}
+                onPolylineDrawn={(feature) => {
+                  void (async () => {
+                    try {
+                      const turf = await import("@turf/turf");
+                      const lengthFt = turf.length(feature as any, { units: "feet" });
+                      const lt = currentLineType;
+                      setDrawnRoofLines((prev) => [
+                        ...prev,
+                        {
+                          id: `3d-line-${Date.now()}`,
+                          type: lt,
+                          lengthFt: Math.round(lengthFt * 100) / 100,
+                          geometry: feature.geometry,
+                        },
+                      ]);
+                    } catch (e) {
+                      console.error("Polyline measurement failed", e);
+                    }
+                  })();
+                }}
+                onFeaturesCleared={() => {
+                  setForm((curr) => ({
+                    ...curr,
+                    areaSqFt: "",
+                    perimeterFt: "",
+                    measuredSquares: "",
+                  }));
+                  setMapboxFeatures([]);
+                  setMapboxAreaSqFt(0);
+                  setMapboxStatus("");
+                }}
+              />
+              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <button type="button" className="secondary-btn" onClick={applyDrawnAreaToEstimate}>
+                  Apply All Measurements To Estimate
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => {
+                    setDrawnRoofLines([]);
+                    setMapboxFeatures([]);
+                    setMapboxAreaSqFt(0);
+                    setForm((curr) => ({ ...curr, areaSqFt: "", perimeterFt: "", measuredSquares: "", ridgesFt: "", eavesFt: "", rakesFt: "", valleysFt: "", hipsFt: "" }));
+                    setMapboxStatus("");
+                  }}
+                >
+                  Clear All
+                </button>
+              </div>
+              {mapboxStatus ? (
+                <div style={{ marginTop: 4, padding: "8px 10px", borderRadius: 8, background: "#111", fontSize: 13 }}>
+                  <strong>{mapboxStatus}</strong>
+                  {(mapboxAreaSqFt > 0 || drawnRoofLines.length > 0) ? (
+                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
+                      {drawnRoofLines.length > 0 ? `${drawnRoofLines.length} line(s) drawn` : ""}
+                      {Object.entries(roofLineSummary).filter(([, v]) => v > 0).map(([k, v]) => ` | ${k}: ${v.toFixed(1)} ft`).join("")}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <div className="map-wrap mapbox-wrap" style={{ minHeight: 520 }}>
+                <div ref={mapboxContainerRef} className="mapbox-canvas" style={{ height: 520 }} />
+                {mapInitFailed ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 16,
+                      background: "rgba(0,0,0,0.78)",
+                      color: "#fff",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ maxWidth: 680 }}>
+                      <h3 style={{ margin: "0 0 8px 0", fontSize: 18 }}>Map unavailable</h3>
+                      <p style={{ margin: 0, lineHeight: 1.45 }}>{mapboxStatus}</p>
+                      <p style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
+                        Fix EagleView embedded credentials on backend and refresh.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              {mapboxStatus ? <p className="muted">{mapboxStatus}</p> : null}
+            </>
+          )}
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              background: "#fafafa",
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>EagleView TrueDesign</h3>
+            {!isTrueDesignApiConfigured() ? (
+              <div
+                role="status"
+                style={{
+                  marginBottom: 12,
+                  padding: "10px 12px",
+                  borderRadius: 6,
+                  border: "1px solid #fcd34d",
+                  background: "#fffbeb",
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>EagleView is not configured for this build.</strong> Set <code>VITE_INTEL_API_BASE</code> to your
+                deployed HD2D Worker (same host handles <code>/api/eagleview/apicenter</code>). Put EagleView OAuth secrets
+                on the Worker (see <code>backend/wrangler.toml</code>). For local <code>npm run dev</code>, run{" "}
+                <code>wrangler dev</code> in <code>backend</code> so <code>/intel-proxy</code> reaches that route.
+              </div>
+            ) : null}
+            {import.meta.env.DEV && isTrueDesignApiConfigured() ? (
+              <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 8 }}>
+                If actions return <strong>401</strong>, fix EagleView credentials on the Worker (<code>backend/.dev.vars</code>) and
+                restart <code>wrangler dev</code> / Vite.
+              </p>
+            ) : null}
+            {isTrueDesignApiConfigured() ? (
+              <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+                Enter an EagleView <strong>report ID</strong> (from your order) to load roof summary into the estimator or
+                open TrueDesign. Your last report ID is remembered on this device.
+              </p>
+            ) : (
+              <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+                Measurement uses EagleView Embedded Explorer above. Configure TrueDesign using the steps in the notice
+                above to enable load and session actions.
+              </p>
+            )}
+            <div className="form-grid" style={{ marginTop: 8 }}>
+              <label>
+                EagleView report ID
+                <input
+                  type="number"
+                  min={1}
+                  value={eagleViewReportId}
+                  onChange={(e) => setEagleViewReportId(e.target.value)}
+                  placeholder="e.g. 44853629"
+                />
+              </label>
+            </div>
+            <div className="actions-row" style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="secondary-btn"
+                disabled={trueDesignBusy || !isTrueDesignApiConfigured()}
+                onClick={() => void loadEagleViewRoofIntoForm()}
+              >
+                {trueDesignBusy ? "Working…" : "Load roof into estimate fields"}
+              </button>
+              <button
+                type="button"
+                className="secondary-btn"
+                disabled={trueDesignBusy || !isTrueDesignApiConfigured()}
+                onClick={() => void launchTrueDesignSession()}
+              >
+                {trueDesignBusy ? "Working…" : "Launch TrueDesign session"}
+              </button>
+              <button
+                type="button"
+                className="secondary-btn"
+                disabled={!trueDesignIframeHtml}
+                onClick={() => setTrueDesignIframeHtml(null)}
+              >
+                Clear embedded session
+              </button>
+            </div>
+            {trueDesignNote ? (
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                {trueDesignNote}
+              </p>
+            ) : null}
+            {trueDesignIframeHtml ? (
+              <iframe
+                title="TrueDesign"
+                srcDoc={trueDesignIframeHtml}
+                style={{ width: "100%", height: 560, marginTop: 12, border: "1px solid #d1d5db", borderRadius: 6 }}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              />
+            ) : null}
           </div>
-          {mapboxStatus ? <p className="muted">{mapboxStatus}</p> : null}
           <div className="actions-row">
             <label>
               Property Type Filter
@@ -4647,7 +5608,7 @@ function App() {
               {intelBusy ? "Loading Intel..." : "Refresh Parcel/Permit/Storm Intel"}
             </button>
           </div>
-          {intelError ? <p className="muted" style={{ color: "#fca5a5" }}>{intelError}</p> : null}
+          {intelError ? <p className="muted" style={{ color: "#000000" }}>{intelError}</p> : null}
           {stlIntel ? (
             <div className="line-measurements-table" style={{ marginTop: 8 }}>
               <table>
@@ -5053,11 +6014,72 @@ function App() {
         </section>
         <section className="panel" id="section-estimate-inputs">
           <h2>Carrier Scope & Settlement Inputs</h2>
+          <p className="muted" style={{ marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+            Pricing source: <strong>{CARRIER_BENCHMARK_SOURCE_LABEL}</strong>
+          </p>
           <label>Carrier Line Items (Xactimate style)<textarea rows={10} value={form.carrierScopeText} onChange={(e) => setForm((curr) => ({ ...curr, carrierScopeText: e.target.value }))} placeholder={"RFG250 Tear Off 42.00 SQ 100.00 4200.00\nRFGDRP Drip Edge 220.00 LF 3.09 679.80\nRCV: 16480  ACV: 13900  Depreciation: 2580\nSupplement RCV: 4200  Deductible: 2500\nNet Claim: 11800"} /></label>
           <div className="form-grid">
+            <label>
+              Carrier benchmark profile
+              <select
+                value={form.carrierBenchmarkProfileId}
+                onChange={(e) => setForm((curr) => ({ ...curr, carrierBenchmarkProfileId: e.target.value }))}
+              >
+                {CARRIER_BENCHMARK_PROFILES.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Benchmark region factor
+              <input
+                type="number"
+                min={0.75}
+                max={1.4}
+                step={0.01}
+                value={form.carrierBenchmarkRegionFactor}
+                onChange={(e) =>
+                  setForm((curr) => ({ ...curr, carrierBenchmarkRegionFactor: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Benchmark complexity factor
+              <input
+                type="number"
+                min={0.75}
+                max={1.4}
+                step={0.01}
+                value={form.carrierBenchmarkComplexityFactor}
+                onChange={(e) =>
+                  setForm((curr) => ({ ...curr, carrierBenchmarkComplexityFactor: e.target.value }))
+                }
+              />
+            </label>
             <label>Deductible ($)<input type="number" min={0} value={form.deductibleUsd} onChange={(e) => setForm((curr) => ({ ...curr, deductibleUsd: e.target.value }))} /></label>
             <label>Non-recoverable Depreciation ($)<input type="number" min={0} value={form.nonRecDepUsd} onChange={(e) => setForm((curr) => ({ ...curr, nonRecDepUsd: e.target.value }))} /></label>
           </div>
+          <div className="tile-grid" style={{ marginBottom: 10 }}>
+            <div className="tile">
+              <span>Instant readiness</span>
+              <strong>{instantReadiness.score}/100</strong>
+            </div>
+            <div className="tile">
+              <span>Preview squares</span>
+              <strong>{instantPreview ? instantPreview.effectiveSquares.toFixed(2) : "—"}</strong>
+            </div>
+            <div className="tile">
+              <span>Preview total</span>
+              <strong>{instantPreview ? money(instantPreview.finalCost) : "—"}</strong>
+            </div>
+          </div>
+          {instantReadiness.reasons.length ? (
+            <p className="muted" style={{ marginTop: -2, marginBottom: 10, fontSize: 12 }}>
+              Missing for high-confidence estimate: {instantReadiness.reasons.join(" · ")}
+            </p>
+          ) : null}
           <div className="actions-row">
             <button className="run-btn" onClick={runEstimateAndRecord}>Generate Estimate & Comparison</button>
             <button className="secondary-btn" onClick={() => setForm(defaultFormState())}>Load Hillsdale Template</button>
@@ -5312,6 +6334,9 @@ function App() {
             <button className="secondary-btn" onClick={printProposal}>
               Print Proposal / PDF
             </button>
+            <button type="button" className="secondary-btn" onClick={exportFootprintDxf} title="2D footprint in feet (local plane) for CAD">
+              Export footprint DXF
+            </button>
           </div>
         </section>
         <section className="panel full" id="section-results">
@@ -5361,15 +6386,15 @@ function App() {
                   <div className="result-card-row"><span>Confidence</span><strong>{roofStructureSuggestion.confidence.toUpperCase()}</strong></div>
                   <div className="result-card-row"><span>Score</span><strong>{roofStructureSuggestion.score}/100</strong></div>
                   <div className="result-card-row"><span>Applied Mode</span><strong>{form.roofStructure.toUpperCase()}</strong></div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: "#cbd5e1", lineHeight: 1.4 }}>
-                    <strong style={{ color: "#e5e7eb" }}>Reason:</strong> {roofStructureSuggestion.reason}
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#000000", lineHeight: 1.4 }}>
+                    <strong style={{ color: "#000000" }}>Reason:</strong> {roofStructureSuggestion.reason}
                   </div>
                 </div>
                 <div className="result-card">
                   <div className="result-card-title">Rules Fired</div>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {roofStructureSuggestion.rules.map((rule) => (
-                      <li key={rule} style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 4 }}>{rule}</li>
+                      <li key={rule} style={{ fontSize: 12, color: "#000000", marginBottom: 4 }}>{rule}</li>
                     ))}
                   </ul>
                 </div>
@@ -5505,8 +6530,12 @@ function App() {
                   <tbody>
                     <tr><td>Valuation Basis</td><td className="r">{result.carrier.valuationBasis}</td></tr>
                     <tr><td>Carrier Total</td><td className="r">{money(result.carrier.total)}</td></tr>
-                    <tr><td>Our Final Cost</td><td className="r">{money(result.finalCost)}</td></tr>
-                    <tr><td>Delta</td><td className="r">{money(result.delta)} ({result.deltaDirection})</td></tr>
+                    <tr><td>Base Benchmark (our final cost)</td><td className="r">{money(result.finalCost)}</td></tr>
+                    <tr><td>Base Delta vs carrier</td><td className="r">{money(result.delta)} ({result.deltaDirection})</td></tr>
+                    <tr><td>Adjusted Benchmark Profile</td><td className="r">{result.carrierBenchmark.profileName}</td></tr>
+                    <tr><td>Adjusted Benchmark RCV</td><td className="r">{money(result.carrierBenchmark.adjustedRcv)}</td></tr>
+                    <tr><td>Adjusted Delta vs carrier</td><td className="r">{money(result.carrierBenchmark.adjustedDelta)} ({result.carrierBenchmark.adjustedDeltaDirection})</td></tr>
+                    <tr><td>Adjustment multipliers</td><td className="r">×{result.carrierBenchmark.blendedMultiplier.toFixed(3)} (region {result.carrierBenchmark.regionFactor.toFixed(2)} × complexity {result.carrierBenchmark.complexityFactor.toFixed(2)})</td></tr>
                     <tr><td>Parser Confidence</td><td className="r">{result.carrier.parserConfidence}</td></tr>
                     <tr><td>Line Math Mismatches</td><td className="r">{result.carrier.lineMathMismatchCount}</td></tr>
                     <tr><td>RCV / ACV / Dep (Carrier)</td><td className="r">{result.carrier.rcv != null ? money(result.carrier.rcv) : "N/A"} / {result.carrier.acv != null ? money(result.carrier.acv) : "N/A"} / {result.carrier.dep != null ? money(result.carrier.dep) : "N/A"}</td></tr>
@@ -5529,12 +6558,21 @@ function App() {
               </div>
 
               {/* Warnings */}
-              {(result.warnings.length > 0 || result.carrier.likelyMissingItems.length > 0) ? (
+              {(result.warnings.length > 0 ||
+                result.carrier.likelyMissingItems.length > 0 ||
+                result.carrierBenchmark.requiredLineCategories.length > 0 ||
+                result.carrierBenchmark.optionalLineCategories.length > 0) ? (
                 <>
                   <h3>Warnings &amp; Missing Scope</h3>
                   <ul className="warning-list">
                     {result.warnings.map((w) => <li key={`w-${w}`}>{w}</li>)}
                     {result.carrier.likelyMissingItems.map((m) => <li key={`m-${m}`}>{m}</li>)}
+                    {result.carrierBenchmark.requiredLineCategories.map((m) => (
+                      <li key={`req-${m}`}>Benchmark required check: {m}</li>
+                    ))}
+                    {result.carrierBenchmark.optionalLineCategories.map((m) => (
+                      <li key={`opt-${m}`}>Benchmark optional check: {m}</li>
+                    ))}
                   </ul>
                 </>
               ) : (

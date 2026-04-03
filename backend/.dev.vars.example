@@ -1,2 +1,23 @@
-OPENAI_API_KEY=your_openai_api_key_here
-SESSION_SECRET=your_session_secret_here
+# Copy to `.dev.vars` for local `wrangler dev`, or run from roofing app:
+#   cd ../roofing-estimator-vite && npm run sync:eagleview-dev
+#
+# Token URL + API base default from wrangler.toml [vars]; only secrets required here:
+
+# EAGLEVIEW_CLIENT_ID=
+# EAGLEVIEW_CLIENT_SECRET=
+# EAGLEVIEW_OAUTH_CLIENT_ID=
+# EAGLEVIEW_SCOPE=
+# Embedded Explorer credentials (recommended to set explicitly; many API Center creds will be rejected for embedded auth):
+# EAGLEVIEW_EMBEDDED_CLIENT_ID=
+# EAGLEVIEW_EMBEDDED_CLIENT_SECRET=
+# EAGLEVIEW_EMBEDDED_TOKEN_URL=https://api.eagleview.com/auth-service/v1/token
+# EAGLEVIEW_EMBEDDED_SCOPE=
+
+# Optional auth overrides for login endpoint (defaults use demo credentials):
+# AUTH_ADMIN_EMAIL=admin@hardcoredoortodoorclosers.com
+# AUTH_ADMIN_PASSWORD=AdminTest123!
+# AUTH_COMPANY_EMAIL=test.company@hardcoredoortodoorclosers.com
+# AUTH_COMPANY_PASSWORD=TestCompany123!
+# AUTH_REP_EMAIL=test.rep@hardcoredoortodoorclosers.com
+# AUTH_REP_PASSWORD=TestRep123!
+# SESSION_SECRET=change-me

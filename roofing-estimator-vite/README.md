@@ -14,12 +14,39 @@ Run the Vite app from this directory (`npm run dev` or `npm run preview`). Some 
 | Feature | Requirement |
 |--------|-------------|
 | Mapbox (measurement map, **Canvassing**) | `VITE_MAPBOX_TOKEN` in `.env`, or paste a public `pk.…` token once (stored in `localStorage`) |
-| **ArcGIS overlay** (parcels / zoning on **Canvassing**) | Optional: set Feature layer URL + token under **Contacts & settings**, or `VITE_ARCGIS_FEATURE_LAYER_URL` / `VITE_ARCGIS_API_KEY` in `.env`. Layer must be `…/FeatureServer/{id}` (public services work without a key). |
+| **ArcGIS overlay** (parcels / zoning on **Canvassing**) | Optional: set Feature layer URL + token under **Contacts & settings**, or `VITE_ARCGIS_FEATURE_LAYER_URL` / `VITE_ARCGIS_API_KEY` in `.env`. Layer must be `…/FeatureServer/{id}` (public services work without a key). The app also queries the same layer with a **point-in-parcel** REST request so attributes can load when you click off the rendered polygon. If `fetch` fails with CORS on localhost, try a `services.arcgis.com` layer or a same-origin proxy. |
 | STL / MO parcel intel (`/intel-proxy`) | HD2D Worker: from repo `backend`, run `npm run dev` (Wrangler on **http://127.0.0.1:8787**). Optional: `VITE_INTEL_API_BASE` for a deployed Worker URL |
 | BatchData property records | BatchData API key in the Property Scraper UI. **Dev/preview:** Vite proxy `/batchdata-api`. **Production build:** requests go to the HD2D Worker at `getHd2dApiBase()` → `POST /api/batchdata/property-search` (run Wrangler locally or set `VITE_INTEL_API_BASE` to your deployed Worker) |
 | Property Scraper offline | If `VITE_PROPERTY_SCRAPER_OFFLINE=true`, live enrichment is disabled |
 
 Proxies are configured in `vite.config.ts` for **dev** and **preview** (`/intel-proxy`, `/batchdata-api`, `/google-places-api`, `/pdl-api`).
+
+## Custom domain setup (`hardcoredoortodoorclosers.com`)
+
+Recommended production topology:
+
+- Frontend SPA: `https://hardcoredoortodoorclosers.com`
+- Backend Worker API: same-origin `https://hardcoredoortodoorclosers.com/api/*` (or `https://api.hardcoredoortodoorclosers.com`)
+
+### Same-origin `/api/*` routing (recommended)
+
+1. Deploy frontend to your domain root.
+2. In `backend/wrangler.toml`, enable the `routes` entry for:
+   - `hardcoredoortodoorclosers.com/api/*`
+3. Deploy worker: `cd backend && npm run deploy`
+4. Set Worker secrets for EagleView and auth:
+   - `EAGLEVIEW_EMBEDDED_CLIENT_ID`
+   - `EAGLEVIEW_EMBEDDED_CLIENT_SECRET`
+   - optionally `EAGLEVIEW_EMBEDDED_TOKEN_URL`, `EAGLEVIEW_EMBEDDED_SCOPE`
+   - `SESSION_SECRET`
+5. Validate endpoint:
+   - `https://hardcoredoortodoorclosers.com/api/eagleview/embedded/token`
+
+### `VITE_INTEL_API_BASE`
+
+- If your API is same-origin (`/api/*` route on same domain), `VITE_INTEL_API_BASE` is optional.
+- If your API is on subdomain, set:
+  - `VITE_INTEL_API_BASE=https://api.hardcoredoortodoorclosers.com`
 
 ## React Compiler
 
