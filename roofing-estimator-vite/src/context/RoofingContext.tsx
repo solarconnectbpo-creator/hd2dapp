@@ -1,4 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  type DamagePhoto,
+  type DamagePhotoAiSummary,
+  type FieldPipelineStage,
+  type FieldProject,
+  MAX_FIELD_PROJECT_PHOTOS,
+  normalizeFieldProject,
+} from "../lib/fieldProjectTypes";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
 
 export type RoofFormKind = "gable" | "hip" | "flat" | "mansard" | "complex";
@@ -63,21 +71,41 @@ export interface Contract {
   status: "draft" | "sent" | "signed";
 }
 
+export type { DamagePhoto, DamagePhotoAiSummary, FieldPipelineStage, FieldProject };
+
 interface RoofingContextType {
   measurements: Measurement[];
   estimates: Estimate[];
   contracts: Contract[];
+  fieldProjects: FieldProject[];
   addMeasurement: (measurement: Measurement) => void;
   addEstimate: (estimate: Estimate) => void;
   addContract: (contract: Contract) => void;
+  addFieldProject: (input: { name: string; address?: string; notes?: string }) => FieldProject;
+  updateFieldProject: (
+    id: string,
+    patch: Partial<Pick<FieldProject, "name" | "address" | "notes" | "linkedMeasurementId">>,
+  ) => void;
+  deleteFieldProject: (id: string) => void;
+  setFieldProjectPipelineStage: (id: string, stage: FieldPipelineStage) => void;
+  addFieldProjectPhoto: (projectId: string, imageDataUrl: string, caption?: string) => boolean;
+  removeFieldProjectPhoto: (projectId: string, photoId: string) => void;
+  updateFieldProjectPhotoCaption: (projectId: string, photoId: string, caption: string) => void;
+  setFieldProjectPhotoAiSummary: (
+    projectId: string,
+    photoId: string,
+    summary: DamagePhotoAiSummary,
+  ) => void;
   /** Replaces all persisted roofing data (used after JSON backup import). */
   replaceAllRoofingData: (payload: {
     measurements: Measurement[];
     estimates: Estimate[];
     contracts: Contract[];
+    fieldProjects: FieldProject[];
   }) => void;
   getMeasurementById: (id: string) => Measurement | undefined;
   getEstimateById: (id: string) => Estimate | undefined;
+  getFieldProjectById: (id: string) => FieldProject | undefined;
 }
 
 const RoofingContext = createContext<RoofingContextType | undefined>(undefined);
@@ -137,10 +165,19 @@ export function normalizeMeasurement(raw: Record<string, unknown>): Measurement 
   };
 }
 
+function newFieldProjectId(): string {
+  return `fp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function newPhotoId(): string {
+  return `ph-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export function RoofingProvider({ children }: { children: ReactNode }) {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [fieldProjects, setFieldProjects] = useState<FieldProject[]>([]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(LS_KEY);
@@ -150,6 +187,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         measurements?: unknown[];
         estimates?: Estimate[];
         contracts?: Contract[];
+        fieldProjects?: unknown[];
       };
       if (Array.isArray(parsed.measurements)) {
         const next: Measurement[] = [];
@@ -163,6 +201,16 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       }
       if (Array.isArray(parsed.estimates)) setEstimates(parsed.estimates);
       if (Array.isArray(parsed.contracts)) setContracts(parsed.contracts);
+      if (Array.isArray(parsed.fieldProjects)) {
+        const fp: FieldProject[] = [];
+        for (const row of parsed.fieldProjects) {
+          if (row && typeof row === "object") {
+            const p = normalizeFieldProject(row as Record<string, unknown>);
+            if (p) fp.push(p);
+          }
+        }
+        setFieldProjects(fp);
+      }
     } catch {
       // ignore invalid storage
     }
@@ -171,28 +219,135 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     window.localStorage.setItem(
       LS_KEY,
-      JSON.stringify({ measurements, estimates, contracts }),
+      JSON.stringify({ measurements, estimates, contracts, fieldProjects }),
     );
-  }, [measurements, estimates, contracts]);
+  }, [measurements, estimates, contracts, fieldProjects]);
 
   const api = useMemo<RoofingContextType>(
     () => ({
       measurements,
       estimates,
       contracts,
+      fieldProjects,
       addMeasurement: (measurement: Measurement) =>
         setMeasurements((prev) => [...prev, measurement]),
       addEstimate: (estimate: Estimate) => setEstimates((prev) => [...prev, estimate]),
       addContract: (contract: Contract) => setContracts((prev) => [...prev, contract]),
+      addFieldProject: (input) => {
+        const now = new Date().toISOString();
+        const p: FieldProject = {
+          id: newFieldProjectId(),
+          name: input.name.trim().slice(0, 200),
+          address: input.address?.trim().slice(0, 500),
+          notes: input.notes?.trim().slice(0, 2000),
+          createdAt: now,
+          updatedAt: now,
+          pipelineStage: "intake",
+          photos: [],
+          linkedMeasurementId: null,
+        };
+        setFieldProjects((prev) => [...prev, p]);
+        return p;
+      },
+      updateFieldProject: (id, patch) => {
+        setFieldProjects((prev) =>
+          prev.map((p) => {
+            if (p.id !== id) return p;
+            const now = new Date().toISOString();
+            let next = { ...p, updatedAt: now };
+            if (patch.name !== undefined) next = { ...next, name: patch.name.trim().slice(0, 200) };
+            if (patch.address !== undefined) {
+              const a = patch.address?.trim().slice(0, 500);
+              next = { ...next, address: a || undefined };
+            }
+            if (patch.notes !== undefined) {
+              const n = patch.notes?.trim().slice(0, 2000);
+              next = { ...next, notes: n || undefined };
+            }
+            if (patch.linkedMeasurementId !== undefined) {
+              next = { ...next, linkedMeasurementId: patch.linkedMeasurementId ?? null };
+            }
+            return next;
+          }),
+        );
+      },
+      deleteFieldProject: (id) => setFieldProjects((prev) => prev.filter((p) => p.id !== id)),
+      setFieldProjectPipelineStage: (id, stage) => {
+        const now = new Date().toISOString();
+        setFieldProjects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, pipelineStage: stage, updatedAt: now } : p)),
+        );
+      },
+      addFieldProjectPhoto: (projectId, imageDataUrl, caption) => {
+        let added = false;
+        setFieldProjects((prev) =>
+          prev.map((p) => {
+            if (p.id !== projectId) return p;
+            if (p.photos.length >= MAX_FIELD_PROJECT_PHOTOS) return p;
+            const now = new Date().toISOString();
+            const photo: DamagePhoto = {
+              id: newPhotoId(),
+              capturedAt: now,
+              caption: caption?.trim().slice(0, 500),
+              imageDataUrl,
+            };
+            added = true;
+            return { ...p, photos: [...p.photos, photo], updatedAt: now };
+          }),
+        );
+        return added;
+      },
+      removeFieldProjectPhoto: (projectId, photoId) => {
+        const now = new Date().toISOString();
+        setFieldProjects((prev) =>
+          prev.map((p) =>
+            p.id === projectId
+              ? { ...p, photos: p.photos.filter((x) => x.id !== photoId), updatedAt: now }
+              : p,
+          ),
+        );
+      },
+      updateFieldProjectPhotoCaption: (projectId, photoId, caption) => {
+        const now = new Date().toISOString();
+        setFieldProjects((prev) =>
+          prev.map((p) => {
+            if (p.id !== projectId) return p;
+            return {
+              ...p,
+              photos: p.photos.map((ph) =>
+                ph.id === photoId ? { ...ph, caption: caption.trim().slice(0, 500) } : ph,
+              ),
+              updatedAt: now,
+            };
+          }),
+        );
+      },
+      setFieldProjectPhotoAiSummary: (projectId, photoId, summary) => {
+        const now = new Date().toISOString();
+        setFieldProjects((prev) =>
+          prev.map((p) => {
+            if (p.id !== projectId) return p;
+            return {
+              ...p,
+              photos: p.photos.map((ph) =>
+                ph.id === photoId ? { ...ph, aiSummary: summary } : ph,
+              ),
+              updatedAt: now,
+            };
+          }),
+        );
+      },
       replaceAllRoofingData: (payload) => {
         setMeasurements(payload.measurements);
         setEstimates(payload.estimates);
         setContracts(payload.contracts);
+        setFieldProjects(payload.fieldProjects ?? []);
       },
       getMeasurementById: (id: string) => measurements.find((m) => m.id === id),
       getEstimateById: (id: string) => estimates.find((e) => e.id === id),
+      getFieldProjectById: (id: string) => fieldProjects.find((p) => p.id === id),
     }),
-    [contracts, estimates, measurements],
+    [contracts, estimates, fieldProjects, measurements],
   );
 
   return <RoofingContext.Provider value={api}>{children}</RoofingContext.Provider>;

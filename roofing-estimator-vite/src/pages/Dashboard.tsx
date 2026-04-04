@@ -6,6 +6,7 @@ import {
   Folder,
   HardDriveDownload,
   MapPinned,
+  Megaphone,
   Ruler,
   Search,
   TrendingUp,
@@ -21,7 +22,7 @@ import {
 } from "../lib/roofingBackup";
 
 export function Dashboard() {
-  const { measurements, estimates, contracts, replaceAllRoofingData } = useRoofing();
+  const { measurements, estimates, contracts, fieldProjects, replaceAllRoofingData } = useRoofing();
   const backupInputRef = useRef<HTMLInputElement>(null);
   const [backupNote, setBackupNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -40,7 +41,7 @@ export function Dashboard() {
   const recentMeasurements = measurements.slice(-5).reverse();
 
   const onExportBackup = () => {
-    const payload = buildRoofingBackupPayload(measurements, estimates, contracts);
+    const payload = buildRoofingBackupPayload(measurements, estimates, contracts, fieldProjects);
     const name = `roofing-pro-backup-${new Date().toISOString().slice(0, 10)}.json`;
     downloadRoofingBackupJson(payload, name);
     setBackupNote({ kind: "ok", text: "Download started — keep this file somewhere safe." });
@@ -61,11 +62,14 @@ export function Dashboard() {
           return;
         }
         const hasExisting =
-          measurements.length > 0 || estimates.length > 0 || contracts.length > 0;
+          measurements.length > 0 ||
+          estimates.length > 0 ||
+          contracts.length > 0 ||
+          fieldProjects.length > 0;
         if (
           hasExisting &&
           !window.confirm(
-            "Replace all measurements, estimates, and contracts in this browser with the backup?",
+            "Replace all measurements, estimates, contracts, and field projects in this browser with the backup?",
           )
         ) {
           return;
@@ -84,9 +88,9 @@ export function Dashboard() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-semibold tracking-tight text-black">Dashboard</h1>
+    <div className="px-4 py-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Dashboard</h1>
         <p className="text-black">
           Measurements, estimates, and field tools — data stays in this browser unless you export.
         </p>
@@ -157,6 +161,12 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <Search className="w-4 h-4 mr-2" />
                 Property records
+              </Button>
+            </Link>
+            <Link to="/marketing">
+              <Button className="w-full justify-start" variant="outline">
+                <Megaphone className="w-4 h-4 mr-2" />
+                Marketing &amp; social / ads
               </Button>
             </Link>
           </CardContent>

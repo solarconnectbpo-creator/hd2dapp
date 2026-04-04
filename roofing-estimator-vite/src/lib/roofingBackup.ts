@@ -1,14 +1,19 @@
 import type { Contract, Estimate, Measurement } from "../context/RoofingContext";
 import { normalizeMeasurement } from "../context/RoofingContext";
+import type { FieldProject } from "./fieldProjectTypes";
+import { normalizeFieldProject } from "./fieldProjectTypes";
 
-export const ROOFING_BACKUP_SCHEMA_VERSION = 1 as const;
+/** v1: measurements/estimates/contracts only. v2: adds fieldProjects (field jobs + damage photos). */
+export const ROOFING_BACKUP_SCHEMA_VERSION = 2 as const;
+export const ROOFING_BACKUP_SCHEMA_VERSION_V1 = 1 as const;
 
-export type RoofingBackupV1 = {
+export type RoofingBackupV2 = {
   schemaVersion: typeof ROOFING_BACKUP_SCHEMA_VERSION;
   exportedAt: string;
   measurements: Measurement[];
   estimates: Estimate[];
   contracts: Contract[];
+  fieldProjects: FieldProject[];
 };
 
 function isRecord(x: unknown): x is Record<string, unknown> {
@@ -49,24 +54,35 @@ export function buildRoofingBackupPayload(
   measurements: Measurement[],
   estimates: Estimate[],
   contracts: Contract[],
-): RoofingBackupV1 {
+  fieldProjects: FieldProject[],
+): RoofingBackupV2 {
   return {
     schemaVersion: ROOFING_BACKUP_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     measurements,
     estimates,
     contracts,
+    fieldProjects,
   };
 }
 
 export function parseRoofingBackupJson(raw: unknown):
-  | { ok: true; data: { measurements: Measurement[]; estimates: Estimate[]; contracts: Contract[] } }
+  | {
+      ok: true;
+      data: {
+        measurements: Measurement[];
+        estimates: Estimate[];
+        contracts: Contract[];
+        fieldProjects: FieldProject[];
+      };
+    }
   | { ok: false; error: string } {
   if (!isRecord(raw)) return { ok: false, error: "Backup must be a JSON object." };
-  if (raw.schemaVersion !== ROOFING_BACKUP_SCHEMA_VERSION) {
+  const ver = raw.schemaVersion;
+  if (ver !== ROOFING_BACKUP_SCHEMA_VERSION && ver !== ROOFING_BACKUP_SCHEMA_VERSION_V1) {
     return {
       ok: false,
-      error: `Unsupported backup version (expected ${ROOFING_BACKUP_SCHEMA_VERSION}).`,
+      error: `Unsupported backup version (expected ${ROOFING_BACKUP_SCHEMA_VERSION} or ${ROOFING_BACKUP_SCHEMA_VERSION_V1}).`,
     };
   }
   if (!Array.isArray(raw.measurements) || !Array.isArray(raw.estimates) || !Array.isArray(raw.contracts)) {
@@ -96,10 +112,21 @@ export function parseRoofingBackupJson(raw: unknown):
     contracts.push(row);
   }
 
-  return { ok: true, data: { measurements, estimates, contracts } };
+  const fieldProjects: FieldProject[] = [];
+  if (ver === ROOFING_BACKUP_SCHEMA_VERSION && Array.isArray(raw.fieldProjects)) {
+    for (let i = 0; i < raw.fieldProjects.length; i++) {
+      const row = raw.fieldProjects[i];
+      if (!isRecord(row)) return { ok: false, error: `Invalid field project at index ${i}.` };
+      const fp = normalizeFieldProject(row);
+      if (!fp) return { ok: false, error: `Could not read field project at index ${i}.` };
+      fieldProjects.push(fp);
+    }
+  }
+
+  return { ok: true, data: { measurements, estimates, contracts, fieldProjects } };
 }
 
-export function downloadRoofingBackupJson(payload: RoofingBackupV1, filename: string): void {
+export function downloadRoofingBackupJson(payload: RoofingBackupV2, filename: string): void {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
