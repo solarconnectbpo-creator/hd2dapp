@@ -51,7 +51,7 @@ Recommended production topology:
 ### Vercel (optional — `app` subdomain)
 
 - **Project:** `hd2d-closers` (team `solarconnectbpo-creators-projects`). Link locally with `npx vercel link` (creates `.vercel/`, gitignored).
-- **Deploy:** `npm run vercel:deploy` — production alias: [https://hd2d-closers.vercel.app](https://hd2d-closers.vercel.app).
+- **Deploy:** `npm run vercel:deploy` — production is also served on **`https://hardcoredoortodoorclosers.com`** when DNS points at Vercel. `vercel.json` redirects **`www`** → **apex** (canonical). In Vercel → **Domains**, you can set **hardcoredoortodoorclosers.com** as the primary domain for the UI if it is not already.
 - **Recommended hostname (keeps Cloudflare Pages on the apex):** **`https://app.hardcoredoortodoorclosers.com`** — added on the Vercel project. In **Cloudflare DNS** for `hardcoredoortodoorclosers.com`, create:
   - **Type:** `A`
   - **Name:** `app`
