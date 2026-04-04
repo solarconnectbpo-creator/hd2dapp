@@ -48,6 +48,24 @@ Recommended production topology:
 - If your API is on subdomain, set:
   - `VITE_INTEL_API_BASE=https://api.hardcoredoortodoorclosers.com`
 
+### Vercel (optional — `app` subdomain)
+
+- **Project:** `hd2d-closers` (team `solarconnectbpo-creators-projects`). Link locally with `npx vercel link` (creates `.vercel/`, gitignored).
+- **Deploy:** `npm run vercel:deploy` — production alias: [https://hd2d-closers.vercel.app](https://hd2d-closers.vercel.app).
+- **Recommended hostname (keeps Cloudflare Pages on the apex):** **`https://app.hardcoredoortodoorclosers.com`** — added on the Vercel project. In **Cloudflare DNS** for `hardcoredoortodoorclosers.com`, create:
+  - **Type:** `A`
+  - **Name:** `app`
+  - **IPv4:** `76.76.21.21` (Vercel)
+  - **Proxy status:** DNS only (grey cloud) is usually best until Vercel shows the domain as verified; you can try proxying later if needed.
+  - Save and wait for DNS + Vercel verification (minutes).
+- **Older / optional domains** on the same Vercel project (`hardcoredoortodoorclosers.com`, `www`) conflict with Cloudflare Pages if both claim the same host — remove them under Vercel → **Domains** if you only use **`app`**.
+- **Env on Vercel:** `VITE_INTEL_API_BASE=https://hardcoredoortodoorclosers.com` (Production) so the SPA on `app.` calls the Worker API on the main domain.
+- **Connect Git in the Vercel UI:** [Project → Settings → Git](https://vercel.com/docs/deployments/git) → connect **solarconnectbpo-creator/hd2dapp**, set **Root Directory** to `roofing-estimator-vite`. The CLI command `vercel git connect` only works after the Vercel GitHub App is installed (browser OAuth).
+- **Deploy from GitHub without the Vercel UI link:** workflow **`.github/workflows/vercel-deploy.yml`** runs on pushes to `main` (paths under `roofing-estimator-vite/`). Add these **repository secrets** (GitHub → *Settings* → *Secrets and variables* → *Actions*):
+  - **`VERCEL_TOKEN`** — [Create](https://vercel.com/account/tokens) (scope: full account or deploy for this project).
+  - **`VERCEL_ORG_ID`** — `team_vSc38xty8O6GCiryXWIrn2u3`
+  - **`VERCEL_PROJECT_ID`** — `prj_hE0g5IRagWnQzfsVYaIG6OZ9VQuW`
+
 ## React Compiler
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).

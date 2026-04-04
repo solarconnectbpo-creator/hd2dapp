@@ -1,0 +1,32 @@
+# Deploy roofing-estimator-vite to Vercel on push to main (no Vercel↔GitHub UI link required).
+# Add these repository secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+# See roofing-estimator-vite/README.md → Vercel.
+name: Deploy Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "roofing-estimator-vite/**"
+      - ".github/workflows/vercel-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: roofing-estimator-vite/package-lock.json
+
+      - name: Deploy to Vercel (production)
+        working-directory: roofing-estimator-vite
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel@latest deploy --prod --yes
