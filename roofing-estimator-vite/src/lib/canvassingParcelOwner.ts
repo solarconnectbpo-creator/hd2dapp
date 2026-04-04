@@ -86,6 +86,17 @@ const OWNER_PRIORITY_KEYS = [
   "MKT_OWNER",
   "TRUST_NAME",
   "TRUSTEE",
+  /** Esri / county tax parcel exports */
+  "UNFORMATTED_OWNER_NAME",
+  "FORMATTED_OWNER_NAME",
+  "CURRENT_OWNER",
+  "CURR_OWNER",
+  "CURRNTOWNER",
+  "TAX_OWNER",
+  "OWNERNAME1",
+  "OWNERNAME2",
+  "OWNER_LINE1",
+  "SITE_OWNER",
 ];
 
 function getKeyCaseInsensitive(parcel: Record<string, unknown>, key: string): unknown {
@@ -96,13 +107,29 @@ function getKeyCaseInsensitive(parcel: Record<string, unknown>, key: string): un
   return undefined;
 }
 
-function isPlausibleOwnerName(s: string): boolean {
+export function isPlausibleOwnerName(s: string): boolean {
   const t = s.trim();
   if (t.length < 2) return false;
   if (/^[\d.\s-]+$/i.test(t)) return false;
   const u = t.toUpperCase();
   if (/^(UNKNOWN|N\/A|N\/A\.|TBD|VACANT|NONE|NULL|TEST|\.+|-+)$/i.test(u)) return false;
   return true;
+}
+
+/** For merge tie-breaks: only plausible strings count as a usable owner display value (not UNKNOWN, not numeric codes). */
+export function parcelOwnerScalarUsableInMerge(v: unknown): boolean {
+  if (typeof v !== "string") return false;
+  return isPlausibleOwnerName(v);
+}
+
+/** Keys where intel/REST placeholders must not beat real GIS/map values (excludes tax_year, amounts, etc.). */
+function isOwnerLikeMergeKey(key: string): boolean {
+  if (/(year|fiscal|amount|rate|bill|levy|district|parcel.?key|objectid|sq_?ft|acre|land|lot|zoning|class|use|value|total)/i.test(key)) {
+    return false;
+  }
+  return /owner|deed|grantee|taxpayer|mail_name|proprietor|nm_|name_full|holdr|holder|grantor|pname|fullname|tax_?name|prop_?owner|parcel_?owner|deedholder|mailing_?name|trustee|trust_?name/i.test(
+    key,
+  );
 }
 
 export function extractOwnerFromParcel(parcel: Record<string, unknown> | null): string {
@@ -237,7 +264,9 @@ export function mergeParcelAttributes(
   for (const k of keys) {
     const iv = intelParcel[k];
     const gv = featureAttributes[k];
-    if (isNonEmptyParcelScalar(iv)) {
+    const intelWins =
+      isNonEmptyParcelScalar(iv) && (!isOwnerLikeMergeKey(k) || parcelOwnerScalarUsableInMerge(iv));
+    if (intelWins) {
       out[k] = iv;
     } else if (Object.prototype.hasOwnProperty.call(intelParcel, k)) {
       out[k] = gv !== undefined ? gv : iv;

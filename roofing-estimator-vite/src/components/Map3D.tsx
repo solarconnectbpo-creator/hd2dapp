@@ -17,6 +17,37 @@ import {
   ringAreaSqM,
   ringPerimeterFt,
 } from "../lib/geoFootprintMeasure";
+import { extractOwnerFromParcel } from "../lib/canvassingParcelOwner";
+
+/** Esri GeoJSON sometimes nests row fields under `properties.attributes`. */
+function flattenParcelFeatureProperties(raw: Record<string, unknown>): Record<string, unknown> {
+  const base = { ...raw };
+  const nested = base.attributes;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const a = nested as Record<string, unknown>;
+    delete base.attributes;
+    return { ...base, ...a };
+  }
+  return base;
+}
+
+/** When stacked polygons share a click, prefer the feature that actually carries assessor attributes / owner. */
+function bestParcelPropertiesFromHits(hits: MapGeoJSONFeature[]): Record<string, unknown> | null {
+  let best: Record<string, unknown> | null = null;
+  let bestScore = -1;
+  for (const h of hits) {
+    const raw = h.properties;
+    if (!raw || typeof raw !== "object") continue;
+    const flat = flattenParcelFeatureProperties({ ...(raw as Record<string, unknown>) });
+    const ownerLen = extractOwnerFromParcel(flat).length;
+    const score = ownerLen * 25 + Object.keys(flat).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = flat;
+    }
+  }
+  return best;
+}
 
 export type Map3DHandle = {
   getCanvas: () => HTMLCanvasElement | null;
@@ -928,12 +959,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
         const hits = map.queryRenderedFeatures(e.point, {
           layers: ["arcgis-overlay-fill", "arcgis-overlay-line"],
         });
-        if (hits.length) {
-          const raw = hits[0].properties;
-          if (raw && typeof raw === "object") {
-            parcelHit = { ...(raw as Record<string, unknown>) };
-          }
-        }
+        parcelHit = bestParcelPropertiesFromHits(hits);
       } catch {
         /* queryRenderedFeatures can throw if style not ready */
       }

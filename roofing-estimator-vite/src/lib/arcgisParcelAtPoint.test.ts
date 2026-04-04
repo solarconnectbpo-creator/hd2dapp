@@ -26,6 +26,14 @@ describe("mergeArcgisFeatureSources", () => {
     expect(merged?.TAX_NAME).toBe("Assessor Correct LLC");
   });
 
+  it("prefers map when REST owner-like value is a placeholder", () => {
+    const merged = mergeArcgisFeatureSources(
+      { OWNER_NAME: "CROSSFACE LLC" },
+      { OWNER_NAME: "UNKNOWN" },
+    );
+    expect(merged?.OWNER_NAME).toBe("CROSSFACE LLC");
+  });
+
   it("prefers map for non-owner keys when both non-empty", () => {
     const merged = mergeArcgisFeatureSources(
       { SITE_ADDRESS: "123 Clicked St", APN: "map-apn" },

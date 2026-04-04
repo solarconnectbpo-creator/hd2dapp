@@ -18,6 +18,12 @@ describe("mergeParcelAttributes", () => {
     expect(m?.PIN).toBe("99");
   });
 
+  it("does not let placeholder Intel owner wipe non-empty GIS owner", () => {
+    const m = mergeParcelAttributes({ OWNER_NAME: "UNKNOWN" }, { OWNER_NAME: "CROSSFACE LLC", PIN: "1" });
+    expect(m?.OWNER_NAME).toBe("CROSSFACE LLC");
+    expect(m?.PIN).toBe("1");
+  });
+
   it("returns Intel-only when no overlay", () => {
     expect(mergeParcelAttributes({ A: "1" }, null)).toEqual({ A: "1" });
   });

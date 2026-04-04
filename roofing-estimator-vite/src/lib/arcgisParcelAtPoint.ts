@@ -9,6 +9,7 @@
  */
 
 import { normalizeArcgisFeatureLayerUrl } from "./arcgisFeatureLayer";
+import { parcelOwnerScalarUsableInMerge } from "./canvassingParcelOwner";
 
 export type ParcelAtPointOutcome =
   | { ok: true; attributes: Record<string, unknown>; geometry?: GeoJSON.Geometry }
@@ -152,8 +153,14 @@ export function mergeArcgisFeatureSources(
     }
     if (rOk && !mOk) out[k] = rv;
     else if (!rOk && mOk) out[k] = mv;
-    else if (isOwnerLikeFieldKey(k)) out[k] = rv;
-    else out[k] = mv;
+    else if (isOwnerLikeFieldKey(k)) {
+      const rUse = parcelOwnerScalarUsableInMerge(rv);
+      const mUse = parcelOwnerScalarUsableInMerge(mv);
+      if (rUse && !mUse) out[k] = rv;
+      else if (!rUse && mUse) out[k] = mv;
+      else if (rUse && mUse) out[k] = rv;
+      else out[k] = rOk ? rv : mv;
+    } else out[k] = mv;
   }
   return out;
 }
