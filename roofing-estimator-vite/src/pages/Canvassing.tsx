@@ -17,7 +17,7 @@ import { Button } from "../components/ui/button";
 import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
 import { parseLeadsFromGeoJson } from "../lib/canvassingGeoJson";
-import { fetchStlIntelAtPoint, isInMissouriBbox } from "../lib/canvassingIntel";
+import { fetchStlIntelAtPoint, isInMissouriBbox, isInMoIlParcelCoverageBbox } from "../lib/canvassingIntel";
 import { parseJsonResponse } from "../lib/readJsonResponse";
 import {
   buildParcelHandoffNotes,
@@ -687,11 +687,11 @@ export function Canvassing() {
           );
         } else if (intelHit && owner) {
           setPanelHint("Regional parcel record loaded. Confirm owner and building details on the assessor before quoting.");
-        } else if (isInMissouriBbox(lat, lng) && !parcel) {
+        } else if (isInMoIlParcelCoverageBbox(lat, lng) && !parcel) {
           setPanelHint("No parcel record at this pin — try the building center or a different spot.");
-        } else if (!isInMissouriBbox(lat, lng) && !fromGis) {
+        } else if (!isInMoIlParcelCoverageBbox(lat, lng) && !fromGis) {
           setPanelHint(
-            "Parcel coverage is strongest in Missouri. Elsewhere you still get the map address — verify the owner locally.",
+            "Parcel overlays use MO/IL county GIS layers where configured (built-in + optional Worker JSON). Rural gaps remain — verify the owner locally.",
           );
         } else if (!owner) {
           setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");

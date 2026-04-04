@@ -9,8 +9,11 @@ export function getIntelApiBase(): string {
   return getHd2dApiBase();
 }
 
-/** Missouri bounds — Worker serves St. Louis–oriented layers; skip fetch outside state to avoid noise. */
+/** Missouri bounds — Worker STL intel layers; skip fetch outside state to avoid noise. */
 export const MISSOURI_BBOX = { west: -95.78, east: -89.09, north: 40.62, south: 35.99 } as const;
+
+/** Illinois state bounds — parcel map fallbacks include several IL counties (not statewide parcels). */
+export const ILLINOIS_BBOX = { west: -91.52, east: -87.02, north: 42.51, south: 36.97 } as const;
 
 export function isInMissouriBbox(lat: number, lng: number): boolean {
   return (
@@ -19,6 +22,20 @@ export function isInMissouriBbox(lat: number, lng: number): boolean {
     lng >= MISSOURI_BBOX.west &&
     lng <= MISSOURI_BBOX.east
   );
+}
+
+export function isInIllinoisBbox(lat: number, lng: number): boolean {
+  return (
+    lat >= ILLINOIS_BBOX.south &&
+    lat <= ILLINOIS_BBOX.north &&
+    lng >= ILLINOIS_BBOX.west &&
+    lng <= ILLINOIS_BBOX.east
+  );
+}
+
+/** True when public MO/IL parcel overlays may apply (metro counties + primary STL layer). */
+export function isInMoIlParcelCoverageBbox(lat: number, lng: number): boolean {
+  return isInMissouriBbox(lat, lng) || isInIllinoisBbox(lat, lng);
 }
 
 export type StlIntelLite = {
