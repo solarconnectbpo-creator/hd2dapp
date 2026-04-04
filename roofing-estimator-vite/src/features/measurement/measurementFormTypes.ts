@@ -44,4 +44,20 @@ export interface FormState {
   nonRecDepUsd: string;
   /** Year built, lot size, etc. from property record import (Property records page). */
   propertyRecordNotes: string;
+
+  /** When "1", mod-bit replace uses explicit tear/flash/deck/haul lines instead of generic tear-off + dumpster. */
+  estimateAddonModBitDetailed: string;
+  estimateAddonDryInSq: string;
+  /** Gutter run LF (optional add-on line). */
+  estimateAddonGutterLf: string;
+  /** Lump-sum general conditions allowance ($), one EA line. */
+  estimateAddonGcAllowanceUsd: string;
+  estimateAddonCopperLf: string;
+  estimateAddonFreightEa: string;
+  estimateAddonEngineeringEa: string;
+  estimateAddonSidingSf: string;
+  estimateAddonWindowEa: string;
+  estimateAddonTrimLf: string;
+  estimateAddonTileLoadSq: string;
+  estimateAddonTileInstallSq: string;
 }

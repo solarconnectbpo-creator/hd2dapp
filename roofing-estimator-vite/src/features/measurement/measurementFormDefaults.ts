@@ -36,6 +36,18 @@ export function defaultFormState(): FormState {
     deductibleUsd: "0",
     nonRecDepUsd: "0",
     propertyRecordNotes: "",
+    estimateAddonModBitDetailed: "",
+    estimateAddonDryInSq: "",
+    estimateAddonGutterLf: "",
+    estimateAddonGcAllowanceUsd: "",
+    estimateAddonCopperLf: "",
+    estimateAddonFreightEa: "",
+    estimateAddonEngineeringEa: "",
+    estimateAddonSidingSf: "",
+    estimateAddonWindowEa: "",
+    estimateAddonTrimLf: "",
+    estimateAddonTileLoadSq: "",
+    estimateAddonTileInstallSq: "",
   };
 }
 
@@ -72,5 +84,17 @@ export function hillsdaleFormTemplate(): FormState {
     deductibleUsd: "2500",
     nonRecDepUsd: "500",
     propertyRecordNotes: "",
+    estimateAddonModBitDetailed: "",
+    estimateAddonDryInSq: "",
+    estimateAddonGutterLf: "",
+    estimateAddonGcAllowanceUsd: "",
+    estimateAddonCopperLf: "",
+    estimateAddonFreightEa: "",
+    estimateAddonEngineeringEa: "",
+    estimateAddonSidingSf: "",
+    estimateAddonWindowEa: "",
+    estimateAddonTrimLf: "",
+    estimateAddonTileLoadSq: "",
+    estimateAddonTileInstallSq: "",
   };
 }

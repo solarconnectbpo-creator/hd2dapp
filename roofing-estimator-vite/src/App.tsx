@@ -164,6 +164,10 @@ interface MeasurementSection {
   areaSqFt: string;
   perimeterFt: string;
   measuredSquares: string;
+  /** Rise/12 for this face; empty uses main roof pitch in face table. */
+  facePitch: string;
+  /** Pitch class letter (e.g. A/B/C) shown as F1 (A). */
+  facetClass: string;
 }
 
 interface CarrierParsed {
@@ -1301,6 +1305,85 @@ function buildDrawingMeasurements(
   return [...roofStructureRows, ...detailRows];
 }
 
+function appendEstimateAddonScopeLines(
+  lines: ScopeLine[],
+  form: FormState,
+  profile: MaterialProfile,
+  scope: "repair" | "replace",
+  effectiveSquares: number,
+  regional: number,
+  lengths: {
+    wallFlashing: number;
+    stepFlashing: number;
+  },
+): void {
+  if (scope !== "replace") return;
+
+  const push = (
+    code: string,
+    description: string,
+    qty: number,
+    unit: ScopeLine["unit"],
+    unitCostPreRegional: number,
+  ) => {
+    if (!Number.isFinite(qty) || qty <= 0 || unitCostPreRegional <= 0) return;
+    lines.push({
+      code,
+      description,
+      quantity: round2(qty),
+      unit,
+      unitCost: round2(unitCostPreRegional * regional),
+      total: 0,
+    });
+  };
+
+  const dryIn = Number.parseFloat(form.estimateAddonDryInSq || "");
+  if (dryIn > 0) push("ADD-DRYIN", "Dry-in process (temporary weathertight)", dryIn, "SQ", 28);
+
+  const gutterLf = Number.parseFloat(form.estimateAddonGutterLf || "");
+  if (gutterLf > 0) push("ADD-GUT", "R&R Gutter / downspout – aluminum – 6\"", gutterLf, "LF", 12.77);
+
+  const gcUsd = Number.parseFloat(form.estimateAddonGcAllowanceUsd || "");
+  if (gcUsd > 0) push("ADD-GC", "General conditions allowance", 1, "EA", gcUsd);
+
+  const copperLf = Number.parseFloat(form.estimateAddonCopperLf || "");
+  if (copperLf > 0) push("ADD-CU", "Copper fabrication & related sheet metal", copperLf, "LF", 45);
+
+  const freightEa = Number.parseFloat(form.estimateAddonFreightEa || "");
+  if (freightEa > 0) push("ADD-FRG", "Freight & logistics", freightEa, "EA", 350);
+
+  const engEa = Number.parseFloat(form.estimateAddonEngineeringEa || "");
+  if (engEa > 0) push("ADD-ENG", "Engineering (allowance)", engEa, "EA", 4056);
+
+  const sidingSf = Number.parseFloat(form.estimateAddonSidingSf || "");
+  if (sidingSf > 0) push("ADD-SID", "Siding (allowance)", sidingSf, "SF", 8.5);
+
+  const winEa = Number.parseFloat(form.estimateAddonWindowEa || "");
+  if (winEa > 0) push("ADD-WIN", "Window (allowance)", winEa, "EA", 450);
+
+  const trimLf = Number.parseFloat(form.estimateAddonTrimLf || "");
+  if (trimLf > 0) push("ADD-TRM", "Exterior trim (allowance)", trimLf, "LF", 6.25);
+
+  const cat = profile.category;
+  if (cat === "tile" || cat === "ludowici") {
+    const tl = Number.parseFloat(form.estimateAddonTileLoadSq || "");
+    if (tl > 0) push("ADD-TLD", "Tile loading", tl, "SQ", 85);
+    const ti = Number.parseFloat(form.estimateAddonTileInstallSq || "");
+    if (ti > 0) push("ADD-TINS", "Tile installation (allowance)", ti, "SQ", 200);
+  }
+
+  const modDetailed = form.estimateAddonModBitDetailed === "1";
+  if (modDetailed && profile.category === "modbit" && effectiveSquares > 0) {
+    push("MOD-TEAR", "Modified bitumen tear-off", effectiveSquares, "SQ", 62.4);
+    const flashLf = lengths.wallFlashing + lengths.stepFlashing;
+    if (flashLf > 0) {
+      push("MOD-FLRMV", "Associated flashing removal (mod-bit related)", flashLf, "LF", 8.5);
+    }
+    push("MOD-DKPOST", "Deck prep (after mod-bit removal, before new system)", effectiveSquares, "SQ", 22);
+    push("MOD-HAUL", "Haul-off & disposal", 1, "EA", 913);
+  }
+}
+
 function buildScopeLines(
   scope: "repair" | "replace",
   _category: string,
@@ -1318,10 +1401,13 @@ function buildScopeLines(
     stepFlashing: number;
     others: number;
   },
-  roofType?: string,
+  roofType: string | undefined,
+  form: FormState,
 ): ScopeLine[] {
   const profile = getMaterialProfile(roofType ?? "Asphalt Shingle");
   const lines: ScopeLine[] = [];
+  const modBitDetailed =
+    form.estimateAddonModBitDetailed === "1" && profile.category === "modbit" && scope === "replace";
 
   /** Portion of roof in scope; repair uses a severity-based fraction so labor/GC match the repair line. */
   const repairPortion =
@@ -1346,10 +1432,10 @@ function buildScopeLines(
     }
   };
 
-  if (scope === "replace" && profile.tearOffRate > 0 && effectiveSquares > 0) {
+  if (scope === "replace" && profile.tearOffRate > 0 && effectiveSquares > 0 && !modBitDetailed) {
     lines.push({
       code: `${profile.category.toUpperCase()}-RMV`,
-      description: `Tear-off & disposal (${profile.category.toUpperCase()})`,
+      description: `Tear-off cost & disposal (${profile.category.toUpperCase()})`,
       quantity: round2(effectiveSquares),
       unit: "SQ",
       unitCost: round2(profile.tearOffRate * regional),
@@ -1372,6 +1458,7 @@ function buildScopeLines(
     }
   } else {
     for (const item of profile.items) {
+      if (modBitDetailed && item.code === "MOD-PREP") continue;
       const qty = qtyFor(item.qtyFn, effectiveSquares);
       if (qty <= 0) continue;
       lines.push({
@@ -1386,6 +1473,7 @@ function buildScopeLines(
   }
 
   for (const gc of GENERAL_CONDITIONS) {
+    if (modBitDetailed && gc.code === "GEN-DMP") continue;
     const qty = qtyFor(gc.qtyFn, accessoryLaborSqBasis);
     if (qty <= 0) continue;
     lines.push({
@@ -1397,6 +1485,8 @@ function buildScopeLines(
       total: 0,
     });
   }
+
+  appendEstimateAddonScopeLines(lines, form, profile, scope, effectiveSquares, regional, lengths);
 
   void STEEP_SURCHARGE;
   void HEIGHT_SURCHARGE;
@@ -1650,7 +1740,59 @@ function buildMeasurementSectionFromForm(form: FormState, label = "Section 1"): 
     areaSqFt: form.areaSqFt,
     perimeterFt: form.perimeterFt,
     measuredSquares: form.measuredSquares,
+    facePitch: form.roofPitch,
+    facetClass: "",
   };
+}
+
+function measurementSectionFaceId(section: MeasurementSection, index: number): string {
+  const lab = section.label.trim();
+  const m = lab.match(/^(F\d+)/i);
+  if (m) return m[1]!.toUpperCase();
+  return `F${index + 1}`;
+}
+
+function formatSlopeColumn(pitchRaw: string | undefined, fallbackPitch: string): string {
+  const rise = parsePitchRise((pitchRaw ?? "").trim() || fallbackPitch);
+  if (rise == null) return "—";
+  return rise.toFixed(2);
+}
+
+type RoofFaceTableRow = { face: string; sqFt: number; squares: number; slope: string };
+
+/** Pure rows for roof faces (sections) — totals match proposal table. */
+function buildFaceTableRows(sections: MeasurementSection[], defaultPitch: string): RoofFaceTableRow[] {
+  return sections.map((s, idx) => {
+    const faceBase = measurementSectionFaceId(s, idx);
+    const cls = (s.facetClass || "").trim();
+    const face = cls ? `${faceBase} (${cls})` : faceBase;
+    const sqFt = Number.parseFloat(s.areaSqFt) || 0;
+    const sqField = Number.parseFloat(s.measuredSquares);
+    const squares =
+      Number.isFinite(sqField) && sqField > 0 ? round2(sqField) : sqFt > 0 ? round2(sqFt / 100) : 0;
+    const slope = formatSlopeColumn(s.facePitch, defaultPitch);
+    return { face, sqFt, squares, slope };
+  });
+}
+
+/** HTML table body rows for proposal. */
+function buildRoofFaceTableHtml(
+  esc: (s: string) => string,
+  sections: MeasurementSection[],
+  defaultPitch: string,
+): string {
+  if (!sections.length) return "";
+  const rows = buildFaceTableRows(sections, defaultPitch);
+  const totSq = rows.reduce((s, r) => s + r.sqFt, 0);
+  const totHundreds = rows.reduce((s, r) => s + r.squares, 0);
+  const body = rows
+    .map(
+      (r) =>
+        `<tr><td>${esc(r.face)}</td><td class="r">${r.sqFt > 0 ? esc(round2(r.sqFt).toLocaleString()) : esc("—")}</td><td class="r">${r.squares > 0 ? esc(r.squares.toFixed(2)) : esc("—")}</td><td class="r">${esc(r.slope)}</td></tr>`,
+    )
+    .join("");
+  const totalRow = `<tr class="total-row"><td>${esc("Estimated Total")}</td><td class="r">${totSq > 0 ? esc(round2(totSq).toLocaleString()) : esc("—")}</td><td class="r">${totHundreds > 0 ? esc(round2(totHundreds).toFixed(2)) : esc("—")}</td><td class="r"></td></tr>`;
+  return `${body}${totalRow}`;
 }
 
 function defaultProposalState(profile: ProposalProfile = "residential"): ProposalState {
@@ -1782,6 +1924,7 @@ function buildResult(form: FormState): EstimateResult | null {
     regional,
     lengths,
     form.roofType,
+    form,
   );
   const drawingMeasurements = buildDrawingMeasurements(
     area,
@@ -2189,6 +2332,8 @@ function buildRoofDiagramSvg(
     footprint?: { lengthFt: number; widthFt: number } | null;
     /** Entered plan perimeter (LF) — used for flat roof label when set. */
     perimeterFt?: number;
+    /** Multi-section face summary for complex schematic (legend only; not implied geometry). */
+    faceLegendLines?: string[];
   },
 ): string {
   const W = opts?.width ?? 520;
@@ -2366,6 +2511,16 @@ function buildRoofDiagramSvg(
     labels += label(L + 2, cy + 2, `Hips: ${fmtFt(lengths.hips)}`, c.hip, "start", 10);
     labels += label(cx, B + 16, `Eaves (total): ${fmtFt(lengths.eaves)} | Rakes (total): ${fmtFt(lengths.rakes)}`, c.eave, "middle", 10);
     labels += label(cx, B + 30, `Flashing: ${fmtFt(lengths.wallFlashing)} | Step: ${fmtFt(lengths.stepFlashing)}`, c.wflash, "middle", 10);
+    if (opts?.faceLegendLines?.length) {
+      let ly = T + 12;
+      const lx = W - 188;
+      labels += label(lx, ly, "Faces (sections)", fg, "start", 9);
+      for (const fl of opts.faceLegendLines) {
+        ly += 12;
+        if (ly > H - 52) break;
+        labels += label(lx, ly, `• ${fl}`, muted, "start", 8);
+      }
+    }
   } else {
     paths += solidLine(L, T, R, T, c.eave, 3);
     paths += solidLine(R, T, R, B, c.eave, 3);
@@ -2415,6 +2570,16 @@ function buildRoofDiagramSvg(
 </svg>`;
 }
 
+function formatFeetInchesFromDecimalFeet(ft: number): string {
+  if (!Number.isFinite(ft) || ft <= 0) return "—";
+  if (ft >= 1000) return `${(ft / 1000).toFixed(1)}k'`;
+  const totalIn = Math.max(0, Math.round(ft * 12));
+  const fe = Math.floor(totalIn / 12);
+  const inch = totalIn % 12;
+  if (inch === 0) return `${fe}'`;
+  return `${fe}' ${inch}"`;
+}
+
 function buildAccurateDiagramSvg(
   polygonFeature: GeoJSON.Feature<GeoJSON.Polygon> | null,
   drawnLines: DrawnRoofLine[],
@@ -2423,11 +2588,12 @@ function buildAccurateDiagramSvg(
   areaSqFt: number,
   perimeterFt: number,
   measuredSquares: number,
-  opts?: { width?: number; height?: number },
+  opts?: { width?: number; height?: number; light?: boolean },
 ): string {
   const W = opts?.width ?? 600;
   const H = opts?.height ?? 440;
   const PAD = 40;
+  const light = opts?.light ?? false;
 
   if (!polygonFeature?.geometry?.coordinates?.[0]?.length) return "";
 
@@ -2466,11 +2632,15 @@ function buildAccurateDiagramSvg(
     y: offY + (maxY - p.y) * scale,
   });
 
+  const dimBlue = "#2563eb";
   const c = {
     ridge: "#ef4444", hip: "#f97316", valley: "#22c55e",
     eave: "#3b82f6", rake: "#a855f7", wflash: "#eab308", sflash: "#06b6d4",
-    outline: "#ffffff", vertex: "#ffffff", bg: "#111827", fg: "#e5e7eb",
-    dim: "#94a3b8",
+    outline: light ? "#334155" : "#ffffff",
+    vertex: light ? "#0f172a" : "#ffffff",
+    bg: light ? "#ffffff" : "#111827",
+    fg: light ? "#0f172a" : "#e5e7eb",
+    polyFill: light ? "rgba(148,163,184,0.28)" : "rgba(59,130,246,0.12)",
   };
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
@@ -2479,32 +2649,38 @@ function buildAccurateDiagramSvg(
 
   const svgPts = localPts.map(toSvg);
   const polyPoints = svgPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  svg += `<polygon points="${polyPoints}" fill="rgba(59,130,246,0.1)" stroke="${c.outline}" stroke-width="2"/>`;
+  svg += `<polygon points="${polyPoints}" fill="${c.polyFill}" stroke="${c.outline}" stroke-width="${light ? 2 : 2}"/>`;
 
+  const dimOffset = 26;
   for (let i = 0; i < svgPts.length - 1; i++) {
-    const a = svgPts[i];
-    const b = svgPts[i + 1];
-    const aGeo = ring[i];
-    const bGeo = ring[i + 1];
+    const a = svgPts[i]!;
+    const b = svgPts[i + 1]!;
+    const aGeo = ring[i]!;
+    const bGeo = ring[i + 1]!;
     const dLat = toR(bGeo[1] - aGeo[1]);
     const dLng = toR(bGeo[0] - aGeo[0]);
     const sinHalfLat = Math.sin(dLat / 2);
     const sinHalfLng = Math.sin(dLng / 2);
     const hav = sinHalfLat * sinHalfLat + Math.cos(toR(aGeo[1])) * Math.cos(toR(bGeo[1])) * sinHalfLng * sinHalfLng;
     const distFt = 2 * 6371000 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav)) * 3.28084;
-    const mx = (a.x + b.x) / 2;
-    const my = (a.y + b.y) / 2;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const nx = len > 0 ? -dy / len * 10 : 0;
-    const ny = len > 0 ? dx / len * 10 : 10;
-    const label = distFt >= 1000 ? `${(distFt / 1000).toFixed(1)}k` : `${Math.round(distFt)}'`;
-    svg += `<text x="${(mx + nx).toFixed(1)}" y="${(my + ny).toFixed(1)}" fill="${c.dim}" font-size="11" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${label}</text>`;
+    const elen = Math.sqrt(dx * dx + dy * dy);
+    const unx = elen > 0 ? -dy / elen : 0;
+    const uny = elen > 0 ? dx / elen : 1;
+    const aOff = { x: a.x + unx * dimOffset, y: a.y + uny * dimOffset };
+    const bOff = { x: b.x + unx * dimOffset, y: b.y + uny * dimOffset };
+    const lab = formatFeetInchesFromDecimalFeet(distFt);
+    const tcx = (aOff.x + bOff.x) / 2;
+    const tcy = (aOff.y + bOff.y) / 2;
+    svg += `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${aOff.x.toFixed(1)}" y2="${aOff.y.toFixed(1)}" stroke="${dimBlue}" stroke-width="1.2"/>`;
+    svg += `<line x1="${b.x.toFixed(1)}" y1="${b.y.toFixed(1)}" x2="${bOff.x.toFixed(1)}" y2="${bOff.y.toFixed(1)}" stroke="${dimBlue}" stroke-width="1.2"/>`;
+    svg += `<line x1="${aOff.x.toFixed(1)}" y1="${aOff.y.toFixed(1)}" x2="${bOff.x.toFixed(1)}" y2="${bOff.y.toFixed(1)}" stroke="${dimBlue}" stroke-width="1.4"/>`;
+    svg += `<text x="${tcx.toFixed(1)}" y="${(tcy - 4).toFixed(1)}" fill="${dimBlue}" font-size="11" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="700">${lab}</text>`;
   }
 
   for (const p of svgPts.slice(0, -1)) {
-    svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${c.vertex}" stroke="${c.outline}" stroke-width="1"/>`;
+    svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${c.vertex}" stroke="${light ? dimBlue : c.outline}" stroke-width="1"/>`;
   }
 
   const lineTypeColors: Record<string, string> = {
@@ -2521,7 +2697,8 @@ function buildAccurateDiagramSvg(
     const points = linePts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
     svg += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="6,3"/>`;
     const mid = { x: (linePts[0].x + linePts[linePts.length - 1].x) / 2, y: (linePts[0].y + linePts[linePts.length - 1].y) / 2 };
-    svg += `<text x="${mid.x.toFixed(1)}" y="${(mid.y - 6).toFixed(1)}" fill="${color}" font-size="10" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${line.type}: ${line.lengthFt.toFixed(1)}'</text>`;
+    const lfLab = formatFeetInchesFromDecimalFeet(line.lengthFt);
+    svg += `<text x="${mid.x.toFixed(1)}" y="${(mid.y - 6).toFixed(1)}" fill="${color}" font-size="10" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${line.type}: ${lfLab}</text>`;
   }
 
   const legendItems = [
@@ -2549,97 +2726,16 @@ function buildAccurateDiagramSvg(
   return svg;
 }
 
-function buildPropertyOutlineDiagramSvg(
-  polygons: Array<{ geometry?: { type?: string; coordinates?: unknown } }>,
-  lines: DrawnRoofLine[],
-  opts?: { width?: number; height?: number },
-): string {
-  const W = opts?.width ?? 560;
-  const H = opts?.height ?? 360;
-  const PAD = 22;
-
-  type Pt = [number, number];
-  const rings: Pt[][] = [];
-  for (const f of polygons) {
-    const g = f.geometry;
-    if (!g || !g.coordinates) continue;
-    if (g.type === "Polygon") {
-      const c = g.coordinates as unknown as Pt[][];
-      if (Array.isArray(c) && c[0]?.length) rings.push(c[0]);
-    } else if (g.type === "MultiPolygon") {
-      const c = g.coordinates as unknown as Pt[][][];
-      if (Array.isArray(c)) {
-        for (const poly of c) {
-          if (poly?.[0]?.length) rings.push(poly[0]);
-        }
-      }
-    }
-  }
-  if (!rings.length) return "";
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const ring of rings) {
-    for (const [x, y] of ring) {
-      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return "";
-
-  const spanX = Math.max(1e-9, maxX - minX);
-  const spanY = Math.max(1e-9, maxY - minY);
-  const scale = Math.min((W - PAD * 2) / spanX, (H - PAD * 2) / spanY);
-
-  const project = (p: Pt): Pt => {
-    const x = PAD + (p[0] - minX) * scale;
-    const y = H - (PAD + (p[1] - minY) * scale);
-    return [x, y];
-  };
-
-  const paths = rings
-    .map((ring) => {
-      const pts = ring.map(project).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
-      if (pts.length < 3) return "";
-      const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-      return `${d} Z`;
-    })
-    .filter(Boolean)
-    .join(" ");
-
-  const labels = lines
-    .map((line) => {
-      const coords = line.geometry?.coordinates as unknown;
-      if (!Array.isArray(coords) || coords.length < 2) return "";
-      const first = coords[0] as Pt;
-      const last = coords[coords.length - 1] as Pt;
-      if (!Array.isArray(first) || !Array.isArray(last)) return "";
-      const mid: Pt = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2];
-      const [x, y] = project(mid);
-      const label = `${line.type.toUpperCase()} ${line.lengthFt.toFixed(1)} LF`;
-      return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="10" font-weight="700" fill="#111827" text-anchor="middle">${label}</text>`;
-    })
-    .filter(Boolean)
-    .join("");
-
-  return `
-<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Property roof outline">
-  <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-  <path d="${paths}" fill="#e5e7eb" stroke="#111827" stroke-width="2" />
-  ${labels}
-</svg>`;
-}
-
 function buildProposalHtml(
   form: FormState,
   result: EstimateResult,
   proposal: ProposalState,
-  opts?: { diagramSvgOverride?: string | null },
+  opts?: {
+    diagramSvgOverride?: string | null;
+    /** Georeferenced footprint with dimension style (preferred when no override). */
+    footprintAccurateSvg?: string | null;
+    measurementSections?: MeasurementSection[];
+  },
 ): string {
   const esc = (s: string) =>
     s
@@ -2664,14 +2760,39 @@ function buildProposalHtml(
   const diagramLengths = getLineLengthsFromForm(form);
   const areaNum = Number.parseFloat(form.areaSqFt) || 0;
   const diagramPerim = Number.parseFloat(form.perimeterFt);
+  const faceLegendLines =
+    (opts?.measurementSections?.length ?? 0) > 1
+      ? (opts!.measurementSections!).map((s, i) => {
+          const fid = measurementSectionFaceId(s, i);
+          const cls = (s.facetClass || "").trim();
+          const sq = Number.parseFloat(s.areaSqFt) || 0;
+          const bits = [cls ? `${fid} (${cls})` : fid, sq > 0 ? `${round2(sq)} SF` : ""].filter(Boolean);
+          return bits.join(" — ");
+        })
+      : undefined;
   const diagramSvg =
     opts?.diagramSvgOverride?.includes("<svg")
       ? opts.diagramSvgOverride
-      : buildRoofDiagramSvg(form.roofType, form.roofStructure, diagramLengths, areaNum, form.roofPitch, {
-          footprint: diagramFootprintFromForm(form),
-          perimeterFt:
-            Number.isFinite(diagramPerim) && diagramPerim > 0 ? diagramPerim : undefined,
-        });
+      : opts?.footprintAccurateSvg?.includes("<svg")
+        ? opts.footprintAccurateSvg
+        : buildRoofDiagramSvg(form.roofType, form.roofStructure, diagramLengths, areaNum, form.roofPitch, {
+            footprint: diagramFootprintFromForm(form),
+            perimeterFt:
+              Number.isFinite(diagramPerim) && diagramPerim > 0 ? diagramPerim : undefined,
+            faceLegendLines,
+          });
+  const faceTableBody =
+    opts?.measurementSections && opts.measurementSections.length > 0
+      ? buildRoofFaceTableHtml(esc, opts.measurementSections, form.roofPitch)
+      : "";
+  const faceTableBlock =
+    faceTableBody.length > 0
+      ? `<h3 style="font-size:13px;margin:16px 0 6px;color:#000000">Roof faces (sections)</h3>
+  <table>
+    <thead><tr><th>Face</th><th class="r">SQ FT</th><th class="r"># SQs</th><th class="r">Slope (rise / 12)</th></tr></thead>
+    <tbody>${faceTableBody}</tbody>
+  </table>`
+      : "";
   const pickMeas = (code: string) => result.drawingMeasurements.find((m) => m.code === code)?.value ?? "—";
   const codeRefs = getComplianceReferencesForCategory(classifyRoofType(form.roofType));
   const takeoffCmpRows = result.takeoffComparison ?? [];
@@ -2763,7 +2884,10 @@ function buildProposalHtml(
   </table>`
       : ""
   }
-  <div style="text-align:center;margin:12px 0">${diagramSvg}</div>
+  <div class="row" style="align-items:flex-start;flex-wrap:wrap">
+    <div class="col" style="flex:1.2;min-width:280px;text-align:center">${diagramSvg}</div>
+    ${faceTableBlock ? `<div class="col" style="flex:1;min-width:220px">${faceTableBlock}</div>` : ""}
+  </div>
   <table>
     <thead><tr><th colspan="2">Dwelling Roof Structure</th></tr></thead>
     <tbody>${structureRows}</tbody>
@@ -3198,6 +3322,16 @@ function App() {
     }
 
     const previewPerim = Number.parseFloat(form.perimeterFt);
+    const prevFaceLegend =
+      measurementSections.length > 1
+        ? measurementSections.map((s, i) => {
+            const fid = measurementSectionFaceId(s, i);
+            const cls = (s.facetClass || "").trim();
+            const sq = Number.parseFloat(s.areaSqFt) || 0;
+            const bits = [cls ? `${fid} (${cls})` : fid, sq > 0 ? `${round2(sq)} SF` : ""].filter(Boolean);
+            return bits.join(" — ");
+          })
+        : undefined;
     return buildRoofDiagramSvg(
       form.roofType,
       form.roofStructure,
@@ -3211,6 +3345,7 @@ function App() {
         footprint: diagramFootprintFromForm(form),
         perimeterFt:
           Number.isFinite(previewPerim) && previewPerim > 0 ? previewPerim : undefined,
+        faceLegendLines: prevFaceLegend,
       },
     );
   }, [
@@ -3218,6 +3353,7 @@ function App() {
     result,
     mapboxFeatures,
     drawnRoofLines,
+    measurementSections,
     form.roofType,
     form.roofStructure,
     form.areaSqFt,
@@ -3232,14 +3368,6 @@ function App() {
     form.wallFlashingFt,
     form.stepFlashingFt,
   ]);
-
-  const proposalPropertyDiagramSvg = useMemo(() => {
-    const polygons = mapboxFeatures.filter(
-      (f: any) => f?.geometry?.type === "Polygon" || f?.geometry?.type === "MultiPolygon",
-    );
-    if (!polygons.length) return "";
-    return buildPropertyOutlineDiagramSvg(polygons, drawnRoofLines, { width: 560, height: 360 });
-  }, [mapboxFeatures, drawnRoofLines]);
 
   const generateRaybevelDiagramFromMap = async () => {
     const poly = mapboxFeatures.find((f: any) => f.geometry?.type === "Polygon");
@@ -4179,8 +4307,30 @@ function App() {
         status: "draft",
       });
     }
+    const drawnPolyPrint = mapboxFeatures.find(
+      (f: { geometry?: { type?: string } }) => f?.geometry?.type === "Polygon",
+    ) as GeoJSON.Feature<GeoJSON.Polygon> | undefined;
+    const rayOverride = raybevelDiagramSvg?.includes("<svg") ? raybevelDiagramSvg : null;
+    const areaN = Number.parseFloat(form.areaSqFt) || 0;
+    const perimN = Number.parseFloat(form.perimeterFt) || 0;
+    const sqN = Number.parseFloat(form.measuredSquares) || 0;
+    const footprintAccurateSvg =
+      !rayOverride && drawnPolyPrint
+        ? buildAccurateDiagramSvg(
+            drawnPolyPrint,
+            drawnRoofLines,
+            form.roofType,
+            form.roofPitch,
+            areaN,
+            perimN,
+            sqN,
+            { width: 560, height: 380, light: true },
+          )
+        : "";
     const html = buildProposalHtml(form, result, proposal, {
-      diagramSvgOverride: proposalPropertyDiagramSvg || raybevelDiagramSvg,
+      diagramSvgOverride: rayOverride,
+      footprintAccurateSvg: footprintAccurateSvg || null,
+      measurementSections,
     });
     const win = window.open("", "_blank", "width=980,height=900");
     if (!win) return;
@@ -4214,6 +4364,8 @@ function App() {
         areaSqFt: "",
         perimeterFt: "",
         measuredSquares: "",
+        facePitch: form.roofPitch,
+        facetClass: "",
       },
     ]);
   };
@@ -4876,8 +5028,12 @@ function App() {
               <div style={{ display: "grid", gap: 8 }}>
                 {measurementSections.map((section, idx) => (
                   <div key={section.id} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
+                    <p className="muted" style={{ margin: "0 0 6px", fontSize: 11 }}>
+                      Face ID <strong>F{idx + 1}</strong>
+                      {section.label.trim() ? ` — label: ${section.label.trim()}` : ""} (override ID with label starting with F1, F2, …)
+                    </p>
                     <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
-                      <label>Label<input value={section.label} onChange={(e) => updateMeasurementSection(section.id, "label", e.target.value)} placeholder={`Section ${idx + 1}`} /></label>
+                      <label>Label<input value={section.label} onChange={(e) => updateMeasurementSection(section.id, "label", e.target.value)} placeholder={`Section ${idx + 1} or F1`} /></label>
                       <label>Area (sq ft)<input type="number" min={0} value={section.areaSqFt} onChange={(e) => updateMeasurementSection(section.id, "areaSqFt", e.target.value)} placeholder="1200" /></label>
                       <label>Perimeter (ft)<input type="number" min={0} value={section.perimeterFt} onChange={(e) => updateMeasurementSection(section.id, "perimeterFt", e.target.value)} placeholder="180" /></label>
                       <label>Squares<input type="number" min={0} value={section.measuredSquares} onChange={(e) => updateMeasurementSection(section.id, "measuredSquares", e.target.value)} placeholder="14.5" /></label>
@@ -4885,12 +5041,169 @@ function App() {
                         Remove
                       </button>
                     </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8, maxWidth: 440 }}>
+                      <label>
+                        Face pitch (rise/12)
+                        <input
+                          value={section.facePitch ?? ""}
+                          onChange={(e) => updateMeasurementSection(section.id, "facePitch", e.target.value)}
+                          placeholder={form.roofPitch || "6/12"}
+                        />
+                      </label>
+                      <label>
+                        Facet class (e.g. A/B/C)
+                        <input
+                          value={section.facetClass ?? ""}
+                          onChange={(e) => updateMeasurementSection(section.id, "facetClass", e.target.value)}
+                          placeholder="optional"
+                        />
+                      </label>
+                    </div>
                   </div>
                 ))}
               </div>
               <p className="muted" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
                 Section totals: {measurementSectionTotals.areaSqFt.toFixed(2)} sq ft, {measurementSectionTotals.perimeterFt.toFixed(2)} ft perimeter, {measurementSectionTotals.measuredSquares.toFixed(2)} SQ.
               </p>
+            </div>
+            <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
+              <strong>Estimate add-ons (replace scope)</strong>
+              <p className="muted" style={{ margin: "6px 0 10px", fontSize: 12 }}>
+                Enter quantities to add supplemental scope lines. For modified bitumen, detailed removal replaces generic tear-off and skips duplicate deck-prep and dumpster lines.
+              </p>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={form.estimateAddonModBitDetailed === "1"}
+                  onChange={(e) =>
+                    setForm((curr) => ({ ...curr, estimateAddonModBitDetailed: e.target.checked ? "1" : "" }))
+                  }
+                />
+                Mod-bit detailed removal (tear-off, flashing removal, deck prep after removal, haul-off)
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))", gap: 8 }}>
+                <label>
+                  Dry-in (SQ)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.estimateAddonDryInSq}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonDryInSq: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Gutter (LF)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={form.estimateAddonGutterLf}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonGutterLf: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  General conditions ($)
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.estimateAddonGcAllowanceUsd}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonGcAllowanceUsd: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Copper fab (LF)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={form.estimateAddonCopperLf}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonCopperLf: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Freight (EA)
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.estimateAddonFreightEa}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonFreightEa: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Engineering (EA)
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.estimateAddonEngineeringEa}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonEngineeringEa: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Siding (SF)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={form.estimateAddonSidingSf}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonSidingSf: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Windows (EA)
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.estimateAddonWindowEa}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonWindowEa: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Trim (LF)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={form.estimateAddonTrimLf}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonTrimLf: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Tile load (SQ)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.estimateAddonTileLoadSq}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonTileLoadSq: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label>
+                  Tile install (SQ)
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.estimateAddonTileInstallSq}
+                    onChange={(e) => setForm((c) => ({ ...c, estimateAddonTileInstallSq: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+              </div>
             </div>
             <label>
               Pricing preset

@@ -5,6 +5,14 @@
   "sheets": {
     "TPO": [
       {
+        "description": "Dry-in process (temporary weathertight)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
         "description": "Additional charge – steep slope (4:12 to 6:12 pitch)",
         "unit": "SQ",
         "remove": null,
@@ -751,6 +759,46 @@
         "oAndP": 0
       },
       {
+        "description": "Dry-in process (temporary weathertight)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Modified bitumen tear-off",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 62.4,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Associated flashing removal (mod-bit related)",
+        "unit": "LF",
+        "remove": null,
+        "replace": 8.5,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Deck prep (after mod-bit removal, before new system)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 22,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
+        "description": "Haul-off & disposal",
+        "unit": "EA",
+        "remove": null,
+        "replace": 913,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
         "description": "R&R Roof deck sheathing – plywood 1/2\" CDX",
         "unit": "SF",
         "remove": 0.65,
@@ -1224,6 +1272,14 @@
       }
     ],
     "EPDM": [
+      {
+        "description": "Dry-in process (temporary weathertight)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 0,
+        "oAndP": 0
+      },
       {
         "description": "Additional charge – steep slope (4:12 to 6:12)",
         "unit": "SQ",
@@ -1731,6 +1787,14 @@
     ],
     "PVC": [
       {
+        "description": "Dry-in process (temporary weathertight)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 0,
+        "oAndP": 0
+      },
+      {
         "description": "Additional charge – steep slope (4:12 to 6:12)",
         "unit": "SQ",
         "remove": null,
@@ -2228,6 +2292,14 @@
       }
     ],
     "Roof Coatings": [
+      {
+        "description": "Dry-in process (temporary weathertight)",
+        "unit": "SQ",
+        "remove": null,
+        "replace": 28,
+        "tax": 0,
+        "oAndP": 0
+      },
       {
         "description": "Roof moisture survey / infrared thermographic scan",
         "unit": "SQ",
