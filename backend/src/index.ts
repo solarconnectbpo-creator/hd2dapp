@@ -59,6 +59,8 @@ interface Env {
   /** ArcGIS parcel layer for Canvassing (FeatureServer …/0). Use wrangler secret for ARCGIS_API_TOKEN. */
   ARCGIS_FEATURE_LAYER_URL?: string;
   ARCGIS_API_TOKEN?: string;
+  /** Optional JSON array of { id, layerUrl, west, south, east, north } merged with built-in MO/IL parcel fallbacks. */
+  ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON?: string;
   /** Optional override for building footprint point query; defaults to USGS national layer. */
   ESRI_BUILDING_FOOTPRINT_LAYER_URL?: string;
   /** Optional MapServer/ImageServer tile template for Canvassing base map overlay ({z}/{y}/{x}); exposed via GET /api/health. */

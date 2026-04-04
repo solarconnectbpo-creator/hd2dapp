@@ -23,6 +23,7 @@ EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com"
 # Override with your county’s FeatureServer …/FeatureServer/N if you work outside STL.
 ARCGIS_FEATURE_LAYER_URL = "https://services6.arcgis.com/evmyRZRrsopdeog7/arcgis/rest/services/AssessorsParcels/FeatureServer/0"
 # ArcGIS (Canvassing): optional MapServer tile template ARCGIS_MAPSERVER_TILE_URL (…/tile/{z}/{y}/{x}); token via `wrangler secret put ARCGIS_API_TOKEN`
+# Built-in MO/IL parcel fallbacks in src/api/moIlParcelFallbackRegions.ts; optional var ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON (see .dev.vars.example).
 #
 # --- DealMachine (Canvassing + Property records) — POST /api/dealmachine/property ---
 # Key is a SECRET (never commit). Canvassing calls the Worker only; the browser never sees the key.

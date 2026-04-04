@@ -2,7 +2,7 @@
  * Server-side ArcGIS FeatureServer access. URLs and tokens stay in Worker env — never exposed to the browser.
  *
  * Secrets: wrangler secret put ARCGIS_API_TOKEN
- * Vars: ARCGIS_FEATURE_LAYER_URL, ESRI_BUILDING_FOOTPRINT_LAYER_URL (optional; defaults to USGS building layer).
+ * Vars: ARCGIS_FEATURE_LAYER_URL, ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON (optional), ESRI_BUILDING_FOOTPRINT_LAYER_URL (optional; defaults to USGS building layer).
  * Optional MapServer raster overlay for the map: ARCGIS_MAPSERVER_TILE_URL etc. (see health.ts — not used in this file).
  */
 
@@ -13,6 +13,11 @@ import {
   resolveArcgisParcelLayerUrl,
   resolveStlCityParcelLayerUrl,
 } from "./arcgisParcelEnv";
+import {
+  allParcelFallbackRegions,
+  bboxIntersectsParcelFallbackRegion,
+  parcelFallbackUrlsForPoint,
+} from "./arcgisParcelFallbacks";
 
 const DEFAULT_BUILDING_LAYER =
   "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/Building_Footprints_USGS/FeatureServer/0";
@@ -21,6 +26,7 @@ export type ArcgisEnv = AuthEnv & {
   ARCGIS_FEATURE_LAYER_URL?: string;
   ARCGIS_STL_CITY_PARCEL_LAYER_URL?: string;
   ARCGIS_API_TOKEN?: string;
+  ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON?: string;
   ESRI_BUILDING_FOOTPRINT_LAYER_URL?: string;
 };
 
@@ -327,6 +333,21 @@ export async function handleArcgisRequest(
             /* City layer merge is best-effort (MapServer availability). */
           }
         }
+        const primaryNorm = normalizeArcgisQueryableLayerUrl(rawUrl);
+        const cityNorm = cityUrl ? normalizeArcgisQueryableLayerUrl(cityUrl) : null;
+        const fallbackRegions = allParcelFallbackRegions(env).filter((region) => {
+          if (!bboxIntersectsParcelFallbackRegion(w, s, e, n, region)) return false;
+          const fn = normalizeArcgisQueryableLayerUrl(region.layerUrl);
+          return Boolean(fn && fn !== primaryNorm && fn !== cityNorm);
+        });
+        const fallbackFetches = await Promise.allSettled(
+          fallbackRegions.map((region) => fetchLayerGeoJson(region.layerUrl, token || undefined, bboxOpts)),
+        );
+        for (const settled of fallbackFetches) {
+          if (settled.status === "fulfilled") {
+            fc = mergeFeatureCollections(fc, settled.value);
+          }
+        }
       }
       return new Response(JSON.stringify(fc), {
         status: 200,
@@ -413,6 +434,21 @@ export async function handleArcgisRequest(
       }
     }
     if (out.reason === "no_hit") {
+      const primaryNorm = normalizeArcgisQueryableLayerUrl(layerUrl);
+      const cityLayer = resolveStlCityParcelLayerUrl(env);
+      const cityNorm = cityLayer ? normalizeArcgisQueryableLayerUrl(cityLayer) : null;
+      const tried = new Set<string>();
+      if (primaryNorm) tried.add(primaryNorm);
+      if (cityNorm) tried.add(cityNorm);
+      for (const fbUrl of parcelFallbackUrlsForPoint(lat, lng, env)) {
+        const fn = normalizeArcgisQueryableLayerUrl(fbUrl);
+        if (!fn || tried.has(fn)) continue;
+        tried.add(fn);
+        const fbOut = await queryAttributesAtPoint(fbUrl, lat, lng, token);
+        if (fbOut.ok) {
+          return new Response(JSON.stringify({ ok: true, attributes: fbOut.attributes }), { status: 200, headers: j });
+        }
+      }
       return new Response(JSON.stringify({ ok: false, reason: "no_hit" }), { status: 200, headers: j });
     }
     return new Response(

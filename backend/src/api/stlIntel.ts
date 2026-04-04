@@ -118,6 +118,32 @@ export async function handleStlIntel(
     const url = new URL(request.url);
     const coords = parseLatLng(url);
     if (!coords) return json({ success: false, error: "Missing lat/lng query params" }, 400, corsHeaders);
+
+    const { lat, lng } = coords;
+    const inMo =
+      lat >= MISSOURI_BBOX.south &&
+      lat <= MISSOURI_BBOX.north &&
+      lng >= MISSOURI_BBOX.west &&
+      lng <= MISSOURI_BBOX.east;
+    if (!inMo) {
+      return json(
+        {
+          success: true,
+          data: {
+            parcel: null,
+            buildingPermits: [],
+            tradesPermits: [],
+            lraParcel: null,
+            taxSaleParcel: null,
+            demolitionParcel: null,
+            esriWorldImageryTiles: ESRI_WORLD_IMAGERY_TILES,
+          },
+        },
+        200,
+        corsHeaders,
+      );
+    }
+
     const nearMeters = Number.parseFloat(url.searchParams.get("nearMeters") ?? "75");
 
     const [parcelRes, bldRes, tradeRes, lraRes, taxRes, demoRes] = await Promise.all([

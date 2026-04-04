@@ -50,6 +50,8 @@
 # ARCGIS_STL_CITY_PARCEL_LAYER_URL=https://maps8.stlouis-mo.gov/arcgis/rest/services/ASSESSOR/Assessor_Public_Parcels/MapServer/11
 # ARCGIS_STL_CITY_PARCEL_LAYER_URL=__DISABLE_STL_CITY_PARCEL__   # skip city merge / point fallback
 # ARCGIS_API_TOKEN=   # only if your layer requires a token
+# Optional: append county parcel layers (JSON array). Each entry: id, layerUrl (…/FeatureServer/N or …/MapServer/N), west, south, east, north (WGS84).
+# ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON=[{"id":"sample_county","layerUrl":"https://example.org/arcgis/rest/services/Parcels/FeatureServer/0","west":-91,"south":40,"east":-90.5,"north":40.5}]
 
 # Optional ArcGIS MapServer / ImageServer cached tiles for Canvassing (slippy XYZ; exposed in GET /api/health, no secrets in URL):
 # ARCGIS_MAPSERVER_TILE_URL=https://your-host/arcgis/rest/services/YourMap/MapServer/tile/{z}/{y}/{x}
