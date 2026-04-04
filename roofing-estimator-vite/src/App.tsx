@@ -3406,7 +3406,7 @@ function App() {
     if (propertyOwnerRecordHasRequiredContact(base)) return base;
     const dm = await fetchDealMachinePropertyByAddress(criteria);
     if (!dm.ok) {
-      setGeoStatus((curr) => (curr ? `${curr} | DealMachine: ${dm.message}` : `DealMachine: ${dm.message}`));
+      setGeoStatus((curr) => (curr ? `${curr} | Property lookup: ${dm.message}` : `Property lookup: ${dm.message}`));
       return base;
     }
     const taxSummary = formatAssessorTaxSummaryFromRecord(dm.rawRecord);
@@ -3521,7 +3521,7 @@ function App() {
         setGeoStatus("Property loaded with assessor/tax and owner contact details.");
       } else {
         setGeoStatus(
-          "Property loaded. Use your ArcGIS parcel layer (Contacts & settings), Missouri intel when applicable, DealMachine, or enter owner details manually.",
+          "Property loaded. Use your parcel layer (Contacts & settings), regional intel when available, supplemental records lookup, or enter owner details manually.",
         );
       }
     } catch (e) {
@@ -4782,8 +4782,8 @@ function App() {
             <label>Latitude<input type="number" step="0.000001" value={form.latitude} onChange={(e) => setForm((curr) => ({ ...curr, latitude: e.target.value }))} placeholder="32.7767" /></label>
             <label>Longitude<input type="number" step="0.000001" value={form.longitude} onChange={(e) => setForm((curr) => ({ ...curr, longitude: e.target.value }))} placeholder="-96.7970" /></label>
             <p className="muted" style={{ gridColumn: "1 / -1", fontSize: 12, margin: 0 }}>
-              <Link to="/property-lookup">Property records</Link> — import CSV / JSON (Parallel-enriched or assessor), then open
-              here. DealMachine runs through the HD2D Worker (<code>DEALMACHINE_API_KEY</code> on the server).
+              <Link to="/property-lookup">Property records</Link> — import CSV / JSON (enriched or assessor), then open here.
+              Supplemental property records run through the HD2D API (server-configured).
               Click the map (draw mode off) or use &quot;Set property from map center&quot; to load owner contact info.
             </p>
             {form.propertyRecordNotes ? (

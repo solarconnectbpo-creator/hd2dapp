@@ -77,14 +77,14 @@ export async function fetchDealMachinePropertyByAddress(
   criteria: UsAddressSearchCriteria,
 ): Promise<DealMachineSearchOk | DealMachineSearchErr> {
   if (!criteria.street_address?.trim() || !criteria.city?.trim() || !criteria.state?.trim()) {
-    return { ok: false, message: "Street, city, and state are required for DealMachine search." };
+    return { ok: false, message: "Street, city, and state are required for property lookup." };
   }
 
   if (!isHd2dApiConfigured()) {
     return {
       ok: false,
       message:
-        "DealMachine needs the HD2D Worker: set VITE_INTEL_API_BASE to your Worker URL and configure DEALMACHINE_API_KEY in wrangler secrets or backend .dev.vars.",
+        "Property lookup needs the HD2D API. Set VITE_INTEL_API_BASE to your app API URL (local: wrangler dev). Server-side lookup must be enabled by your administrator.",
     };
   }
 
@@ -107,7 +107,7 @@ export async function fetchDealMachinePropertyByAddress(
   } catch (e) {
     return {
       ok: false,
-      message: `Network error calling DealMachine (${e instanceof Error ? e.message : String(e)}).`,
+      message: `Network error during property lookup (${e instanceof Error ? e.message : String(e)}).`,
     };
   }
 
@@ -118,10 +118,10 @@ export async function fetchDealMachinePropertyByAddress(
     if (res.status === 401) {
       return {
         ok: false,
-        message: `DealMachine ${res.status}${suffix}. Set DEALMACHINE_API_KEY on the Worker (wrangler secret or .dev.vars).`,
+        message: `Property lookup is not available (${res.status}${suffix}). Ask your administrator to enable server-side records lookup on the API.`,
       };
     }
-    return { ok: false, message: `DealMachine ${res.status}${suffix}` };
+    return { ok: false, message: `Property lookup failed (${res.status}${suffix}).` };
   }
 
   const record = extractNestedPropertyRecordFromJson(json);
@@ -129,13 +129,13 @@ export async function fetchDealMachinePropertyByAddress(
     return {
       ok: false,
       message:
-        "DealMachine returned 200 but no property object was found. Check the raw JSON in the network tab or verify DEALMACHINE_PROPERTY_PATH matches your DealMachine API docs.",
+        "Records service returned no property for this address. Try another address line or verify coverage for this area.",
     };
   }
 
   const payload = mapRecordToImportPayload(record, "dealmachine");
   if (!payload) {
-    return { ok: false, message: "Could not map DealMachine record to a property row (missing address)." };
+    return { ok: false, message: "Could not read property details from the records response (missing address)." };
   }
   return { ok: true, payload, rawRecord: record };
 }
@@ -211,7 +211,7 @@ export async function enrichPropertyRecordsWithDealMachine(
       failed++;
       results[i] = {
         ...row,
-        notes: row.notes + (row.notes ? "\n" : "") + `DealMachine error: ${r.message}`,
+        notes: row.notes + (row.notes ? "\n" : "") + `Property lookup error: ${r.message}`,
       };
     } else {
       filled++;

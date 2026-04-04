@@ -933,7 +933,7 @@ export function Canvassing() {
               </Button>
               <span className="text-sm font-semibold text-zinc-950">Canvassing</span>
               <span className="hidden text-xs text-zinc-700 sm:inline">
-                Tap parcel or pin — owner + lead match (120m) — sheet below for door-knock notes
+                Tap parcel or pin — owner + lead match (120m) — property panel opens without covering map controls
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-1">
                 {leads.length > 0 ? (
@@ -1015,8 +1015,8 @@ export function Canvassing() {
               </div>
             ) : null}
 
-          <div className="relative min-h-0 min-w-0 flex-1 p-2 pb-2 sm:p-2.5 sm:pb-2.5">
-            <div className="relative h-full min-h-[12rem] w-full overflow-hidden rounded-2xl border border-zinc-800/85 bg-zinc-950 shadow-[0_12px_48px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.06] [&_.maplibregl-ctrl-top-left]:mt-2 [&_.maplibregl-ctrl-top-left]:ml-2">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-2 pb-2 sm:p-2.5 sm:pb-2.5 lg:flex-row lg:items-stretch">
+            <div className="relative h-full min-h-[10rem] min-w-0 flex-1 overflow-hidden rounded-2xl border border-zinc-800/85 bg-zinc-950 shadow-[0_12px_48px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.06] lg:min-h-0 [&_.maplibregl-ctrl-top-left]:mt-2 [&_.maplibregl-ctrl-top-left]:ml-2">
             <Map3D
               center={mapCenter}
               zoom={17}
@@ -1097,29 +1097,25 @@ export function Canvassing() {
                 ) : null}
               </ul>
             </div>
-            </div>
-          </div>
-
-          {toast ? (
-            <div className="canvass-paper pointer-events-none absolute left-1/2 top-20 z-20 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-zinc-950 shadow-lg">
-              {toast}
-            </div>
-          ) : null}
-
-          {!sheetOpen ? (
-            <button
-              type="button"
-              className="canvass-paper pointer-events-auto absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm text-zinc-950 shadow-lg backdrop-blur-md"
-              onClick={() => setSheetOpen(true)}
-            >
-              Tap a lead pin or Use map center — then load owner &amp; parcel
-            </button>
-          ) : (
-            <div className="canvass-light-sheet pointer-events-auto absolute inset-x-0 bottom-0 z-20 max-h-[min(56vh,460px)] overflow-y-auto rounded-t-3xl border border-gray-200/90 bg-white pb-[env(safe-area-inset-bottom,0px)] text-zinc-950 shadow-[0_-12px_40px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04]">
-              <div className="flex justify-center pt-2" aria-hidden>
-                <span className="h-1 w-10 rounded-full bg-gray-300/90" />
+            {toast ? (
+              <div className="canvass-paper pointer-events-none absolute left-1/2 top-14 z-[25] -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-zinc-950 shadow-lg sm:top-16">
+                {toast}
               </div>
-              <div className="canvass-sheet-header sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-gradient-to-r from-slate-50 via-white to-white px-4 py-2.5">
+            ) : null}
+            {!sheetOpen ? (
+              <button
+                type="button"
+                className="canvass-paper pointer-events-auto absolute bottom-4 left-1/2 z-[25] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-center text-sm text-zinc-950 shadow-lg backdrop-blur-md sm:px-5"
+                onClick={() => setSheetOpen(true)}
+              >
+                Tap a lead pin or Use map center — then load owner &amp; parcel
+              </button>
+            ) : null}
+            </div>
+
+            {sheetOpen ? (
+            <aside className="canvass-light-sheet flex max-h-[min(44vh,420px)] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white pb-[env(safe-area-inset-bottom,0px)] text-zinc-950 shadow-md ring-1 ring-black/[0.04] lg:h-auto lg:max-h-none lg:w-[min(100%,400px)] lg:min-w-[min(100%,320px)] lg:shrink-0">
+              <div className="canvass-sheet-header flex shrink-0 items-center justify-between border-b border-gray-100 bg-gradient-to-r from-slate-50 via-white to-white px-4 py-2.5">
                 <span className="text-sm font-semibold uppercase tracking-wide text-zinc-950">
                   {panelBusy ? "Loading…" : "Property"}
                 </span>
@@ -1132,7 +1128,7 @@ export function Canvassing() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="canvass-sheet-body space-y-3.5 px-4 pb-6 pt-3 text-sm text-zinc-950">
+              <div className="canvass-sheet-body min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 pb-6 pt-3 text-sm text-zinc-950">
                 {panelHint ? <p className="text-xs text-amber-900">{panelHint}</p> : null}
                 <p className="text-[11px] leading-snug text-zinc-950">
                   Owner and contact fields come from public parcel and map data where available, plus automated property
@@ -1378,8 +1374,9 @@ export function Canvassing() {
                   Require owner + contact info before opening Measurement
                 </label>
               </div>
-            </div>
-          )}
+            </aside>
+            ) : null}
+          </div>
     </div>
   );
 }

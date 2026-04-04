@@ -111,12 +111,12 @@ export async function runOwnerFallbackLookup(
     return { ok: false, message: "Owner fallback is turned off in this browser (Contacts settings)." };
   }
   if (org.ownerFallbackProvider !== "dealmachine-relaxed" && org.ownerFallbackProvider !== "none") {
-    return { ok: false, message: `Unsupported fallback provider: ${org.ownerFallbackProvider}` };
+    return { ok: false, message: "Owner supplement is not available for this configuration." };
   }
   if (!isDealMachineLikelyConfigured()) {
     return {
       ok: false,
-      message: "DealMachine fallback needs the HD2D Worker with DEALMACHINE_API_KEY configured (wrangler secret).",
+      message: "Owner supplement needs the HD2D API enabled (VITE_INTEL_API_BASE) and server-side records lookup configured.",
     };
   }
 
@@ -138,7 +138,7 @@ export async function runOwnerFallbackLookup(
         ok: true,
         payload: merged,
         source: "fallback",
-        note: "Owner fallback (relaxed address match) added owner/contact fields via DealMachine.",
+        note: "Supplemental records (relaxed address match) added owner or contact fields.",
       };
     }
   }

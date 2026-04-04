@@ -317,7 +317,8 @@ export function mapRecordToImportPayload(
   if (source === "json-paste") notesParts.push("Imported via JSON paste.");
   if (source === "rentcast") notesParts.push("Legacy RentCast import (API removed — re-verify data).");
   if (source === "batchdata") notesParts.push("BatchData Property Search API — verify owner and contact fields before outreach.");
-  if (source === "dealmachine") notesParts.push("DealMachine Public API — verify owner and contact fields before outreach.");
+  if (source === "dealmachine")
+    notesParts.push("Supplemental property records — verify owner and contact fields before outreach.");
   const pt = String(row.propertyType ?? row.type ?? "").trim();
   if (pt) notesParts.push(`Assessor property type: ${pt}.`);
   if (ownerEntityType) notesParts.push(`Owner entity type: ${ownerEntityType}.`);

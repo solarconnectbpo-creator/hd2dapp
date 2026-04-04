@@ -1211,7 +1211,13 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
             position: "absolute",
             top: 10,
             right: 10,
-            zIndex: 10,
+            zIndex: 8,
+            maxWidth: "min(220px, 46vw)",
+            pointerEvents: "none",
+          }}
+        >
+        <div
+          style={{
             display: "flex",
             flexDirection: "column",
             gap: 4,
@@ -1221,7 +1227,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
             border: "1px solid rgba(15,23,42,0.12)",
             boxShadow: "0 4px 18px rgba(15,23,42,0.12)",
             backdropFilter: "blur(8px)",
-            maxWidth: "min(200px, 46vw)",
+            pointerEvents: "auto",
           }}
         >
           {showViewControls ? (
@@ -1292,6 +1298,54 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                 }}
               >
                 3D
+              </button>
+              <button
+                type="button"
+                title="Zoom in"
+                onClick={() => mapRef.current?.zoomIn({ duration: 220 })}
+                style={{
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  borderRadius: 4,
+                  border: "1px solid #cbd5e1",
+                  cursor: "pointer",
+                  background: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                title="Zoom out"
+                onClick={() => mapRef.current?.zoomOut({ duration: 220 })}
+                style={{
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  borderRadius: 4,
+                  border: "1px solid #cbd5e1",
+                  cursor: "pointer",
+                  background: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                title="Reset north (compass)"
+                onClick={() => mapRef.current?.easeTo({ bearing: 0, duration: 400 })}
+                style={{
+                  padding: "4px 8px",
+                  fontSize: 10,
+                  borderRadius: 4,
+                  border: "1px solid #cbd5e1",
+                  cursor: "pointer",
+                  background: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                N
               </button>
             </div>
           ) : null}
@@ -1427,6 +1481,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
             </button>
           ) : null}
         </div>
+        </div>
       ) : null}
       {drawInfo ? (
         <div
@@ -1435,7 +1490,8 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
             bottom: 12,
             left: "50%",
             transform: "translateX(-50%)",
-            zIndex: 10,
+            zIndex: 6,
+            pointerEvents: "none",
             background: "rgba(255,255,255,0.95)",
             color: "#0f172a",
             border: "1px solid rgba(15,23,42,0.12)",

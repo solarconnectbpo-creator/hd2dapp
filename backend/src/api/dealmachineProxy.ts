@@ -59,8 +59,7 @@ export async function handleDealMachinePropertyPost(
     return json(
       {
         success: false,
-        error:
-          "DealMachine API key not configured. Set DEALMACHINE_API_KEY on the Worker (wrangler secret or .dev.vars).",
+        error: "Property records lookup is not configured on this server. Contact your administrator.",
       },
       401,
       corsHeaders,
@@ -120,7 +119,7 @@ export async function handleDealMachinePropertyPost(
     return json(
       {
         success: false,
-        error: e instanceof Error ? e.message : "DealMachine upstream request failed",
+        error: e instanceof Error ? e.message : "Upstream property records request failed",
       },
       502,
       corsHeaders,
