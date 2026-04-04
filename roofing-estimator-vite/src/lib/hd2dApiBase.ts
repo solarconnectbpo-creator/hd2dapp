@@ -2,8 +2,8 @@
  * Base URL for the HD2D Cloudflare Worker (intel, auth, DealMachine proxy, AI routes, etc.).
  *
  * - **Development (`vite`):** `VITE_INTEL_API_BASE` if set, else same-origin `/intel-proxy` (see `INTEL_PROXY_TARGET` in `vite.config.ts`).
- * - **Production on hardcoredoortodoorclosers.com:** `window.location.origin` so the browser calls `https://hardcoredoortodoorclosers.com/api/*`
- *   (Cloudflare Pages Functions proxy to the Worker — see `functions/api/`).
+ * - **Production on hardcoredoortodoorclosers.com:** by default `HD2D_WORKER_API_ORIGIN` (Vercel has no `/api` proxy).
+ *   For Cloudflare Pages + `functions/api/*`, set `VITE_HD2D_SAME_ORIGIN_API=true` to use same-origin `/api/*`.
  * - **Preview** (`*.pages.dev`, `*.vercel.app`): direct Worker URL from `siteOrigin.ts`.
  * - **Override:** Set `VITE_INTEL_API_BASE` to a full origin if the API lives elsewhere.
  */
@@ -35,8 +35,8 @@ function isAbsoluteHttpUrl(s: string): boolean {
 }
 
 /**
- * On hosts where Pages/Vercel serve the SPA but `/api/*` would be wrong without a proxy, force the Worker origin.
- * For `*.hardcoredoortodoorclosers.com`, `apiOriginForHostname` is null — same-origin base is kept.
+ * On preview hosts (`*.vercel.app`, `*.pages.dev`), if the base is still the SPA origin, force the Worker URL.
+ * Production apex uses `resolveProductionApiOrigin()` (Worker by default); this mainly helps dev/preview edge cases.
  */
 function coerceWorkerIfShadowedSite(base: string): string {
   if (typeof window === "undefined") return base;
@@ -67,7 +67,7 @@ export function getHd2dApiBase(): string {
     if (raw) {
       const overrideHost = viteOverrideHostname(raw);
       if (overrideHost && isHd2dZoneHostname(overrideHost)) {
-        base = window.location.origin.replace(/\/$/, "");
+        base = resolveProductionApiOrigin();
       } else if (overrideHost && apiOriginForHostname(overrideHost) !== null) {
         base = resolveProductionApiOrigin();
       } else {

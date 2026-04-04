@@ -9,10 +9,11 @@
 #   - Add www: www.hardcoredoortodoorclosers.com (optional; set redirect www → apex in Rules → Redirect Rules if you want one canonical host)
 # DNS for the zone must be on Cloudflare; proxy (orange cloud) enabled for those records.
 #
-# API: same origin at https://hardcoredoortodoorclosers.com/api/* via Worker `hd2d-backend` (see ../backend/wrangler.toml routes).
+# API: Pages Functions in `functions/api/*` proxy to Worker `hd2d-backend` (see functions/api/*.ts).
 #
 # Build-time env (Pages → Settings → Environment variables):
-#   Leave VITE_INTEL_API_BASE unset so the SPA uses window.location.origin → same-origin /api/* (see src/lib/hd2dApiBase.ts).
+#   VITE_HD2D_SAME_ORIGIN_API=true — SPA uses same-origin /api/* (this Pages project).
+#   Omit both that and VITE_INTEL_API_BASE — SPA calls HD2D_WORKER_API_ORIGIN (see src/config/siteOrigin.ts).
 
 name = "hd2d-closers"
 pages_build_output_dir = "dist"
