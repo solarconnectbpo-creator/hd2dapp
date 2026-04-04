@@ -5,6 +5,7 @@ import {
   getStoredSession,
   loginWithPassword,
   logoutRemote,
+  registerAccount,
   type AuthSession,
   type AuthUser,
 } from "../lib/authClient";
@@ -13,7 +14,8 @@ type AuthContextValue = {
   loading: boolean;
   session: AuthSession | null;
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
+  register: (email: string, password: string, name: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
@@ -55,6 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const next = await loginWithPassword(email, password);
     setSession(next);
+    return next.user;
+  }, []);
+
+  const register = useCallback(async (email: string, password: string, name: string) => {
+    const next = await registerAccount(email, password, name);
+    setSession(next);
+    return next.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -70,10 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       user: session?.user ?? null,
       login,
+      register,
       logout,
       isAuthenticated: Boolean(session?.token),
     }),
-    [loading, session, login, logout],
+    [loading, session, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

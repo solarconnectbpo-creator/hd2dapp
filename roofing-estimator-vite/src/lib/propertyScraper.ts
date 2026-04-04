@@ -9,7 +9,13 @@ export const PENDING_PROPERTY_IMPORT_KEY = "roofing-pending-property-import-v1";
 export const PENDING_PROPERTY_IMPORT_SESSION_KEY = "roofing-pending-property-import-session-v1";
 
 /** `rentcast` kept only for decoding older saved payloads / JSON. */
-export type PropertyImportSource = "csv-upload" | "json-paste" | "import" | "rentcast" | "batchdata";
+export type PropertyImportSource =
+  | "csv-upload"
+  | "json-paste"
+  | "import"
+  | "rentcast"
+  | "batchdata"
+  | "dealmachine";
 
 export interface PropertyImportPayload {
   address: string;
@@ -57,6 +63,8 @@ export interface PendingPropertyImportOptions {
 export interface PendingPropertyImportEnvelope {
   payload: PropertyImportPayload;
   options?: PendingPropertyImportOptions;
+  /** GIS building footprint from Canvassing — applied on measurement map when `options.importFootprint`. */
+  buildingFootprint?: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null;
 }
 
 /** Default row for CSV / manual assembly. */
@@ -309,6 +317,7 @@ export function mapRecordToImportPayload(
   if (source === "json-paste") notesParts.push("Imported via JSON paste.");
   if (source === "rentcast") notesParts.push("Legacy RentCast import (API removed — re-verify data).");
   if (source === "batchdata") notesParts.push("BatchData Property Search API — verify owner and contact fields before outreach.");
+  if (source === "dealmachine") notesParts.push("DealMachine Public API — verify owner and contact fields before outreach.");
   const pt = String(row.propertyType ?? row.type ?? "").trim();
   if (pt) notesParts.push(`Assessor property type: ${pt}.`);
   if (ownerEntityType) notesParts.push(`Owner entity type: ${ownerEntityType}.`);
@@ -395,9 +404,14 @@ export function parsePendingPropertyImport(raw: string): PendingPropertyImportEn
 export function stashPendingPropertyImport(
   payload: PropertyImportPayload,
   options?: PendingPropertyImportOptions,
+  buildingFootprint?: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null,
 ): void {
   try {
-    const envelope: PendingPropertyImportEnvelope = { payload, options };
+    const envelope: PendingPropertyImportEnvelope = {
+      payload,
+      options,
+      ...(buildingFootprint != null ? { buildingFootprint } : {}),
+    };
     const json = JSON.stringify(envelope);
     window.localStorage.setItem(PENDING_PROPERTY_IMPORT_KEY, json);
     try {

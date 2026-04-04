@@ -2,12 +2,12 @@ import {
   type ChangeEvent,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { Link, useSearchParams } from "react-router";
+import { toast } from "sonner";
 import { useRoofing } from "./context/RoofingContext";
 import { type ContactRecord, parseContactsCsv } from "./lib/contactsCsv";
 import {
@@ -23,12 +23,12 @@ import {
   type PropertyImportPayload,
 } from "./lib/propertyScraper";
 import {
-  PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE,
-  fetchBatchDataPropertyByAddress,
-  formatTaxSummaryFromBatchDataRecord,
-  nominatimReverseToBatchDataCriteria,
-  parseUsAddressLineForBatchData,
-} from "./lib/propertyBatchDataLookup";
+  formatAssessorTaxSummaryFromRecord,
+  nominatimReverseToAddressCriteria,
+  parseUsAddressLineForSearch,
+  type UsAddressSearchCriteria,
+} from "./lib/propertyAddressCriteria";
+import { fetchDealMachinePropertyByAddress, isDealMachineLikelyConfigured } from "./lib/propertyDealMachineLookup";
 import { buildParcelHandoffNotes, extractParcelAutoFill } from "./lib/canvassingParcelOwner";
 import {
   computePolygonRoofGeometry,
@@ -38,22 +38,18 @@ import {
   type RoofStructureMode,
 } from "./lib/roofGeometryFromPolygons";
 import {
+  footprintToPolygonFeatures,
+  polygonFeatureOuterPerimeterFt,
+  polygonFeaturePlanAreaSqFt,
+  type BuildingFootprintFeature,
+} from "./lib/geoFootprintMeasure";
+import {
   exteriorRingLngLatFromPolygonFeature,
   fetchRaybevelSkeletonSvg,
 } from "./lib/raybevelDiagramClient";
 import { getHd2dApiBase, isHd2dApiConfigured } from "./lib/hd2dApiBase";
-import {
-  collectGeoJsonFeatures,
-  loadEmbeddedExplorerScript,
-  type EmbeddedExplorerMapHandle,
-} from "./lib/embeddedExplorer";
-import { getEagleViewEmbeddedAuthToken } from "./lib/eagleViewEmbeddedAuth";
-import {
-  isTrueDesignApiConfigured,
-  mapEagleViewSystemRoofToFormPatch,
-  trueDesignFetch,
-  type EagleViewSystemRoofData,
-} from "./lib/trueDesignApi";
+import { parseJsonResponse, readJsonResponseBody } from "./lib/readJsonResponse";
+import { formatWorkerFetchFailure } from "./lib/workerApiError";
 import {
   AHJ_COMPLIANCE_DISCLAIMER,
   getComplianceReferencesForCategory,
@@ -63,23 +59,25 @@ import {
 } from "./lib/roofComplianceReferences";
 import { buildFootprintDxfFromPolygons, type FootprintFeature } from "./lib/roofDxfExport";
 import { compareDrawnVsHeuristic, type TakeoffComparisonRow } from "./lib/roofTakeoffComparison";
-import { useMapProvider } from "./lib/useMapProvider";
 import { Map3D, type Map3DHandle } from "./components/Map3D";
 import {
   computeCarrierBenchmark,
   getCarrierBenchmarkProfiles,
   getCarrierBenchmarkSourceLabel,
-  getDefaultCarrierBenchmarkProfileId,
 } from "./lib/carrierBenchmarkPricing";
+import {
+  DAMAGE_TYPES,
+  type DamageType,
+  type FormState,
+} from "./features/measurement/measurementFormTypes";
+import { defaultFormState, hillsdaleFormTemplate } from "./features/measurement/measurementFormDefaults";
 import pricingCatalog from "./data/ai-cheatsheet-pricing.json";
 
-type DamageType = "Hail" | "Wind" | "Missing Shingles" | "Leaks" | "Flashing" | "Structural";
 type ParserConfidence = "low" | "medium" | "high";
 type ValuationBasis = "RCV" | "ACV" | "line-total";
 type DeltaDirection = "under-scoped" | "over-scoped" | "aligned";
 type RoofLineType = "ridge" | "hip" | "valley" | "eave" | "rake" | "wall-flashing" | "step-flashing";
 
-const DAMAGE_TYPES: DamageType[] = ["Hail", "Wind", "Missing Shingles", "Leaks", "Flashing", "Structural"];
 const DAMAGE_PHOTO_TAGS = [
   "hail-impact",
   "wind-crease",
@@ -96,10 +94,12 @@ const DAMAGE_PHOTO_TAGS = [
 ] as const;
 
 const STORAGE_KEY = "roofing-estimator-vite-jobs-v1";
-const EAGLEV_REPORT_ID_STORAGE_KEY = "roofing-estimator-vite-eagleview-report-id-v1";
 const PROPERTY_DB_KEY = "roofing-estimator-vite-property-db-v1";
 
-const INTEL_API_BASE = getHd2dApiBase();
+/** Resolve at call time so production same-origin `window.location.origin` is correct after load. */
+function intelApiBase(): string {
+  return getHd2dApiBase().replace(/\/$/, "");
+}
 /** Applied per effective square (after waste) in scope; scaled by regional multiplier like other lines. */
 const LABOR_PER_SQUARE_USD = 350;
 
@@ -117,6 +117,9 @@ const ROOF_LINE_TYPES: { type: RoofLineType; label: string; color: string; formK
   { type: "wall-flashing", label: "Wall Flashing", color: "#eab308", formKey: "wallFlashingFt" },
   { type: "step-flashing", label: "Step Flashing", color: "#06b6d4", formKey: "stepFlashingFt" },
 ];
+
+/** Roof-segment service may return these line kinds (geometry heuristics, not true SAM semantics). */
+const AI_ROOF_LINE_TYPES = new Set<RoofLineType>(["ridge", "hip", "valley", "eave", "rake"]);
 
 interface DrawnRoofLine {
   id: string;
@@ -154,41 +157,6 @@ const STATE_MULTIPLIER: Record<string, number> = {
 };
 const CARRIER_BENCHMARK_SOURCE_LABEL = getCarrierBenchmarkSourceLabel();
 const CARRIER_BENCHMARK_PROFILES = getCarrierBenchmarkProfiles();
-const DEFAULT_CARRIER_BENCHMARK_PROFILE_ID = getDefaultCarrierBenchmarkProfileId();
-
-interface FormState {
-  address: string;
-  stateCode: string;
-  latitude: string;
-  longitude: string;
-  roofType: string;
-  roofStructure: RoofStructureMode;
-  stories: string;
-  exteriorWallHeightFt: string;
-  areaSqFt: string;
-  perimeterFt: string;
-  roofPitch: string;
-  wastePercent: string;
-  measuredSquares: string;
-  ridgesFt: string;
-  eavesFt: string;
-  rakesFt: string;
-  valleysFt: string;
-  hipsFt: string;
-  wallFlashingFt: string;
-  stepFlashingFt: string;
-  othersFt: string;
-  severity: number;
-  damageTypes: DamageType[];
-  carrierScopeText: string;
-  carrierBenchmarkProfileId: string;
-  carrierBenchmarkRegionFactor: string;
-  carrierBenchmarkComplexityFactor: string;
-  deductibleUsd: string;
-  nonRecDepUsd: string;
-  /** Year built, lot size, etc. from property record import (Property records page). */
-  propertyRecordNotes: string;
-}
 
 interface MeasurementSection {
   id: string;
@@ -323,7 +291,7 @@ interface PropertyOwnerRecord {
   lotSizeSqFt: string;
   roofType: string;
   stories: string;
-  /** Human-readable assessor/tax lines collected from BatchData. */
+  /** Human-readable assessor/tax lines (parcel APIs / DealMachine). */
   taxSummary: string;
   notes: string;
   createdAt: string;
@@ -427,37 +395,6 @@ function fmtLengthFeetInches(ft: number): string {
   const w = Math.floor(ft);
   const inches = Math.round((ft - w) * 12);
   return `${w}ft ${inches}in`;
-}
-
-/** Rectangle footprint on map (feet) aligned N–S × E–W from property coordinates. */
-async function buildAiFootprintPolygonFeature(
-  lng: number,
-  lat: number,
-  buildingLFt: number,
-  buildingWFt: number,
-): Promise<{ type: "Feature"; id: string; geometry: { type: "Polygon"; coordinates: number[][][] }; properties: Record<string, never> }> {
-  const turf = await import("@turf/turf");
-  const c = turf.point([lng, lat]);
-  const north = turf.destination(c, buildingWFt / 2, 0, { units: "feet" });
-  const south = turf.destination(c, buildingWFt / 2, 180, { units: "feet" });
-  const ne = turf.destination(north, buildingLFt / 2, 90, { units: "feet" });
-  const nw = turf.destination(north, buildingLFt / 2, 270, { units: "feet" });
-  const se = turf.destination(south, buildingLFt / 2, 90, { units: "feet" });
-  const sw = turf.destination(south, buildingLFt / 2, 270, { units: "feet" });
-  const ring: number[][] = [
-    ne.geometry.coordinates as number[],
-    se.geometry.coordinates as number[],
-    sw.geometry.coordinates as number[],
-    nw.geometry.coordinates as number[],
-    ne.geometry.coordinates as number[],
-  ];
-  const poly = turf.polygon([ring]);
-  return {
-    type: "Feature",
-    id: `ai-footprint-${Date.now()}`,
-    geometry: poly.geometry as { type: "Polygon"; coordinates: number[][][] },
-    properties: {},
-  };
 }
 
 function parseLengthFeet(value?: string): number {
@@ -1706,41 +1643,6 @@ function buildEstimatedInsurancePayoutSummary(result: EstimateResult): string {
   return parts.join("\n");
 }
 
-function defaultFormState(): FormState {
-  return {
-    address: "7270 Hillsdale Court, Chanhassen, MN 55317",
-    stateCode: "MN",
-    latitude: "",
-    longitude: "",
-    roofType: "Asphalt Shingle",
-    roofStructure: "auto",
-    stories: "",
-    exteriorWallHeightFt: "",
-    areaSqFt: "3432.61",
-    perimeterFt: "387.58",
-    roofPitch: "6/12",
-    wastePercent: "25",
-    measuredSquares: "38.38",
-    ridgesFt: "141ft 2in",
-    eavesFt: "135ft 6in",
-    rakesFt: "252ft 1in",
-    valleysFt: "130ft 4in",
-    hipsFt: "0ft 0in",
-    wallFlashingFt: "19ft 2in",
-    stepFlashingFt: "50ft 5in",
-    othersFt: "2ft 3in",
-    severity: 3,
-    damageTypes: ["Wind", "Leaks"],
-    carrierScopeText: "",
-    carrierBenchmarkProfileId: DEFAULT_CARRIER_BENCHMARK_PROFILE_ID,
-    carrierBenchmarkRegionFactor: "1.00",
-    carrierBenchmarkComplexityFactor: "1.00",
-    deductibleUsd: "2500",
-    nonRecDepUsd: "500",
-    propertyRecordNotes: "",
-  };
-}
-
 function buildMeasurementSectionFromForm(form: FormState, label = "Section 1"): MeasurementSection {
   return {
     id: `sec_${Math.random().toString(36).slice(2, 10)}`,
@@ -2443,7 +2345,7 @@ function buildRoofDiagramSvg(
     labels += label(cx, iT - 6, `Ridge: ${fmtFt(lengths.ridges)}`, c.ridge);
     labels += label(L + 18, cy - 10, `Hip: ${fmtFt(lengths.hips)}`, c.hip, "start", 10);
   } else if (form === "complex") {
-    // Complex multi-facet diagram style inspired by EagleView length diagram references.
+    // Complex multi-facet diagram style (length-callout references).
     const p1 = `${L + 10},${T + 40} ${L + 110},${T + 20} ${L + 160},${T + 65} ${L + 90},${T + 120} ${L + 20},${T + 90}`;
     const p2 = `${cx - 20},${T + 30} ${cx + 80},${T + 45} ${cx + 120},${T + 95} ${cx + 55},${T + 130} ${cx - 15},${T + 100}`;
     const p3 = `${cx - 80},${cy + 10} ${cx - 20},${cy - 30} ${cx + 35},${cy + 10} ${cx + 15},${B - 30} ${cx - 60},${B - 20}`;
@@ -2938,22 +2840,11 @@ function buildProposalHtml(
 }
 
 function App() {
-  const mapProvider = useMapProvider();
   const [searchParams, setSearchParams] = useSearchParams();
   /** Captured once for /measurement/new?auto=1 instant estimate (avoid stale searchParams in one-shot import effect). */
   const measurementAutoFromQueryRef = useRef(searchParams.get("auto") === "1");
   const map3dRef = useRef<Map3DHandle>(null);
-  const mapboxContainerRef = useRef<HTMLDivElement | null>(null);
-  /** EagleView Embedded Explorer map handle (legacy name kept to limit churn). */
-  const mapboxMapRef = useRef<EmbeddedExplorerMapHandle | null>(null);
-  const mapboxDrawRef = useRef<any>(null);
-  const refreshMapboxFromDrawRef = useRef<(() => void) | null>(null);
-  const eeViewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 44.86, lon: -93.53 });
-  const pendingAiFootprintRef = useRef<{ lat: number; lng: number; L: number; W: number } | null>(null);
-  const [aiMapFootprintTick, setAiMapFootprintTick] = useState(0);
-  /** Mapbox style `load` fired — Draw features are reliable after this. */
-  const mapboxStyleLoadedRef = useRef(false);
-  const turfModuleRef = useRef<any>(null);
+  const mapViewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 44.86, lon: -93.53 });
   const mapClickHandlerRef = useRef<(lat: number, lng: number) => void>(() => {});
   const applyContactHandlerRef = useRef<(c: ContactRecord) => void>(() => {});
   const lineTypeRef = useRef<RoofLineType>("ridge");
@@ -2972,25 +2863,9 @@ function App() {
   const [selectedContactId, setSelectedContactId] = useState("");
   const [contactSearch, setContactSearch] = useState("");
   const [contactsGeocodeBusy, setContactsGeocodeBusy] = useState(false);
-  const [eeContainerId] = useState(() =>
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? `ee-${crypto.randomUUID().replace(/-/g, "")}`
-      : `ee-${Date.now()}`,
-  );
   const [mapboxAreaSqFt, setMapboxAreaSqFt] = useState(0);
   const [mapboxFeatures, setMapboxFeatures] = useState<any[]>([]);
   const [mapboxStatus, setMapboxStatus] = useState("");
-  const [eagleViewReportId, setEagleViewReportId] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = window.localStorage.getItem(EAGLEV_REPORT_ID_STORAGE_KEY);
-      if (saved?.trim()) return saved.trim();
-    }
-    return "";
-  });
-  const [trueDesignBusy, setTrueDesignBusy] = useState(false);
-  const [trueDesignNote, setTrueDesignNote] = useState("");
-  const [trueDesignIframeHtml, setTrueDesignIframeHtml] = useState<string | null>(null);
-  const [mapReady, setMapReady] = useState(false);
   const [raybevelDiagramSvg, setRaybevelDiagramSvg] = useState<string | null>(null);
   const [raybevelDiagramBusy, setRaybevelDiagramBusy] = useState(false);
   const [raybevelDiagramNote, setRaybevelDiagramNote] = useState("");
@@ -2998,34 +2873,6 @@ function App() {
   const [drawnRoofLines, setDrawnRoofLines] = useState<DrawnRoofLine[]>([]);
   const [autoCalcEnabled, setAutoCalcEnabled] = useState(true);
   const [autoCalcInfo, setAutoCalcInfo] = useState("");
-  const flushPendingAiFootprint = useCallback(async () => {
-    const p = pendingAiFootprintRef.current;
-    if (!p) return;
-    const ee = mapboxMapRef.current;
-    const refresh = refreshMapboxFromDrawRef.current;
-    if (!ee || !refresh || !mapboxStyleLoadedRef.current) return;
-
-    try {
-      try {
-        ee.removeFeatures?.({
-          geoJson: (f: GeoJSON.Feature) => f.geometry?.type === "Polygon",
-        });
-      } catch {
-        /* ignore */
-      }
-      const feat = await buildAiFootprintPolygonFeature(p.lng, p.lat, p.L, p.W);
-      ee.addFeatures({ geoJson: [feat as GeoJSON.Feature] });
-      refresh();
-      pendingAiFootprintRef.current = null;
-      setAutoCalcInfo(
-        "AI: footprint rectangle on map; ridge/eave/rake/hip/valley lengths filled from plan + pitch model.",
-      );
-    } catch {
-      pendingAiFootprintRef.current = null;
-      setMapboxStatus((s) => (s ? `${s} (AI map footprint skipped.)` : "AI map footprint skipped."));
-    }
-  }, []);
-
   const [aiMeasureBusy, setAiMeasureBusy] = useState(false);
   const [aiMeasureNote, setAiMeasureNote] = useState("");
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
@@ -3048,6 +2895,7 @@ function App() {
   const [intelError, setIntelError] = useState("");
   const [permitFilter, setPermitFilter] = useState<"all" | "building" | "trades">("all");
   const [stormFilter, setStormFilter] = useState<"all" | "lsr" | "spc" | "nws">("all");
+  const [nwsAlertBannerDismissed, setNwsAlertBannerDismissed] = useState(false);
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"all" | "residential" | "commercial" | "other">("all");
   const [damagePhotos, setDamagePhotos] = useState<TaggedDamagePhoto[]>([]);
   const { addContract, addEstimate, addMeasurement } = useRoofing();
@@ -3122,222 +2970,6 @@ function App() {
     fetchSavedReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!eagleViewReportId.trim()) {
-      window.localStorage.removeItem(EAGLEV_REPORT_ID_STORAGE_KEY);
-      return;
-    }
-    window.localStorage.setItem(EAGLEV_REPORT_ID_STORAGE_KEY, eagleViewReportId.trim());
-  }, [eagleViewReportId]);
-
-  useLayoutEffect(() => {
-    if (!isHd2dApiConfigured()) {
-      setMapboxStatus(
-        "Map unavailable: set VITE_INTEL_API_BASE (or run local /intel-proxy) so EagleView auth token can be requested from backend.",
-      );
-      return;
-    }
-    const container = mapboxContainerRef.current;
-    if (!container) return;
-    if (mapboxMapRef.current) return;
-
-    let disposed = false;
-    mapboxStyleLoadedRef.current = false;
-    mapboxDrawRef.current = null;
-    let pollId: number | null = null;
-
-    const init = async () => {
-      try {
-        const turf = await import("@turf/turf");
-        if (disposed || !mapboxContainerRef.current) return;
-        turfModuleRef.current = turf;
-
-        await loadEmbeddedExplorerScript();
-        if (disposed || !mapboxContainerRef.current) return;
-
-        const Ev = window.ev?.EmbeddedExplorer;
-        if (!Ev) {
-          setMapboxStatus("EagleView Embedded Explorer failed to load (check network / ad blockers).");
-          return;
-        }
-
-        mapboxContainerRef.current.id = eeContainerId;
-        const lat0 = Number.parseFloat(form.latitude);
-        const lng0 = Number.parseFloat(form.longitude);
-        const lat = Number.isFinite(lat0) ? lat0 : 44.86;
-        const lng = Number.isFinite(lng0) ? lng0 : -93.53;
-        eeViewCenterRef.current = { lat, lon: lng };
-
-        const authToken = await getEagleViewEmbeddedAuthToken();
-        const map = new Ev().mount(eeContainerId, {
-          authToken,
-          view: { lonLat: { lon: lng, lat } },
-        }) as EmbeddedExplorerMapHandle;
-
-        mapboxMapRef.current = map;
-
-        const syncFromEe = () => {
-          if (disposed) return;
-          try {
-            const raw = map.getFeatures();
-            const feats = collectGeoJsonFeatures(raw);
-            const polygons = feats.filter((f) => f.geometry?.type === "Polygon") as GeoJSON.Feature<
-              GeoJSON.Polygon | GeoJSON.MultiPolygon
-            >[];
-            setMapboxFeatures(polygons);
-            if (!polygons.length) {
-              setMapboxAreaSqFt(0);
-            } else {
-              const totalSqM = polygons.reduce((sum, f) => sum + turf.area(f as any), 0);
-              setMapboxAreaSqFt(totalSqM * 10.7639);
-              autoCalcRef.current(polygons);
-            }
-            const lineFeats = feats.filter((f) => f.geometry?.type === "LineString") as GeoJSON.Feature<
-              GeoJSON.LineString
-            >[];
-            if (lineFeats.length) {
-              const lt = lineTypeRef.current;
-              setDrawnRoofLines(
-                lineFeats.map((f, i) => ({
-                  id: `ee-line-${i}`,
-                  type: lt,
-                  lengthFt: Math.round(turf.length(f as any, { units: "feet" }) * 100) / 100,
-                  geometry: f.geometry,
-                })),
-              );
-            }
-          } catch {
-            /* EE may return unexpected shape while editing */
-          }
-        };
-        refreshMapboxFromDrawRef.current = syncFromEe;
-
-        const onReady = () => {
-          if (disposed) return;
-          try {
-            map.enableMeasurementPanel(true);
-            map.enableSearchBar(true);
-          } catch {
-            /* optional UI toggles */
-          }
-          mapboxStyleLoadedRef.current = true;
-          setMapReady(true);
-          setMapboxStatus(
-            "EagleView imagery: use the viewer’s measurement tools. Estimator syncs polygons/lines every 2s. Use “Set property from map center” for intake pin.",
-          );
-          void flushPendingAiFootprint();
-          syncFromEe();
-          pollId = window.setInterval(syncFromEe, 2000);
-        };
-
-        map.on("onMapReady", onReady);
-        map.on("onViewUpdate", (u: unknown) => {
-          const v = u as { lonLat?: { lat: number; lon: number } };
-          if (v?.lonLat) eeViewCenterRef.current = v.lonLat;
-        });
-        map.on("Errors", (err: unknown) => {
-          console.error("EagleView Embedded Explorer:", err);
-          const msg =
-            err && typeof err === "object" && "message" in err && typeof (err as Error).message === "string"
-              ? (err as Error).message
-              : String(err);
-          setMapboxStatus(`EagleView map error: ${msg || "unknown error"}`);
-        });
-        window.setTimeout(() => {
-          if (disposed || mapboxStyleLoadedRef.current) return;
-          onReady();
-        }, 2500);
-      } catch (error) {
-        setMapboxStatus(
-          error instanceof Error ? `EagleView map init failed: ${error.message}` : "EagleView map init failed.",
-        );
-      }
-    };
-    void init();
-
-    return () => {
-      disposed = true;
-      if (pollId != null) window.clearInterval(pollId);
-      mapboxStyleLoadedRef.current = false;
-      setMapReady(false);
-      try {
-        const m = mapboxMapRef.current;
-        m?.off?.("onMapReady");
-        m?.off?.("onViewUpdate");
-        m?.off?.("Errors");
-      } catch {
-        /* ignore */
-      }
-      mapboxMapRef.current = null;
-      mapboxDrawRef.current = null;
-      refreshMapboxFromDrawRef.current = null;
-      if (mapboxContainerRef.current) {
-        mapboxContainerRef.current.innerHTML = "";
-        mapboxContainerRef.current.removeAttribute("id");
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eeContainerId, flushPendingAiFootprint]);
-
-  useEffect(() => {
-    if (aiMapFootprintTick === 0) return;
-    void flushPendingAiFootprint();
-  }, [aiMapFootprintTick, flushPendingAiFootprint]);
-
-  useEffect(() => {
-    if (!mapReady) return;
-    const ee = mapboxMapRef.current;
-    if (!ee?.addFeatures) return;
-
-    try {
-      ee.removeFeatures?.({
-        geoJson: (f: GeoJSON.Feature) => Boolean((f.properties as Record<string, unknown> | undefined)?.__roofingApp),
-      });
-    } catch {
-      /* ignore */
-    }
-
-    const feats: GeoJSON.Feature[] = [];
-    const lat = Number.parseFloat(form.latitude);
-    const lng = Number.parseFloat(form.longitude);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      feats.push({
-        type: "Feature",
-        properties: { __roofingApp: true, kind: "property" },
-        geometry: { type: "Point", coordinates: [lng, lat] },
-      });
-    }
-    for (const c of contacts.filter((x) => x.lat != null && x.lng != null).slice(0, 200)) {
-      feats.push({
-        type: "Feature",
-        properties: { __roofingApp: true, kind: "contact", contactId: c.id, name: c.name || "Contact" },
-        geometry: { type: "Point", coordinates: [c.lng!, c.lat!] },
-      });
-    }
-    if (feats.length) ee.addFeatures({ geoJson: feats });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, form.latitude, form.longitude, contacts]);
-
-  useEffect(() => {
-    const map = mapboxMapRef.current as unknown as { getSource?: (id: string) => { setData?: (d: unknown) => void } };
-    if (!map?.getSource?.("roof-lines") || !mapReady) return;
-    const source = map.getSource("roof-lines") as { setData: (d: unknown) => void };
-    source.setData({
-      type: "FeatureCollection",
-      features: drawnRoofLines.map((line) => ({
-        type: "Feature" as const,
-        properties: {
-          lineType: line.type,
-          label: ROOF_LINE_TYPES.find((t) => t.type === line.type)?.label || line.type,
-          lengthFt: line.lengthFt.toFixed(1),
-        },
-        geometry: line.geometry,
-      })),
-    });
-  }, [drawnRoofLines, mapReady]);
 
   useEffect(() => {
     const lat = Number.parseFloat(form.latitude);
@@ -3472,7 +3104,12 @@ function App() {
     return `${wholeFt}ft ${inches}in`;
   }
 
-  function prepareFormFromMapMeasurements(base: FormState): FormState {
+  type MapMeasurementOverrides = {
+    mapboxAreaSqFt?: number;
+    mapboxFeatures?: any[];
+  };
+
+  function prepareFormFromMapMeasurements(base: FormState, overrides?: MapMeasurementOverrides): FormState {
     const next = { ...base };
 
     const manualSums: Record<RoofLineType, number> = {
@@ -3486,10 +3123,15 @@ function App() {
     };
     for (const line of drawnRoofLines) manualSums[line.type] += line.lengthFt;
 
-    // Always apply explicit map area when available.
-    if (mapboxAreaSqFt > 0) {
-      next.areaSqFt = mapboxAreaSqFt.toFixed(2);
-      next.measuredSquares = (mapboxAreaSqFt / 100).toFixed(2);
+    const effectiveMapArea = overrides?.mapboxAreaSqFt ?? mapboxAreaSqFt;
+    const effectiveMapFeatures = overrides?.mapboxFeatures ?? mapboxFeatures;
+
+    // Always apply explicit map plan area when available; roofing squares = surface area ÷ 100 (pitch-adjusted).
+    if (effectiveMapArea > 0) {
+      next.areaSqFt = effectiveMapArea.toFixed(2);
+      const pitchRise = parsePitchRise(next.roofPitch) ?? 6;
+      const pitchFactor = Math.sqrt(1 + (pitchRise / 12) ** 2);
+      next.measuredSquares = ((effectiveMapArea * pitchFactor) / 100).toFixed(2);
     }
 
     // Apply manual line measurements first (they should override auto-calc dimensions).
@@ -3504,7 +3146,7 @@ function App() {
     if (manualPerim > 0) next.perimeterFt = manualPerim.toFixed(2);
 
     // Auto-calculate from polygons when available (shared geometry module).
-    const polygons = mapboxFeatures.filter((f: any) => f.geometry?.type === "Polygon");
+    const polygons = effectiveMapFeatures.filter((f: any) => f.geometry?.type === "Polygon");
     if (!autoCalcEnabled || polygons.length === 0) return next;
 
     const geo = computePolygonRoofGeometry(polygons, next.roofType, next.roofStructure, next.roofPitch);
@@ -3602,12 +3244,12 @@ function App() {
   const generateRaybevelDiagramFromMap = async () => {
     const poly = mapboxFeatures.find((f: any) => f.geometry?.type === "Polygon");
     if (!poly) {
-      window.alert("Draw or import a roof polygon on the map first.");
+      toast.error("Draw or import a roof polygon on the map first.");
       return;
     }
     const ring = exteriorRingLngLatFromPolygonFeature(poly);
     if (!ring || ring.length < 4) {
-      window.alert("Could not read polygon exterior ring.");
+      toast.error("Could not read polygon exterior ring.");
       return;
     }
     setRaybevelDiagramBusy(true);
@@ -3640,7 +3282,7 @@ function App() {
 
   const geocodeAddress = async () => {
     if (!form.address.trim()) {
-      window.alert("Enter an address first.");
+      toast.error("Enter an address first.");
       return;
     }
     setGeoBusy(true);
@@ -3649,7 +3291,10 @@ function App() {
       const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=" + encodeURIComponent(form.address);
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error("Address lookup failed");
-      const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
+      const data = await parseJsonResponse<Array<{ lat: string; lon: string; display_name: string }>>(
+        res,
+        "Nominatim search",
+      );
       const hit = data[0];
       if (!hit) {
         setGeoStatus("No match found.");
@@ -3669,7 +3314,7 @@ function App() {
     const lat = Number.parseFloat(form.latitude);
     const lng = Number.parseFloat(form.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      window.alert("Enter valid latitude and longitude first.");
+      toast.error("Enter valid latitude and longitude first.");
       return;
     }
     setGeoBusy(true);
@@ -3678,7 +3323,7 @@ function App() {
       const url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" + encodeURIComponent(String(lat)) + "&lon=" + encodeURIComponent(String(lng));
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error("Reverse lookup failed");
-      const data = (await res.json()) as { display_name?: string };
+      const data = await parseJsonResponse<{ display_name?: string }>(res, "Nominatim reverse");
       setForm((curr) => ({ ...curr, address: data.display_name?.trim() || curr.address }));
       setGeoStatus("Coordinates resolved.");
     } catch (e) {
@@ -3700,13 +3345,13 @@ function App() {
     }
     try {
       const [intelRes, stormsRes] = await Promise.all([
-        fetch(`${INTEL_API_BASE}/api/stl/intel?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`),
-        fetch(`${INTEL_API_BASE}/api/stl/storm-reports?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&days=14`),
+        fetch(`${intelApiBase()}/api/stl/intel?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`),
+        fetch(`${intelApiBase()}/api/stl/storm-reports?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&days=14`),
       ]);
       if (!intelRes.ok) throw new Error(`STL intel request failed (${intelRes.status})`);
       if (!stormsRes.ok) throw new Error(`Storm report request failed (${stormsRes.status})`);
-      const intelJson = (await intelRes.json()) as { data?: StlIntelData };
-      const stormJson = (await stormsRes.json()) as { data?: StlStormData };
+      const intelJson = await readJsonResponseBody<{ data?: StlIntelData }>(intelRes);
+      const stormJson = await readJsonResponseBody<{ data?: StlStormData }>(stormsRes);
       const intel = intelJson.data ?? null;
       setStlIntel(intel);
       setStlStorms(stormJson.data ?? null);
@@ -3717,12 +3362,6 @@ function App() {
     } finally {
       setIntelBusy(false);
     }
-  };
-
-  const resolveBatchDataKey = (): string => {
-    const fromStorage = window.localStorage.getItem(PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE)?.trim() || "";
-    if (fromStorage) return fromStorage;
-    return String(import.meta.env.VITE_BATCHDATA_API_KEY ?? "").trim();
   };
 
   const mergeBatchPayloadIntoProperty = (
@@ -3752,20 +3391,26 @@ function App() {
     };
   };
 
-  const enrichPropertyFromBatchData = async (
+  /** Owner + phone/email present — aligns with Canvassing owner-ready check (simplified for PropertyOwnerRecord). */
+  const propertyOwnerRecordHasRequiredContact = (p: PropertyOwnerRecord): boolean => {
+    const owner = p.ownerName.trim();
+    const hasContact = Boolean(p.ownerPhone.trim() || p.ownerEmail.trim());
+    return Boolean(owner && hasContact);
+  };
+
+  const enrichPropertyWithDealMachineIfNeeded = async (
     base: PropertyOwnerRecord,
-    criteria: { street_address: string; city: string; state: string; zip_code: string } | null,
+    criteria: UsAddressSearchCriteria | null,
   ): Promise<PropertyOwnerRecord> => {
-    if (!criteria) return base;
-    const key = resolveBatchDataKey();
-    if (!key) return base;
-    const r = await fetchBatchDataPropertyByAddress(key, criteria);
-    if (!r.ok) {
-      setGeoStatus((curr) => (curr ? `${curr} | BatchData: ${r.message}` : `BatchData: ${r.message}`));
+    if (!criteria || !isDealMachineLikelyConfigured()) return base;
+    if (propertyOwnerRecordHasRequiredContact(base)) return base;
+    const dm = await fetchDealMachinePropertyByAddress(criteria);
+    if (!dm.ok) {
+      setGeoStatus((curr) => (curr ? `${curr} | DealMachine: ${dm.message}` : `DealMachine: ${dm.message}`));
       return base;
     }
-    const taxSummary = formatTaxSummaryFromBatchDataRecord(r.rawRecord);
-    return mergeBatchPayloadIntoProperty(base, r.payload, taxSummary);
+    const taxSummary = formatAssessorTaxSummaryFromRecord(dm.rawRecord);
+    return mergeBatchPayloadIntoProperty(base, dm.payload, taxSummary);
   };
 
   const applyParcelAutoFillToProperty = (
@@ -3839,7 +3484,18 @@ function App() {
         encodeURIComponent(String(lng));
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error("Map reverse lookup failed");
-      const data = (await res.json()) as { display_name?: string; address?: { state?: string; house_number?: string; road?: string; city?: string; town?: string; village?: string; postcode?: string } };
+      const data = await parseJsonResponse<{
+        display_name?: string;
+        address?: {
+          state?: string;
+          house_number?: string;
+          road?: string;
+          city?: string;
+          town?: string;
+          village?: string;
+          postcode?: string;
+        };
+      }>(res, "Nominatim reverse");
       const resolvedAddress = data.display_name?.trim() || "";
       const stateCode = (data.address?.state?.slice(0, 2) || form.stateCode).toUpperCase();
       setForm((curr) => ({
@@ -3851,11 +3507,11 @@ function App() {
       const intel = await fetchStlIntelAtPoint(lat, lng);
       blank = applyParcelAutoFillToProperty(blank, intel?.parcel ?? null);
       const criteria =
-        nominatimReverseToBatchDataCriteria({
+        nominatimReverseToAddressCriteria({
           display_name: data.display_name,
           address: data.address as Record<string, string | undefined> | undefined,
-        }) ?? parseUsAddressLineForBatchData(resolvedAddress);
-      const enriched = await enrichPropertyFromBatchData(blank, criteria);
+        }) ?? parseUsAddressLineForSearch(resolvedAddress);
+      const enriched = await enrichPropertyWithDealMachineIfNeeded(blank, criteria);
       setActiveProperty(enriched);
       setShowPropertyPanel(true);
       applyPropertyToForm(enriched);
@@ -3864,12 +3520,9 @@ function App() {
       if (hasTax || hasContact) {
         setGeoStatus("Property loaded with assessor/tax and owner contact details.");
       } else {
-        const key = resolveBatchDataKey();
-        if (!key) {
-          setGeoStatus("Property loaded. Add a BatchData API key in settings to pull owner/contact details on click.");
-        } else {
-          setGeoStatus("Property loaded. Add owner details and save.");
-        }
+        setGeoStatus(
+          "Property loaded. Use your ArcGIS parcel layer (Contacts & settings), Missouri intel when applicable, DealMachine, or enter owner details manually.",
+        );
       }
     } catch (e) {
       const blank = newBlankProperty("", lat, lng);
@@ -3889,16 +3542,14 @@ function App() {
       const parsed = parseContactsCsv(text);
       setContacts(parsed);
       if (parsed.length) setSelectedContactId(parsed[0]?.id ?? "");
-      window.alert(`Imported ${parsed.length} contacts.`);
+      toast.success(`Imported ${parsed.length} contacts.`);
     };
     reader.readAsText(file);
   };
 
   const flyMapTo = (lat: number, lng: number) => {
-    const map = mapboxMapRef.current;
-    if (!map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    eeViewCenterRef.current = { lat, lon: lng };
-    map.setLonLat?.({ lat, lon: lng });
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    mapViewCenterRef.current = { lat, lon: lng };
   };
 
   const applyContactToProposal = (contact: ContactRecord) => {
@@ -3913,20 +3564,22 @@ function App() {
     applyContactToProposal(contact);
     if (contact.lat == null || contact.lng == null) return;
     const addressLine = [contact.address, contact.city, contact.state, contact.zip].filter(Boolean).join(", ");
-    const criteria = parseUsAddressLineForBatchData(addressLine);
+    const criteria = parseUsAddressLineForSearch(addressLine);
     const base = newBlankProperty(addressLine, contact.lat, contact.lng);
     setShowPropertyPanel(true);
     setActiveProperty(base);
     setPropertyEnrichBusy(true);
     setGeoStatus("Loading property + tax/contact details for selected contact...");
     try {
-      const enriched = await enrichPropertyFromBatchData(base, criteria);
+      const enriched = await enrichPropertyWithDealMachineIfNeeded(base, criteria);
       setActiveProperty(enriched);
       applyPropertyToForm(enriched);
       const hasTax = enriched.taxSummary.trim().length > 0;
       const hasContact = Boolean(enriched.ownerName || enriched.ownerPhone || enriched.ownerEmail);
       if (hasTax || hasContact) {
         setGeoStatus("Contact property loaded with assessor/tax and owner details.");
+      } else if (!isDealMachineLikelyConfigured()) {
+        setGeoStatus("Contact applied. Use parcel settings or enter owner details manually.");
       } else {
         setGeoStatus("Contact applied. No additional assessor fields returned.");
       }
@@ -3968,7 +3621,7 @@ function App() {
       }
       const contextParts: string[] = [];
       if (form.address.trim()) contextParts.push(`Job address: ${form.address.trim()}`);
-      const res = await fetch(`${INTEL_API_BASE}/api/ai/roof-pitch`, {
+      const res = await fetch(`${intelApiBase()}/api/ai/roof-pitch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3999,8 +3652,16 @@ function App() {
         setAiMeasureNote(
           res.ok
             ? "Invalid response from intel server."
-            : `Intel server error (${res.status}). Is the Worker running on port 8787?`,
+            : formatWorkerFetchFailure(
+                res,
+                rawText,
+                "Intel server error — is the Worker running on port 8787?",
+              ),
         );
+        return;
+      }
+      if (!res.ok) {
+        setAiMeasureNote(formatWorkerFetchFailure(res, rawText, "Roof pitch request failed"));
         return;
       }
       const rawPitch = json.data?.estimatePitch;
@@ -4074,12 +3735,6 @@ function App() {
         return next;
       });
 
-      const lat = parseFloat(form.latitude);
-      const lng = parseFloat(form.longitude);
-      if (geo && Number.isFinite(lat) && Number.isFinite(lng)) {
-        pendingAiFootprintRef.current = { lat, lng, L: geo.buildingL, W: geo.buildingW };
-        setAiMapFootprintTick((t) => t + 1);
-      }
       const bits = [`Pitch ${pitchForForm} (${d.confidence || "low"})`];
       if (d.rationale) bits.push(d.rationale);
       if (d.estimateRoofAreaSqFt != null && d.estimateRoofAreaSqFt > 0) {
@@ -4106,8 +3761,10 @@ function App() {
     }
   };
 
+  const resolveMeasurementMapCanvas = (): HTMLCanvasElement | null => map3dRef.current?.getCanvas() ?? null;
+
   const handleAiMeasureFromMap = async () => {
-    const canvas = map3dRef.current?.getCanvas();
+    const canvas = resolveMeasurementMapCanvas();
     if (!canvas) {
       setAiMeasureNote("Map not ready — wait for satellite tiles to load, then try again.");
       return;
@@ -4119,7 +3776,15 @@ function App() {
     setAiMeasureBusy(true);
     setAiMeasureNote("Capturing map view and analyzing roof...");
     try {
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      let dataUrl: string;
+      try {
+        dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      } catch {
+        setAiMeasureNote(
+          "Could not export the map image (browser security with satellite tiles). Use Manual Trace, Auto Trace, or upload a roof photo.",
+        );
+        return;
+      }
       const imageBase64 = dataUrl.split(",")[1];
       if (!imageBase64 || imageBase64.length < 100) {
         setAiMeasureNote("Could not capture map — try zooming in closer to the roof.");
@@ -4127,7 +3792,7 @@ function App() {
       }
       const contextParts: string[] = [];
       if (form.address.trim()) contextParts.push(`Job address: ${form.address.trim()}`);
-      const res = await fetch(`${INTEL_API_BASE}/api/ai/roof-pitch`, {
+      const res = await fetch(`${intelApiBase()}/api/ai/roof-pitch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4155,7 +3820,15 @@ function App() {
       try {
         json = JSON.parse(rawText);
       } catch {
-        setAiMeasureNote(res.ok ? "Invalid response from server." : `Server error (${res.status}).`);
+        setAiMeasureNote(
+          res.ok
+            ? "Invalid response from server."
+            : formatWorkerFetchFailure(res, rawText, "Roof pitch request failed"),
+        );
+        return;
+      }
+      if (!res.ok) {
+        setAiMeasureNote(formatWorkerFetchFailure(res, rawText, "Roof pitch request failed"));
         return;
       }
       const rawPitch = json.data?.estimatePitch;
@@ -4378,7 +4051,7 @@ function App() {
 
   const bulkGeocodeContacts = async () => {
     if (!contacts.length) {
-      window.alert("Import contacts first.");
+      toast.error("Import contacts first.");
       return;
     }
     setContactsGeocodeBusy(true);
@@ -4395,7 +4068,7 @@ function App() {
           encodeURIComponent(query);
         const res = await fetch(url, { headers: { Accept: "application/json" } });
         if (!res.ok) continue;
-        const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+        const data = await parseJsonResponse<Array<{ lat: string; lon: string }>>(res, "Nominatim batch");
         const hit = data[0];
         if (hit) {
           const lat = Number.parseFloat(hit.lat);
@@ -4413,7 +4086,7 @@ function App() {
     }
     setContacts(next);
     setContactsGeocodeBusy(false);
-    window.alert(`Geocoded ${updatedCount} contact(s).`);
+    toast.success(`Geocoded ${updatedCount} contact(s).`);
   };
 
   const createProposalFromContact = (contact: ContactRecord) => {
@@ -4440,7 +4113,7 @@ function App() {
 
   const exportTxt = () => {
     if (!result) {
-      window.alert("Run estimate first.");
+      toast.error("Run estimate first.");
       return;
     }
     const text = buildReportText(form, result);
@@ -4454,7 +4127,7 @@ function App() {
 
   const exportProposalTxt = () => {
     if (!result) {
-      window.alert("Run estimate first.");
+      toast.error("Run estimate first.");
       return;
     }
     const text = buildProposalText(form, result, proposal);
@@ -4468,7 +4141,7 @@ function App() {
 
   const printReport = () => {
     if (!result) {
-      window.alert("Run estimate first.");
+      toast.error("Run estimate first.");
       return;
     }
     const html = buildReportText(form, result).replace(/\n/g, "<br/>");
@@ -4482,7 +4155,7 @@ function App() {
 
   const printProposal = () => {
     if (!result) {
-      window.alert("Run estimate first.");
+      toast.error("Run estimate first.");
       return;
     }
     if (lastEstimateId) {
@@ -4520,7 +4193,7 @@ function App() {
   const exportFootprintDxf = useCallback(() => {
     const polys = mapboxFeatures.filter((f: { geometry?: { type?: string } }) => f.geometry?.type === "Polygon");
     if (!polys.length) {
-      window.alert("Draw or import a building footprint polygon on the map first.");
+      toast.error("Draw or import a building footprint polygon on the map first.");
       return;
     }
     const dxf = buildFootprintDxfFromPolygons(polys as FootprintFeature[]);
@@ -4531,102 +4204,6 @@ function App() {
     a.click();
     URL.revokeObjectURL(a.href);
   }, [mapboxFeatures]);
-
-  const loadEagleViewRoofIntoForm = useCallback(async () => {
-    if (!isTrueDesignApiConfigured()) {
-      window.alert(
-        "EagleView API is not configured. Run the HD2D Worker (wrangler dev in backend) and point Vite at it, or set VITE_INTEL_API_BASE / VITE_EAGLEVIEW_API_BASE. Configure EagleView secrets on the Worker (see backend/wrangler.toml).",
-      );
-      return;
-    }
-    const id = Number.parseInt(eagleViewReportId.trim(), 10);
-    if (!Number.isFinite(id) || id <= 0) {
-      window.alert("Enter a valid numeric EagleView report ID.");
-      return;
-    }
-    setTrueDesignBusy(true);
-    setTrueDesignNote("");
-    try {
-      const res = await trueDesignFetch(`/solar/v1/truedesign/systemRoof?reportId=${id}`);
-      const text = await res.text();
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error(
-            "HTTP 401 — EagleView or the Worker rejected the request. Check EAGLEVIEW_* secrets on the Worker (.dev.vars locally) and that your OAuth Client ID matches developer.eagleview.com.",
-          );
-        }
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-      const data = JSON.parse(text) as EagleViewSystemRoofData;
-      const patch = mapEagleViewSystemRoofToFormPatch(data);
-      setForm((curr) => ({
-        ...curr,
-        ...patch,
-        propertyRecordNotes: [
-          curr.propertyRecordNotes,
-          `EagleView TrueDesign systemRoof (reportId=${id})`,
-        ]
-          .filter((s) => typeof s === "string" && s.trim() !== "")
-          .join("\n"),
-      }));
-      setTrueDesignNote(`Loaded roof summary from EagleView report ${id}.`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setTrueDesignNote(msg);
-      window.alert(`EagleView systemRoof failed: ${msg}`);
-    } finally {
-      setTrueDesignBusy(false);
-    }
-  }, [eagleViewReportId]);
-
-  const launchTrueDesignSession = useCallback(async () => {
-    if (!isTrueDesignApiConfigured()) {
-      window.alert(
-        "EagleView API is not configured. Run the HD2D Worker (wrangler dev in backend) and point Vite at it, or set VITE_INTEL_API_BASE / VITE_EAGLEVIEW_API_BASE. Configure EagleView secrets on the Worker (see backend/wrangler.toml).",
-      );
-      return;
-    }
-    const id = Number.parseInt(eagleViewReportId.trim(), 10);
-    if (!Number.isFinite(id) || id <= 0) {
-      window.alert("Enter a valid numeric EagleView report ID.");
-      return;
-    }
-    setTrueDesignBusy(true);
-    setTrueDesignNote("");
-    setTrueDesignIframeHtml(null);
-    try {
-      const res = await trueDesignFetch(`/solar/v1/truedesign/init?reportId=${id}`, {
-        method: "POST",
-        body: JSON.stringify({
-          reportId: id,
-          customScope: [],
-          featureConfig: [],
-          configuration: { defaultVersion: "", hideVersion: [] },
-        }),
-      });
-      const html = await res.text();
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error(
-            "HTTP 401 — EagleView or the Worker rejected the request. Check EAGLEVIEW_* secrets on the Worker (.dev.vars locally) and that your OAuth Client ID matches developer.eagleview.com.",
-          );
-        }
-        throw new Error(html || `HTTP ${res.status}`);
-      }
-      if (html.includes("<") && html.includes(">")) {
-        setTrueDesignIframeHtml(html);
-        setTrueDesignNote("TrueDesign session HTML loaded below (embedded).");
-      } else {
-        setTrueDesignNote(`TrueDesign init response: ${html.trim() || "(empty)"}`);
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setTrueDesignNote(msg);
-      window.alert(`TrueDesign init failed: ${msg}`);
-    } finally {
-      setTrueDesignBusy(false);
-    }
-  }, [eagleViewReportId]);
 
   const addMeasurementSection = () => {
     setMeasurementSections((prev) => [
@@ -4694,16 +4271,16 @@ function App() {
         : preparedForm;
     const readiness = scoreEstimateReadiness(preparedWithSectionTotals);
     if (readiness.score < 45 && !opts?.forceLowReadiness) {
-      window.alert(
-        `Estimate readiness is ${readiness.score}/100. Add missing inputs first:\n- ${readiness.reasons.join("\n- ")}`,
-      );
+      toast.warning(`Estimate readiness is ${readiness.score}/100`, {
+        description: `Add missing inputs: ${readiness.reasons.join(" · ")}`,
+      });
       setMapboxStatus(`Estimate paused: readiness ${readiness.score}/100.`);
       return;
     }
     const area = Number.parseFloat(preparedWithSectionTotals.areaSqFt);
     const sq = Number.parseFloat(preparedWithSectionTotals.measuredSquares);
     if ((!Number.isFinite(area) || area <= 0) && (!Number.isFinite(sq) || sq <= 0)) {
-      window.alert("Enter plan area or measured squares before generating.");
+      toast.error("Enter plan area or measured squares before generating.");
       return;
     }
 
@@ -4868,7 +4445,26 @@ function App() {
         propertyRecordNotes: metaBits.join("\n"),
       };
 
-      setForm(importedForm);
+      const bf = parsed.buildingFootprint;
+      const useBuildingFootprint =
+        Boolean(parsed.options?.importFootprint) &&
+        bf &&
+        bf.geometry &&
+        (bf.geometry.type === "Polygon" || bf.geometry.type === "MultiPolygon");
+
+      let mapImportOverride:
+        | { mapboxAreaSqFt: number; mapboxFeatures: GeoJSON.Feature<GeoJSON.Polygon>[] }
+        | undefined;
+      if (useBuildingFootprint) {
+        const polys = footprintToPolygonFeatures(bf as BuildingFootprintFeature);
+        const area = polys.reduce((sum, p) => sum + polygonFeaturePlanAreaSqFt(p), 0);
+        setMapboxFeatures(polys);
+        setMapboxAreaSqFt(area);
+        mapImportOverride = { mapboxAreaSqFt: area, mapboxFeatures: polys };
+      }
+
+      const preparedForm = prepareFormFromMapMeasurements(importedForm, mapImportOverride);
+      setForm(preparedForm);
 
       setProposal((curr) => {
         const org = (payload.ownerEntityType ?? "").toLowerCase() === "organization";
@@ -4892,13 +4488,18 @@ function App() {
         queueMicrotask(() => flyMapTo(lat, lng));
       }
 
-      setMapboxStatus(`Imported property record (${payload.source}).`);
+      setMapboxStatus(
+        mapImportOverride
+          ? `Imported property record (${payload.source}) with GIS building footprint on map.`
+          : `Imported property record (${payload.source}).`,
+      );
       if (shouldAutoEstimate) {
         queueMicrotask(async () => {
           try {
-            const prepared = prepareFormFromMapMeasurements(importedForm);
-            setForm(prepared);
-            runEstimatePipeline(prepared, { forceLowReadiness: true });
+            if (mapImportOverride?.mapboxFeatures?.length) {
+              autoCalcRef.current(mapImportOverride.mapboxFeatures);
+            }
+            runEstimatePipeline(preparedForm, { forceLowReadiness: true });
           } catch (e) {
             console.error("[measurement] instant estimate after property import failed", e);
           }
@@ -4917,9 +4518,7 @@ function App() {
 
   const applyDrawnAreaToEstimate = () => {
     if (mapboxAreaSqFt <= 0 && drawnRoofLines.length === 0) {
-      window.alert(
-        "Draw a roof polygon in EagleView, or add measurement lines / dimensions first.",
-      );
+      toast.error("Draw a roof polygon on the map, or add measurement lines / dimensions first.");
       return;
     }
     setForm((curr) => prepareFormFromMapMeasurements(curr));
@@ -4954,22 +4553,9 @@ function App() {
     for (const line of drawnRoofLines) sums[line.type] += line.lengthFt;
     return sums;
   }, [drawnRoofLines]);
-  const mapInitFailed = useMemo(() => {
-    if (mapReady) return false;
-    const text = mapboxStatus.trim().toLowerCase();
-    if (!text) return false;
-    return (
-      text.includes("init failed") ||
-      text.includes("map unavailable") ||
-      text.includes("map error") ||
-      text.includes("credentials") ||
-      text.includes("auth")
-    );
-  }, [mapReady, mapboxStatus]);
-
   const saveMapboxReport = async () => {
     if (!mapboxFeatures.length || mapboxAreaSqFt <= 0) {
-      window.alert("Draw roof polygons before saving.");
+      toast.error("Draw roof polygons before saving.");
       return;
     }
     try {
@@ -4985,10 +4571,10 @@ function App() {
         }),
       });
       if (!res.ok) throw new Error("Report save failed");
-      window.alert("Map report saved.");
+      toast.success("Map report saved.");
       await fetchSavedReports();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Report save failed");
+      toast.error(error instanceof Error ? error.message : "Report save failed");
     }
   };
 
@@ -4998,7 +4584,7 @@ function App() {
     try {
       const res = await fetch("http://localhost:5000/api/reports");
       if (!res.ok) throw new Error("Unable to load reports");
-      const data = (await res.json()) as SavedApiReport[];
+      const data = await parseJsonResponse<SavedApiReport[]>(res, "Saved reports");
       setSavedReports(Array.isArray(data) ? data : []);
       setReportsStatus(`Loaded ${Array.isArray(data) ? data.length : 0} report(s).`);
     } catch (error) {
@@ -5113,6 +4699,16 @@ function App() {
     return { lsr, spc, nws };
   }, [stlStorms, stormFilter]);
 
+  /** NWS alerts at the intel point — independent of storm filter (used for banner). */
+  const nwsAlertFeatures = useMemo(() => {
+    if (!stlStorms?.nwsActiveAlerts?.features || !Array.isArray(stlStorms.nwsActiveAlerts.features)) return [];
+    return stlStorms.nwsActiveAlerts.features as Array<Record<string, unknown>>;
+  }, [stlStorms]);
+
+  useEffect(() => {
+    setNwsAlertBannerDismissed(false);
+  }, [stlStorms]);
+
   const parcelPropertyType = useMemo(
     () => inferPropertyTypeFromParcel(stlIntel?.parcel ?? null),
     [stlIntel],
@@ -5124,7 +4720,7 @@ function App() {
     setForm((curr) => ({ ...curr, roofStructure: roofStructureSuggestion.mode }));
   };
   return (
-    <div className="min-w-0 flex-1 p-8">
+    <div className="min-w-0 flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:p-8">
       <div className="mx-auto max-w-[1400px]">
         <header className="top">
           <h1>Roofing Measurement & Estimate Pro</h1>
@@ -5132,6 +4728,51 @@ function App() {
             Professional measurement, estimate, and proposal workflow for residential and commercial roofing.
           </p>
         </header>
+        {nwsAlertFeatures.length > 0 && !nwsAlertBannerDismissed ? (
+          <div
+            className="mb-4 rounded-lg border border-amber-500/50 bg-amber-950/50 px-4 py-3 text-sm text-amber-50 shadow-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-amber-100">
+                  NWS active alerts ({nwsAlertFeatures.length}) — point forecast for your property coordinates
+                </p>
+                <p className="mt-1 text-xs text-amber-200/90">
+                  From api.weather.gov for this lat/lng. IEM storm reports below are Missouri-bounded; SPC Day 1 is CONUS-wide.
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-50/95">
+                  {nwsAlertFeatures.slice(0, 4).map((f, i) => {
+                    const p = (f.properties ?? f) as Record<string, unknown>;
+                    const headline = String(p.headline ?? p.event ?? p.description ?? "Alert").trim().slice(0, 220);
+                    return (
+                      <li key={i} className="break-words">
+                        {headline}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className="secondary-btn whitespace-nowrap px-3 py-1.5 text-xs"
+                  onClick={() => setStormFilter("nws")}
+                >
+                  Storm table: NWS
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-amber-400/60 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-900/50"
+                  onClick={() => setNwsAlertBannerDismissed(true)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <main className="grid2">
         <section className="panel" id="section-intake">
           <h2>Property & Measurement Intake</h2>
@@ -5142,7 +4783,8 @@ function App() {
             <label>Longitude<input type="number" step="0.000001" value={form.longitude} onChange={(e) => setForm((curr) => ({ ...curr, longitude: e.target.value }))} placeholder="-96.7970" /></label>
             <p className="muted" style={{ gridColumn: "1 / -1", fontSize: 12, margin: 0 }}>
               <Link to="/property-lookup">Property records</Link> — import CSV / JSON (Parallel-enriched or assessor), then open
-              here.
+              here. DealMachine runs through the HD2D Worker (<code>DEALMACHINE_API_KEY</code> on the server).
+              Click the map (draw mode off) or use &quot;Set property from map center&quot; to load owner contact info.
             </p>
             {form.propertyRecordNotes ? (
               <div style={{ gridColumn: "1 / -1" }}>
@@ -5389,9 +5031,8 @@ function App() {
             <button
               type="button"
               className="secondary-btn"
-              disabled={mapProvider === "eagleview" && !mapReady}
               onClick={() => {
-                const { lat, lon } = eeViewCenterRef.current;
+                const { lat, lon } = mapViewCenterRef.current;
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
                 void mapClickSetProperty(lat, lon);
               }}
@@ -5422,9 +5063,8 @@ function App() {
               Upload Photo Instead
             </button>
             <span className="muted" style={{ fontSize: 11 }}>
-              {mapProvider === "osm-fallback" || mapProvider === "checking"
-                ? "Use the polygon tool (top-right) to trace the roof outline. Draw lines for ridge/eave/rake/etc. Measurements auto-fill the estimate form."
-                : "No photo required: trace the roof in EagleView, then use Apply All Measurements To Estimate. Optional AI photo can fill pitch and surface area when the model sees scale."}
+              Use the polygon tool (top-right) to trace the roof outline. Draw lines for ridge/eave/rake/etc. Measurements
+              auto-fill the estimate form. Optional AI photo can fill pitch and surface area when the model sees scale.
             </span>
           </div>
           {aiMeasureNote ? (
@@ -5432,6 +5072,10 @@ function App() {
               {aiMeasureNote}
             </p>
           ) : null}
+          <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+            <strong>Line colors on the map</strong> match the type you select. Use Measure Line for each ridge, eave, rake,
+            valley, hip, etc., then <strong>Finish</strong> before switching type.
+          </p>
           <div className="line-legend">
             {ROOF_LINE_TYPES.map((lt) => (
               <span key={lt.type} className={`legend-item${currentLineType === lt.type ? " legend-active" : ""}`} onClick={() => setCurrentLineType(lt.type)}>
@@ -5443,9 +5087,8 @@ function App() {
               </span>
             ))}
           </div>
-          {mapProvider === "osm-fallback" || mapProvider === "checking" ? (
-            <>
-              <Map3D
+          <div className="measurement-map-shell">
+          <Map3D
                 ref={map3dRef}
                 center={{
                   lat: Number.parseFloat(form.latitude) || 44.86,
@@ -5454,59 +5097,61 @@ function App() {
                 zoom={18}
                 pitch={60}
                 bearing={-20}
-                height={580}
+                height="100%"
                 enableGps
                 enableDraw
                 polylineColor={ROOF_LINE_TYPES.find((lt) => lt.type === currentLineType)?.color ?? "#ef4444"}
+                manualRoofLineType={currentLineType}
                 points={
                   Number.isFinite(Number.parseFloat(form.latitude)) && Number.isFinite(Number.parseFloat(form.longitude))
                     ? [{ id: "property", lat: Number.parseFloat(form.latitude), lng: Number.parseFloat(form.longitude), label: form.address || "Property", color: "#ef4444" }]
                     : []
                 }
                 onMapClick={(lat, lng) => {
-                  setForm((curr) => ({ ...curr, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
+                  void mapClickSetProperty(lat, lng);
                 }}
                 onMoveEnd={(lat, lng) => {
-                  eeViewCenterRef.current = { lat, lon: lng };
+                  mapViewCenterRef.current = { lat, lon: lng };
                 }}
                 onPolygonDrawn={(feature) => {
-                  void (async () => {
-                    try {
-                      const turf = await import("@turf/turf");
-                      const areaSqM = turf.area(feature as any);
-                      const areaSqFt = areaSqM * 10.7639;
-                      const perimFt = turf.length(feature as any, { units: "feet" });
-                      const pitchRise = parsePitchRise(form.roofPitch) ?? 6;
-                      const pitchFactor = Math.sqrt(1 + (pitchRise / 12) ** 2);
-                      const surfaceSqFt = areaSqFt * pitchFactor;
-                      const measuredSquares = surfaceSqFt / 100;
-                      setForm((curr) => ({
-                        ...curr,
-                        areaSqFt: areaSqFt.toFixed(2),
-                        perimeterFt: perimFt.toFixed(2),
-                        measuredSquares: measuredSquares.toFixed(2),
-                      }));
-                      setMapboxFeatures([feature as any]);
-                      setMapboxAreaSqFt(areaSqFt);
-                      autoCalcRef.current([feature as any]);
-                      setMapboxStatus(
-                        `Area: ${Math.round(areaSqFt).toLocaleString()} sq ft | Perimeter: ${Math.round(perimFt)} ft | ${measuredSquares.toFixed(2)} SQ`,
-                      );
-                    } catch (e) {
-                      console.error("Polygon measurement failed", e);
-                    }
-                  })();
+                  try {
+                    const poly = feature as GeoJSON.Feature<GeoJSON.Polygon>;
+                    const areaSqFt = polygonFeaturePlanAreaSqFt(poly);
+                    const perimFt = polygonFeatureOuterPerimeterFt(poly);
+                    const pitchRise = parsePitchRise(form.roofPitch) ?? 6;
+                    const pitchFactor = Math.sqrt(1 + (pitchRise / 12) ** 2);
+                    const surfaceSqFt = areaSqFt * pitchFactor;
+                    const measuredSquares = surfaceSqFt / 100;
+                    setForm((curr) => ({
+                      ...curr,
+                      areaSqFt: areaSqFt.toFixed(2),
+                      perimeterFt: perimFt.toFixed(2),
+                      measuredSquares: measuredSquares.toFixed(2),
+                    }));
+                    setMapboxFeatures([feature as any]);
+                    setMapboxAreaSqFt(areaSqFt);
+                    autoCalcRef.current([feature as any]);
+                    setMapboxStatus(
+                      `Area: ${Math.round(areaSqFt).toLocaleString()} sq ft plan | Perimeter: ${Math.round(perimFt)} ft | ${measuredSquares.toFixed(2)} SQ surface`,
+                    );
+                  } catch (e) {
+                    console.error("Polygon measurement failed", e);
+                  }
                 }}
                 onPolylineDrawn={(feature) => {
+                  const fromProp = (feature.properties as { roofLineType?: string } | null)?.roofLineType;
+                  const lt: RoofLineType =
+                    fromProp && ROOF_LINE_TYPES.some((x) => x.type === fromProp)
+                      ? (fromProp as RoofLineType)
+                      : currentLineType;
                   void (async () => {
                     try {
                       const turf = await import("@turf/turf");
                       const lengthFt = turf.length(feature as any, { units: "feet" });
-                      const lt = currentLineType;
                       setDrawnRoofLines((prev) => [
                         ...prev,
                         {
-                          id: `3d-line-${Date.now()}`,
+                          id: `3d-line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
                           type: lt,
                           lengthFt: Math.round(lengthFt * 100) / 100,
                           geometry: feature.geometry,
@@ -5517,18 +5162,49 @@ function App() {
                     }
                   })();
                 }}
+                onAutoTraceRoofLines={(items) => {
+                  void (async () => {
+                    try {
+                      const turf = await import("@turf/turf");
+                      const ts = Date.now();
+                      setDrawnRoofLines((prev) => [
+                        ...prev,
+                        ...items
+                          .filter((it) => AI_ROOF_LINE_TYPES.has(it.type as RoofLineType))
+                          .map((it, i) => ({
+                            id: `ai-roof-line-${ts}-${i}`,
+                            type: it.type as RoofLineType,
+                            lengthFt:
+                              Math.round(turf.length(it.feature as any, { units: "feet" }) * 100) / 100,
+                            geometry: it.feature.geometry,
+                          })),
+                      ]);
+                    } catch (e) {
+                      console.error("Auto-trace roof lines failed", e);
+                    }
+                  })();
+                }}
                 onFeaturesCleared={() => {
+                  setDrawnRoofLines([]);
                   setForm((curr) => ({
                     ...curr,
                     areaSqFt: "",
                     perimeterFt: "",
                     measuredSquares: "",
+                    ridgesFt: "",
+                    eavesFt: "",
+                    rakesFt: "",
+                    valleysFt: "",
+                    hipsFt: "",
+                    wallFlashingFt: "",
+                    stepFlashingFt: "",
                   }));
                   setMapboxFeatures([]);
                   setMapboxAreaSqFt(0);
                   setMapboxStatus("");
                 }}
               />
+          </div>
               <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                 <button type="button" className="secondary-btn" onClick={applyDrawnAreaToEstimate}>
                   Apply All Measurements To Estimate
@@ -5558,136 +5234,6 @@ function App() {
                   ) : null}
                 </div>
               ) : null}
-            </>
-          ) : (
-            <>
-              <div className="map-wrap mapbox-wrap" style={{ minHeight: 520 }}>
-                <div ref={mapboxContainerRef} className="mapbox-canvas" style={{ height: 520 }} />
-                {mapInitFailed ? (
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 16,
-                      background: "rgba(0,0,0,0.78)",
-                      color: "#fff",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ maxWidth: 680 }}>
-                      <h3 style={{ margin: "0 0 8px 0", fontSize: 18 }}>Map unavailable</h3>
-                      <p style={{ margin: 0, lineHeight: 1.45 }}>{mapboxStatus}</p>
-                      <p style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
-                        Fix EagleView embedded credentials on backend and refresh.
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              {mapboxStatus ? <p className="muted">{mapboxStatus}</p> : null}
-            </>
-          )}
-          <div
-            style={{
-              marginTop: 16,
-              padding: 12,
-              border: "1px solid #e5e7eb",
-              borderRadius: 8,
-              background: "#fafafa",
-            }}
-          >
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>EagleView TrueDesign</h3>
-            {!isTrueDesignApiConfigured() ? (
-              <div
-                role="status"
-                style={{
-                  marginBottom: 12,
-                  padding: "10px 12px",
-                  borderRadius: 6,
-                  border: "1px solid #fcd34d",
-                  background: "#fffbeb",
-                  fontSize: 13,
-                  lineHeight: 1.45,
-                }}
-              >
-                <strong>EagleView is not configured for this build.</strong> Set <code>VITE_INTEL_API_BASE</code> to your
-                deployed HD2D Worker (same host handles <code>/api/eagleview/apicenter</code>). Put EagleView OAuth secrets
-                on the Worker (see <code>backend/wrangler.toml</code>). For local <code>npm run dev</code>, run{" "}
-                <code>wrangler dev</code> in <code>backend</code> so <code>/intel-proxy</code> reaches that route.
-              </div>
-            ) : null}
-            {import.meta.env.DEV && isTrueDesignApiConfigured() ? (
-              <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 8 }}>
-                If actions return <strong>401</strong>, fix EagleView credentials on the Worker (<code>backend/.dev.vars</code>) and
-                restart <code>wrangler dev</code> / Vite.
-              </p>
-            ) : null}
-            {isTrueDesignApiConfigured() ? (
-              <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-                Enter an EagleView <strong>report ID</strong> (from your order) to load roof summary into the estimator or
-                open TrueDesign. Your last report ID is remembered on this device.
-              </p>
-            ) : (
-              <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-                Measurement uses EagleView Embedded Explorer above. Configure TrueDesign using the steps in the notice
-                above to enable load and session actions.
-              </p>
-            )}
-            <div className="form-grid" style={{ marginTop: 8 }}>
-              <label>
-                EagleView report ID
-                <input
-                  type="number"
-                  min={1}
-                  value={eagleViewReportId}
-                  onChange={(e) => setEagleViewReportId(e.target.value)}
-                  placeholder="e.g. 44853629"
-                />
-              </label>
-            </div>
-            <div className="actions-row" style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                className="secondary-btn"
-                disabled={trueDesignBusy || !isTrueDesignApiConfigured()}
-                onClick={() => void loadEagleViewRoofIntoForm()}
-              >
-                {trueDesignBusy ? "Working…" : "Load roof into estimate fields"}
-              </button>
-              <button
-                type="button"
-                className="secondary-btn"
-                disabled={trueDesignBusy || !isTrueDesignApiConfigured()}
-                onClick={() => void launchTrueDesignSession()}
-              >
-                {trueDesignBusy ? "Working…" : "Launch TrueDesign session"}
-              </button>
-              <button
-                type="button"
-                className="secondary-btn"
-                disabled={!trueDesignIframeHtml}
-                onClick={() => setTrueDesignIframeHtml(null)}
-              >
-                Clear embedded session
-              </button>
-            </div>
-            {trueDesignNote ? (
-              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                {trueDesignNote}
-              </p>
-            ) : null}
-            {trueDesignIframeHtml ? (
-              <iframe
-                title="TrueDesign"
-                srcDoc={trueDesignIframeHtml}
-                style={{ width: "100%", height: 560, marginTop: 12, border: "1px solid #d1d5db", borderRadius: 6 }}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              />
-            ) : null}
-          </div>
           <div className="actions-row">
             <label>
               Property Type Filter
@@ -5709,10 +5255,10 @@ function App() {
             <label>
               Storm Filter
               <select value={stormFilter} onChange={(e) => setStormFilter(e.target.value as "all" | "lsr" | "spc" | "nws")}>
-                <option value="all">All Storm Data</option>
-                <option value="lsr">NOAA/IEM LSR</option>
-                <option value="spc">SPC Day 1</option>
-                <option value="nws">NWS Alerts</option>
+                <option value="all">All storm layers</option>
+                <option value="lsr">IEM LSR (MO region)</option>
+                <option value="spc">SPC Day 1 (CONUS)</option>
+                <option value="nws">NWS alerts (this point)</option>
               </select>
             </label>
             <button
@@ -5721,7 +5267,7 @@ function App() {
                 const lat = Number.parseFloat(form.latitude);
                 const lng = Number.parseFloat(form.longitude);
                 if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-                  window.alert("Set property coordinates first.");
+                  toast.error("Set property coordinates first.");
                   return;
                 }
                 fetchStlIntelAtPoint(lat, lng);
@@ -5785,9 +5331,10 @@ function App() {
                         <td>{stlIntel.demolitionParcel ? "Demolition-related parcel found" : "No demolition record at point"}</td>
                       </tr>
                       <tr>
-                        <td>NOAA/NWS/SPC Storms</td>
+                        <td>NOAA / NWS / SPC storms</td>
                         <td>
-                          LSR: {filteredStormFeatures.lsr.length} | SPC: {filteredStormFeatures.spc.length} | NWS Alerts: {filteredStormFeatures.nws.length}
+                          IEM LSR (MO bbox): {filteredStormFeatures.lsr.length} | SPC Day 1 (CONUS):{" "}
+                          {filteredStormFeatures.spc.length} | NWS alerts (this lat/lng): {filteredStormFeatures.nws.length}
                         </td>
                       </tr>
                     </>
@@ -6205,7 +5752,7 @@ function App() {
           ) : null}
           <div className="actions-row">
             <button className="run-btn" onClick={runEstimateAndRecord}>Generate Estimate & Comparison</button>
-            <button className="secondary-btn" onClick={() => setForm(defaultFormState())}>Load Hillsdale Template</button>
+            <button className="secondary-btn" onClick={() => setForm(hillsdaleFormTemplate())}>Load Hillsdale Template</button>
             <button className="secondary-btn" onClick={saveJob}>Save Job</button>
             <button className="secondary-btn" onClick={exportTxt}>Export TXT</button>
             <button className="secondary-btn" onClick={printReport}>Print / PDF</button>

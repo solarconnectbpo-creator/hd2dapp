@@ -2,17 +2,48 @@ name = "hd2d-backend"
 main = "src/index.ts"
 compatibility_date = "2024-12-02"
 compatibility_flags = ["nodejs_compat"]
+# Avoid Wrangler warnings; custom routes still win for production domains.
+workers_dev = true
+preview_urls = true
+
+# Custom domain API routes (place before [[kv_namespaces]] so TOML does not attach to KV table).
+# Zone: hardcoredoortodoorclosers.com — SPA at https://hardcoredoortodoorclosers.com (Cloudflare Pages project hd2d-closers).
+# Deploy Pages from ../roofing-estimator-vite (`npm run pages:deploy`); attach apex + www under Pages → Custom domains.
+# This Worker handles ONLY /api/* on those hostnames; Pages serves / and static assets.
+routes = [
+  { pattern = "hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "www.hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" }
+]
 
 # Public EagleView API Center defaults (override with secrets if needed).
 [vars]
 EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token"
 EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com"
+# St. Louis County MO assessor parcels (public FeatureServer — same as backend/src/api/stlIntel.ts STL_ASSESSOR_PARCEL_LAYER).
+# Override with your county’s FeatureServer …/FeatureServer/N if you work outside STL.
+ARCGIS_FEATURE_LAYER_URL = "https://services6.arcgis.com/evmyRZRrsopdeog7/arcgis/rest/services/AssessorsParcels/FeatureServer/0"
+# ArcGIS (Canvassing): optional MapServer tile template ARCGIS_MAPSERVER_TILE_URL (…/tile/{z}/{y}/{x}); token via `wrangler secret put ARCGIS_API_TOKEN`
+#
+# --- DealMachine (Canvassing + Property records) — POST /api/dealmachine/property ---
+# Key is a SECRET (never commit). Canvassing calls the Worker only; the browser never sees the key.
+# 1) Production / deployed Worker (`npm run deploy` uses top-level `--env=""`):
+#      npx wrangler secret put DEALMACHINE_API_KEY --env ""
+#    Or: set shell env DEALMACHINE_API_KEY, then: npm run secret:dealmachine
+# 2) Local `wrangler dev`: add DEALMACHINE_API_KEY to backend/.dev.vars (see .dev.vars.example).
+# 3) SPA must call this Worker (same-origin or VITE_INTEL_API_BASE → your workers.dev / custom domain).
+# Verify: GET /api/health → capabilities.dealmachineServerKey: true
+# Optional non-secret overrides in [vars] below (uncomment if your account uses a different host or Bearer auth):
+# DEALMACHINE_API_BASE = "https://public-api.dealmachine.com"
+# DEALMACHINE_PROPERTY_PATH = "/v1/properties/search"
+# DEALMACHINE_AUTH_MODE = "client_key"
+
 
 # D1 Database Binding
 [[d1_databases]]
 binding = "DB"
 database_name = "d2d"
 database_id = "2a9b7931-181f-4b19-b963-97d00e9b6d5a"
+migrations_dir = "migrations"
 
 # KV Namespace for real-time call state
 [[kv_namespaces]]
@@ -22,24 +53,27 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 
 # Environment variables
 [env.development]
-vars = { ENVIRONMENT = "development", EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token", EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com" }
+vars = { ENVIRONMENT = "development", EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token", EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com", ARCGIS_FEATURE_LAYER_URL = "https://services6.arcgis.com/evmyRZRrsopdeog7/arcgis/rest/services/AssessorsParcels/FeatureServer/0" }
 
 [env.production]
-vars = { ENVIRONMENT = "production", EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token", EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com" }
+vars = { ENVIRONMENT = "production", EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token", EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com", ARCGIS_FEATURE_LAYER_URL = "https://services6.arcgis.com/evmyRZRrsopdeog7/arcgis/rest/services/AssessorsParcels/FeatureServer/0" }
 
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "d2d"
 database_id = "2a9b7931-181f-4b19-b963-97d00e9b6d5a"
+migrations_dir = "migrations"
 
 [[env.production.kv_namespaces]]
 binding = "HD2D_CACHE"
 id = "c534b1528e46480eab0979236a4b63ef"
 preview_id = "d5629502b89544fd80f3e0880b352832"
 
-# Configure runtime secrets via Wrangler:
-# - wrangler secret put OPENAI_API_KEY --env production --config backend/wrangler.toml
-# - wrangler secret put SESSION_SECRET --env production --config backend/wrangler.toml
+# Configure runtime secrets via Wrangler (target the Worker you deploy: `npm run deploy` uses top-level `--env=""`):
+# - npx wrangler secret put SESSION_SECRET --env ""
+# - npx wrangler secret put DEALMACHINE_API_KEY --env ""   (or: npm run secret:dealmachine with DEALMACHINE_API_KEY in env)
+# Avoid putting secrets only on `--env production` unless you deploy that environment — that creates a separate Worker name.
+# - npx wrangler secret put OPENAI_API_KEY --env production --config wrangler.toml
 #
 # EagleView API Center (TrueDesign) — /api/eagleview/apicenter/* on this Worker:
 # - wrangler secret put EAGLEVIEW_CLIENT_SECRET
@@ -51,11 +85,26 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 # - wrangler secret put EAGLEVIEW_EMBEDDED_CLIENT_SECRET
 # Optional: EAGLEVIEW_EMBEDDED_TOKEN_URL (default https://api.eagleview.com/auth-service/v1/token), EAGLEVIEW_EMBEDDED_SCOPE
 # Fallback if omitted: shared EAGLEVIEW_CLIENT_ID / EAGLEVIEW_CLIENT_SECRET are used.
+#
+# ML roof vision + SAM auto-trace — proxies /api/ai/roof-vision and /api/ai/roof-segment:
+#   Deploy backend/ml-vision-service (see ml-vision-service/README.md; use Dockerfile.sam for SAM).
+#   Then set (top-level worker — do not use --env production unless that is the worker you deploy):
+#   - wrangler secret put ROOF_VISION_SERVICE_URL
+#       → public HTTPS base only, e.g. https://your-service.fly.dev  (no trailing slash)
+#   - wrangler secret put ROOF_VISION_SERVICE_SECRET  (optional but recommended)
+#       → must match SERVICE_SECRET in the Python service .env / container env
+# Local dev: point ROOF_VISION_SERVICE_URL at http://127.0.0.1:8090 in backend/.dev.vars
+# Production: deploy ml-vision-service (e.g. Fly: `npm run deploy:vision:fly` from backend/ after `fly auth login`),
+#   then from backend/: `npm run worker:set-roof-vision -- -BaseUrl "https://<app>.fly.dev" -SharedSecret "..."`
+#
 # Local dev: create backend/.dev.vars (gitignored) with the same KEY=value lines, then `npm run dev` in backend.
-
-routes = [
-  { pattern = "hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" }
-]
+#
+# Auth (D1 users table): after clone, from `backend/`: `npm run d1:migrate:local`
+# Production D1 (once): `npm run d1:migrate:remote` (requires `wrangler login`).
+# If remote commands fail with "Invalid format for Authorization header" / code 6003: remove or fix a bad
+# CLOUDFLARE_API_TOKEN in your shell/environment, then run `wrangler login` (or set a token with D1 + Workers permissions).
+# Optional Worker vars: AUTH_SIGNUP_ENABLED=false to disable public sign-up; SESSION_SECRET via `wrangler secret put SESSION_SECRET`.
+# Env-based admin (same as /login + admin routes): `wrangler secret put AUTH_ADMIN_EMAIL`, `AUTH_ADMIN_PASSWORD`; optional `AUTH_ADMIN_NAME` (or plain [vars]).
 
 # Build configuration
 [build]

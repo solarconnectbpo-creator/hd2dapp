@@ -1,34 +1,8 @@
-import { useEffect, useState } from "react";
-import { getEagleViewEmbeddedAuthToken } from "./eagleViewEmbeddedAuth";
+import { useMemo } from "react";
 
-export type MapProvider = "eagleview" | "osm-fallback" | "checking";
-
-let cachedResult: MapProvider | null = null;
+/** Satellite/map source for leads and measurement — OSM/MapLibre only (no third-party imagery SDKs). */
+export type MapProvider = "osm-fallback";
 
 export function useMapProvider(): MapProvider {
-  const [provider, setProvider] = useState<MapProvider>(
-    cachedResult ?? "checking",
-  );
-
-  useEffect(() => {
-    if (cachedResult) {
-      setProvider(cachedResult);
-      return;
-    }
-    let mounted = true;
-    (async () => {
-      try {
-        await getEagleViewEmbeddedAuthToken();
-        cachedResult = "eagleview";
-      } catch {
-        cachedResult = "osm-fallback";
-      }
-      if (mounted) setProvider(cachedResult);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return provider;
+  return useMemo(() => "osm-fallback", []);
 }

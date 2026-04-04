@@ -30,3 +30,5 @@ dist-ssr
 /data/mo-commercial-pm-candidates-50k.csv
 # Synthetic load-test list (regenerate: npm run data:leads-10k)
 /data/leads-sample-10000.csv
+
+.vercel

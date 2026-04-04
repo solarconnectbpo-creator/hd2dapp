@@ -28,6 +28,35 @@ Recommended production topology:
 - Frontend SPA: `https://hardcoredoortodoorclosers.com`
 - Backend Worker API: same-origin `https://hardcoredoortodoorclosers.com/api/*` (or `https://api.hardcoredoortodoorclosers.com`)
 
+### Cloudflare Pages (apex SPA — `npm run pages:deploy`)
+
+The Worker ([`backend/wrangler.toml`](../backend/wrangler.toml)) routes **`/api/*`** to **hd2d-backend**; the **HTML/JS** for `/` and static assets are served by **Cloudflare Pages** project **`hd2d-closers`**.
+
+**Deploy the latest SPA:**
+
+```bash
+cd roofing-estimator-vite && npm run pages:deploy
+```
+
+**Verify:**
+
+- Open `https://main.hd2d-closers.pages.dev` — the `<title>` should be **HD2D Closers — Roofing Pro** (matches current [`index.html`](index.html)).
+- If the **apex** `https://hardcoredoortodoorclosers.com` still shows an **old** `<title>` (e.g. “Roofing Pro — measurements & estimates”) or a broken logo while `main.hd2d-closers.pages.dev` is correct, the **custom domain is not attached to this Pages project**. In **Cloudflare Dashboard → Workers & Pages → hd2d-closers → Custom domains**, add **`hardcoredoortodoorclosers.com`** (and remove it from any **other** Pages project or conflicting host). Then **Caching → Configuration → Purge Everything** (or purge HTML for `/`).
+
+**Only one** host stack should own the apex (Cloudflare Pages **or** Vercel). If both try to use the same hostname, DNS/SSL will conflict.
+
+**Attach the domain in the Cloudflare Dashboard (no CLI):**
+
+1. Open [Cloudflare Dashboard](https://dash.cloudflare.com/) and select account **`2b2f31d4f2fd46db5be5d72e772ecac5`** (or your team account that owns the zone `hardcoredoortodoorclosers.com`).
+2. Go to **Workers & Pages** → select project **`hd2d-closers`** (the one you deploy with `npm run pages:deploy`).
+3. Open the **Custom domains** tab → **Set up a custom domain** (or **Add**).
+4. Enter **`hardcoredoortodoorclosers.com`** and complete DNS/SSL prompts (apex should use the records Cloudflare suggests; zone must be on Cloudflare).
+5. If **`www.hardcoredoortodoorclosers.com`** should also open this app, add it here too (your [`vercel.json`](vercel.json) redirects `www` → apex if you prefer a single canonical host).
+6. If the same hostname appears under **another** Pages project or **Vercel** → **remove** it there so only **`hd2d-closers`** owns it.
+7. **Caching** → **Configuration** → **Purge Everything** for the zone if the browser still shows an old `<title>`.
+
+**CLI (optional):** with a valid **`CLOUDFLARE_API_TOKEN`** (40+ chars, **Account → Cloudflare Pages → Edit**), run `npm run pages:add-domain` from this directory.
+
 ### Same-origin `/api/*` routing (recommended)
 
 1. Deploy frontend to your domain root.
@@ -48,10 +77,23 @@ Recommended production topology:
 - If your API is on subdomain, set:
   - `VITE_INTEL_API_BASE=https://api.hardcoredoortodoorclosers.com`
 
+### Vercel — point **hardcoredoortodoorclosers.com** at this project
+
+The domain is already added on project **`hd2d-closers`**. If **`https://hardcoredoortodoorclosers.com`** does not load the app but **`https://hd2d-closers.vercel.app`** does, **DNS is still pointing away from Vercel** (common with Cloudflare).
+
+1. In **Cloudflare** → **DNS** for `hardcoredoortodoorclosers.com`, add (or fix) the **apex** record:
+   - **Type:** `A`
+   - **Name:** `@` (or `hardcoredoortodoorclosers.com`)
+   - **IPv4:** `76.76.21.21` (Vercel — run `npx vercel domains inspect hardcoredoortodoorclosers.com` if this ever changes)
+   - **Proxy:** **DNS only** (grey cloud) until Vercel shows the domain as verified; then you can experiment with orange cloud if needed.
+2. Remove or change any **other** apex `A`/`AAAA`/`CNAME` that pointed the domain at **Cloudflare Pages** or another host, or only one stack can own the apex.
+3. Wait for propagation; Vercel → **Project → Settings → Domains** should show the domain as valid.
+4. `vercel.json` redirects **`hd2d-closers.vercel.app`** and **`www`** → **`https://hardcoredoortodoorclosers.com`** so the canonical URL is the custom domain.
+
 ### Vercel (optional — `app` subdomain)
 
 - **Project:** `hd2d-closers` (team `solarconnectbpo-creators-projects`). Link locally with `npx vercel link` (creates `.vercel/`, gitignored).
-- **Deploy:** `npm run vercel:deploy` — production is also served on **`https://hardcoredoortodoorclosers.com`** when DNS points at Vercel. `vercel.json` redirects **`www`** → **apex** (canonical). In Vercel → **Domains**, you can set **hardcoredoortodoorclosers.com** as the primary domain for the UI if it is not already.
+- **Deploy:** `npm run vercel:deploy` — production is served on **`https://hardcoredoortodoorclosers.com`** once apex DNS points at Vercel as above. `vercel.json` redirects **`www`** → **apex** (canonical).
 - **Recommended hostname (keeps Cloudflare Pages on the apex):** **`https://app.hardcoredoortodoorclosers.com`** — added on the Vercel project. In **Cloudflare DNS** for `hardcoredoortodoorclosers.com`, create:
   - **Type:** `A`
   - **Name:** `app`

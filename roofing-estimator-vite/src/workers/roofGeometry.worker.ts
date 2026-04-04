@@ -1,9 +1,12 @@
+import type { Feature, Polygon } from "geojson";
 import { computePolygonRoofGeometry, type RoofStructureMode } from "../lib/roofGeometryFromPolygons";
+
+type PolyFeature = Feature<Polygon>;
 
 type AutoCalcRequest = {
   type: "compute";
   requestId: number;
-  polygons: any[];
+  polygons: PolyFeature[];
   roofType: string;
   roofStructure: RoofStructureMode;
   roofPitch: string;

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast as sonnerToast } from "sonner";
 import {
   ChevronDown,
   ChevronUp,
@@ -17,6 +18,7 @@ import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
 import { parseLeadsFromGeoJson } from "../lib/canvassingGeoJson";
 import { fetchStlIntelAtPoint, isInMissouriBbox } from "../lib/canvassingIntel";
+import { parseJsonResponse } from "../lib/readJsonResponse";
 import {
   buildParcelHandoffNotes,
   extractOwnerFromParcel,
@@ -49,39 +51,49 @@ import {
   type PropertyImportPayload,
 } from "../lib/propertyScraper";
 import {
-  PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE,
-  fetchBatchDataPropertyByAddress,
-  nominatimReverseToBatchDataCriteria,
-  parseUsAddressLineForBatchData,
-} from "../lib/propertyBatchDataLookup";
+  nominatimReverseToAddressCriteria,
+  parseUsAddressLineForSearch,
+} from "../lib/propertyAddressCriteria";
+import {
+  getArcgisMapServerTileConfig,
+  hydrateDealMachineCapabilitiesFromHealth,
+  fetchDealMachinePropertyByAddress,
+} from "../lib/propertyDealMachineLookup";
 import {
   buildCriteriaCandidates,
   runOwnerFallbackLookup,
   type OwnerEnrichmentSource,
 } from "../lib/propertyOwnerLookup";
-import {
-  fetchArcgisLayerAsGeoJson,
-  normalizeArcgisFeatureLayerUrl,
-  resolveArcgisApiKey,
-  resolveArcgisFeatureLayerUrl,
-} from "../lib/arcgisFeatureLayer";
-import { fetchParcelAttributesAtPoint, mergeArcgisFeatureSources } from "../lib/arcgisParcelAtPoint";
 import { loadOrgSettings } from "../lib/orgSettings";
-import { loadEmbeddedExplorerScript, type EmbeddedExplorerMapHandle } from "../lib/embeddedExplorer";
-import { getEagleViewEmbeddedAuthToken } from "../lib/eagleViewEmbeddedAuth";
-import { useMapProvider } from "../lib/useMapProvider";
+import { fetchArcgisParcelGeoJsonViaBackend, queryArcgisAtPointViaBackend } from "../lib/arcgisBackendClient";
+import { mergeArcgisFeatureSources } from "../lib/arcgisParcelAtPoint";
+import { fetchUsBuildingFootprintAtPoint, formatBuildingFootprintNotes } from "../lib/esriBuildingFootprint";
+import { fetchOsmBuildingFootprintAtPoint, formatOsmBuildingFootprintNotes } from "../lib/osmBuildingFootprint";
+import {
+  estimateRoofSqFtFromLotSqFtConservative,
+  footprintFeaturePlanAreaSqFt,
+  type BuildingFootprintFeature,
+} from "../lib/geoFootprintMeasure";
 import { Map3D, type Map3DPoint } from "../components/Map3D";
-
-function canvassTagFeature(f: GeoJSON.Feature, extra: Record<string, unknown>): GeoJSON.Feature {
-  const base =
-    f.properties && typeof f.properties === "object" && !Array.isArray(f.properties)
-      ? { ...(f.properties as Record<string, unknown>) }
-      : {};
-  return { ...f, properties: { ...base, ...extra } };
-}
 
 const AUTO_OPEN_ESTIMATE_KEY = "roofing-canvass-auto-open-estimate-v1";
 const REQUIRE_OWNER_INFO_KEY = "roofing-canvass-require-owner-info-v1";
+
+/** Best-effort lot size (ft²) from assessor-style parcel attributes for footprint fallback. */
+function guessLotSqFtFromParcel(parcel: Record<string, unknown> | null): number | null {
+  if (!parcel) return null;
+  const tryNum = (v: unknown) => {
+    const n = Number.parseFloat(String(v ?? ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  for (const k of ["LOT_SQFT", "lot_sqft", "LOT_SIZE_SQFT", "LOTAREA", "LotSqFt", "LOT_SQ_FT"]) {
+    const n = tryNum(parcel[k]);
+    if (n != null && n >= 500 && n <= 2_000_000) return n;
+  }
+  const acres = tryNum(parcel.ACRES ?? parcel.acres ?? parcel.CALC_ACRE);
+  if (acres != null && acres >= 0.01 && acres < 500) return acres * 43560;
+  return null;
+}
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371000;
@@ -94,11 +106,14 @@ function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number)
   return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
+/** ~120m — geocoded pins are often street-center; door-to-door clicks can be farther from the pin. */
+const NEAR_LEAD_MAX_M = 120;
+
 function findNearestLead(
   leads: ContactRecord[],
   lat: number,
   lng: number,
-  maxM = 45,
+  maxM = NEAR_LEAD_MAX_M,
 ): ContactRecord | null {
   let best: ContactRecord | null = null;
   let bestD = Infinity;
@@ -111,6 +126,35 @@ function findNearestLead(
     }
   }
   return best;
+}
+
+/** Match a CSV lead when reverse-geocode text overlaps the lead’s address (same property, pin was off). */
+function findLeadMatchingReverseAddress(displayName: string, leads: ContactRecord[]): ContactRecord | null {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const d = norm(displayName);
+  if (d.length < 12) return null;
+  let best: ContactRecord | null = null;
+  let bestScore = 0;
+  for (const c of leads) {
+    const a = norm([c.address, c.city, c.state, c.zip].filter(Boolean).join(", "));
+    if (a.length < 8) continue;
+    const head = a.slice(0, Math.min(42, a.length));
+    const dhead = d.slice(0, Math.min(48, d.length));
+    let score = 0;
+    if (d.includes(head) || head.includes(dhead.slice(0, Math.min(28, dhead.length)))) score = 3;
+    else {
+      const num = a.match(/^\s*(\d+)/)?.[1];
+      const street = a.replace(/^\s*\d+\s+/, "").split(",")[0]?.trim() ?? "";
+      if (num && street.length > 4 && d.includes(num) && d.includes(street.slice(0, Math.min(18, street.length)))) {
+        score = 2;
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return bestScore >= 2 ? best : null;
 }
 
 function contactToImportBase(c: ContactRecord): PropertyImportPayload {
@@ -137,22 +181,17 @@ const STATUS_RANK: Record<CanvassVisitStatus, number> = {
 };
 
 export function Canvassing() {
-  const mapProvider = useMapProvider();
   const navigate = useNavigate();
-  const mapRef = useRef<HTMLDivElement | null>(null);
-  /** Bumps when the map container DOM node attaches so layout effect can init the viewer reliably. */
-  const [mapContainerEl, setMapContainerEl] = useState<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<EmbeddedExplorerMapHandle | null>(null);
-  const styleLoadedRef = useRef(false);
   const viewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 38.63, lon: -90.2 });
-  const [eeMapReady, setEeMapReady] = useState(false);
-  const [eeContainerId] = useState(() =>
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? `ee-canvass-${crypto.randomUUID().replace(/-/g, "")}`
-      : `ee-canvass-${Date.now()}`,
-  );
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => ({
+    lat: viewCenterRef.current.lat,
+    lng: viewCenterRef.current.lon,
+  }));
   const csvInputRef = useRef<HTMLInputElement | null>(null);
   const geoInputRef = useRef<HTMLInputElement | null>(null);
+  /** Map viewport for bbox-scoped parcel GeoJSON (St. Louis County layer). */
+  const mapBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null);
+  const arcgisSyncDebounceRef = useRef<number | null>(null);
 
   const [leads, setLeads] = useState<ContactRecord[]>(() => loadCanvassLeads());
   const [states, setStates] = useState<Record<string, CanvassLeadState>>(() => loadCanvassStates());
@@ -166,19 +205,14 @@ export function Canvassing() {
   const [parcelIdDisplay, setParcelIdDisplay] = useState("");
   const [stlParcel, setStlParcel] = useState<Record<string, unknown> | null>(null);
   const [lastPayload, setLastPayload] = useState<PropertyImportPayload | null>(null);
+  const [lastBuildingFootprint, setLastBuildingFootprint] = useState<BuildingFootprintFeature | null>(null);
   const [lastOwnerSource, setLastOwnerSource] = useState<OwnerEnrichmentSource>("base");
   const [focusLatLng, setFocusLatLng] = useState<{ lat: number; lng: number } | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const [geoBusy, setGeoBusy] = useState(false);
   const [toast, setToast] = useState("");
-  const [mapInitError, setMapInitError] = useState("");
 
-  const resolveBatchDataKey = useCallback((): string => {
-    const fromStorage = window.localStorage.getItem(PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE)?.trim() || "";
-    if (fromStorage) return fromStorage;
-    return String(import.meta.env.VITE_BATCHDATA_API_KEY ?? "").trim();
-  }, []);
   const [autoOpenEstimate, setAutoOpenEstimate] = useState<boolean>(() => {
     try {
       if (typeof window === "undefined") return true;
@@ -199,6 +233,18 @@ export function Canvassing() {
   });
   const [arcgisBusy, setArcgisBusy] = useState(false);
   const [arcgisHint, setArcgisHint] = useState("");
+  /** GeoJSON from Contacts & settings parcel layer — rendered on the satellite map. */
+  const [arcgisParcelOverlay, setArcgisParcelOverlay] = useState<GeoJSON.FeatureCollection | null>(null);
+  /** USGS/Esri building footprint polygon at the last lookup point (cyan on map). */
+  const [buildingFootprintOverlay, setBuildingFootprintOverlay] = useState<GeoJSON.FeatureCollection | null>(null);
+  /** Optional ArcGIS Server raster overlay (XYZ tiles from Worker /api/health). */
+  const [arcgisMapTile, setArcgisMapTile] = useState<ReturnType<typeof getArcgisMapServerTileConfig> | null>(null);
+
+  useEffect(() => {
+    void hydrateDealMachineCapabilitiesFromHealth().then(() => {
+      setArcgisMapTile(getArcgisMapServerTileConfig());
+    });
+  }, []);
 
   const hasRequiredOwnerInfo = useCallback((payload: PropertyImportPayload | null): boolean => {
     if (!payload) return false;
@@ -239,32 +285,6 @@ export function Canvassing() {
     [leads, selectedId],
   );
 
-  const leadsGeoJson = useMemo(() => {
-    const features = leads
-      .filter((c) => c.lat != null && c.lng != null && Number.isFinite(c.lat) && Number.isFinite(c.lng))
-      .map((c) => {
-        const st = states[c.id]?.status ?? "new";
-        const payloadForComplete = normalizePropertyImportPayloadContacts(
-          enrichment[c.id]?.payload ?? contactToImportBase(c),
-        );
-        const ownerComplete = hasRequiredOwnerInfo(payloadForComplete);
-        return {
-          type: "Feature" as const,
-          properties: {
-            id: c.id,
-            status: st,
-            label: c.name || c.address || "Lead",
-            ownerComplete,
-          },
-          geometry: {
-            type: "Point" as const,
-            coordinates: [c.lng!, c.lat!],
-          },
-        };
-      });
-    return { type: "FeatureCollection" as const, features };
-  }, [leads, states, enrichment, hasRequiredOwnerInfo]);
-
   const setVisitStatus = useCallback((leadId: string, status: CanvassVisitStatus) => {
     setStates((prev) => ({
       ...prev,
@@ -288,12 +308,16 @@ export function Canvassing() {
   }, []);
 
   const openPayloadInEstimator = useCallback(
-    (payload: PropertyImportPayload) => {
+    (payload: PropertyImportPayload, buildingFootprint?: BuildingFootprintFeature | null) => {
       try {
-        stashPendingPropertyImport(payload, { autoEstimate: true, importFootprint: true });
+        stashPendingPropertyImport(
+          payload,
+          { autoEstimate: true, importFootprint: true },
+          buildingFootprint ?? undefined,
+        );
         navigate("/measurement/new?auto=1");
       } catch {
-        window.alert("Could not open measurement — storage blocked.");
+        sonnerToast.error("Could not open measurement — storage blocked.");
       }
     },
     [navigate],
@@ -313,10 +337,13 @@ export function Canvassing() {
       const cached = pref?.id ? enrichmentRef.current[pref.id] : undefined;
       setPanelBusy(true);
       setPanelHint("");
+      if (pref?.id) setSelectedId(pref.id);
+      else setSelectedId(null);
       if (cached) {
         const p = normalizePropertyImportPayloadContacts({ ...cached.payload });
         setLastPayload(p);
         setStlParcel(cached.parcel);
+        setLastBuildingFootprint(cached.buildingFootprint ?? null);
         setOwnerDisplay(p.ownerName || extractOwnerFromParcel(cached.parcel ?? {}));
         setParcelIdDisplay(extractParcelIdFromParcel(cached.parcel ?? {}));
         setAddressLine(p.address || "");
@@ -327,24 +354,36 @@ export function Canvassing() {
         setParcelIdDisplay("");
         setStlParcel(null);
         setLastPayload(null);
+        setLastBuildingFootprint(null);
         setLastOwnerSource("base");
       }
       setFocusLatLng({ lat, lng });
-      setSheetOpen(!autoOpenEstimate);
+      setSheetOpen(true);
       try {
+        setBuildingFootprintOverlay(null);
+        let footprintForStash: BuildingFootprintFeature | null = null;
         const url =
-          "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" +
+          "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=" +
           encodeURIComponent(String(lat)) +
           "&lon=" +
           encodeURIComponent(String(lng));
         const res = await fetch(url, { headers: { Accept: "application/json" } });
         if (!res.ok) throw new Error("Could not resolve address for this point.");
-        const data = (await res.json()) as {
+        const data = await parseJsonResponse<{
           display_name?: string;
           address?: Record<string, string | undefined>;
-        };
+        }>(res, "Nominatim reverse");
         const line = data.display_name?.trim() || "";
         setAddressLine(line);
+
+        let prefForMerge: ContactRecord | null = pref ?? null;
+        if (!prefForMerge?.id && line) {
+          const byAddr = findLeadMatchingReverseAddress(line, leadsRef.current);
+          if (byAddr) {
+            prefForMerge = byAddr;
+            setSelectedId(byAddr.id);
+          }
+        }
 
         let intelParcel: Record<string, unknown> | null = null;
         let ownerSource: OwnerEnrichmentSource = "base";
@@ -356,28 +395,90 @@ export function Canvassing() {
           }
         }
 
-        const orgForArcgis = loadOrgSettings();
-        const arcgisLayerUrl = resolveArcgisFeatureLayerUrl(orgForArcgis.arcgisFeatureLayerUrl);
         let arcgisRestAttrs: Record<string, unknown> | null = null;
-        if (normalizeArcgisFeatureLayerUrl(arcgisLayerUrl)) {
-          const token = resolveArcgisApiKey(orgForArcgis.arcgisApiKey);
-          const restOut = await fetchParcelAttributesAtPoint(arcgisLayerUrl, lat, lng, { token });
-          if (restOut.ok) {
-            arcgisRestAttrs = restOut.attributes;
-          } else if (restOut.reason === "network" || restOut.reason === "api") {
-            setPanelHint((curr) =>
-              curr
-                ? `${curr} ArcGIS parcel query: ${restOut.message ?? restOut.reason}`
-                : `ArcGIS parcel query: ${restOut.message ?? restOut.reason}`,
-            );
-          }
+        const parcelOut = await queryArcgisAtPointViaBackend("parcel", lat, lng);
+        if (parcelOut.ok) {
+          arcgisRestAttrs = parcelOut.attributes;
+        } else if (parcelOut.reason === "network" || parcelOut.reason === "api") {
+          setPanelHint((curr) =>
+            curr
+              ? `${curr} Parcel lookup: ${parcelOut.message ?? parcelOut.reason}`
+              : `Parcel lookup: ${parcelOut.message ?? parcelOut.reason}`,
+          );
         }
 
         const arcgisMerged = mergeArcgisFeatureSources(arcgisFeatureProps, arcgisRestAttrs);
         const mapHitEmpty = !arcgisFeatureProps || Object.keys(arcgisFeatureProps).length === 0;
 
         const parcel = mergeParcelAttributes(intelParcel, arcgisMerged);
-        setStlParcel(parcel);
+        const buildingOut = await fetchUsBuildingFootprintAtPoint(lat, lng);
+        let buildingNotes = "";
+        const buildingFlat: Record<string, unknown> = {};
+        let hadFootprintGeometry = false;
+
+        if (buildingOut.ok && buildingOut.geometry) {
+          const g = buildingOut.geometry;
+          if (g.type === "Polygon" || g.type === "MultiPolygon") {
+            footprintForStash = {
+              type: "Feature",
+              properties: { source: "usgs-building-footprint" },
+              geometry: g,
+            };
+            setBuildingFootprintOverlay({
+              type: "FeatureCollection",
+              features: [footprintForStash],
+            });
+            hadFootprintGeometry = true;
+            buildingNotes =
+              buildingOut.ok && buildingOut.attributes ? formatBuildingFootprintNotes(buildingOut.attributes) : "";
+            if (buildingOut.ok && buildingOut.attributes) {
+              for (const [k, v] of Object.entries(buildingOut.attributes)) {
+                buildingFlat[`BLDG_${k}`] = v;
+              }
+            }
+          }
+        }
+
+        if (!hadFootprintGeometry) {
+          const osmOut = await fetchOsmBuildingFootprintAtPoint(lat, lng);
+          if (osmOut.ok && osmOut.geometry) {
+            const g = osmOut.geometry;
+            if (g.type === "Polygon" || g.type === "MultiPolygon") {
+              footprintForStash = {
+                type: "Feature",
+                properties: { source: "osm-building" },
+                geometry: g,
+              };
+              setBuildingFootprintOverlay({
+                type: "FeatureCollection",
+                features: [footprintForStash],
+              });
+              hadFootprintGeometry = true;
+              buildingNotes = osmOut.attributes
+                ? formatOsmBuildingFootprintNotes(osmOut.attributes)
+                : formatOsmBuildingFootprintNotes({});
+              if (osmOut.attributes) {
+                for (const [k, v] of Object.entries(osmOut.attributes)) {
+                  buildingFlat[`OSM_${k}`] = v;
+                }
+              }
+            }
+          }
+        }
+
+        if (!hadFootprintGeometry) {
+          const lotSq = guessLotSqFtFromParcel(parcel);
+          if (lotSq != null) {
+            const est = estimateRoofSqFtFromLotSqFtConservative(lotSq);
+            if (est) {
+              buildingFlat.EST_roof_sqft_plan = est.midpointSqFt;
+              buildingNotes = buildingNotes ? `${buildingNotes}\n\n${est.note}` : est.note;
+            }
+          }
+        }
+        const parcelForUi =
+          parcel && Object.keys(buildingFlat).length ? { ...parcel, ...buildingFlat } : parcel ?? (Object.keys(buildingFlat).length ? buildingFlat : null);
+        setStlParcel(parcelForUi);
 
         const auto = extractParcelAutoFill(parcel);
         debugLogParcelEnrichment({
@@ -397,8 +498,8 @@ export function Canvassing() {
         const addrPrimary = siteFromParcel || line;
         const st = inferStateCodeFromAddressLine(addrPrimary);
 
-        let base: PropertyImportPayload = pref
-          ? contactToImportBase(pref)
+        let base: PropertyImportPayload = prefForMerge
+          ? contactToImportBase(prefForMerge)
           : emptyPropertyImportPayload("import", {
               address: addrPrimary,
               latitude: String(lat),
@@ -434,108 +535,135 @@ export function Canvassing() {
           yearBuilt: auto.yearBuilt || base.yearBuilt,
           lotSizeSqFt: auto.lotSizeSqFt || base.lotSizeSqFt,
           propertyType: typeHint ? mapPropertyType(typeHint) : base.propertyType,
-          notes: [base.notes, parcelNotes].filter(Boolean).join("\n\n"),
+          notes: [base.notes, parcelNotes, buildingNotes].filter(Boolean).join("\n\n"),
         };
 
-        if (pref) {
+        if (prefForMerge) {
           base = {
             ...base,
-            ownerName: base.ownerName.trim() || pref.name.trim(),
-            ownerPhone: base.ownerPhone.trim() || pref.phone.trim(),
-            ownerEmail: base.ownerEmail.trim() || pref.email.trim(),
-            contactPersonName: base.contactPersonName.trim() || pref.name.trim(),
+            ownerName: base.ownerName.trim() || prefForMerge.name.trim(),
+            ownerPhone: base.ownerPhone.trim() || prefForMerge.phone.trim(),
+            ownerEmail: base.ownerEmail.trim() || prefForMerge.email.trim(),
+            contactPersonName: base.contactPersonName.trim() || prefForMerge.name.trim(),
           };
         }
 
-        const key = resolveBatchDataKey();
-        if (key) {
-          const primary =
-            nominatimReverseToBatchDataCriteria({
-              display_name: data.display_name,
-              address: data.address,
-            }) ?? parseUsAddressLineForBatchData(base.address);
-          const fromBuilder = buildCriteriaCandidates({
+        base = normalizePropertyImportPayloadContacts(base);
+
+        let dealMachineHit = false;
+        const primary =
+          nominatimReverseToAddressCriteria({
+            display_name: data.display_name,
+            address: data.address,
+          }) ?? parseUsAddressLineForSearch(base.address);
+        const fromBuilder = buildCriteriaCandidates({
+          payload: base,
+          nominatimDisplayName: data.display_name,
+          nominatimAddress: data.address,
+          lat,
+          lng,
+        });
+        const toTryDm =
+          fromBuilder.length > 0 ? fromBuilder : primary ? [primary] : [];
+        let lastDmMsg = "";
+        for (const criteria of toTryDm) {
+          const dm = await fetchDealMachinePropertyByAddress(criteria);
+          if (dm.ok) {
+            const p = dm.payload;
+            base = {
+              ...base,
+              ownerName: p.ownerName.trim() || p.ownerPmEntityLabel?.trim() || base.ownerName,
+              ownerPhone: p.ownerPhone.trim() || p.contactPersonPhone.trim() || base.ownerPhone,
+              ownerEmail: p.ownerEmail.trim() || base.ownerEmail,
+              ownerMailingAddress: p.ownerMailingAddress.trim() || base.ownerMailingAddress,
+              areaSqFt: p.areaSqFt.trim() || base.areaSqFt,
+              yearBuilt: p.yearBuilt.trim() || base.yearBuilt,
+              lotSizeSqFt: p.lotSizeSqFt.trim() || base.lotSizeSqFt,
+              ownerEntityType: p.ownerEntityType.trim() || base.ownerEntityType,
+              contactPersonName: p.contactPersonName.trim() || base.contactPersonName,
+              contactPersonPhone: p.contactPersonPhone.trim() || base.contactPersonPhone,
+              ownerPmEntityLabel: p.ownerPmEntityLabel?.trim() || base.ownerPmEntityLabel,
+              notes: [base.notes, p.notes].filter(Boolean).join("\n\n"),
+            };
+            ownerSource = "dealmachine";
+            dealMachineHit = true;
+            break;
+          }
+          lastDmMsg = dm.message;
+        }
+        if (!dealMachineHit && toTryDm.length && lastDmMsg) {
+          setPanelHint((curr) => (curr ? `${curr} Property lookup: ${lastDmMsg}` : `Property lookup: ${lastDmMsg}`));
+        } else if (!dealMachineHit && toTryDm.length === 0) {
+          setPanelHint((curr) =>
+            curr
+              ? `${curr} Could not build a full U.S. street address from this pin — try the building or street front.`
+              : "Could not build a full U.S. street address from this pin — try the building or street front.",
+          );
+        }
+
+        base = normalizePropertyImportPayloadContacts(base);
+
+        const org = loadOrgSettings();
+        const ownerFallbackOff = org.ownerFallbackProvider === "none" && org.ownerFallbackLockedOff;
+        if (!ownerFallbackOff && (!dealMachineHit || !hasRequiredOwnerInfo(base))) {
+          const fb = await runOwnerFallbackLookup(org, {
             payload: base,
             nominatimDisplayName: data.display_name,
             nominatimAddress: data.address,
             lat,
             lng,
           });
-          const toTry =
-            fromBuilder.length > 0 ? fromBuilder : primary ? [primary] : [];
-          let batchDataHit = false;
-          let lastBdMsg = "";
-          for (const criteria of toTry) {
-            const bd = await fetchBatchDataPropertyByAddress(key, criteria);
-            if (bd.ok) {
-              const p = bd.payload;
-              base = {
-                ...base,
-                ownerName: p.ownerName.trim() || p.ownerPmEntityLabel?.trim() || base.ownerName,
-                ownerPhone: p.ownerPhone.trim() || p.contactPersonPhone.trim() || base.ownerPhone,
-                ownerEmail: p.ownerEmail.trim() || base.ownerEmail,
-                ownerMailingAddress: p.ownerMailingAddress.trim() || base.ownerMailingAddress,
-                areaSqFt: p.areaSqFt.trim() || base.areaSqFt,
-                yearBuilt: p.yearBuilt.trim() || base.yearBuilt,
-                lotSizeSqFt: p.lotSizeSqFt.trim() || base.lotSizeSqFt,
-                ownerEntityType: p.ownerEntityType.trim() || base.ownerEntityType,
-                contactPersonName: p.contactPersonName.trim() || base.contactPersonName,
-                contactPersonPhone: p.contactPersonPhone.trim() || base.contactPersonPhone,
-                ownerPmEntityLabel: p.ownerPmEntityLabel?.trim() || base.ownerPmEntityLabel,
-                notes: [base.notes, p.notes].filter(Boolean).join("\n\n"),
-              };
-              ownerSource = "batchdata";
-              batchDataHit = true;
-              break;
+          if (fb.ok) {
+            base = normalizePropertyImportPayloadContacts(fb.payload);
+            if (fb.source === "fallback") ownerSource = "fallback";
+            if (fb.note) {
+              setPanelHint((curr) => (curr ? `${curr} ${fb.note}` : fb.note!));
             }
-            lastBdMsg = bd.message;
-          }
-          if (!batchDataHit && toTry.length && lastBdMsg) {
-            setPanelHint((curr) => (curr ? `${curr} BatchData: ${lastBdMsg}` : `BatchData: ${lastBdMsg}`));
           }
         }
 
         base = normalizePropertyImportPayloadContacts(base);
 
-        if (!hasRequiredOwnerInfo(base)) {
-          const org = loadOrgSettings();
-          const fallback = await runOwnerFallbackLookup(org, key, {
-            payload: base,
-            nominatimDisplayName: data.display_name,
-            nominatimAddress: data.address,
-            lat,
-            lng,
-          });
-          if (fallback.ok) {
-            base = normalizePropertyImportPayloadContacts(fallback.payload);
-            ownerSource = fallback.source;
-            if (fallback.note) {
-              const note = fallback.note;
-              setPanelHint((curr) => (curr ? `${curr} ${note}` : note));
-            }
-          } else if (org.ownerFallbackProvider !== "none") {
-            setPanelHint((curr) =>
-              curr ? `${curr} Fallback: ${fallback.message}` : `Fallback: ${fallback.message}`,
-            );
+        if (footprintForStash) {
+          const gisSq = Math.round(footprintFeaturePlanAreaSqFt(footprintForStash));
+          const existing = Number.parseFloat(String(base.areaSqFt).replace(/,/g, ""));
+          if (!base.areaSqFt.trim() || !Number.isFinite(existing) || existing <= 0) {
+            base = { ...base, areaSqFt: String(gisSq) };
+          } else if (Number.isFinite(existing) && gisSq > 400 && existing > gisSq * 2.5) {
+            base = {
+              ...base,
+              areaSqFt: String(gisSq),
+              notes: [
+                base.notes,
+                `Plan area from GIS building footprint (${gisSq} sf); assessor total/living was ${Math.round(existing)} sf — verify before quoting.`,
+              ]
+                .filter(Boolean)
+                .join("\n\n"),
+            };
           }
         }
-
-        base = normalizePropertyImportPayloadContacts(base);
 
         setOwnerDisplay(base.ownerName || owner);
         setLastPayload(base);
+        setLastBuildingFootprint(footprintForStash);
         setLastOwnerSource(ownerSource);
-        if (pref?.id) {
-          setEnrichment((prev) => mergeCanvassEnrichment(prev, pref.id, { payload: base, parcel }));
+        if (prefForMerge?.id) {
+          setEnrichment((prev) =>
+            mergeCanvassEnrichment(prev, prefForMerge.id, {
+              payload: base,
+              parcel: parcelForUi ?? parcel,
+              buildingFootprint: footprintForStash,
+            }),
+          );
         }
         if (autoOpenEstimate) {
           if (requireOwnerInfoBeforeOpen && !hasRequiredOwnerInfo(base)) {
             setSheetOpen(true);
             setPanelHint(
-              "Owner lock: add owner name plus phone, email, or mailing address before opening Measurement. Add a BatchData API key under Contacts & settings (or enable Owner fallback) to pull owner data from public records when available.",
+              "Add owner name plus phone, email, or mailing address before opening Measurement, or enter owner details manually.",
             );
           } else {
-          openPayloadInEstimator(base);
+            openPayloadInEstimator(base, footprintForStash);
           }
         }
 
@@ -543,30 +671,37 @@ export function Canvassing() {
         const intelHit = intelParcel && Object.keys(intelParcel).length > 0;
         if (fromGis && owner && intelHit) {
           setPanelHint(
-            "Owner and fields use Missouri parcel intel when present; map layer fills any gaps. Always confirm before quoting.",
+            "Owner and fields use regional parcel data when available; the map layer fills gaps. Confirm before quoting.",
           );
         } else if (fromGis && owner) {
           setPanelHint(
             mapHitEmpty && arcgisRestAttrs
-              ? "Owner and property details from ArcGIS REST (point query). Verify before quoting."
-              : "Owner and property details pulled from the map layer you clicked. Verify before quoting.",
+              ? "Owner and property details from the parcel record at this point. Verify before quoting."
+              : "Owner and property details from the map layer you tapped. Verify before quoting.",
           );
         } else if (fromGis && !owner) {
           setPanelHint(
             mapHitEmpty && arcgisRestAttrs
-              ? "ArcGIS REST returned parcel attributes — owner name not in this layer; check assessor or parcel details."
-              : "Map layer attributes loaded — owner name not in this layer; check parcel details.",
+              ? "Parcel attributes found — owner name is not on this layer; check assessor or parcel details."
+              : "Map layer loaded — owner name is not on this layer; check parcel details.",
           );
         } else if (intelHit && owner) {
-          setPanelHint("Missouri parcel intel loaded. Confirm owner and building details on the assessor before quoting.");
+          setPanelHint("Regional parcel record loaded. Confirm owner and building details on the assessor before quoting.");
         } else if (isInMissouriBbox(lat, lng) && !parcel) {
           setPanelHint("No parcel record at this pin — try the building center or a different spot.");
         } else if (!isInMissouriBbox(lat, lng) && !fromGis) {
           setPanelHint(
-            "Owner lookup uses Missouri public parcel layers. Outside MO you still get the map address; verify owner locally.",
+            "Parcel coverage is strongest in Missouri. Elsewhere you still get the map address — verify the owner locally.",
           );
         } else if (!owner) {
           setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");
+        }
+        if (buildingOut.ok && (buildingOut.attributes || buildingOut.geometry)) {
+          setPanelHint((curr) =>
+            curr
+              ? `${curr} Building outline from public map data — shown on the map and in details.`
+              : "Building outline from public map data — shown on the map and in details.",
+          );
         }
       } catch (e) {
         setPanelHint(e instanceof Error ? e.message : "Lookup failed.");
@@ -576,19 +711,18 @@ export function Canvassing() {
           setParcelIdDisplay("");
           setStlParcel(null);
           setLastPayload(null);
+          setLastBuildingFootprint(null);
         }
       } finally {
         setPanelBusy(false);
       }
     },
-    [autoOpenEstimate, hasRequiredOwnerInfo, openPayloadInEstimator, requireOwnerInfoBeforeOpen, resolveBatchDataKey],
+    [autoOpenEstimate, hasRequiredOwnerInfo, openPayloadInEstimator, requireOwnerInfoBeforeOpen],
   );
 
-  const flyTo = useCallback((lat: number, lng: number, zoom = 17.5) => {
-    const map = mapInstanceRef.current;
-    if (!map?.setLonLat) return;
+  const flyTo = useCallback((lat: number, lng: number) => {
     viewCenterRef.current = { lat, lon: lng };
-    map.setLonLat({ lat, lon: lng, z: zoom });
+    setMapCenter({ lat, lng });
   }, []);
 
   const enrichRef = useRef(enrichAtLatLng);
@@ -597,38 +731,40 @@ export function Canvassing() {
   }, [enrichAtLatLng]);
 
   const syncArcgisLayer = useCallback(async () => {
-    const ee = mapInstanceRef.current;
-    if (!ee?.addFeatures || !styleLoadedRef.current) return;
-    const org = loadOrgSettings();
-    const layerUrl = resolveArcgisFeatureLayerUrl(org.arcgisFeatureLayerUrl);
-    const normalized = normalizeArcgisFeatureLayerUrl(layerUrl);
-    try {
-      ee.removeFeatures?.({
-        geoJson: (f) => Boolean((f.properties as Record<string, unknown> | undefined)?.__canvassArcgis),
-      });
-    } catch {
-      /* ignore */
-    }
-    if (!normalized) {
-      setArcgisHint("");
-      return;
-    }
-    const token = resolveArcgisApiKey(org.arcgisApiKey);
     setArcgisBusy(true);
     try {
-      const fc = await fetchArcgisLayerAsGeoJson(layerUrl, { token: token || undefined });
-      if (fc.features.length) {
-        ee.addFeatures({
-          geoJson: fc.features.map((f) => canvassTagFeature(f, { __canvassArcgis: true })),
-        });
+      const bbox = mapBoundsRef.current;
+      const result = await fetchArcgisParcelGeoJsonViaBackend(bbox);
+      if (!result.ok) {
+        setArcgisParcelOverlay(null);
+        setArcgisHint(result.message);
+        return;
       }
-      setArcgisHint(`${fc.features.length} features from ArcGIS`);
-    } catch (e) {
-      setArcgisHint(e instanceof Error ? e.message : "ArcGIS layer failed");
+      const fc = result.data;
+      setArcgisParcelOverlay(fc);
+      setArcgisHint(
+        `${fc.features.length} parcel outlines in this view — tap a boundary for owner details. Outside covered areas, add owner info manually.`,
+      );
     } finally {
       setArcgisBusy(false);
     }
   }, []);
+
+  const scheduleArcgisSync = useCallback(() => {
+    if (arcgisSyncDebounceRef.current != null) window.clearTimeout(arcgisSyncDebounceRef.current);
+    arcgisSyncDebounceRef.current = window.setTimeout(() => {
+      arcgisSyncDebounceRef.current = null;
+      void syncArcgisLayer();
+    }, 400);
+  }, [syncArcgisLayer]);
+
+  const handleMapBounds = useCallback(
+    (b: { west: number; south: number; east: number; north: number }) => {
+      mapBoundsRef.current = b;
+      scheduleArcgisSync();
+    },
+    [scheduleArcgisSync],
+  );
 
   useEffect(() => {
     const onOrg = () => void syncArcgisLayer();
@@ -654,154 +790,6 @@ export function Canvassing() {
       void enrichRef.current(c.lat, c.lon, null, null);
     }
   }, []);
-
-  useLayoutEffect(() => {
-    if (!mapContainerEl || !mapRef.current) return;
-    if (mapInstanceRef.current) return;
-
-    let disposed = false;
-    styleLoadedRef.current = false;
-    setEeMapReady(false);
-    setMapInitError("");
-
-    const run = async () => {
-      try {
-        await loadEmbeddedExplorerScript();
-        if (disposed || !mapRef.current) return;
-        const Ev = window.ev?.EmbeddedExplorer;
-        if (!Ev) {
-          setMapInitError("EagleView Embedded Explorer script failed to load (network or blocker).");
-          return;
-        }
-
-        const el = mapRef.current;
-        el.id = eeContainerId;
-
-        let lat = 38.63;
-        let lon = -90.2;
-        const first = leadsRef.current.find((l) => l.lat != null && l.lng != null);
-        if (first?.lat != null && first.lng != null) {
-          lat = first.lat;
-          lon = first.lng;
-        }
-        viewCenterRef.current = { lat, lon };
-
-        const map = new Ev().mount(eeContainerId, {
-          authToken: await getEagleViewEmbeddedAuthToken(),
-          view: { lonLat: { lon, lat } },
-        }) as EmbeddedExplorerMapHandle;
-
-        mapInstanceRef.current = map;
-
-        let readyOnce = false;
-        const onFeatureClick = (raw: unknown) => {
-          const arr = Array.isArray(raw) ? raw : [];
-          for (const item of arr) {
-            const f = item as GeoJSON.Feature;
-            const props = f?.properties as Record<string, unknown> | undefined;
-            if (props?.["__canvassLead"] != null && props["id"] != null) {
-              const id = String(props["id"]);
-              setSelectedId(id);
-              const lead = leadsRef.current.find((l) => l.id === id);
-              if (lead?.lat != null && lead?.lng != null) {
-                void enrichRef.current(lead.lat, lead.lng, lead, null);
-              }
-              return;
-            }
-          }
-        };
-
-        const onReady = () => {
-          if (disposed || readyOnce) return;
-          readyOnce = true;
-          try {
-            map.enableMeasurementPanel(false);
-            map.enableSearchBar(true);
-          } catch {
-            /* optional widget toggles */
-          }
-          styleLoadedRef.current = true;
-          setEeMapReady(true);
-          setMapInitError("");
-          try {
-            map.on("featureClick", onFeatureClick);
-          } catch {
-            /* ignore */
-          }
-          if (
-            normalizeArcgisFeatureLayerUrl(resolveArcgisFeatureLayerUrl(loadOrgSettings().arcgisFeatureLayerUrl))
-          ) {
-            queueMicrotask(() => {
-              if (!disposed) void syncArcgisLayer();
-            });
-          }
-        };
-
-        map.on("onMapReady", onReady);
-        map.on("onViewUpdate", (u: unknown) => {
-          const v = u as { lonLat?: { lat: number; lon: number } };
-          if (v?.lonLat) viewCenterRef.current = v.lonLat;
-        });
-        map.on("Errors", (err: unknown) => {
-          console.error("EagleView Canvassing:", err);
-          const msg =
-            err && typeof err === "object" && "message" in err && typeof (err as Error).message === "string"
-              ? (err as Error).message
-              : String(err);
-          setMapInitError(msg || "EagleView map error");
-        });
-
-        window.setTimeout(() => {
-          if (disposed || styleLoadedRef.current) return;
-          onReady();
-        }, 2500);
-      } catch (e) {
-        if (!disposed) {
-          setMapInitError(e instanceof Error ? e.message : "Could not start EagleView map.");
-        }
-      }
-    };
-
-    void run();
-
-    return () => {
-      disposed = true;
-      styleLoadedRef.current = false;
-      setEeMapReady(false);
-      try {
-        const m = mapInstanceRef.current;
-        m?.off?.("onMapReady");
-        m?.off?.("onViewUpdate");
-        m?.off?.("Errors");
-        m?.off?.("featureClick");
-      } catch {
-        /* ignore */
-      }
-      mapInstanceRef.current = null;
-      const node = mapRef.current;
-      if (node) {
-        node.innerHTML = "";
-        node.removeAttribute("id");
-      }
-    };
-  }, [mapContainerEl, syncArcgisLayer, eeContainerId]);
-
-  useEffect(() => {
-    const ee = mapInstanceRef.current;
-    if (!ee?.addFeatures || !eeMapReady) return;
-    try {
-      ee.removeFeatures?.({
-        geoJson: (f) => Boolean((f.properties as Record<string, unknown> | undefined)?.__canvassLead),
-      });
-    } catch {
-      /* ignore */
-    }
-    if (leadsGeoJson.features.length) {
-      ee.addFeatures({
-        geoJson: leadsGeoJson.features.map((f) => canvassTagFeature(f, { __canvassLead: true })),
-      });
-    }
-  }, [leadsGeoJson, eeMapReady]);
 
   const goNext = useCallback(() => {
     if (!queue.length) return;
@@ -875,10 +863,10 @@ export function Canvassing() {
     if (!lastPayload) return;
     if (requireOwnerInfoBeforeOpen && !hasRequiredOwnerInfo(lastPayload)) {
       setSheetOpen(true);
-      setPanelHint("Owner lock: add owner name plus phone/email/mailing info before opening Measurement.");
+      setPanelHint("Add owner name plus phone, email, or mailing address before opening Measurement.");
       return;
     }
-    openPayloadInEstimator(lastPayload);
+    openPayloadInEstimator(lastPayload, lastBuildingFootprint);
   };
 
   useEffect(() => {
@@ -905,8 +893,17 @@ export function Canvassing() {
 
   const parcelDetailRows = stlParcel ? parcelRowsForDisplay(stlParcel, 150) : [];
 
+  const contactOwnerPhone = lastPayload?.ownerPhone.trim() ?? "";
+  const contactPersonPhoneDisplay = lastPayload?.contactPersonPhone.trim() ?? "";
+  const contactPrimaryPhone = contactOwnerPhone || contactPersonPhoneDisplay || "—";
+  const contactShowSecondPhone =
+    Boolean(contactOwnerPhone && contactPersonPhoneDisplay && contactOwnerPhone !== contactPersonPhoneDisplay);
+
   return (
-    <div className="relative flex h-[calc(100dvh-3.5rem)] min-h-[calc(100dvh-3.5rem)] w-full shrink-0 flex-col overflow-hidden bg-black lg:h-[100dvh] lg:min-h-[100dvh]">
+    <div
+      data-canvass-route
+      className="relative flex h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))] min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black text-zinc-950 lg:h-[100dvh] lg:min-h-0"
+    >
       <input
         ref={csvInputRef}
         type="file"
@@ -930,92 +927,28 @@ export function Canvassing() {
         }}
       />
 
-      <>
-          <div className="relative min-h-0 w-full flex-1">
-            {mapProvider === "osm-fallback" || mapProvider === "checking" ? (
-              <Map3D
-                center={viewCenterRef.current ? { lat: viewCenterRef.current.lat, lng: viewCenterRef.current.lon } : undefined}
-                zoom={16}
-                pitch={45}
-                bearing={0}
-                height="100%"
-                enableGps
-                style={{ position: "absolute", inset: 0 }}
-                points={leads
-                  .filter((c) => c.lat != null && c.lng != null)
-                  .map((c) => {
-                    const st = states[c.id]?.status ?? "new";
-                    return {
-                      id: c.id,
-                      lat: c.lat!,
-                      lng: c.lng!,
-                      label: c.name || c.address || "Lead",
-                      color: st === "interested" ? "#22c55e" : st === "visited" ? "#3b82f6" : st === "skip" ? "#6b7280" : "#ef4444",
-                    };
-                  }) as Map3DPoint[]}
-                onMapClick={(lat, lng) => {
-                  viewCenterRef.current = { lat, lon: lng };
-                  void enrichAtLatLng(lat, lng, findNearestLead(leads, lat, lng));
-                }}
-                onPointClick={(id) => {
-                  const lead = leads.find((l) => l.id === id);
-                  if (lead) {
-                    setSelectedId(id);
-                    if (lead.lat != null && lead.lng != null) {
-                      void enrichAtLatLng(lead.lat, lead.lng, lead);
-                    }
-                  }
-                }}
-                onMoveEnd={(lat, lng) => {
-                  viewCenterRef.current = { lat, lon: lng };
-                }}
-              />
-            ) : (
-              <>
-                <div
-                  ref={(node) => {
-                    mapRef.current = node;
-                    setMapContainerEl(node);
-                  }}
-                  className="absolute inset-0 z-0 min-h-[240px] w-full"
-                  style={{ height: "100%" }}
-                />
-                {mapInitError ? (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4 text-center">
-                    <div className="max-w-2xl rounded-xl border border-amber-300 bg-amber-50 p-4 text-black shadow-xl">
-                      <h3 className="mb-2 text-base font-semibold">Canvassing map unavailable</h3>
-                      <p className="text-sm">{mapInitError}</p>
-                      <p className="mt-2 text-xs text-black/80">
-                        Update EagleView embedded credentials on backend, restart services, then refresh this page.
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-0">
-            <div className="pointer-events-auto flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white/90 px-3 py-2 backdrop-blur-md">
-              <Button asChild variant="ghost" size="sm" className="text-black hover:bg-gray-100">
+      <div className="canvass-paper shrink-0 flex flex-wrap items-center gap-2 border-b border-gray-200/80 bg-white/98 px-3 py-2.5 shadow-[0_4px_24px_rgba(15,23,42,0.08)] backdrop-blur-md">
+              <Button asChild variant="ghost" size="sm" className="text-zinc-950 hover:bg-gray-100">
                 <Link to="/">← Back</Link>
               </Button>
-              <span className="text-sm font-medium text-black">Canvassing</span>
-              <span className="hidden text-xs text-black sm:inline">Tap a roof or lot — Missouri parcels load public owner data</span>
+              <span className="text-sm font-semibold text-zinc-950">Canvassing</span>
+              <span className="hidden text-xs text-zinc-700 sm:inline">
+                Tap parcel or pin — owner + lead match (120m) — sheet below for door-knock notes
+              </span>
               <div className="ml-auto flex flex-wrap items-center gap-1">
                 {leads.length > 0 ? (
-                  <span className="mr-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-black" title="Emerald = owner + contact ready">
+                  <span className="mr-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-zinc-950" title="Emerald = owner + contact ready">
                     {leads.length} pins
                   </span>
                 ) : null}
-                <span className="hidden text-[11px] text-black/80 sm:inline" title="Route leads with owner + contact show emerald">
+                <span className="hidden text-[11px] text-zinc-950 sm:inline" title="Route leads with owner + contact show emerald">
                   Emerald = ready
                 </span>
                 <Button
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-black hover:bg-gray-100"
+                  className="h-8 w-8 text-zinc-950 hover:bg-gray-100"
                   title="Add leads CSV"
                   onClick={() => csvInputRef.current?.click()}
                 >
@@ -1025,7 +958,7 @@ export function Canvassing() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-black hover:bg-gray-100"
+                  className="h-8 w-8 text-zinc-950 hover:bg-gray-100"
                   title="Add GeoJSON points"
                   onClick={() => geoInputRef.current?.click()}
                 >
@@ -1036,7 +969,7 @@ export function Canvassing() {
                   size="icon"
                   variant="ghost"
                   disabled={geoBusy || !leads.length}
-                  className="h-8 w-8 text-black hover:bg-gray-100"
+                  className="h-8 w-8 text-zinc-950 hover:bg-gray-100"
                   title="Geocode addresses"
                   onClick={() => void runGeocode()}
                 >
@@ -1047,7 +980,7 @@ export function Canvassing() {
                   size="icon"
                   variant="ghost"
                   disabled={!leads.length}
-                  className="h-8 w-8 text-black hover:bg-gray-100"
+                  className="h-8 w-8 text-zinc-950 hover:bg-gray-100"
                   title="Clear pins"
                   onClick={clearList}
                 >
@@ -1058,8 +991,8 @@ export function Canvassing() {
                   size="icon"
                   variant="ghost"
                   disabled={arcgisBusy}
-                  className="h-8 w-8 text-black hover:bg-gray-100"
-                  title="Refresh ArcGIS overlay (Contacts & settings)"
+                  className="h-8 w-8 text-zinc-950 hover:bg-gray-100"
+                  title="Refresh parcel outlines on the map"
                   onClick={() => void syncArcgisLayer()}
                 >
                   <Layers className={`h-4 w-4 ${arcgisBusy ? "opacity-50" : ""}`} />
@@ -1068,29 +1001,107 @@ export function Canvassing() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  className="h-8 text-xs text-black"
+                  className="h-8 text-xs text-zinc-950"
                   title="Run owner/parcel lookup at current map center"
-                  disabled={mapProvider === "eagleview" ? !eeMapReady : false}
                   onClick={() => enrichAtMapCenter()}
                 >
                   Use map center
                 </Button>
               </div>
             </div>
-            {mapInitError ? (
-              <div className="pointer-events-auto border-b border-amber-300 bg-amber-50 px-3 py-2 text-xs text-black backdrop-blur-md">
-                Map blocked: {mapInitError}
-              </div>
-            ) : null}
             {arcgisHint ? (
-              <div className="pointer-events-none border-b border-sky-200 bg-sky-50 px-3 py-1.5 text-center text-[11px] text-black backdrop-blur-md">
-                ArcGIS: {arcgisHint}
+              <div className="shrink-0 border-b border-sky-200 bg-sky-50 px-3 py-1.5 text-center text-[11px] text-zinc-950 backdrop-blur-md">
+                Parcels: {arcgisHint}
               </div>
             ) : null}
+
+          <div className="relative min-h-0 min-w-0 flex-1 p-2 pb-2 sm:p-2.5 sm:pb-2.5">
+            <div className="relative h-full min-h-[12rem] w-full overflow-hidden rounded-2xl border border-zinc-800/85 bg-zinc-950 shadow-[0_12px_48px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.06] [&_.maplibregl-ctrl-top-left]:mt-2 [&_.maplibregl-ctrl-top-left]:ml-2">
+            <Map3D
+              center={mapCenter}
+              zoom={17}
+              pitch={50}
+              bearing={0}
+              height="100%"
+              enableGps
+              parcelOverlay={arcgisParcelOverlay}
+              buildingFootprintOverlay={buildingFootprintOverlay}
+              arcgisServerTileUrl={arcgisMapTile?.url ?? undefined}
+              arcgisServerTileOpacity={arcgisMapTile?.opacity}
+              arcgisServerTileAttribution={arcgisMapTile?.attribution}
+              style={{ position: "absolute", inset: 0 }}
+              points={leads
+                .filter((c) => c.lat != null && c.lng != null)
+                .map((c) => {
+                  const st = states[c.id]?.status ?? "new";
+                  const ownerReady = hasRequiredOwnerInfo(
+                    normalizePropertyImportPayloadContacts(
+                      enrichment[c.id]?.payload ?? contactToImportBase(c),
+                    ),
+                  );
+                  const color = ownerReady
+                    ? "#10b981"
+                    : st === "interested"
+                      ? "#22c55e"
+                      : st === "visited"
+                        ? "#3b82f6"
+                        : st === "skip"
+                          ? "#6b7280"
+                          : "#ef4444";
+                  return {
+                    id: c.id,
+                    lat: c.lat!,
+                    lng: c.lng!,
+                    label: c.name || c.address || "Lead",
+                    color,
+                  };
+                }) as Map3DPoint[]}
+              onMapClick={(lat, lng, parcelHit) => {
+                viewCenterRef.current = { lat, lon: lng };
+                void enrichAtLatLng(lat, lng, findNearestLead(leads, lat, lng), parcelHit ?? null);
+              }}
+              onPointClick={(id) => {
+                const lead = leads.find((l) => l.id === id);
+                if (lead) {
+                  setSelectedId(id);
+                  if (lead.lat != null && lead.lng != null) {
+                    void enrichAtLatLng(lead.lat, lead.lng, lead);
+                  }
+                }
+              }}
+              onMoveEnd={(lat, lng) => {
+                viewCenterRef.current = { lat, lon: lng };
+              }}
+              onBoundsChange={handleMapBounds}
+            />
+            <div className="pointer-events-none absolute bottom-3 left-3 z-[5] max-w-[min(92vw,260px)] rounded-xl border border-white/25 bg-white/[0.94] px-2.5 py-2 text-[10px] leading-snug text-zinc-950 shadow-lg backdrop-blur-sm sm:bottom-4 sm:left-4 sm:text-xs">
+              <div className="font-semibold tracking-wide text-zinc-950">Canvass map</div>
+              <ul className="mt-1.5 space-y-0.5 text-zinc-800">
+                <li className="flex items-start gap-1.5">
+                  <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-sm bg-emerald-500" aria-hidden />
+                  <span>Emerald pin — owner + contact ready for estimate</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-sm bg-red-500" aria-hidden />
+                  <span>Red / blue / gray — route status (new → visited)</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-sm border border-emerald-600 bg-emerald-500/30" aria-hidden />
+                  <span>Green outline — parcel boundary (tap for owner)</span>
+                </li>
+                {arcgisMapTile?.url ? (
+                  <li className="flex items-start gap-1.5 text-zinc-700">
+                    <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-sm bg-amber-400/90" aria-hidden />
+                    <span>Faint overlay — optional reference layer from your organization</span>
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+            </div>
           </div>
 
           {toast ? (
-            <div className="pointer-events-none absolute left-1/2 top-20 z-20 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-black shadow-lg">
+            <div className="canvass-paper pointer-events-none absolute left-1/2 top-20 z-20 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-zinc-950 shadow-lg">
               {toast}
             </div>
           ) : null}
@@ -1098,61 +1109,84 @@ export function Canvassing() {
           {!sheetOpen ? (
             <button
               type="button"
-              className="pointer-events-auto absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm text-black shadow-lg backdrop-blur-md"
+              className="canvass-paper pointer-events-auto absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm text-zinc-950 shadow-lg backdrop-blur-md"
               onClick={() => setSheetOpen(true)}
             >
               Tap a lead pin or Use map center — then load owner &amp; parcel
             </button>
           ) : (
-            <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 max-h-[min(52vh,420px)] overflow-y-auto rounded-t-2xl border border-gray-200/80 bg-white/95 shadow-[0_-8px_32px_rgba(0,0,0,0.12)] backdrop-blur-sm">
-              <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white/95 px-4 py-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-black">
+            <div className="canvass-light-sheet pointer-events-auto absolute inset-x-0 bottom-0 z-20 max-h-[min(56vh,460px)] overflow-y-auto rounded-t-3xl border border-gray-200/90 bg-white pb-[env(safe-area-inset-bottom,0px)] text-zinc-950 shadow-[0_-12px_40px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04]">
+              <div className="flex justify-center pt-2" aria-hidden>
+                <span className="h-1 w-10 rounded-full bg-gray-300/90" />
+              </div>
+              <div className="canvass-sheet-header sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-gradient-to-r from-slate-50 via-white to-white px-4 py-2.5">
+                <span className="text-sm font-semibold uppercase tracking-wide text-zinc-950">
                   {panelBusy ? "Loading…" : "Property"}
                 </span>
                 <button
                   type="button"
-                  className="rounded-full p-1.5 text-black hover:bg-gray-100"
+                  className="rounded-full p-1.5 text-zinc-950 hover:bg-gray-100"
                   aria-label="Close"
                   onClick={() => setSheetOpen(false)}
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="space-y-3 px-4 pb-5 pt-3 text-sm">
-                {panelHint ? <p className="text-xs text-amber-800">{panelHint}</p> : null}
+              <div className="canvass-sheet-body space-y-3.5 px-4 pb-6 pt-3 text-sm text-zinc-950">
+                {panelHint ? <p className="text-xs text-amber-900">{panelHint}</p> : null}
+                <p className="text-[11px] leading-snug text-zinc-950">
+                  Owner and contact fields come from public parcel and map data where available, plus automated property
+                  lookup when we can match a full U.S. address — not generic web search.
+                </p>
                 {focusLatLng ? (
-                  <p className="flex items-center gap-1 text-xs text-black">
+                  <p className="flex items-center gap-1 text-xs text-zinc-950">
                     <Navigation className="h-3.5 w-3.5 shrink-0" />
                     {focusLatLng.lat.toFixed(5)}, {focusLatLng.lng.toFixed(5)}
                   </p>
                 ) : null}
 
                 <div>
-                  <div className="text-xs font-medium text-black">Owner (assessor / map layer)</div>
-                  <div className="text-base font-semibold text-black">{ownerDisplay || "—"}</div>
-                </div>
-                <div
-                  className={[
-                    "rounded-md border px-2.5 py-1.5 text-xs font-medium",
-                    hasRequiredOwnerInfo(lastPayload)
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-rose-200 bg-rose-50 text-rose-800",
-                  ].join(" ")}
-                >
-                  {hasRequiredOwnerInfo(lastPayload)
-                    ? "Owner Ready: owner + contact info complete"
-                    : "Owner Ready: missing owner/contact info"}
+                  <div className="text-xs font-medium text-zinc-950">Owner (assessor / map layer)</div>
+                  <div className="text-base font-semibold text-zinc-950">{ownerDisplay || "—"}</div>
                 </div>
                 {lastPayload ? (
-                  <div className="text-[11px] text-black">
-                    <span className="font-medium text-black">Source: </span>
+                  <div>
+                    <div className="text-xs font-medium text-zinc-950">Contact info</div>
+                    <div className="mt-0.5 space-y-1 text-sm text-zinc-950">
+                      <div>
+                        <span className="text-zinc-600">Phone: </span>
+                        {contactPrimaryPhone}
+                      </div>
+                      {contactShowSecondPhone ? (
+                        <div>
+                          <span className="text-zinc-600">Contact phone: </span>
+                          {contactPersonPhoneDisplay}
+                        </div>
+                      ) : null}
+                      {lastPayload.ownerEmail.trim() ? (
+                        <div>
+                          <span className="text-zinc-600">Email: </span>
+                          {lastPayload.ownerEmail.trim()}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+                {hasRequiredOwnerInfo(lastPayload) ? (
+                  <div className="canvass-lock-hint rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-zinc-950">
+                    Owner ready: name + phone or email on file.
+                  </div>
+                ) : null}
+                {lastPayload ? (
+                  <div className="text-[11px] text-zinc-950">
+                    <span className="font-medium text-zinc-950">Source: </span>
                     {lastOwnerSource === "stl"
-                      ? "STL Parcel Intel"
-                      : lastOwnerSource === "batchdata"
-                        ? "BatchData"
-                        : lastOwnerSource === "fallback"
-                          ? "Fallback Provider"
-                          : "Base map/lead"}
+                      ? "Regional parcel supplement"
+                      : lastOwnerSource === "dealmachine"
+                          ? "Property records lookup"
+                          : lastOwnerSource === "fallback"
+                            ? "Supplemental lookup"
+                            : "Map / lead"}
                   </div>
                 ) : null}
 
@@ -1166,66 +1200,66 @@ export function Canvassing() {
                   lastPayload.contactPersonPhone.trim() ||
                   lastPayload.ownerEntityType.trim() ||
                   (lastPayload.ownerPmEntityLabel ?? "").trim()) ? (
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-black">
-                    <div className="mb-1.5 font-semibold text-black">Auto-filled for estimator</div>
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-zinc-950">
+                    <div className="mb-1.5 font-semibold text-zinc-950">Auto-filled for estimator</div>
                     <ul className="space-y-1">
                       {lastPayload.contactPersonName.trim() ? (
                         <li>
-                          <span className="text-black">Contact person: </span>
+                          <span className="text-zinc-950">Contact person: </span>
                           {lastPayload.contactPersonName}
                         </li>
                       ) : null}
                       {lastPayload.contactPersonPhone.trim() ? (
                         <li>
-                          <span className="text-black">Contact phone: </span>
+                          <span className="text-zinc-950">Contact phone: </span>
                           {lastPayload.contactPersonPhone}
                         </li>
                       ) : null}
                       {(lastPayload.ownerPmEntityLabel ?? "").trim() ? (
                         <li>
-                          <span className="text-black">PM / entity: </span>
+                          <span className="text-zinc-950">PM / entity: </span>
                           {lastPayload.ownerPmEntityLabel}
                         </li>
                       ) : null}
                       {lastPayload.ownerEntityType.trim() ? (
                         <li>
-                          <span className="text-black">Owner type: </span>
+                          <span className="text-zinc-950">Owner type: </span>
                           {lastPayload.ownerEntityType}
                         </li>
                       ) : null}
                       {lastPayload.ownerPhone ? (
                         <li>
-                          <span className="text-black">Phone: </span>
+                          <span className="text-zinc-950">Phone: </span>
                           {lastPayload.ownerPhone}
                         </li>
                       ) : null}
                       {lastPayload.ownerEmail ? (
                         <li>
-                          <span className="text-black">Email: </span>
+                          <span className="text-zinc-950">Email: </span>
                           {lastPayload.ownerEmail}
                         </li>
                       ) : null}
                       {lastPayload.ownerMailingAddress ? (
                         <li>
-                          <span className="text-black">Mailing: </span>
+                          <span className="text-zinc-950">Mailing: </span>
                           {lastPayload.ownerMailingAddress}
                         </li>
                       ) : null}
                       {lastPayload.areaSqFt ? (
                         <li>
-                          <span className="text-black">Area: </span>
+                          <span className="text-zinc-950">Area: </span>
                           {lastPayload.areaSqFt} sq ft
                         </li>
                       ) : null}
                       {lastPayload.yearBuilt ? (
                         <li>
-                          <span className="text-black">Year built: </span>
+                          <span className="text-zinc-950">Year built: </span>
                           {lastPayload.yearBuilt}
                         </li>
                       ) : null}
                       {lastPayload.lotSizeSqFt ? (
                         <li>
-                          <span className="text-black">Lot: </span>
+                          <span className="text-zinc-950">Lot: </span>
                           {lastPayload.lotSizeSqFt} sq ft
                         </li>
                       ) : null}
@@ -1234,28 +1268,28 @@ export function Canvassing() {
                 ) : null}
 
                 {parcelIdDisplay ? (
-                  <div className="text-xs text-black">
-                    <span className="font-medium text-black">Parcel / ID: </span>
+                  <div className="text-xs text-zinc-950">
+                    <span className="font-medium text-zinc-950">Parcel / ID: </span>
                     {parcelIdDisplay}
                   </div>
                 ) : null}
 
                 {addressLine ? (
                   <div>
-                    <div className="text-xs font-medium text-black">Address</div>
-                    <p className="whitespace-pre-wrap text-black">{addressLine}</p>
+                    <div className="text-xs font-medium text-zinc-950">Address</div>
+                    <p className="whitespace-pre-wrap text-zinc-950">{addressLine}</p>
                   </div>
                 ) : null}
 
                 {stlParcel && parcelDetailRows.length > 0 ? (
-                  <details className="rounded-lg border border-gray-100 bg-gray-50/80">
-                    <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-black">
+                  <details className="canvass-parcel-details rounded-lg border border-gray-100 bg-gray-50/80">
+                    <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-950">
                       Tax assessor / parcel attributes
                     </summary>
-                    <ul className="max-h-[min(42vh,360px)] space-y-1 overflow-y-auto px-3 pb-2 text-xs text-black">
+                    <ul className="max-h-[min(42vh,360px)] space-y-1 overflow-y-auto px-3 pb-2 text-xs text-zinc-950">
                       {parcelDetailRows.map((r) => (
                         <li key={r.key}>
-                          <span className="text-black">{r.key}: </span>
+                          <span className="text-zinc-950">{r.key}: </span>
                           {r.value}
                         </li>
                       ))}
@@ -1275,9 +1309,21 @@ export function Canvassing() {
                 ) : null}
 
                 {selectedLead ? (
-                  <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <div className="text-xs font-medium text-black">Route pin</div>
-                    <div className="font-medium text-black">{selectedLead.name || selectedLead.address || "Lead"}</div>
+                  <div className="canvass-route-block rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <div className="text-xs font-medium text-zinc-950">Route pin</div>
+                    <div className="font-medium text-zinc-950">{selectedLead.name || selectedLead.address || "Lead"}</div>
+                    {selectedLead.phone.trim() ? (
+                      <div className="mt-1 text-sm text-zinc-950">
+                        <span className="text-zinc-600">Phone: </span>
+                        {selectedLead.phone.trim()}
+                      </div>
+                    ) : null}
+                    {selectedLead.email.trim() ? (
+                      <div className="text-sm text-zinc-950">
+                        <span className="text-zinc-600">Email: </span>
+                        {selectedLead.email.trim()}
+                      </div>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap gap-1">
                       {(["visited", "skip", "interested", "new"] as const).map((s) => {
                         const active = (states[selectedLead.id]?.status ?? "new") === s;
@@ -1296,7 +1342,7 @@ export function Canvassing() {
                       })}
                     </div>
                     <textarea
-                      className="mt-2 w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-xs"
+                      className="mt-2 w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-zinc-950 placeholder:text-zinc-600 [color-scheme:light]"
                       rows={2}
                       placeholder="Quick note…"
                       value={states[selectedLead.id]?.notes ?? ""}
@@ -1307,14 +1353,15 @@ export function Canvassing() {
 
                 <Button
                   type="button"
-                  className="w-full"
+                  size="lg"
+                  className="w-full gap-2 bg-zinc-900 font-semibold text-white shadow-md hover:bg-zinc-800"
                   disabled={!lastPayload || panelBusy || (requireOwnerInfoBeforeOpen && !hasRequiredOwnerInfo(lastPayload))}
                   onClick={openInEstimator}
                 >
                   <Ruler className="h-4 w-4" />
                   Instant Estimate in Measurement
                 </Button>
-                <label className="flex items-center gap-2 text-xs text-black">
+                <label className="flex items-center gap-2 text-xs text-zinc-950">
                   <input
                     type="checkbox"
                     checked={autoOpenEstimate}
@@ -1322,7 +1369,7 @@ export function Canvassing() {
                   />
                   Auto-open instant estimate when I click a property
                 </label>
-                <label className="flex items-center gap-2 text-xs text-black">
+                <label className="flex items-center gap-2 text-xs text-zinc-950">
                   <input
                     type="checkbox"
                     checked={requireOwnerInfoBeforeOpen}
@@ -1333,7 +1380,6 @@ export function Canvassing() {
               </div>
             </div>
           )}
-      </>
     </div>
   );
 }

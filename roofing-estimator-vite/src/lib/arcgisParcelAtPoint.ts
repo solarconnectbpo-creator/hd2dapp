@@ -3,7 +3,7 @@
  * Use when Mapbox queryRenderedFeatures misses the polygon (click off-line) but the REST API can still hit the parcel.
  *
  * CORS: many *.arcgis.com and county hosts allow browser fetch; some do not. On failure, check DevTools
- * network tab — you may need a same-origin proxy (same pattern as BatchData in production).
+ * network tab — you may need a same-origin proxy (HD2D Worker in production).
  *
  * @see https://developers.arcgis.com/rest/services-reference/enterprise/query-feature-service-layer-.htm
  */
@@ -11,7 +11,7 @@
 import { normalizeArcgisFeatureLayerUrl } from "./arcgisFeatureLayer";
 
 export type ParcelAtPointOutcome =
-  | { ok: true; attributes: Record<string, unknown> }
+  | { ok: true; attributes: Record<string, unknown>; geometry?: GeoJSON.Geometry }
   | { ok: false; reason: "no_layer" | "no_hit" | "network" | "api"; message?: string };
 
 const SPATIAL_RELS = ["esriSpatialRelIntersects", "esriSpatialRelWithin"] as const;
@@ -111,7 +111,22 @@ export async function fetchParcelAttributesAtPoint(
   }
 }
 
-/** Merge map-hit attributes with REST point query; map click wins on key collision. */
+function isNonEmptyScalar(v: unknown): boolean {
+  if (v == null) return false;
+  if (typeof v === "number") return Number.isFinite(v);
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "boolean") return true;
+  return false;
+}
+
+function isOwnerLikeFieldKey(key: string): boolean {
+  return /owner|tax|deed|grantee|taxpayer|mail_name|proprietor|nm_|name_full|holdr|holder/i.test(key);
+}
+
+/**
+ * Merge map-hit attributes with REST point query.
+ * Empty map values no longer wipe non-empty REST fields. When both sides have values, REST wins for owner-like keys (assessor), map wins for site/display fields.
+ */
 export function mergeArcgisFeatureSources(
   fromMap: Record<string, unknown> | null | undefined,
   fromRest: Record<string, unknown> | null | undefined,
@@ -121,5 +136,24 @@ export function mergeArcgisFeatureSources(
   if (!hasMap && !hasRest) return null;
   if (!hasMap) return { ...fromRest! };
   if (!hasRest) return { ...fromMap! };
-  return { ...fromRest, ...fromMap };
+
+  const rest = fromRest!;
+  const map = fromMap!;
+  const keys = new Set([...Object.keys(rest), ...Object.keys(map)]);
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    const rv = rest[k];
+    const mv = map[k];
+    const rOk = isNonEmptyScalar(rv);
+    const mOk = isNonEmptyScalar(mv);
+    if (!rOk && !mOk) {
+      out[k] = mv !== undefined ? mv : rv;
+      continue;
+    }
+    if (rOk && !mOk) out[k] = rv;
+    else if (!rOk && mOk) out[k] = mv;
+    else if (isOwnerLikeFieldKey(k)) out[k] = rv;
+    else out[k] = mv;
+  }
+  return out;
 }

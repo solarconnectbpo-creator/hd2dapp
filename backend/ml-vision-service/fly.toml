@@ -1,0 +1,27 @@
+# Fly.io — SAM + roof vision (Dockerfile.sam bakes in PyTorch + checkpoint).
+#
+# 1) Install CLI: https://fly.io/docs/hands-on/install-flyctl/
+# 2) fly auth login
+# 3) If app name "hd2d-roof-vision" is taken, change `app` below (must be globally unique).
+# 4) fly secrets set SERVICE_SECRET="<long random>"  (same value goes to Worker as ROOF_VISION_SERVICE_SECRET)
+# 5) fly deploy
+# 6) Public URL: https://<app>.fly.dev — set on Worker: ROOF_VISION_SERVICE_URL
+
+app = "hd2d-roof-vision"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile.sam"
+
+[http_service]
+  internal_port = 8090
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+# SAM + PyTorch need substantial RAM; default small Machines will OOM on inference.
+[[vm]]
+  cpus = 2
+  cpu_kind = "shared"
+  memory = "4gb"

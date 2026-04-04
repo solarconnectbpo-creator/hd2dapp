@@ -1,12 +1,13 @@
 {
-  "name": "Roofing Pro",
-  "short_name": "Roofing Pro",
+  "id": "https://hardcoredoortodoorclosers.com/",
+  "name": "HD2D Closers — Roofing Pro",
+  "short_name": "HD2D Closers",
   "description": "Roof measurements, estimates, contracts, and field tools for roofing contractors.",
-  "start_url": "/",
+  "start_url": "https://hardcoredoortodoorclosers.com/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f9fafb",
-  "theme_color": "#f9fafb",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "/favicon.svg",

@@ -1,10 +1,11 @@
 import type { ContactRecord } from "./contactsCsv";
+import { optHttpsUrl } from "./fieldProjectTypes";
 
 export const CONTACTS_STORAGE_KEY = "roofing-estimator-vite-contacts-v1";
 export const ORG_SETTINGS_STORAGE_KEY = "roofing-estimator-vite-org-v1";
 
 export type OrgTemplateProfile = "residential" | "commercial";
-export type OwnerFallbackProvider = "none" | "batchdata-relaxed";
+export type OwnerFallbackProvider = "none" | "dealmachine-relaxed";
 
 export interface OrgSettings {
   companyName: string;
@@ -16,17 +17,14 @@ export interface OrgSettings {
   /** data:image/...;base64,... or empty */
   logoDataUrl: string;
   defaultTemplateProfile: OrgTemplateProfile;
-  /**
-   * ArcGIS Feature layer REST URL through the layer id, e.g.
-   * `https://…/arcgis/rest/services/MyMap/FeatureServer/0` — used as a Mapbox overlay on Canvassing.
-   */
-  arcgisFeatureLayerUrl: string;
-  /** Optional ArcGIS API token / key for private layers (also settable via VITE_ARCGIS_API_KEY). */
-  arcgisApiKey: string;
-  /** Optional non-MO owner/contact fallback provider. */
+  /** Owner/contact fallback when parcel layers omit PII (DealMachine via Worker). */
   ownerFallbackProvider: OwnerFallbackProvider;
-  /** Optional API key specifically for fallback provider; if empty, app falls back to BatchData key. */
+  /** When true, `none` was chosen in settings — do not auto-upgrade to DealMachine relaxed. */
+  ownerFallbackLockedOff?: boolean;
+  /** Reserved for future optional override keys (DealMachine uses Worker secret or app key). */
   ownerFallbackApiKey: string;
+  /** Default GoHighLevel app URL when a field job has no per-project link (https). */
+  ghlBaseUrl: string;
 }
 
 export function defaultOrgSettings(): OrgSettings {
@@ -39,10 +37,9 @@ export function defaultOrgSettings(): OrgSettings {
     contactPhone: "(000) 000-0000",
     logoDataUrl: "",
     defaultTemplateProfile: "residential",
-    arcgisFeatureLayerUrl: "",
-    arcgisApiKey: "",
-    ownerFallbackProvider: "none",
+    ownerFallbackProvider: "dealmachine-relaxed",
     ownerFallbackApiKey: "",
+    ghlBaseUrl: "",
   };
 }
 
@@ -50,8 +47,22 @@ export function loadOrgSettings(): OrgSettings {
   try {
     const raw = window.localStorage.getItem(ORG_SETTINGS_STORAGE_KEY);
     if (!raw) return defaultOrgSettings();
-    const p = JSON.parse(raw) as Partial<OrgSettings>;
-    return { ...defaultOrgSettings(), ...p };
+    const rawObj = JSON.parse(raw) as Record<string, unknown>;
+    delete rawObj.arcgisFeatureLayerUrl;
+    delete rawObj.esriBuildingFootprintLayerUrl;
+    delete rawObj.arcgisApiKey;
+    const p = rawObj as Partial<OrgSettings> & { ownerFallbackProvider?: string };
+    const rawFallback = rawObj.ownerFallbackProvider;
+    if (rawFallback === "batchdata-relaxed") {
+      p.ownerFallbackProvider = "dealmachine-relaxed";
+    }
+    const merged = { ...defaultOrgSettings(), ...p };
+    const lockedOff = Boolean((rawObj as { ownerFallbackLockedOff?: boolean }).ownerFallbackLockedOff);
+    if (merged.ownerFallbackProvider === "none" && !lockedOff) {
+      merged.ownerFallbackProvider = "dealmachine-relaxed";
+    }
+    merged.ghlBaseUrl = optHttpsUrl(merged.ghlBaseUrl ?? "") ?? "";
+    return merged;
   } catch {
     return defaultOrgSettings();
   }
@@ -60,20 +71,6 @@ export function loadOrgSettings(): OrgSettings {
 export function saveOrgSettings(org: OrgSettings): void {
   const r = saveOrgSettingsSafe(org);
   if (!r.ok) throw new Error(r.message);
-}
-
-/**
- * If `VITE_ARCGIS_API_KEY` is set but org storage has no key yet, copy env → localStorage
- * so the token appears under Contacts & settings and survives without re-reading `.env` in some flows.
- * Does not overwrite a key already saved in the browser.
- */
-export function syncArcgisApiKeyFromEnvToOrgIfNeeded(): void {
-  if (typeof window === "undefined") return;
-  const env = import.meta.env.VITE_ARCGIS_API_KEY?.trim();
-  if (!env) return;
-  const org = loadOrgSettings();
-  if (org.arcgisApiKey?.trim()) return;
-  saveOrgSettingsSafe({ ...org, arcgisApiKey: env });
 }
 
 /** Returns an error message when quota exceeded or payload too large. */

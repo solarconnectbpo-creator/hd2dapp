@@ -6,6 +6,7 @@ import {
   type FieldProject,
   MAX_FIELD_PROJECT_PHOTOS,
   normalizeFieldProject,
+  optHttpsUrl,
 } from "../lib/fieldProjectTypes";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
 
@@ -81,10 +82,18 @@ interface RoofingContextType {
   addMeasurement: (measurement: Measurement) => void;
   addEstimate: (estimate: Estimate) => void;
   addContract: (contract: Contract) => void;
-  addFieldProject: (input: { name: string; address?: string; notes?: string }) => FieldProject;
+  addFieldProject: (input: {
+    name: string;
+    address?: string;
+    notes?: string;
+    ghlUrl?: string;
+    ghlEmbedUrl?: string;
+  }) => FieldProject;
   updateFieldProject: (
     id: string,
-    patch: Partial<Pick<FieldProject, "name" | "address" | "notes" | "linkedMeasurementId">>,
+    patch: Partial<
+      Pick<FieldProject, "name" | "address" | "notes" | "linkedMeasurementId" | "ghlUrl" | "ghlEmbedUrl">
+    >,
   ) => void;
   deleteFieldProject: (id: string) => void;
   setFieldProjectPipelineStage: (id: string, stage: FieldPipelineStage) => void;
@@ -235,6 +244,8 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       addContract: (contract: Contract) => setContracts((prev) => [...prev, contract]),
       addFieldProject: (input) => {
         const now = new Date().toISOString();
+        const ghlUrl = input.ghlUrl ? optHttpsUrl(input.ghlUrl.trim()) : undefined;
+        const ghlEmbedUrl = input.ghlEmbedUrl ? optHttpsUrl(input.ghlEmbedUrl.trim()) : undefined;
         const p: FieldProject = {
           id: newFieldProjectId(),
           name: input.name.trim().slice(0, 200),
@@ -245,6 +256,8 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           pipelineStage: "intake",
           photos: [],
           linkedMeasurementId: null,
+          ...(ghlUrl ? { ghlUrl } : {}),
+          ...(ghlEmbedUrl ? { ghlEmbedUrl } : {}),
         };
         setFieldProjects((prev) => [...prev, p]);
         return p;
@@ -266,6 +279,18 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
             }
             if (patch.linkedMeasurementId !== undefined) {
               next = { ...next, linkedMeasurementId: patch.linkedMeasurementId ?? null };
+            }
+            if (patch.ghlUrl !== undefined) {
+              const raw = typeof patch.ghlUrl === "string" ? patch.ghlUrl.trim() : "";
+              const u = raw ? optHttpsUrl(raw) : undefined;
+              next = { ...next, ...(u ? { ghlUrl: u } : {}) };
+              if (!u) delete next.ghlUrl;
+            }
+            if (patch.ghlEmbedUrl !== undefined) {
+              const raw = typeof patch.ghlEmbedUrl === "string" ? patch.ghlEmbedUrl.trim() : "";
+              const u = raw ? optHttpsUrl(raw) : undefined;
+              next = { ...next, ...(u ? { ghlEmbedUrl: u } : {}) };
+              if (!u) delete next.ghlEmbedUrl;
             }
             return next;
           }),

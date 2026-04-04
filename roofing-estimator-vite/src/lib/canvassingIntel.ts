@@ -3,6 +3,7 @@
  */
 
 import { getHd2dApiBase } from "./hd2dApiBase";
+import { readJsonResponseBody } from "./readJsonResponse";
 
 export function getIntelApiBase(): string {
   return getHd2dApiBase();
@@ -33,7 +34,7 @@ export async function fetchStlIntelAtPoint(lat: number, lng: number): Promise<St
       `${base}/api/stl/intel?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`,
     );
     if (!res.ok) return null;
-    const json = (await res.json()) as { data?: { parcel?: Record<string, unknown> | null } };
+    const json = await readJsonResponseBody<{ data?: { parcel?: Record<string, unknown> | null } }>(res);
     return { parcel: json.data?.parcel ?? null };
   } catch {
     return null;

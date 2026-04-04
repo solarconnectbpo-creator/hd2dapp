@@ -52,6 +52,7 @@ export async function handleRoofVisionProxy(
   try {
     upstream = await fetch(target, { method: "POST", headers, body });
   } catch (e) {
+    console.error("[roof-vision] upstream fetch failed", e);
     return new Response(
       JSON.stringify({
         success: false,
@@ -108,6 +109,7 @@ export async function handleRoofSegmentProxy(
   try {
     upstream = await fetch(target, { method: "POST", headers, body });
   } catch (e) {
+    console.error("[roof-segment] upstream fetch failed", e);
     return new Response(
       JSON.stringify({
         success: false,

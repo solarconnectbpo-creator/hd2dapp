@@ -10,10 +10,14 @@ body {
   font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
   background: #000000;
   color: #e7e9ea;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
+  min-width: 0;
 }
 
 /* X-inspired global skin */
@@ -36,6 +40,67 @@ body {
 .bg-gray-50,
 .bg-gray-100 {
   background: var(--x-surface) !important;
+}
+
+/* Canvassing route: Root layout uses text-[#e7e9ea]; reset so overlays/sheet inherit real ink (ghost buttons etc. otherwise stay light). */
+[data-canvass-route] {
+  color: #0f172a;
+}
+
+/* Light surfaces on Canvassing map: real paper + ink. Global .text-black / .bg-white map to --x-* for dark chrome. */
+.canvass-paper,
+.canvass-light-sheet {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+.canvass-paper .text-black,
+.canvass-light-sheet .text-black,
+.canvass-light-sheet.text-black {
+  color: #0f172a !important;
+}
+
+.canvass-light-sheet .border-gray-100,
+.canvass-light-sheet .border-gray-200,
+.canvass-light-sheet .border-gray-300,
+.canvass-light-sheet .border-gray-200\/90 {
+  border-color: #e2e8f0 !important;
+}
+
+.canvass-light-sheet .text-amber-900 {
+  color: #78350f !important;
+}
+
+.canvass-light-sheet .sticky.top-0 {
+  background: linear-gradient(to right, #f8fafc, #ffffff, #ffffff) !important;
+  color: #0f172a !important;
+}
+
+.canvass-light-sheet input,
+.canvass-light-sheet textarea,
+.canvass-light-sheet select {
+  color: #0f172a !important;
+}
+
+.canvass-light-sheet .canvass-parcel-details {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.canvass-light-sheet .canvass-parcel-details summary {
+  color: #0f172a !important;
+}
+
+.canvass-light-sheet .canvass-parcel-details ul li {
+  color: #0f172a !important;
+}
+
+.canvass-light-sheet .canvass-route-block {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 .border,
@@ -65,6 +130,9 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: 18px;
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+  padding-bottom: max(18px, env(safe-area-inset-bottom, 0px));
 }
 
 .app-shell {
@@ -74,8 +142,8 @@ body {
 }
 
 .sidebar {
-  border-right: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border-right: 1px solid var(--x-border);
+  background: var(--x-surface);
   padding: 16px 12px;
   position: sticky;
   top: 0;
@@ -86,11 +154,12 @@ body {
 .sidebar-brand h1 {
   margin: 0;
   font-size: 20px;
+  color: var(--x-text);
 }
 
 .sidebar-brand p {
   margin: 6px 0 0;
-  color: #000000;
+  color: var(--x-muted);
   font-size: 13px;
 }
 
@@ -107,11 +176,12 @@ body {
 .top h1 {
   margin: 0 0 6px;
   font-size: 30px;
+  color: var(--x-text);
 }
 
 .top p {
   margin: 0;
-  color: #000000;
+  color: var(--x-muted);
 }
 
 .grid2 {
@@ -134,7 +204,9 @@ body {
 .panel h2 {
   margin: 0 0 10px;
   font-size: 18px;
+  color: var(--x-text);
 }
+
 
 .form-grid {
   display: grid;
@@ -147,7 +219,16 @@ label {
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
-  color: #000000;
+  color: var(--x-text);
+}
+
+.auth-page label {
+  color: var(--x-text);
+}
+
+/* Auth screens use rectangular fields; global input uses pill radius */
+.auth-page input.auth-input {
+  border-radius: 0.5rem;
 }
 
 input,
@@ -175,7 +256,7 @@ textarea {
 
 .damage-wrap p {
   margin: 0 0 8px;
-  color: #000000;
+  color: var(--x-text);
 }
 
 .damage-grid {
@@ -301,16 +382,18 @@ textarea {
 
 .tile span {
   font-size: 12px;
-  color: #000000;
+  color: var(--x-muted);
 }
 
 .tile strong {
   font-size: 14px;
+  color: var(--x-text);
 }
 
 h3 {
   margin: 14px 0 8px;
   font-size: 16px;
+  color: var(--x-text);
 }
 
 ul {
@@ -318,8 +401,21 @@ ul {
   padding-left: 18px;
 }
 
-.muted {
-  color: #000000;
+
+/* Roof measurement map: usable height on phones; Map3D fills this box. */
+.measurement-map-shell {
+  width: 100%;
+  height: min(70vh, 620px);
+  min-height: 280px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--x-border);
+}
+
+@media (max-width: 480px) {
+  .measurement-map-shell {
+    height: min(56vh, 520px);
+  }
 }
 
 .line-legend {
@@ -354,7 +450,7 @@ ul {
 
 .legend-item strong {
   margin-left: 4px;
-  color: #000000;
+  color: var(--x-text);
 }
 
 .legend-swatch {
@@ -379,12 +475,12 @@ ul {
 .line-measurements-table th,
 .line-measurements-table td {
   padding: 6px 10px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--x-border);
   text-align: left;
 }
 
 .line-measurements-table th {
-  color: #000000;
+  color: var(--x-muted);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
@@ -392,7 +488,7 @@ ul {
 }
 
 .line-measurements-table td {
-  color: #000000;
+  color: var(--x-text);
 }
 
 .line-measurements-table td .legend-swatch {
@@ -407,7 +503,7 @@ ul {
 }
 
 .line-measurements-table .row-active td {
-  background: #f3f4f6;
+  background: rgba(29, 155, 240, 0.12);
 }
 
 .auto-calc-row {
@@ -677,4 +773,63 @@ ul {
   .result-hero-value {
     font-size: 28px;
   }
+}
+
+@media (max-width: 640px) {
+  .app {
+    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .top h1 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+}
+
+/*
+ * Canvassing bottom sheet — must be last in this file so it wins over Tailwind @layer utilities
+ * and survives Vercel/minified CSS ordering (fixes white “PROPERTY” / cream box text).
+ */
+html body #root .canvass-light-sheet,
+html body #root .canvass-light-sheet .canvass-sheet-header,
+html body #root .canvass-light-sheet .canvass-sheet-header button,
+html body #root .canvass-light-sheet .canvass-sheet-header span,
+html body #root .canvass-light-sheet .canvass-sheet-header svg,
+html body #root .canvass-light-sheet .canvass-sheet-body,
+html body #root .canvass-light-sheet .canvass-sheet-body label,
+html body #root .canvass-light-sheet .canvass-sheet-body li,
+html body #root .canvass-light-sheet .canvass-sheet-body summary,
+html body #root .canvass-light-sheet .canvass-lock-hint {
+  color: #0f172a !important;
+}
+
+html body #root .canvass-light-sheet .canvass-sheet-body p:not(.text-amber-900),
+html body #root .canvass-light-sheet .canvass-sheet-body span:not(.text-amber-900) {
+  color: #0f172a !important;
+}
+
+html body #root .canvass-light-sheet p.text-amber-900 {
+  color: #78350f !important;
+}
+
+html body #root .canvass-light-sheet input::placeholder,
+html body #root .canvass-light-sheet textarea::placeholder {
+  color: #52525b !important;
+  opacity: 1 !important;
+}
+
+html body #root .canvass-light-sheet button.bg-zinc-900,
+html body #root .canvass-light-sheet button.bg-zinc-900 svg {
+  color: #fafafa !important;
+}
+
+html body #root .canvass-paper {
+  color: #0f172a !important;
 }

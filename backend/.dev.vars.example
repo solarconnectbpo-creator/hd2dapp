@@ -16,8 +16,42 @@
 # Optional auth overrides for login endpoint (defaults use demo credentials):
 # AUTH_ADMIN_EMAIL=admin@hardcoredoortodoorclosers.com
 # AUTH_ADMIN_PASSWORD=AdminTest123!
+# AUTH_ADMIN_NAME=Admin
 # AUTH_COMPANY_EMAIL=test.company@hardcoredoortodoorclosers.com
 # AUTH_COMPANY_PASSWORD=TestCompany123!
 # AUTH_REP_EMAIL=test.rep@hardcoredoortodoorclosers.com
 # AUTH_REP_PASSWORD=TestRep123!
 # SESSION_SECRET=change-me
+
+# ML vision — Worker proxies /api/ai/roof-vision + /api/ai/roof-segment → ml-vision-service (see backend/ml-vision-service/README.md).
+# Same-origin app flow: Vite `/intel-proxy` → Worker → ROOF_VISION_SERVICE_URL (local default: http://127.0.0.1:18090).
+# One terminal (from roofing-estimator-vite): npm run dev:full:vision  (Worker + vision + Vite).
+# Copy the same secret string into ml-vision-service/.env as SERVICE_SECRET=...
+# ROOF_VISION_SERVICE_URL=http://127.0.0.1:18090
+# ROOF_VISION_SERVICE_SECRET=hd2d-local-dev-roof-vision-secret
+# Windows: if the port is busy (10048), stop the other process or set VISION_DEV_PORT and match ROOF_VISION_SERVICE_URL.
+
+# --- DealMachine (Canvassing owner enrichment + Property records) ---
+# Recommended for full Canvassing: uncomment DEALMACHINE_API_KEY (SPA defaults to DealMachine relaxed fallback in Contacts settings).
+# Required for POST /api/dealmachine/property. Get key: DealMachine app → Application Settings → API.
+# Never put this in roofing-estimator-vite — only Worker secrets or this file for local wrangler dev.
+# DEALMACHINE_API_KEY=
+# Optional (defaults match dealmachineProxy.ts — only if DealMachine docs differ for your account):
+# DEALMACHINE_API_BASE=https://public-api.dealmachine.com
+# DEALMACHINE_PROPERTY_PATH=/v1/properties/search
+# DEALMACHINE_AUTH_MODE=client_key
+
+# ArcGIS parcel layer (Canvassing — GeoJSON overlay + query-at-point). Default: St. Louis County assessor parcels (public).
+# Same value is in wrangler.toml [vars]; uncomment to override locally or use another county FeatureServer …/FeatureServer/N URL.
+# If the var is missing/blank, the Worker uses the same STL default (see arcgisParcelEnv.ts).
+# ARCGIS_FEATURE_LAYER_URL=https://services6.arcgis.com/evmyRZRrsopdeog7/arcgis/rest/services/AssessorsParcels/FeatureServer/0
+# ARCGIS_FEATURE_LAYER_URL=__DISABLE_ARCGIS_PARCEL__   # advanced: turn off parcel layer entirely
+# Optional: override City of St. Louis parcel MapServer layer (default: maps8 assessor Parcels/11). Independent city is not in STL County parcels.
+# ARCGIS_STL_CITY_PARCEL_LAYER_URL=https://maps8.stlouis-mo.gov/arcgis/rest/services/ASSESSOR/Assessor_Public_Parcels/MapServer/11
+# ARCGIS_STL_CITY_PARCEL_LAYER_URL=__DISABLE_STL_CITY_PARCEL__   # skip city merge / point fallback
+# ARCGIS_API_TOKEN=   # only if your layer requires a token
+
+# Optional ArcGIS MapServer / ImageServer cached tiles for Canvassing (slippy XYZ; exposed in GET /api/health, no secrets in URL):
+# ARCGIS_MAPSERVER_TILE_URL=https://your-host/arcgis/rest/services/YourMap/MapServer/tile/{z}/{y}/{x}
+# ARCGIS_MAPSERVER_TILE_ATTRIBUTION=County GIS
+# ARCGIS_MAPSERVER_TILE_OPACITY=0.55

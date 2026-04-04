@@ -1,70 +1,87 @@
-import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
+import { type FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { AuthDivider } from "../components/auth/AuthDivider";
+import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
+import { AUTH_FIELD_CLASS, AUTH_SIGNUP_CTA } from "../components/auth/authFieldStyles";
+import { PasswordField } from "../components/auth/PasswordField";
 import { useAuth } from "../context/AuthContext";
 
 export function Login() {
-  const { isAuthenticated, login } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { from?: string } };
-  const [email, setEmail] = useState("admin@hardcoredoortodoorclosers.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  const submit = async (e: React.FormEvent) => {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError("");
+    setError(null);
     setBusy(true);
     try {
       await login(email.trim(), password);
-      const target = location.state?.from || "/";
-      navigate(target, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      navigate("/", { replace: true });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
     } finally {
       setBusy(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-[#000000] text-[#e7e9ea] flex items-center justify-center p-4">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-md rounded-2xl border border-[#2f3336] bg-[#0f1419] p-6 space-y-4"
-      >
-        <div>
-          <h1 className="text-xl font-semibold">Sign in</h1>
-          <p className="text-sm text-[#71767b]">Use your HD2D account credentials.</p>
-        </div>
-        <label className="block">
-          <span className="text-sm text-[#9aa0a6]">Email</span>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm text-[#9aa0a6]">Password</span>
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
+    <AuthScreenLayout
+      tagline={
+        <>
+          Sign in to access canvassing, storm intel, and roofing estimates — built for reps in the field.
+        </>
+      }
+    >
+      <div className="rounded-2xl border border-[#2f3336] bg-[#16181c]/90 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-md">
+        <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Sign in</h1>
+        <p className="mb-6 text-center text-sm text-[#71767b]">Use your HD2D Closers account</p>
+        <p className="-mt-4 mb-6 text-center">
+          <Link
+            to="/admin/login"
+            className="text-sm font-medium text-[#71767b] underline-offset-2 hover:text-[#1d9bf0] hover:underline"
+          >
+            Admin sign in
+          </Link>
+        </p>
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-[#e7e9ea]">Email</span>
+            <input
+              className={AUTH_FIELD_CLASS}
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
+          <PasswordField
+            label="Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
+            autoComplete="current-password"
           />
-        </label>
-        {error ? <p className="text-sm text-[#f4212e]">{error}</p> : null}
-        <button type="submit" className="run-btn w-full" disabled={busy}>
-          {busy ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
-    </div>
+          {error ? (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-3 pt-1">
+            <button type="submit" className="run-btn w-full min-h-[48px]" disabled={busy}>
+              {busy ? "Signing in..." : "Sign in"}
+            </button>
+            <AuthDivider label="New here?" />
+            <Link to="/signup" className={AUTH_SIGNUP_CTA}>
+              Sign up
+            </Link>
+          </div>
+        </form>
+      </div>
+    </AuthScreenLayout>
   );
 }

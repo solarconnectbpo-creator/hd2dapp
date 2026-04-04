@@ -1,0 +1,33 @@
+# SAM-enabled image for click-to-trace (/v1/roof-vision/segment-at-point).
+# CPU PyTorch (~large image). For GPU, build a custom base with CUDA wheels.
+#
+#   docker build -f Dockerfile.sam -t hd2d-roof-vision-sam .
+#   docker run -p 8090:8090 -e SERVICE_SECRET=your-secret hd2d-roof-vision-sam
+#
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+  && pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+  && pip install --no-cache-dir -r requirements.txt \
+  && pip install --no-cache-dir git+https://github.com/facebookresearch/segment-anything.git
+
+# ViT-B checkpoint (~375 MB) — same as README / segmentation_sam.py
+RUN curl -fsSL -o /app/sam_vit_b_01ec64.pth \
+  https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+
+COPY app ./app
+
+ENV HOST=0.0.0.0
+ENV PORT=8090
+ENV SAM_CHECKPOINT_PATH=/app/sam_vit_b_01ec64.pth
+ENV SAM_MODEL_TYPE=vit_b
+
+EXPOSE 8090
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8090"]

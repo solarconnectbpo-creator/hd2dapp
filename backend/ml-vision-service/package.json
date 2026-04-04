@@ -1,0 +1,9 @@
+{
+  "name": "@hd2d/ml-vision-service",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/run-dev.mjs",
+    "download-sam": "curl.exe -fsSL -o sam_vit_b_01ec64.pth https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+    "deploy:fly": "fly deploy"
+  }
+}

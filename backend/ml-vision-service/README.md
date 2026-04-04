@@ -87,12 +87,64 @@ Deploy to **Cloud Run**, **Fly.io**, **Railway**, **ECS**, etc. Use HTTPS in pro
 ## Wire Cloudflare Worker → this service
 
 1. Deploy the container and note the **public base URL** (e.g. `https://roof-vision-xxxxx.run.app`).
-2. Set Worker secrets (or `wrangler.toml` vars for dev):
+2. Set Worker secrets (or `backend/.dev.vars` for local `wrangler dev`):
 
-   - `ROOF_VISION_SERVICE_URL` = that base URL (no trailing slash)
-   - `ROOF_VISION_SERVICE_SECRET` = optional; must match `SERVICE_SECRET` in Python `.env`
+   - `ROOF_VISION_SERVICE_URL` = that base URL (**no trailing slash**)
+   - `ROOF_VISION_SERVICE_SECRET` = optional; if set on the Worker, it must match **`SERVICE_SECRET`** in this service’s `.env` / container (sent as header `X-HD2D-Secret`)
 
-3. The app calls **`POST /api/ai/roof-vision`** on your Worker; the Worker proxies to `/v1/roof-vision/infer`.
+3. The app calls the Worker, which proxies:
+   - **`POST /api/ai/roof-vision`** → `/v1/roof-vision/infer`
+   - **`POST /api/ai/roof-segment`** → `/v1/roof-vision/segment-at-point` (SAM click-to-trace)
+
+Use the **same** `hd2d-backend` worker you already deploy (see `backend/wrangler.toml`). For `wrangler secret put`, use the **top-level** worker unless you intentionally use `[env.production]`.
+
+### SAM auto-trace (`/api/ai/roof-segment`)
+
+1. **Checkpoint:** download [sam_vit_b_01ec64.pth](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth) (~375 MB).
+2. **Local:** install PyTorch + Segment Anything (see comments in `requirements.txt`), then in `.env`:
+
+   ```env
+   SAM_CHECKPOINT_PATH=C:/path/to/sam_vit_b_01ec64.pth
+   SAM_MODEL_TYPE=vit_b
+   ```
+
+3. **Docker (production-friendly):** from this directory:
+
+   ```bash
+   docker build -f Dockerfile.sam -t hd2d-roof-vision-sam .
+   docker run -p 8090:8090 --env-file .env hd2d-roof-vision-sam
+   ```
+
+   The image sets `SAM_CHECKPOINT_PATH` to the baked-in checkpoint. Set `SERVICE_SECRET` in `.env` when running the container, and the same value as `ROOF_VISION_SERVICE_SECRET` on the Worker.
+
+4. Deploy the image to **Fly.io**, **Cloud Run**, **Railway**, **ECS**, etc., then set **`ROOF_VISION_SERVICE_URL`** on the Worker to that **HTTPS** origin.
+
+### Fly.io (recommended — `fly.toml` + `Dockerfile.sam`)
+
+1. Install [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) and run `fly auth login`.
+2. Edit **`fly.toml`** and set `app = "..."` to a **globally unique** name (or create the app first: `fly apps create <name>`).
+3. From **`backend/ml-vision-service`**:
+
+   ```bash
+   fly secrets set SERVICE_SECRET="<long-random-string>"
+   fly deploy
+   ```
+
+   The build downloads the SAM checkpoint inside the image (no local `.pth` required). First deploy can take several minutes.
+
+4. Confirm: `curl https://<your-app>.fly.dev/health` → `{"ok":true,...}`.
+
+5. Point the Worker at Fly (from **`backend/`**):
+
+   ```powershell
+   npm run worker:set-roof-vision -- -BaseUrl "https://<your-app>.fly.dev" -SharedSecret "<same-as-SERVICE_SECRET>"
+   ```
+
+   Or manually: `npx wrangler secret put ROOF_VISION_SERVICE_URL` (paste base URL, no trailing slash), then `npx wrangler secret put ROOF_VISION_SERVICE_SECRET` if you use a shared secret.
+
+6. Deploy the Worker: `npm run deploy` in **`backend/`**.
+
+If inference runs out of memory on a small Fly VM, scale up in the Fly dashboard or `fly scale memory 4096` (SAM + PyTorch are heavy on CPU).
 
 ## Managed vision API (`http_json`)
 

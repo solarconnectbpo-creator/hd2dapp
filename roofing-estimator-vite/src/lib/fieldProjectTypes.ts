@@ -46,6 +46,10 @@ export interface FieldProject {
   pipelineStage: FieldPipelineStage;
   photos: DamagePhoto[];
   linkedMeasurementId?: string | null;
+  /** Deep link to opportunity/contact/board in GoHighLevel (https only). */
+  ghlUrl?: string;
+  /** Optional separate URL for iframe embed; if unset, embed is not suggested when only ghlUrl is set. */
+  ghlEmbedUrl?: string;
 }
 
 export const MAX_FIELD_PROJECT_PHOTOS = 24;
@@ -55,6 +59,22 @@ function optString(v: unknown, max: number): string | undefined {
   const t = v.trim();
   if (!t) return undefined;
   return t.slice(0, max);
+}
+
+const MAX_GHL_URL = 2048;
+
+/** Accept only https URLs for GHL fields (avoids javascript: and mixed-content issues). */
+export function optHttpsUrl(v: unknown, max = MAX_GHL_URL): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim().slice(0, max);
+  if (!t) return undefined;
+  try {
+    const u = new URL(t);
+    if (u.protocol !== "https:") return undefined;
+    return t;
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeAiSummary(raw: unknown): DamagePhotoAiSummary | undefined {
@@ -117,6 +137,9 @@ export function normalizeFieldProject(raw: Record<string, unknown>): FieldProjec
         ? raw.linkedMeasurementId
         : null;
 
+  const ghlUrl = optHttpsUrl(raw.ghlUrl);
+  const ghlEmbedUrl = optHttpsUrl(raw.ghlEmbedUrl);
+
   return {
     id,
     name: name.slice(0, 200),
@@ -127,6 +150,8 @@ export function normalizeFieldProject(raw: Record<string, unknown>): FieldProjec
     pipelineStage,
     photos: photos.slice(0, MAX_FIELD_PROJECT_PHOTOS),
     linkedMeasurementId: linked,
+    ...(ghlUrl ? { ghlUrl } : {}),
+    ...(ghlEmbedUrl ? { ghlEmbedUrl } : {}),
   };
 }
 

@@ -205,9 +205,9 @@ export function ContactsSettings() {
   );
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="mx-auto max-w-5xl px-4 py-4 sm:p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-3xl mb-2 text-black">Contacts &amp; settings</h1>
+        <h1 className="mb-2 text-2xl text-black sm:text-3xl">Contacts &amp; settings</h1>
         <p className="text-black">
           Upload a contact list (CSV), set company branding and report defaults. Everything is stored locally in your
           browser.
@@ -271,6 +271,20 @@ export function ContactsSettings() {
                   onChange={(e) => setOrg((o) => ({ ...o, companyWebsite: e.target.value }))}
                 />
               </label>
+              <label className="text-sm md:col-span-2">
+                <span className="text-black block mb-1">GoHighLevel base URL (optional)</span>
+                <input
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="https://app.gohighlevel.com/…"
+                  value={org.ghlBaseUrl}
+                  onChange={(e) => setOrg((o) => ({ ...o, ghlBaseUrl: e.target.value }))}
+                />
+                <span className="mt-1 block text-xs text-gray-600 leading-relaxed">
+                  Used for <strong className="text-black">Open in GHL</strong> on field jobs that do not have their own
+                  link. Must be <code className="text-xs">https://</code>. API keys stay in GHL; this app only stores
+                  URLs.
+                </span>
+              </label>
               <label className="text-sm">
                 <span className="text-black block mb-1">Estimator email</span>
                 <input
@@ -300,6 +314,10 @@ export function ContactsSettings() {
                   <option value="commercial">Commercial</option>
                 </select>
               </label>
+              <p className="text-xs text-gray-600 md:col-span-2 leading-relaxed">
+                <strong className="text-black">Canvassing:</strong> Owner and parcel details are filled from map and
+                property data your organization enables on the server — not from keys typed into this browser app.
+              </p>
             </div>
             <div>
               <span className="text-black text-sm block mb-2">Logo (PNG/JPG, shown on proposals)</span>
@@ -373,48 +391,13 @@ export function ContactsSettings() {
             <div className="border-t border-gray-100 pt-6">
               <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-black">
                 <Layers className="h-4 w-4 text-black" />
-                Canvassing map — ArcGIS overlay
+                Canvassing map — parcel layers
               </h3>
               <p className="mb-4 text-xs text-black">
-                Draw public (or secured) <strong>Feature Server</strong> polygons/lines on the satellite map. Paste the
-                layer URL through <code className="rounded bg-gray-100 px-1">/FeatureServer/&lt;id&gt;</code> (no{" "}
-                <code className="rounded bg-gray-100 px-1">/query</code>). Optional token for private portals. Env
-                overrides: <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_FEATURE_LAYER_URL</code>,{" "}
-                <code className="rounded bg-gray-100 px-1">VITE_ARCGIS_API_KEY</code>. Canvassing also runs an
-                ArcGIS REST <strong>point-in-parcel</strong> query on the same layer so owner fields can load even when
-                you click off the drawn polygon. Some county servers block browser CORS from localhost — use a public
-                layer on <code className="rounded bg-gray-100 px-1">arcgis.com</code> or deploy behind a same-origin
-                proxy if needed.
+                Parcel outlines, optional reference imagery, and building footprints are configured on your HD2D backend
+                (not in this browser). Your administrator can adjust coverage and credentials in the server environment.
+                The map loads data through your signed-in session.
               </p>
-              <div className="space-y-3">
-                <label className="text-sm block">
-                  <span className="text-black mb-1 block">Feature layer URL</span>
-                  <input
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs"
-                    placeholder="https://services.arcgis.com/.../FeatureServer/0"
-                    value={org.arcgisFeatureLayerUrl}
-                    onChange={(e) => setOrg((o) => ({ ...o, arcgisFeatureLayerUrl: e.target.value }))}
-                  />
-                </label>
-                <label className="text-sm block">
-                  <span className="text-black mb-1 block">API key / token (optional)</span>
-                  {import.meta.env.VITE_ARCGIS_API_KEY ? (
-                    <p className="mb-2 text-xs text-emerald-800">
-                      <strong>Saved for this app:</strong> <code className="rounded bg-emerald-50 px-1">VITE_ARCGIS_API_KEY</code> is set
-                      in <code className="rounded bg-emerald-50 px-1">.env.local</code> and is copied into browser storage here on first
-                      load (if this field was empty). Restart the dev server after changing the env file.
-                    </p>
-                  ) : null}
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="If the service requires authentication"
-                    value={org.arcgisApiKey}
-                    onChange={(e) => setOrg((o) => ({ ...o, arcgisApiKey: e.target.value }))}
-                  />
-                </label>
-              </div>
             </div>
 
             <Button onClick={persistOrg}>
@@ -513,7 +496,11 @@ export function ContactsSettings() {
                         >
                           <td className="p-2">
                             <div className="font-medium text-black">{c.name || "—"}</div>
-                            <div className="text-black text-xs">{c.email || c.phone || ""}</div>
+                            <div className="space-y-0.5 text-xs text-black">
+                              {c.email.trim() ? <div>{c.email.trim()}</div> : null}
+                              {c.phone.trim() ? <div>{c.phone.trim()}</div> : null}
+                              {!c.email.trim() && !c.phone.trim() ? <div className="text-gray-500">—</div> : null}
+                            </div>
                           </td>
                           <td className="p-2 text-black">
                             {[c.address, c.city, c.state].filter(Boolean).join(", ") || "—"}

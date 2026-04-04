@@ -1,0 +1,377 @@
+import { verifyPassword } from "../auth/password";
+import { signAuthPayload, verifyAuthToken, type AuthUser } from "../auth/token";
+import { isValidEmail, normalizeDisplayName } from "../auth/validation";
+import {
+  ensureDbUserFromEnvLogin,
+  findUserByEmail,
+  findUserById,
+  insertUser,
+  rowToAuthUser,
+} from "../auth/userDb";
+
+export type AuthEnv = {
+  DB: any;
+  SESSION_SECRET?: string;
+  AUTH_ADMIN_EMAIL?: string;
+  AUTH_ADMIN_PASSWORD?: string;
+  /** Display name for the env-based admin user (default "Admin"). */
+  AUTH_ADMIN_NAME?: string;
+  AUTH_COMPANY_EMAIL?: string;
+  AUTH_COMPANY_PASSWORD?: string;
+  AUTH_REP_EMAIL?: string;
+  AUTH_REP_PASSWORD?: string;
+  /** When "false", POST /api/auth/register is disabled. Defaults to enabled. */
+  AUTH_SIGNUP_ENABLED?: string;
+};
+
+function jsonHeaders(cors: Record<string, string>) {
+  return { ...cors, "Content-Type": "application/json" };
+}
+
+function getSecret(env: AuthEnv): string {
+  return (env.SESSION_SECRET || "dev-session-secret-change-me").trim();
+}
+
+/** Match Worker `AUTH_*` passwords; case-insensitive so mobile/caps-lock typos still work. D1 users stay case-sensitive via verifyPassword. */
+function staticEnvPasswordMatches(stored: string, input: string): boolean {
+  if (stored === input) return true;
+  return stored.length > 0 && stored.toLowerCase() === input.toLowerCase();
+}
+
+function staticEnvUsers(env: AuthEnv): Array<{ user: AuthUser; password: string }> {
+  const adminName = (env.AUTH_ADMIN_NAME || "Admin").trim() || "Admin";
+  const adminEmail = (env.AUTH_ADMIN_EMAIL || "admin@hardcoredoortodoorclosers.com").trim();
+  const adminPassword = (env.AUTH_ADMIN_PASSWORD || "AdminTest123!").trim();
+  const companyEmail = (env.AUTH_COMPANY_EMAIL || "test.company@hardcoredoortodoorclosers.com").trim();
+  const companyPassword = (env.AUTH_COMPANY_PASSWORD || "TestCompany123!").trim();
+  const repEmail = (env.AUTH_REP_EMAIL || "test.rep@hardcoredoortodoorclosers.com").trim();
+  const repPassword = (env.AUTH_REP_PASSWORD || "TestRep123!").trim();
+  return [
+    {
+      user: { id: "admin-1", email: adminEmail, name: adminName, user_type: "admin" },
+      password: adminPassword,
+    },
+    {
+      user: { id: "company-1", email: companyEmail, name: "Test Company", user_type: "company" },
+      password: companyPassword,
+    },
+    {
+      user: { id: "rep-1", email: repEmail, name: "Test Rep", user_type: "sales_rep" },
+      password: repPassword,
+    },
+  ];
+}
+
+async function issueToken(env: AuthEnv, user: AuthUser): Promise<{ token: string; expiresAt: number }> {
+  const expMs = Date.now() + 1000 * 60 * 60 * 12;
+  const token = await signAuthPayload(
+    {
+      sub: user.id,
+      email: user.email,
+      user_type: user.user_type,
+      exp: expMs,
+    },
+    getSecret(env),
+  );
+  return { token, expiresAt: expMs };
+}
+
+export async function getBearerPayload(request: Request, env: AuthEnv) {
+  const authHeader = request.headers.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  if (!token) return null;
+  return verifyAuthToken(token, getSecret(env));
+}
+
+export async function handleAuthRequest(
+  request: Request,
+  env: AuthEnv,
+  path: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  const j = jsonHeaders(corsHeaders);
+  /** Ignore trailing slashes so `/api/auth/login/` matches. */
+  const p = path.replace(/\/+$/, "") || "/";
+  try {
+  if (p === "/api/auth/login" && request.method === "POST") {
+    let body: { email?: string; password?: string } = {};
+    try {
+      body = (await request.json()) as { email?: string; password?: string };
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const email = (body.email || "").trim().toLowerCase();
+    const password = body.password || "";
+    if (!email || !password) {
+      return new Response(JSON.stringify({ success: false, error: "Email and password are required." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    if (!isValidEmail(email)) {
+      return new Response(JSON.stringify({ success: false, error: "Enter a valid email address." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    // Cloudflare AUTH_* env users first so admin/company/rep secrets win over an older D1 row (e.g. same email as sales_rep).
+    const matched = staticEnvUsers(env).find(
+      (u) => u.user.email.toLowerCase() === email && staticEnvPasswordMatches(u.password, password),
+    );
+    if (matched) {
+      try {
+        await ensureDbUserFromEnvLogin(env.DB, matched.user, password);
+      } catch (e) {
+        console.error("ensureDbUserFromEnvLogin:", e);
+      }
+      const { token, expiresAt } = await issueToken(env, matched.user);
+      return new Response(JSON.stringify({ success: true, token, user: matched.user, expiresAt }), {
+        status: 200,
+        headers: j,
+      });
+    }
+    let dbUser: Awaited<ReturnType<typeof findUserByEmail>> = null;
+    try {
+      dbUser = await findUserByEmail(env.DB, email);
+    } catch (e) {
+      console.error("login findUserByEmail:", e);
+      const detail = e instanceof Error ? e.message : String(e);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "Could not look up user. Run `npm run d1:migrate:remote` once from the backend folder if D1 is new.",
+          detail,
+        }),
+        { status: 503, headers: j },
+      );
+    }
+    if (dbUser) {
+      let ok = false;
+      try {
+        ok = await verifyPassword(password, dbUser.salt, dbUser.password_hash);
+      } catch (e) {
+        console.error("login verifyPassword:", e);
+        return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
+          status: 401,
+          headers: j,
+        });
+      }
+      if (!ok) {
+        return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
+          status: 401,
+          headers: j,
+        });
+      }
+      const user = rowToAuthUser(dbUser);
+      const { token, expiresAt } = await issueToken(env, user);
+      return new Response(JSON.stringify({ success: true, token, user, expiresAt }), { status: 200, headers: j });
+    }
+    return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
+      status: 401,
+      headers: j,
+    });
+  }
+
+  if (p === "/api/auth/register" && request.method === "POST") {
+    const signupOff = (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() === "false";
+    if (signupOff) {
+      return new Response(JSON.stringify({ success: false, error: "Self-service sign up is disabled." }), {
+        status: 403,
+        headers: j,
+      });
+    }
+    let body: { email?: string; password?: string; name?: string } = {};
+    try {
+      body = (await request.json()) as { email?: string; password?: string; name?: string };
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const email = (body.email || "").trim().toLowerCase();
+    const password = body.password || "";
+    const nameRaw = normalizeDisplayName(body.name || "");
+    if (!email || !password) {
+      return new Response(JSON.stringify({ success: false, error: "Email and password are required." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    if (!isValidEmail(email)) {
+      return new Response(JSON.stringify({ success: false, error: "Enter a valid email address." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    if (password.length < 8) {
+      return new Response(JSON.stringify({ success: false, error: "Password must be at least 8 characters." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    if (password.length > 256) {
+      return new Response(JSON.stringify({ success: false, error: "Password is too long." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    if (await findUserByEmail(env.DB, email)) {
+      return new Response(JSON.stringify({ success: false, error: "An account with this email already exists." }), {
+        status: 409,
+        headers: j,
+      });
+    }
+    const displayName = nameRaw || email.split("@")[0];
+    const id = crypto.randomUUID();
+    try {
+      await insertUser(env.DB, {
+        id,
+        email,
+        plainPassword: password,
+        name: displayName,
+        user_type: "sales_rep",
+      });
+    } catch (e) {
+      console.error("insertUser register:", e);
+      const detail = e instanceof Error ? e.message : String(e);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Could not create account.",
+          detail,
+        }),
+        { status: 500, headers: j },
+      );
+    }
+    const user: AuthUser = {
+      id,
+      email,
+      name: displayName,
+      user_type: "sales_rep",
+    };
+    const { token, expiresAt } = await issueToken(env, user);
+    return new Response(JSON.stringify({ success: true, token, user, expiresAt }), { status: 201, headers: j });
+  }
+
+  if (p === "/api/auth/me" && request.method === "GET") {
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!token) {
+      return new Response(JSON.stringify({ success: false, error: "Missing bearer token." }), {
+        status: 401,
+        headers: j,
+      });
+    }
+    const payload = await verifyAuthToken(token, getSecret(env));
+    if (!payload) {
+      return new Response(JSON.stringify({ success: false, error: "Invalid or expired session." }), {
+        status: 401,
+        headers: j,
+      });
+    }
+    let row: Awaited<ReturnType<typeof findUserById>> = null;
+    try {
+      row = await findUserById(env.DB, payload.sub);
+    } catch (e) {
+      console.error("me findUserById:", e);
+      // Valid JWT but D1 failed — still return profile from token so sessions are not dropped on refresh.
+      row = null;
+    }
+    // Role comes from the signed JWT (matches login), not D1 — avoids downgrading admin after env login when DB row is stale.
+    const user: AuthUser = row
+      ? { id: row.id, email: row.email, name: row.name, user_type: payload.user_type }
+      : {
+          id: payload.sub,
+          email: payload.email,
+          name: payload.email.split("@")[0],
+          user_type: payload.user_type,
+        };
+    return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: j });
+  }
+
+  if (p === "/api/auth/logout" && request.method === "POST") {
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: j });
+  }
+
+  if (p === "/api/auth" && request.method === "GET") {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "HD2D auth API",
+        endpoints: {
+          login: "POST /api/auth/login  body: { email, password }",
+          register: "POST /api/auth/register  body: { email, password, name }",
+          me: "GET /api/auth/me  header: Authorization: Bearer <token>",
+          logout: "POST /api/auth/logout",
+        },
+      }),
+      { status: 200, headers: j },
+    );
+  }
+
+  if (p === "/api/auth/login") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Login requires POST with JSON body { email, password }.",
+        receivedMethod: request.method,
+      }),
+      { status: 405, headers: { ...j, Allow: "POST, OPTIONS" } },
+    );
+  }
+  if (p === "/api/auth/register") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Registration requires POST with JSON body { email, password, name }.",
+        receivedMethod: request.method,
+      }),
+      { status: 405, headers: { ...j, Allow: "POST, OPTIONS" } },
+    );
+  }
+  if (p === "/api/auth/me") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Session check requires GET with header Authorization: Bearer <token>.",
+        receivedMethod: request.method,
+      }),
+      { status: 405, headers: { ...j, Allow: "GET, OPTIONS" } },
+    );
+  }
+  if (p === "/api/auth/logout") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Logout requires POST.",
+        receivedMethod: request.method,
+      }),
+      { status: 405, headers: { ...j, Allow: "POST, OPTIONS" } },
+    );
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "Unknown auth path.",
+      path: p,
+      method: request.method,
+    }),
+    { status: 404, headers: j },
+  );
+  } catch (e) {
+    console.error("handleAuthRequest:", e);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: e instanceof Error ? e.message : "Internal error",
+      }),
+      { status: 500, headers: j },
+    );
+  }
+}

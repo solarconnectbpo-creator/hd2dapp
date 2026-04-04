@@ -1,6 +1,6 @@
 /**
  * `import.meta.env.DEV` is false for `vite preview` and production builds, even on localhost.
- * Dev and preview register `/google-places-api`, `/pdl-api`, `/batchdata-api` — use them whenever
+ * Dev and preview register `/google-places-api`, `/pdl-api` (and legacy `/dealmachine-api` for tooling) — use them whenever
  * the app is served from this machine so the browser stays same-origin (avoids CORS "Failed to fetch").
  */
 function isPrivateLanHostname(hostname: string): boolean {

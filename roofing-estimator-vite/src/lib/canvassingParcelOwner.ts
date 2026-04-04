@@ -47,11 +47,15 @@ const OWNER_KEY_EXCLUDE =
 const OWNER_PRIORITY_KEYS = [
   "OWNER_NAME",
   "OWNERNAME",
+  /** St. Louis County assessor / ArcGIS open data (varies by export). */
+  "OWNER_NAME_CURRENT",
+  "OWN_NAME1",
   "OWNER_NAME_1",
   "OWNER1_NAME",
   "OWNER_NAME_FULL",
   "OWNERFULLNAME",
   "OWN_NAME",
+  "OWN_NAME2",
   "PARCEL_OWNER",
   "PROP_OWNER",
   "PROP_OWNER_NAME",
@@ -71,6 +75,17 @@ const OWNER_PRIORITY_KEYS = [
   "PNAME",
   "OWNERCURRENT",
   "OWNER_CURRENT",
+  /** Common county / statewide GIS aliases */
+  "NM_NAME",
+  "NAME_COMBINED",
+  "ASSESSOR_OWNER",
+  "RES_OWNER",
+  "COM_OWNER",
+  "APPR_OWNER",
+  "CNTY_OWNER",
+  "MKT_OWNER",
+  "TRUST_NAME",
+  "TRUSTEE",
 ];
 
 function getKeyCaseInsensitive(parcel: Record<string, unknown>, key: string): unknown {
@@ -130,6 +145,12 @@ const SITE_KEY_REGEXES = [
   /^site_?addr/i,
   /^sit_?addr/i,
   /^site_?address$/i,
+  /^SITE_ADDR/i,
+  /^ADDR_?FULL$/i,
+  /^FULL_?ADDR/i,
+  /^SITUS/i,
+  /^PROP_?ADDRESS/i,
+  /^PROPERTY_?ADDR/i,
   /^address$/i,
   /^prop_?addr/i,
   /^location_?addr/i,
@@ -192,10 +213,17 @@ export function buildParcelHandoffNotes(parcel: Record<string, unknown>): string
   return ["Missouri open parcel (public assessor extract)", ...rows.map((r) => `${r.key}: ${r.value}`)].join("\n");
 }
 
+function isNonEmptyParcelScalar(v: unknown): boolean {
+  if (v == null) return false;
+  if (typeof v === "number") return Number.isFinite(v);
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "boolean") return true;
+  return false;
+}
+
 /**
  * Merge Intel parcel with attributes from an ArcGIS / GeoJSON feature (click).
- * **Intel wins on key collision** — MO intel is normalized assessor data; GIS may duplicate or alias fields.
- * GIS-only keys still fill gaps Intel does not have.
+ * Non-empty Intel values win on shared keys (normalized MO assessor). Empty Intel values do not wipe GIS fields.
  */
 export function mergeParcelAttributes(
   intelParcel: Record<string, unknown> | null,
@@ -203,7 +231,21 @@ export function mergeParcelAttributes(
 ): Record<string, unknown> | null {
   if (!featureAttributes || Object.keys(featureAttributes).length === 0) return intelParcel;
   if (!intelParcel || Object.keys(intelParcel).length === 0) return { ...featureAttributes };
-  return { ...featureAttributes, ...intelParcel };
+
+  const keys = new Set([...Object.keys(featureAttributes), ...Object.keys(intelParcel)]);
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    const iv = intelParcel[k];
+    const gv = featureAttributes[k];
+    if (isNonEmptyParcelScalar(iv)) {
+      out[k] = iv;
+    } else if (Object.prototype.hasOwnProperty.call(intelParcel, k)) {
+      out[k] = gv !== undefined ? gv : iv;
+    } else {
+      out[k] = gv;
+    }
+  }
+  return out;
 }
 
 const PHONE_KEY_RX =

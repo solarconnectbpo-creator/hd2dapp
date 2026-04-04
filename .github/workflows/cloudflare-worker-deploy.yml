@@ -1,0 +1,30 @@
+# Deploy hd2d-backend to Cloudflare Workers (run manually if local `wrangler deploy` fails with 9106/6003).
+# Repo secrets: CLOUDFLARE_API_TOKEN (Workers Scripts Edit + D1 + bindings), CLOUDFLARE_ACCOUNT_ID.
+name: Deploy Cloudflare Worker (backend)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install + build
+        working-directory: backend
+        run: npm ci && npm run build
+      - name: Deploy Worker
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy
+      - name: Verify live revision
+        working-directory: backend
+        continue-on-error: true
+        run: npm run verify:worker

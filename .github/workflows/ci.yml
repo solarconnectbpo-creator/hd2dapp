@@ -1,0 +1,48 @@
+# HD2D — Cloudflare Worker (backend) + Vite SPA (roofing-estimator-vite)
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  roofing-estimator-vite:
+    name: roofing-estimator-vite (test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: roofing-estimator-vite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: roofing-estimator-vite/package-lock.json
+      - run: npm ci
+      - run: npm run test
+      - run: npm run build
+      # ESLint has known debt in App.tsx / contexts; run locally with `npm run lint`.
+      # Goal: keep `npm run test` + `npm run build` green in CI.
+
+  backend-worker:
+    name: backend (wrangler build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run build

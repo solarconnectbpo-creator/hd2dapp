@@ -1,0 +1,76 @@
+import { getDefaultCarrierBenchmarkProfileId } from "../../lib/carrierBenchmarkPricing";
+import type { FormState } from "./measurementFormTypes";
+
+const DEFAULT_CARRIER_BENCHMARK_PROFILE_ID = getDefaultCarrierBenchmarkProfileId();
+
+/** Blank intake — address search and measurements start empty. */
+export function defaultFormState(): FormState {
+  return {
+    address: "",
+    stateCode: "",
+    latitude: "",
+    longitude: "",
+    roofType: "Asphalt Shingle",
+    roofStructure: "auto",
+    stories: "",
+    exteriorWallHeightFt: "",
+    areaSqFt: "",
+    perimeterFt: "",
+    roofPitch: "6/12",
+    wastePercent: "12",
+    measuredSquares: "",
+    ridgesFt: "",
+    eavesFt: "",
+    rakesFt: "",
+    valleysFt: "",
+    hipsFt: "",
+    wallFlashingFt: "",
+    stepFlashingFt: "",
+    othersFt: "",
+    severity: 2,
+    damageTypes: [],
+    carrierScopeText: "",
+    carrierBenchmarkProfileId: DEFAULT_CARRIER_BENCHMARK_PROFILE_ID,
+    carrierBenchmarkRegionFactor: "1.00",
+    carrierBenchmarkComplexityFactor: "1.00",
+    deductibleUsd: "0",
+    nonRecDepUsd: "0",
+    propertyRecordNotes: "",
+  };
+}
+
+/** Demo / training job (Chanhassen) — use “Load Hillsdale Template” to fill the form. */
+export function hillsdaleFormTemplate(): FormState {
+  return {
+    address: "7270 Hillsdale Court, Chanhassen, MN 55317",
+    stateCode: "MN",
+    latitude: "",
+    longitude: "",
+    roofType: "Asphalt Shingle",
+    roofStructure: "auto",
+    stories: "",
+    exteriorWallHeightFt: "",
+    areaSqFt: "3432.61",
+    perimeterFt: "387.58",
+    roofPitch: "6/12",
+    wastePercent: "25",
+    measuredSquares: "38.38",
+    ridgesFt: "141ft 2in",
+    eavesFt: "135ft 6in",
+    rakesFt: "252ft 1in",
+    valleysFt: "130ft 4in",
+    hipsFt: "0ft 0in",
+    wallFlashingFt: "19ft 2in",
+    stepFlashingFt: "50ft 5in",
+    othersFt: "2ft 3in",
+    severity: 3,
+    damageTypes: ["Wind", "Leaks"],
+    carrierScopeText: "",
+    carrierBenchmarkProfileId: DEFAULT_CARRIER_BENCHMARK_PROFILE_ID,
+    carrierBenchmarkRegionFactor: "1.00",
+    carrierBenchmarkComplexityFactor: "1.00",
+    deductibleUsd: "2500",
+    nonRecDepUsd: "500",
+    propertyRecordNotes: "",
+  };
+}

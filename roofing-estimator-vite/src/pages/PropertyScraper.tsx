@@ -44,13 +44,13 @@ import {
   FREE_PUBLIC_RECORDS_CSV_TEMPLATE,
 } from "../lib/propertyCampaignExport";
 import { rankCommercialPropertyLeads } from "../lib/propertyCommercialLeadRank";
+import { parseUsAddressLineForSearch } from "../lib/propertyAddressCriteria";
 import {
-  enrichPropertyRecordsWithBatchData,
-  fetchBatchDataPropertyByAddress,
-  mergeBatchDataIntoPropertyRow,
-  parseUsAddressLineForBatchData,
-  PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE,
-} from "../lib/propertyBatchDataLookup";
+  enrichPropertyRecordsWithDealMachine,
+  fetchDealMachinePropertyByAddress,
+  isDealMachineLikelyConfigured,
+  mergeDealMachineIntoPropertyRow,
+} from "../lib/propertyDealMachineLookup";
 import { parsePropertyJsonPaste, stashPendingPropertyImport, type PropertyImportPayload } from "../lib/propertyScraper";
 
 function reindexPreviewAfterRank(
@@ -69,6 +69,7 @@ function sourceLabel(source: PropertyImportPayload["source"]): string {
   if (source === "import") return "Import";
   if (source === "rentcast") return "Legacy import";
   if (source === "batchdata") return "BatchData";
+  if (source === "dealmachine") return "DealMachine";
   return "Import";
 }
 
@@ -105,12 +106,11 @@ export function PropertyScraper() {
   const [pdlCompanyRows, setPdlCompanyRows] = useState(true);
   const [pdlIncludeIndividuals, setPdlIncludeIndividuals] = useState(false);
 
-  const [batchdataKey, setBatchdataKey] = useState("");
-  const [batchdataBusy, setBatchdataBusy] = useState(false);
-  const [batchdataAddressLine, setBatchdataAddressLine] = useState("");
-  const [batchdataLimit, setBatchdataLimit] = useState(15);
-  const [batchdataDelayMs, setBatchdataDelayMs] = useState(350);
-  const [batchdataSkipIfOwner, setBatchdataSkipIfOwner] = useState(false);
+  const [dealmachineBusy, setDealmachineBusy] = useState(false);
+  const [dealmachineAddressLine, setDealmachineAddressLine] = useState("");
+  const [dealmachineLimit, setDealmachineLimit] = useState(15);
+  const [dealmachineDelayMs, setDealmachineDelayMs] = useState(350);
+  const [dealmachineSkipIfOwner, setDealmachineSkipIfOwner] = useState(false);
 
   /** Typed after manual lookup on FastPeopleSearch (pasted name optional; phones via clipboard). */
   const [manualFpsOwnerName, setManualFpsOwnerName] = useState("");
@@ -138,24 +138,13 @@ export function PropertyScraper() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE);
-      const fromEnv = import.meta.env.VITE_BATCHDATA_API_KEY?.trim();
-      if (saved) setBatchdataKey(saved);
-      else if (fromEnv) setBatchdataKey(fromEnv);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
     if (selectedRowIndex != null) {
       const a = commResults[selectedRowIndex]?.address?.trim();
-      if (a) setBatchdataAddressLine(a);
+      if (a) setDealmachineAddressLine(a);
       return;
     }
     if (!commResults.length && preview?.address?.trim()) {
-      setBatchdataAddressLine(preview.address.trim());
+      setDealmachineAddressLine(preview.address.trim());
     }
   }, [selectedRowIndex, commResults, preview]);
 
@@ -177,22 +166,13 @@ export function PropertyScraper() {
     }
   }, [pdlKey]);
 
-  const persistBatchdataKey = useCallback(() => {
-    try {
-      window.localStorage.setItem(PROPERTY_SCRAPER_BATCHDATA_KEY_STORAGE, batchdataKey.trim());
-      setMessage({ kind: "ok", text: "BatchData API key saved in this browser." });
-    } catch {
-      setMessage({ kind: "err", text: "Could not save BatchData key." });
-    }
-  }, [batchdataKey]);
-
-  const onFetchBatchDataSingle = useCallback(async () => {
-    const line = batchdataAddressLine.trim() || preview?.address?.trim() || "";
+  const onFetchDealMachineSingle = useCallback(async () => {
+    const line = dealmachineAddressLine.trim() || preview?.address?.trim() || "";
     if (!line) {
       setMessage({ kind: "err", text: "Enter a full US address (e.g. 123 Main St, City, ST 12345) or select a table row." });
       return;
     }
-    const criteria = parseUsAddressLineForBatchData(line);
+    const criteria = parseUsAddressLineForSearch(line);
     if (!criteria) {
       setMessage({
         kind: "err",
@@ -200,10 +180,10 @@ export function PropertyScraper() {
       });
       return;
     }
-    setBatchdataBusy(true);
+    setDealmachineBusy(true);
     setMessage(null);
     try {
-      const r = await fetchBatchDataPropertyByAddress(batchdataKey, criteria);
+      const r = await fetchDealMachinePropertyByAddress(criteria);
       if (!r.ok) {
         setMessage({ kind: "err", text: r.message });
         return;
@@ -214,15 +194,15 @@ export function PropertyScraper() {
         setSelectedRowIndex(null);
         setMessage({
           kind: "ok",
-          text: "Loaded property row from BatchData. Open in measurement or export when ready.",
+          text: "Loaded property row from DealMachine. Open in measurement or export when ready.",
         });
         return;
       }
       const trackAddr = preview?.address ?? line;
       const mapped = commResults.map((row, i) => {
-        if (selectedRowIndex === i) return mergeBatchDataIntoPropertyRow(row, rankedOne);
+        if (selectedRowIndex === i) return mergeDealMachineIntoPropertyRow(row, rankedOne);
         if (row.address === line || row.address === rankedOne.address) {
-          return mergeBatchDataIntoPropertyRow(row, rankedOne);
+          return mergeDealMachineIntoPropertyRow(row, rankedOne);
         }
         return row;
       });
@@ -233,32 +213,28 @@ export function PropertyScraper() {
       setPreview(nextPreview ?? rankedOne);
       setMessage({
         kind: "ok",
-        text: "Merged BatchData fields into the selected / matching row (empty fields only).",
+        text: "Merged DealMachine fields into the selected / matching row (empty fields only).",
       });
     } finally {
-      setBatchdataBusy(false);
+      setDealmachineBusy(false);
     }
-  }, [batchdataAddressLine, batchdataKey, commResults, preview, selectedRowIndex]);
+  }, [dealmachineAddressLine, commResults, preview, selectedRowIndex]);
 
-  const onFetchBatchDataBulk = useCallback(async () => {
+  const onFetchDealMachineBulk = useCallback(async () => {
     if (!commResults.length) {
       setMessage({ kind: "err", text: "Import a CSV first, or use single-address fetch above." });
       return;
     }
-    setBatchdataBusy(true);
+    setDealmachineBusy(true);
     setMessage(null);
     try {
       const trackAddr =
         preview?.address ?? (selectedRowIndex != null ? commResults[selectedRowIndex]?.address : undefined);
-      const { results, filled, skipped, failed } = await enrichPropertyRecordsWithBatchData(
-        commResults,
-        batchdataKey,
-        {
-          limit: batchdataLimit,
-          delayMs: batchdataDelayMs,
-          skipIfOwnerPresent: batchdataSkipIfOwner,
-        },
-      );
+      const { results, filled, skipped, failed } = await enrichPropertyRecordsWithDealMachine(commResults, {
+        limit: dealmachineLimit,
+        delayMs: dealmachineDelayMs,
+        skipIfOwnerPresent: dealmachineSkipIfOwner,
+      });
       const ranked = rankCommercialPropertyLeads(results);
       setCommResults(ranked);
       const { nextIndex, nextPreview } = reindexPreviewAfterRank(ranked, trackAddr);
@@ -270,20 +246,12 @@ export function PropertyScraper() {
       }
       setMessage({
         kind: "ok",
-        text: `BatchData: filled ${filled} row(s); skipped ${skipped}; errors ${failed}. Max ${batchdataLimit} API calls this run.`,
+        text: `DealMachine: filled ${filled} row(s); skipped ${skipped}; errors ${failed}. Max ${dealmachineLimit} API calls this run.`,
       });
     } finally {
-      setBatchdataBusy(false);
+      setDealmachineBusy(false);
     }
-  }, [
-    batchdataKey,
-    batchdataDelayMs,
-    batchdataLimit,
-    batchdataSkipIfOwner,
-    commResults,
-    preview,
-    selectedRowIndex,
-  ]);
+  }, [dealmachineDelayMs, dealmachineLimit, dealmachineSkipIfOwner, commResults, preview, selectedRowIndex]);
 
   const onEnrichBulk = useCallback(async () => {
     if (!commResults.length) {
@@ -523,7 +491,7 @@ export function PropertyScraper() {
           const n = ranked.length.toLocaleString();
           setMessage({
             kind: "ok",
-            text: `Imported ${n} row(s) from ${file.name}; ranked by commercial lead score. Table uses virtual scrolling for large lists. Enhance with Places/PDL/BatchData as needed.`,
+            text: `Imported ${n} row(s) from ${file.name}; ranked by commercial lead score. Table uses virtual scrolling for large lists. Enhance with Places/PDL/DealMachine as needed.`,
           });
         } catch (err) {
           setMessage({
@@ -679,9 +647,9 @@ export function PropertyScraper() {
   }, [applyMergedPreviewToTable, manualFpsOwnerName, preview]);
 
   return (
-    <div className="p-8 max-w-5xl text-black">
+    <div className="mx-auto max-w-5xl px-4 py-4 text-black sm:p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-3xl mb-2 font-semibold text-black">Property records</h1>
+        <h1 className="mb-2 text-2xl font-semibold text-black sm:text-3xl">Property records</h1>
         <p className="text-black max-w-3xl">
           <strong>Open parcel data does not include owner phone numbers.</strong> The app cannot invent 50,000 accurate
           phones or contacts — that requires a <strong>file you are licensed to use</strong> (CRM export, dialer list, data
@@ -699,13 +667,13 @@ export function PropertyScraper() {
           {!propertyScraperOffline ? (
             <>
               {" "}
-              Optional in-browser <strong>BatchData</strong>, <strong>Google Places</strong>, and{" "}
+              Optional in-browser <strong>DealMachine</strong>, <strong>Google Places</strong>, and{" "}
               <strong>People Data Labs</strong> can fill some gaps when you add keys (localhost dev proxy).
             </>
           ) : (
             <>
               {" "}
-              <strong>BatchData / Places / PDL</strong> panels are off (
+              <strong>DealMachine / Places / PDL</strong> panels are off (
               <code className="text-xs bg-gray-100 px-1 rounded">VITE_PROPERTY_SCRAPER_OFFLINE=true</code>).
             </>
           )}{" "}
@@ -779,8 +747,8 @@ export function PropertyScraper() {
                 Optional in-browser enrichers after CSV import. Keys stay in this browser (localStorage) or{" "}
                 <code className="text-xs bg-white px-1 rounded">.env.local</code> (
                 <code className="text-xs bg-white px-1 rounded">VITE_GOOGLE_PLACES_API_KEY</code>,{" "}
-                <code className="text-xs bg-white px-1 rounded">VITE_PDL_API_KEY</code>,{" "}
-                <code className="text-xs bg-white px-1 rounded">VITE_BATCHDATA_API_KEY</code>). For{" "}
+                <code className="text-xs bg-white px-1 rounded">VITE_PDL_API_KEY</code>). DealMachine uses the Worker
+                only (<code className="text-xs bg-white px-1 rounded">DEALMACHINE_API_KEY</code>). For{" "}
               <a
                 href={FAST_PEOPLE_SEARCH_HOME_LANG_EN}
                 className="underline text-black"
@@ -793,7 +761,7 @@ export function PropertyScraper() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 text-black">
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
               <label className="text-sm block">
                 <span className="text-black block mb-1 font-medium">Google Places (phones)</span>
                 <input
@@ -819,20 +787,6 @@ export function PropertyScraper() {
                   placeholder="X-Api-Key"
                 />
                 <Button type="button" variant="outline" size="sm" className="mt-2" onClick={persistPdlKey}>
-                  Save
-                </Button>
-              </label>
-              <label className="text-sm block">
-                <span className="text-black block mb-1 font-medium">BatchData (property + owner)</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black"
-                  value={batchdataKey}
-                  onChange={(e) => setBatchdataKey(e.target.value)}
-                  placeholder="Bearer token"
-                />
-                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={persistBatchdataKey}>
                   Save
                 </Button>
               </label>
@@ -895,15 +849,14 @@ export function PropertyScraper() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-black">
               <Building2 className="w-5 h-5" />
-              BatchData — fetch property records
+              DealMachine — fetch property records
             </CardTitle>
             <CardDescription className="text-black">
-              Calls BatchData <code className="text-xs bg-white px-1 rounded">POST /api/v1/property/search</code> with a
-              parsed US address (commas required; ZIP optional). Requires account balance / plan. Merged rows only fill{" "}
-              <strong>empty</strong> fields. Use <code className="text-xs bg-white px-1 rounded">npm run dev</code> or{" "}
-              <code className="text-xs bg-white px-1 rounded">vite preview</code> so <code className="text-xs bg-white px-1 rounded">/batchdata-api</code>{" "}
-              proxies on localhost or your LAN IP (set <code className="text-xs bg-white px-1 rounded">VITE_LAN_USE_API_PROXY=false</code>{" "}
-              if you must hit the API directly from a private-IP build).
+              Uses the DealMachine public API (proxied by the HD2D Worker). Parsed US address (commas required; ZIP optional).
+              Merged rows only fill <strong>empty</strong> fields. Configure{" "}
+              <code className="text-xs bg-white px-1 rounded">DEALMACHINE_API_KEY</code> on the Worker (wrangler secret or{" "}
+              <code className="text-xs bg-white px-1 rounded">.dev.vars</code>) and set <code className="text-xs bg-white px-1 rounded">VITE_INTEL_API_BASE</code>{" "}
+              for local dev.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-black">
@@ -912,8 +865,8 @@ export function PropertyScraper() {
               <input
                 type="text"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black"
-                value={batchdataAddressLine}
-                onChange={(e) => setBatchdataAddressLine(e.target.value)}
+                value={dealmachineAddressLine}
+                onChange={(e) => setDealmachineAddressLine(e.target.value)}
                 placeholder="123 Main St, City, ST 12345 — or without ZIP"
               />
               <span className="text-xs text-neutral-600 mt-1 block">
@@ -925,21 +878,21 @@ export function PropertyScraper() {
               <Button
                 type="button"
                 variant="default"
-                disabled={batchdataBusy || enrichBusy || pdlEnrichBusy || !batchdataKey.trim()}
-                onClick={() => void onFetchBatchDataSingle()}
+                disabled={dealmachineBusy || enrichBusy || pdlEnrichBusy || !isDealMachineLikelyConfigured()}
+                onClick={() => void onFetchDealMachineSingle()}
               >
-                {batchdataBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {dealmachineBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Fetch / merge this address
               </Button>
               <Button
                 type="button"
                 variant="secondary"
                 disabled={
-                  batchdataBusy || enrichBusy || pdlEnrichBusy || !batchdataKey.trim() || !commResults.length
+                  dealmachineBusy || enrichBusy || pdlEnrichBusy || !isDealMachineLikelyConfigured() || !commResults.length
                 }
-                onClick={() => void onFetchBatchDataBulk()}
+                onClick={() => void onFetchDealMachineBulk()}
               >
-                BatchData table (up to {batchdataLimit} calls)
+                DealMachine table (up to {dealmachineLimit} calls)
               </Button>
             </div>
             <div className="flex flex-wrap gap-4 items-center text-sm border-t border-amber-200/80 pt-3">
@@ -950,8 +903,8 @@ export function PropertyScraper() {
                   min={1}
                   max={100}
                   className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-black"
-                  value={batchdataLimit}
-                  onChange={(e) => setBatchdataLimit(Number.parseInt(e.target.value, 10) || 15)}
+                  value={dealmachineLimit}
+                  onChange={(e) => setDealmachineLimit(Number.parseInt(e.target.value, 10) || 15)}
                 />
               </label>
               <label className="flex items-center gap-2">
@@ -961,15 +914,15 @@ export function PropertyScraper() {
                   min={0}
                   max={5000}
                   className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-black"
-                  value={batchdataDelayMs}
-                  onChange={(e) => setBatchdataDelayMs(Number.parseInt(e.target.value, 10) || 0)}
+                  value={dealmachineDelayMs}
+                  onChange={(e) => setDealmachineDelayMs(Number.parseInt(e.target.value, 10) || 0)}
                 />
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={batchdataSkipIfOwner}
-                  onChange={(e) => setBatchdataSkipIfOwner(e.target.checked)}
+                  checked={dealmachineSkipIfOwner}
+                  onChange={(e) => setDealmachineSkipIfOwner(e.target.checked)}
                 />
                 Skip rows that already have Owner filled
               </label>
@@ -1108,7 +1061,7 @@ export function PropertyScraper() {
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={enrichBusy || pdlEnrichBusy || batchdataBusy || !placesKey.trim()}
+                    disabled={enrichBusy || pdlEnrichBusy || dealmachineBusy || !placesKey.trim()}
                     onClick={() => void onEnrichBulk()}
                   >
                     {enrichBusy ? (
@@ -1125,7 +1078,7 @@ export function PropertyScraper() {
                     disabled={
                       enrichBusy ||
                       pdlEnrichBusy ||
-                      batchdataBusy ||
+                      dealmachineBusy ||
                       !pdlKey.trim() ||
                       (!pdlCompanyRows && !pdlIncludeIndividuals)
                     }
@@ -1349,7 +1302,7 @@ export function PropertyScraper() {
                       type="button"
                       variant="secondary"
                       size="sm"
-                      disabled={enrichBusy || pdlEnrichBusy || batchdataBusy || !placesKey.trim()}
+                      disabled={enrichBusy || pdlEnrichBusy || dealmachineBusy || !placesKey.trim()}
                       onClick={() => void onEnrichPreview()}
                     >
                       {enrichBusy ? (
@@ -1366,7 +1319,7 @@ export function PropertyScraper() {
                       disabled={
                         enrichBusy ||
                         pdlEnrichBusy ||
-                        batchdataBusy ||
+                        dealmachineBusy ||
                         !pdlKey.trim() ||
                         (!pdlCompanyRows && !pdlIncludeIndividuals)
                       }

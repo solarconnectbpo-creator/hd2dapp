@@ -12,6 +12,12 @@ describe("mergeParcelAttributes", () => {
     expect(m?.TAX_NAME).toBe("Alt");
   });
 
+  it("does not let empty Intel owner wipe non-empty GIS owner", () => {
+    const m = mergeParcelAttributes({ OWNER_NAME: "" }, { OWNER_NAME: "From GIS", PIN: "99" });
+    expect(m?.OWNER_NAME).toBe("From GIS");
+    expect(m?.PIN).toBe("99");
+  });
+
   it("returns Intel-only when no overlay", () => {
     expect(mergeParcelAttributes({ A: "1" }, null)).toEqual({ A: "1" });
   });

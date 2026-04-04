@@ -66,3 +66,12 @@ test-results/
 backend/.wrangler/
 roofing-estimator-vite/scripts/.cache/
 roofing-estimator-vite/.cursor/
+
+.vercel
+
+# Local debug / credentials (never commit)
+backend/_curl-login.json
+backend/_curl-www-h.txt
+
+# Downloaded ML weights (use Dockerfile/scripts to fetch in deploy)
+backend/ml-vision-service/*.pth

@@ -1,0 +1,6 @@
+# Long-lived hashed bundles; short-lived HTML shell so apex stays fresh after deploys.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate

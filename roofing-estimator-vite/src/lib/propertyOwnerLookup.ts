@@ -1,13 +1,16 @@
 import type { OrgSettings } from "./orgSettings";
 import {
-  fetchBatchDataPropertyByAddress,
-  type BatchDataAddressCriteria,
-  nominatimReverseToBatchDataCriteria,
-  parseUsAddressLineForBatchData,
-} from "./propertyBatchDataLookup";
+  fetchDealMachinePropertyByAddress,
+  isDealMachineLikelyConfigured,
+} from "./propertyDealMachineLookup";
+import {
+  nominatimReverseToAddressCriteria,
+  parseUsAddressLineForSearch,
+  type UsAddressSearchCriteria,
+} from "./propertyAddressCriteria";
 import type { PropertyImportPayload } from "./propertyScraper";
 
-export type OwnerEnrichmentSource = "base" | "stl" | "batchdata" | "fallback";
+export type OwnerEnrichmentSource = "base" | "stl" | "dealmachine" | "fallback";
 
 export type OwnerLookupContext = {
   payload: PropertyImportPayload;
@@ -68,11 +71,11 @@ function mergeOwnerFields(base: PropertyImportPayload, fromApi: PropertyImportPa
   };
 }
 
-/** Exported for Canvassing: try multiple parsed address lines when the first BatchData query misses. */
-export function buildCriteriaCandidates(ctx: OwnerLookupContext): BatchDataAddressCriteria[] {
-  const candidates: BatchDataAddressCriteria[] = [];
+/** Exported for Canvassing: try multiple parsed address lines when the first DealMachine query misses. */
+export function buildCriteriaCandidates(ctx: OwnerLookupContext): UsAddressSearchCriteria[] {
+  const candidates: UsAddressSearchCriteria[] = [];
   const seen = new Set<string>();
-  const push = (c: BatchDataAddressCriteria | null) => {
+  const push = (c: UsAddressSearchCriteria | null) => {
     if (!c) return;
     const key = `${c.street_address}|${c.city}|${c.state}|${c.zip_code}`;
     if (seen.has(key)) return;
@@ -81,50 +84,50 @@ export function buildCriteriaCandidates(ctx: OwnerLookupContext): BatchDataAddre
   };
 
   push(
-    nominatimReverseToBatchDataCriteria({
+    nominatimReverseToAddressCriteria({
       display_name: ctx.nominatimDisplayName,
       address: ctx.nominatimAddress,
     }),
   );
   if (ctx.nominatimDisplayName) {
-    push(parseUsAddressLineForBatchData(ctx.nominatimDisplayName));
+    push(parseUsAddressLineForSearch(ctx.nominatimDisplayName));
     const trimmed = ctx.nominatimDisplayName.replace(/,?\s*United States\s*$/i, "").trim();
     if (trimmed !== ctx.nominatimDisplayName) {
-      push(parseUsAddressLineForBatchData(trimmed));
+      push(parseUsAddressLineForSearch(trimmed));
     }
   }
-  push(parseUsAddressLineForBatchData(ctx.payload.address));
+  push(parseUsAddressLineForSearch(ctx.payload.address));
   return candidates;
 }
 
 export async function runOwnerFallbackLookup(
   org: OrgSettings,
-  batchDataApiKey: string,
   ctx: OwnerLookupContext,
 ): Promise<OwnerLookupResult> {
   if (isOwnerInfoComplete(ctx.payload)) {
     return { ok: true, payload: ctx.payload, source: "base" };
   }
-  if (org.ownerFallbackProvider === "none") {
-    return { ok: false, message: "Owner fallback provider is disabled in org settings." };
+  if (org.ownerFallbackProvider === "none" && org.ownerFallbackLockedOff) {
+    return { ok: false, message: "Owner fallback is turned off in this browser (Contacts settings)." };
   }
-  if (org.ownerFallbackProvider !== "batchdata-relaxed") {
+  if (org.ownerFallbackProvider !== "dealmachine-relaxed" && org.ownerFallbackProvider !== "none") {
     return { ok: false, message: `Unsupported fallback provider: ${org.ownerFallbackProvider}` };
   }
-
-  const key = (org.ownerFallbackApiKey || batchDataApiKey || "").trim();
-  if (!key) {
-    return { ok: false, message: "Fallback provider needs an API key. Add BatchData or fallback key in settings." };
+  if (!isDealMachineLikelyConfigured()) {
+    return {
+      ok: false,
+      message: "DealMachine fallback needs the HD2D Worker with DEALMACHINE_API_KEY configured (wrangler secret).",
+    };
   }
 
   const candidates = buildCriteriaCandidates(ctx);
   if (!candidates.length) {
-    return { ok: false, message: "Fallback provider could not build a valid address query for this property." };
+    return { ok: false, message: "Fallback could not build a valid address query for this property." };
   }
 
   let latestError = "";
   for (const criteria of candidates) {
-    const res = await fetchBatchDataPropertyByAddress(key, criteria);
+    const res = await fetchDealMachinePropertyByAddress(criteria);
     if (!res.ok) {
       latestError = res.message;
       continue;
@@ -135,14 +138,13 @@ export async function runOwnerFallbackLookup(
         ok: true,
         payload: merged,
         source: "fallback",
-        note: "Fallback provider (BatchData relaxed) added owner/contact fields.",
+        note: "Owner fallback (relaxed address match) added owner/contact fields via DealMachine.",
       };
     }
   }
 
   return {
     ok: false,
-    message: latestError || "Fallback provider could not find owner/contact data for this address.",
+    message: latestError || "Fallback could not find owner/contact data for this address.",
   };
 }
-

@@ -6,14 +6,19 @@ import {
   Folder,
   Home,
   MapPinned,
+  Megaphone,
   Menu,
   Ruler,
   Search,
+  Shield,
   Users,
   X,
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { hydrateDealMachineCapabilitiesFromHealth } from "../lib/propertyDealMachineLookup";
 import { isNavActive } from "../lib/navMatch";
+import { hd2dLogoUrl } from "../branding/hd2dLogoUrl";
 import { useAuth } from "../context/AuthContext";
 
 const navItems = [
@@ -25,7 +30,11 @@ const navItems = [
   { path: "/contacts", label: "Contacts & settings", icon: Users },
   { path: "/property-lookup", label: "Property records", icon: Search },
   { path: "/canvassing", label: "Canvassing", icon: MapPinned },
+  { path: "/marketing", label: "Marketing", icon: Megaphone },
 ] as const;
+
+const ADMIN_USERS_PATH = "/admin/users";
+const ADMIN_USERS_LABEL = "Admin — users";
 
 function NavLinks({
   onNavigate,
@@ -64,7 +73,14 @@ function NavLinks({
 export function Root() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [, setCapabilitiesBump] = useState(0);
   const { user, logout } = useAuth();
+
+  useEffect(() => {
+    void hydrateDealMachineCapabilitiesFromHealth().then(() => {
+      setCapabilitiesBump((n) => n + 1);
+    });
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -94,7 +110,7 @@ export function Root() {
       </a>
 
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-[#2f3336] bg-[#000000]/95 px-4 backdrop-blur lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] items-center gap-3 border-b border-[#2f3336] bg-[#000000]/95 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur lg:hidden">
         <button
           type="button"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#e7e9ea] hover:bg-[#1f1f1f]"
@@ -105,9 +121,17 @@ export function Root() {
           <Menu className="h-6 w-6" aria-hidden />
           <span className="sr-only">Open menu</span>
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-[#e7e9ea]">Roofing Pro</p>
-          <p className="truncate text-xs text-[#71767b]">Professional suite</p>
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+          <img
+            src={hd2dLogoUrl}
+            alt=""
+            className="h-8 w-auto max-w-[min(8.5rem,42vw)] shrink-0 object-contain object-left"
+            width={136}
+            height={40}
+          />
+          <div className="min-w-0 hidden min-[380px]:block">
+            <p className="truncate text-xs text-[#71767b]">Roofing suite</p>
+          </div>
         </div>
       </header>
 
@@ -126,14 +150,20 @@ export function Root() {
       <aside
         id="app-sidebar"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-[#2f3336] bg-[#000000] transition-transform duration-200 ease-out lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-[#2f3336] bg-[#000000] pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] transition-transform duration-200 ease-out lg:static lg:translate-x-0 lg:pt-0 lg:pb-0",
           mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full lg:shadow-none",
         )}
       >
         <div className="flex items-start justify-between gap-2 border-b border-[#2f3336] p-6">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-[#e7e9ea]">Roofing Pro</h1>
-            <p className="text-sm text-[#71767b]">Professional Roofing Suite</p>
+          <div className="min-w-0 flex flex-col gap-2">
+            <img
+              src={hd2dLogoUrl}
+              alt="Hardcore D2D Closers"
+              className="h-auto w-full max-w-[12.5rem] object-contain object-left"
+              width={200}
+              height={120}
+            />
+            <p className="text-sm text-[#71767b]">Roofing Pro suite</p>
           </div>
           <button
             type="button"
@@ -146,23 +176,63 @@ export function Root() {
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="Main">
           <NavLinks currentPath={location.pathname} onNavigate={() => setMobileOpen(false)} />
+          {user?.user_type === "admin" ? (
+            <Link
+              to={ADMIN_USERS_PATH}
+              onClick={() => setMobileOpen(false)}
+              aria-current={isNavActive(ADMIN_USERS_PATH, location.pathname) ? "page" : undefined}
+              className={cn(
+                "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                isNavActive(ADMIN_USERS_PATH, location.pathname)
+                  ? "bg-[#1d9bf0] text-white"
+                  : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
+              )}
+            >
+              <Shield className="h-5 w-5 shrink-0" aria-hidden />
+              <span>{ADMIN_USERS_LABEL}</span>
+            </Link>
+          ) : null}
         </nav>
         <div className="border-t border-[#2f3336] p-4">
-          <p className="text-xs text-[#71767b] mb-2">
-            Signed in as <span className="text-[#e7e9ea]">{user?.email || "unknown"}</span>
-          </p>
-          <button type="button" className="secondary-btn w-full" onClick={() => void logout()}>
-            Sign out
-          </button>
+          {user ? (
+            <>
+              <p className="text-xs text-[#71767b] mb-2">
+                Signed in as <span className="text-[#e7e9ea]">{user.email}</span>
+              </p>
+              <button type="button" className="secondary-btn w-full" onClick={() => void logout()}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-[#71767b]">
+                Sign in to save estimates, canvassing, and storm intel across devices.
+              </p>
+              <Link
+                to="/login"
+                className="flex w-full items-center justify-center rounded-full border border-[#2f3336] bg-[#16181c] px-4 py-2.5 text-sm font-semibold text-[#e7e9ea] hover:bg-[#1a1a1a]"
+              >
+                Sign in
+              </Link>
+              <Link
+                to="/signup"
+                className="flex w-full items-center justify-center text-sm font-medium text-[#1d9bf0] hover:underline"
+              >
+                Create account
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
 
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto pt-14 outline-none lg:pt-0"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto pt-[calc(3.5rem+env(safe-area-inset-top,0px))] pb-[env(safe-area-inset-bottom,0px)] outline-none focus-visible:ring-2 focus-visible:ring-[#1d9bf0] focus-visible:ring-offset-2 focus-visible:ring-offset-black lg:pt-0 lg:pb-0"
       >
-        <Outlet />
+        <ErrorBoundary title="Something went wrong in this view">
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );

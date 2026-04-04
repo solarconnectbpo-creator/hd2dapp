@@ -10,15 +10,15 @@ export function Estimates() {
   const money = (value: number) => `$${value.toLocaleString()}`;
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="px-4 py-4 sm:p-6 lg:p-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl mb-2 text-black">Estimates</h1>
+          <h1 className="mb-2 text-2xl text-black sm:text-3xl">Estimates</h1>
           <p className="text-black">Manage your project estimates</p>
         </div>
-        <Link to="/measurement/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
+        <Link to="/measurement/new" className="shrink-0">
+          <Button className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
             New Estimate
           </Button>
         </Link>

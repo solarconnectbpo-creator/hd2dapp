@@ -1,0 +1,18 @@
+# Cloudflare Pages — HD2D web app (Vite SPA)
+# Production site: https://hardcoredoortodoorclosers.com
+#
+# Deploy: `npm run pages:deploy` — builds, ensures Pages project `hd2d-closers` exists, uploads `dist/` (see scripts/pages-deploy.mjs).
+# Manual create: `npm run pages:create` if you prefer not to use the script.
+#
+# Custom domains (Cloudflare Dashboard → Workers & Pages → hd2d-closers → Custom domains):
+#   - Add apex: hardcoredoortodoorclosers.com
+#   - Add www: www.hardcoredoortodoorclosers.com (optional; set redirect www → apex in Rules → Redirect Rules if you want one canonical host)
+# DNS for the zone must be on Cloudflare; proxy (orange cloud) enabled for those records.
+#
+# API: same origin at https://hardcoredoortodoorclosers.com/api/* via Worker `hd2d-backend` (see ../backend/wrangler.toml routes).
+#
+# Build-time env (Pages → Settings → Environment variables):
+#   Leave VITE_INTEL_API_BASE unset so the SPA uses window.location.origin → same-origin /api/* (see src/lib/hd2dApiBase.ts).
+
+name = "hd2d-closers"
+pages_build_output_dir = "dist"

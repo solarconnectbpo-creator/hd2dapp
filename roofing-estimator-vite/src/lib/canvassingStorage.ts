@@ -13,6 +13,8 @@ export type CanvassLeadState = {
 export type CanvassLeadEnrichment = {
   payload: PropertyImportPayload;
   parcel: Record<string, unknown> | null;
+  /** USGS/OSM building footprint at enrich — handed off to measurement when importFootprint. */
+  buildingFootprint?: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null;
   updatedAt: string;
 };
 
@@ -122,13 +124,18 @@ export function clearCanvassEnrichment(): void {
 export function mergeCanvassEnrichment(
   prev: Record<string, CanvassLeadEnrichment>,
   leadId: string,
-  partial: { payload: PropertyImportPayload; parcel: Record<string, unknown> | null },
+  partial: {
+    payload: PropertyImportPayload;
+    parcel: Record<string, unknown> | null;
+    buildingFootprint?: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null;
+  },
 ): Record<string, CanvassLeadEnrichment> {
   return {
     ...prev,
     [leadId]: {
       payload: partial.payload,
       parcel: trimParcelForStorage(partial.parcel),
+      buildingFootprint: partial.buildingFootprint ?? null,
       updatedAt: new Date().toISOString(),
     },
   };

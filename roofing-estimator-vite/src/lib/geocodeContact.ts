@@ -1,4 +1,5 @@
 import type { ContactRecord } from "./contactsCsv";
+import { parseJsonResponse } from "./readJsonResponse";
 
 function buildAddressQuery(c: ContactRecord): string {
   const parts = [c.address, c.city, c.state, c.zip].filter(Boolean);
@@ -35,7 +36,7 @@ export async function geocodeContactsMissing(
         onProgress?.(done, total);
         continue;
       }
-      const data = (await res.json()) as { lat?: string; lon?: string }[];
+      const data = await parseJsonResponse<{ lat?: string; lon?: string }[]>(res, "Nominatim search");
       const hit = data[0];
       if (hit?.lat && hit?.lon) {
         next[i] = {

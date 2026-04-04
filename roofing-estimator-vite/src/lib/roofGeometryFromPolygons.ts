@@ -1,6 +1,8 @@
 import * as turf from "@turf/turf";
 import type { Feature, Polygon } from "geojson";
 
+import { polygonFeatureOuterPerimeterFt, SQ_FT_PER_SQ_M } from "./geoFootprintMeasure";
+
 type PolyFeature = Feature<Polygon>;
 
 export type RoofStructureMode = "auto" | "gable" | "hip" | "flat" | "mansard" | "complex";
@@ -222,14 +224,13 @@ export function computePolygonRoofGeometry(
   if (!polygons.length) return null;
 
   const totalAreaSqM = polygons.reduce((s, f) => s + (turf.area(f as never) || 0), 0);
-  const planAreaSqFt = totalAreaSqM * 10.7639;
+  const planAreaSqFt = totalAreaSqM * SQ_FT_PER_SQ_M;
   if (planAreaSqFt <= 0) return null;
 
   let floorPerimeterFt = 0;
   for (const poly of polygons) {
     try {
-      const line = turf.polygonToLine(poly as never);
-      floorPerimeterFt += turf.length(line, { units: "feet" });
+      floorPerimeterFt += polygonFeatureOuterPerimeterFt(poly);
     } catch {
       /* skip malformed polygons */
     }

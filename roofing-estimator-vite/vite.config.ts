@@ -84,7 +84,7 @@ function raybevelDiagramPlugin(): Plugin {
   };
 }
 
-/** HTTP proxies: same-origin to HD2D Worker (intel + EagleView API Center) and third-party APIs. EagleView TrueDesign uses `/intel-proxy` → Worker `/api/eagleview/apicenter/*`. */
+/** HTTP proxies: same-origin to HD2D Worker (intel routes) and third-party APIs via `/intel-proxy` → Worker. */
 const allowGeolocationHeader = {
   /** Lets the browser prompt for Geolocation API (Mapbox Geolocate control). */
   "Permissions-Policy": "geolocation=(self)",
@@ -102,6 +102,9 @@ export default defineConfig(({ mode }) => {
   } as const;
 
   return {
+  define: {
+    "import.meta.env.VERCEL_ENV": JSON.stringify(process.env.VERCEL_ENV ?? ""),
+  },
   plugins: [react(), tailwindcss(), raybevelDiagramPlugin()],
   server: {
     headers: allowGeolocationHeader,
@@ -122,11 +125,11 @@ export default defineConfig(({ mode }) => {
         rewrite: (p) => p.replace(/^\/pdl-api/, ""),
         secure: true,
       },
-      /** BatchData — browser sends Authorization: Bearer; dev CORS workaround. */
-      "/batchdata-api": {
-        target: "https://api.batchdata.com",
+      /** DealMachine Public API — browser sends X-DM-Client-Key; dev CORS workaround (optional; prefer Worker + secret). */
+      "/dealmachine-api": {
+        target: "https://public-api.dealmachine.com",
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/batchdata-api/, ""),
+        rewrite: (p) => p.replace(/^\/dealmachine-api/, ""),
         secure: true,
       },
     },
@@ -147,10 +150,10 @@ export default defineConfig(({ mode }) => {
         rewrite: (p) => p.replace(/^\/pdl-api/, ""),
         secure: true,
       },
-      "/batchdata-api": {
-        target: "https://api.batchdata.com",
+      "/dealmachine-api": {
+        target: "https://public-api.dealmachine.com",
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/batchdata-api/, ""),
+        rewrite: (p) => p.replace(/^\/dealmachine-api/, ""),
         secure: true,
       },
     },
@@ -161,5 +164,17 @@ export default defineConfig(({ mode }) => {
     },
   },
   assetsInclude: ["**/*.svg", "**/*.csv"],
+  build: {
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/maplibre-gl")) return "maplibre";
+          if (id.includes("node_modules/react-dom")) return "react-dom";
+          if (id.includes("node_modules/react/")) return "react-vendor";
+        },
+      },
+    },
+  },
   };
 });

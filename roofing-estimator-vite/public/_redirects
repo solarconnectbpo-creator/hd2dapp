@@ -1,0 +1,8 @@
+# Root static assets (explicit before SPA fallback)
+/hd2d-brand-logo.png /hd2d-brand-logo.png 200
+/hd2d-logo.png /hd2d-logo.png 200
+/favicon.svg /favicon.svg 200
+/manifest.webmanifest /manifest.webmanifest 200
+/icons.svg /icons.svg 200
+# Cloudflare Pages — client-side routing (React Router)
+/*    /index.html   200
