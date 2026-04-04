@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { HD2D_WORKER_API_ORIGIN, apiOriginForHostname } from "./siteOrigin";
+import { HD2D_WORKER_API_ORIGIN, apiOriginForHostname, isHd2dZoneHostname } from "./siteOrigin";
+
+describe("isHd2dZoneHostname", () => {
+  it("matches apex, www, and subdomains", () => {
+    expect(isHd2dZoneHostname("hardcoredoortodoorclosers.com")).toBe(true);
+    expect(isHd2dZoneHostname("www.hardcoredoortodoorclosers.com")).toBe(true);
+    expect(isHd2dZoneHostname("app.hardcoredoortodoorclosers.com")).toBe(true);
+    expect(isHd2dZoneHostname("localhost")).toBe(false);
+  });
+});
 
 describe("apiOriginForHostname", () => {
   it("maps Vercel preview to Worker API origin", () => {
@@ -12,13 +21,10 @@ describe("apiOriginForHostname", () => {
     expect(apiOriginForHostname("08fa9b7d.hd2d-closers.pages.dev")).toBe(HD2D_WORKER_API_ORIGIN);
   });
 
-  it("maps app subdomain to Worker API origin", () => {
-    expect(apiOriginForHostname("app.hardcoredoortodoorclosers.com")).toBe(HD2D_WORKER_API_ORIGIN);
-  });
-
-  it("maps apex and www to Worker API origin", () => {
-    expect(apiOriginForHostname("hardcoredoortodoorclosers.com")).toBe(HD2D_WORKER_API_ORIGIN);
-    expect(apiOriginForHostname("www.hardcoredoortodoorclosers.com")).toBe(HD2D_WORKER_API_ORIGIN);
+  it("returns null for HD2D zone so the SPA uses same-origin /api/*", () => {
+    expect(apiOriginForHostname("app.hardcoredoortodoorclosers.com")).toBeNull();
+    expect(apiOriginForHostname("hardcoredoortodoorclosers.com")).toBeNull();
+    expect(apiOriginForHostname("www.hardcoredoortodoorclosers.com")).toBeNull();
   });
 
   it("returns null for unknown hosts so same-origin is used", () => {

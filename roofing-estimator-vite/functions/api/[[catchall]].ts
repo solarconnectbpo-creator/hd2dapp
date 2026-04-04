@@ -1,8 +1,8 @@
 /**
- * Proxies same-origin `/api/*` on the Pages hostname to the HD2D Worker.
- * Without this, Pages SPA routing serves `index.html` for `/api/*`, so the zone Worker route never wins.
+ * Proxies same-origin `/api/*` on hardcoredoortodoorclosers.com (and Pages previews) to the HD2D Worker.
+ * The browser only talks to `https://hardcoredoortodoorclosers.com/api/*`; workers.dev is server-side here.
  *
- * Keep in sync with `src/config/siteOrigin.ts` HD2D_WORKER_API_ORIGIN.
+ * Keep in sync with `HD2D_WORKER_API_ORIGIN` in `src/config/siteOrigin.ts`.
  */
 const HD2D_WORKER_API_ORIGIN = "https://hd2d-backend.solarconnectbpo.workers.dev";
 

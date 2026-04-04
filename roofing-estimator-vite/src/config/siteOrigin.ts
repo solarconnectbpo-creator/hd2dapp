@@ -5,33 +5,43 @@ export const HD2D_PRODUCTION_ORIGIN = "https://hardcoredoortodoorclosers.com";
 
 /**
  * Deployed Worker origin (`wrangler.toml` `name` + account `*.workers.dev`).
- * Use for `/api/*` because Cloudflare Pages on the apex often serves HTML for `/api/*` instead of this Worker.
+ * Used for:
+ * - Pages Functions proxy target (`functions/lib/hd2dWorkerOrigin.ts` — keep in sync)
+ * - Preview hosts (`*.pages.dev`, `*.vercel.app`) where the SPA has no same-origin `/api` proxy
  */
 export const HD2D_WORKER_API_ORIGIN = "https://hd2d-backend.solarconnectbpo.workers.dev";
 
-/** Primary site apex — any subdomain on this zone is served by Pages; `/api/*` must use the Worker, not same-origin. */
+/** Primary site apex — subdomains on this zone use same-origin `/api/*` when served by this Pages project. */
 export const HD2D_SITE_ROOT = "hardcoredoortodoorclosers.com";
 
+export function isHd2dZoneHostname(hostname: string): boolean {
+  const h = hostname.trim().toLowerCase();
+  return h === HD2D_SITE_ROOT || h.endsWith(`.${HD2D_SITE_ROOT}`);
+}
+
 /**
- * Where `/api/*` lives for a given hostname. Never same-origin on apex when Pages shadows `/api/*` — use Worker URL.
+ * Hosts where the SPA must call the Worker URL directly (no same-origin `/api` bundle).
+ * Returns null for the HD2D zone — those use `window.location.origin` + `/api/*` (Pages Functions or zone routes).
  */
 export function apiOriginForHostname(hostname: string): string | null {
   const h = hostname.trim().toLowerCase();
   if (!h) return null;
   if (h.endsWith(".vercel.app")) return HD2D_WORKER_API_ORIGIN;
   if (h.endsWith(".pages.dev")) return HD2D_WORKER_API_ORIGIN;
-  if (h === HD2D_SITE_ROOT || h.endsWith(`.${HD2D_SITE_ROOT}`)) return HD2D_WORKER_API_ORIGIN;
+  if (isHd2dZoneHostname(h)) return null;
   return null;
 }
 
 /**
- * Base URL for Worker `/api/*` in production when `VITE_INTEL_API_BASE` is unset or overridden in `getHd2dApiBase()`.
+ * API base origin in production for `getHd2dApiBase()`.
+ * - hardcoredoortodoorclosers.com (and subdomains): same origin so all traffic is under your domain.
+ * - Cloudflare / Vercel preview URLs: direct Worker origin.
  */
 export function resolveProductionApiOrigin(): string {
   if (typeof window === "undefined") return HD2D_WORKER_API_ORIGIN;
-  const host = window.location.hostname || "";
-  const mapped = apiOriginForHostname(host);
-  if (mapped) return mapped;
-  // Unknown host (e.g. extra custom domain on Pages): same-origin `/api/*` is still HTML — use deployed Worker.
-  return HD2D_WORKER_API_ORIGIN;
+  const host = (window.location.hostname || "").trim().toLowerCase();
+  const origin = window.location.origin.replace(/\/$/, "");
+  if (isHd2dZoneHostname(host)) return origin;
+  if (host.endsWith(".vercel.app") || host.endsWith(".pages.dev")) return HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
+  return HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
 }
