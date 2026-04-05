@@ -1698,6 +1698,21 @@ function buildInsuranceSupplementNotes(form: FormState, result: EstimateResult):
   } else if (c.supplementAmounts.length > 0) {
     linesOut.push(`Supplement figures found in scope: ${c.supplementAmounts.map((n) => money(n)).join(", ")}.`);
   }
+  if (
+    c.parsedLineCount > 0 &&
+    c.lineExtensionSum > 0 &&
+    (c.valuationBasis === "RCV" || c.valuationBasis === "ACV")
+  ) {
+    const labelAmt = c.valuationBasis === "RCV" ? c.rcv : c.acv;
+    if (
+      labelAmt != null &&
+      Math.abs(labelAmt - c.lineExtensionSum) > Math.max(500, labelAmt * 0.02)
+    ) {
+      linesOut.push(
+        `Summed line-item extensions (${money(c.lineExtensionSum)}) differ from labeled ${c.valuationBasis} (${money(labelAmt)}) — taxes, O&P, fees, or non-line totals may explain the gap.`,
+      );
+    }
+  }
   const deltaNote =
     result.deltaDirection === "under-scoped"
       ? "Estimator RCV is higher than the carrier total — review for potential supplement / line-item gaps."
@@ -3351,6 +3366,7 @@ function App() {
   const instantPreparedForm = useMemo(() => prepareFormFromMapMeasurements(form), [form, mapboxFeatures, drawnRoofLines, autoCalcEnabled, mapboxAreaSqFt]);
   const instantReadiness = useMemo(() => scoreEstimateReadiness(instantPreparedForm), [instantPreparedForm, scoreEstimateReadiness]);
   const instantPreview = useMemo(() => buildResult(instantPreparedForm), [instantPreparedForm]);
+  const carrierScopeLive = useMemo(() => parseCarrierScope(form.carrierScopeText), [form.carrierScopeText]);
 
   const roofDiagramPreviewHtml = useMemo(() => {
     if (!result) return "";
@@ -6057,7 +6073,136 @@ function App() {
           <p className="muted" style={{ marginTop: -6, marginBottom: 10, fontSize: 12 }}>
             Pricing source: <strong>{CARRIER_BENCHMARK_SOURCE_LABEL}</strong>
           </p>
-          <label>Carrier Line Items (Xactimate style)<textarea rows={10} value={form.carrierScopeText} onChange={(e) => setForm((curr) => ({ ...curr, carrierScopeText: e.target.value }))} placeholder={"RFG LAM Laminated comp shingle 27.10 SQ 286.65 7768.22\nRFG TEAR LAM Tear off laminated 24.20 SQ 93.00 2250.60\nRFG DRPE Drip edge 187.80 LF 3.10 582.18\nRCV: 45000  ACV: 38000  Depreciation: 7000\nDeductible: 2500  Net Claim: 35500"} /></label>
+          <label>
+            Carrier Line Items (Xactimate style)
+            <textarea
+              rows={10}
+              value={form.carrierScopeText}
+              onChange={(e) => setForm((curr) => ({ ...curr, carrierScopeText: e.target.value }))}
+              placeholder={
+                "RFG LAM Laminated comp shingle 27.10 SQ 286.65 7768.22\nRFG TEAR LAM Tear off laminated 24.20 SQ 93.00 2250.60\nRFG DRPE Drip edge 187.80 LF 3.10 582.18\nRCV: 45000  ACV: 38000  Depreciation: 7000\nDeductible: 2500  Net Claim: 35500"
+              }
+            />
+          </label>
+          {form.carrierScopeText.trim() ? (
+            <div
+              className="carrier-scope-live"
+              style={{
+                marginTop: 10,
+                marginBottom: 12,
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(148, 163, 184, 0.45)",
+                background: "linear-gradient(145deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.9) 100%)",
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+              }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", color: "#0f172a" }}>
+                  Live scope read
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background:
+                      carrierScopeLive.parserConfidence === "high"
+                        ? "rgba(34, 197, 94, 0.18)"
+                        : carrierScopeLive.parserConfidence === "medium"
+                          ? "rgba(245, 158, 11, 0.2)"
+                          : "rgba(148, 163, 184, 0.25)",
+                    color: "#0f172a",
+                  }}
+                >
+                  {carrierScopeLive.parserConfidence} confidence
+                </span>
+                <span className="muted" style={{ fontSize: 11 }}>
+                  {carrierScopeLive.parsedLineCount} priced line(s) · basis{" "}
+                  <strong>{carrierScopeLive.valuationBasis}</strong>
+                  {carrierScopeLive.lineMathMismatchCount > 0
+                    ? ` · ${carrierScopeLive.lineMathMismatchCount} qty×price check(s) off`
+                    : ""}
+                </span>
+              </div>
+              <div className="tile-grid" style={{ marginBottom: carrierScopeLive.lineCodes.length ? 8 : 0 }}>
+                <div className="tile">
+                  <span>Carrier total (basis)</span>
+                  <strong>{carrierScopeLive.total > 0 ? money(carrierScopeLive.total) : "—"}</strong>
+                </div>
+                <div className="tile">
+                  <span>Summed extensions</span>
+                  <strong>
+                    {carrierScopeLive.lineExtensionSum > 0 ? money(carrierScopeLive.lineExtensionSum) : "—"}
+                  </strong>
+                </div>
+                <div className="tile">
+                  <span>RCV / ACV</span>
+                  <strong style={{ fontSize: 13 }}>
+                    {carrierScopeLive.rcv != null ? money(carrierScopeLive.rcv) : "—"} /{" "}
+                    {carrierScopeLive.acv != null ? money(carrierScopeLive.acv) : "—"}
+                  </strong>
+                </div>
+                <div className="tile">
+                  <span>Ded / net (from text)</span>
+                  <strong style={{ fontSize: 12 }}>
+                    {carrierScopeLive.deductibleFromCarrier != null
+                      ? money(carrierScopeLive.deductibleFromCarrier)
+                      : "—"}{" "}
+                    /{" "}
+                    {carrierScopeLive.netClaimFromCarrier != null
+                      ? money(carrierScopeLive.netClaimFromCarrier)
+                      : "—"}
+                  </strong>
+                </div>
+              </div>
+              {carrierScopeLive.valuationBasis !== "line-total" &&
+              carrierScopeLive.lineExtensionSum > 0 &&
+              carrierScopeLive.total > 0 &&
+              Math.abs(carrierScopeLive.total - carrierScopeLive.lineExtensionSum) >
+                Math.max(400, carrierScopeLive.total * 0.02) ? (
+                <p className="muted" style={{ fontSize: 11, margin: "0 0 8px", lineHeight: 1.45 }}>
+                  Labeled {carrierScopeLive.valuationBasis} and summed lines differ by{" "}
+                  <strong>{money(Math.abs(carrierScopeLive.total - carrierScopeLive.lineExtensionSum))}</strong> — normal
+                  if taxes, O&amp;P, or summary rows are outside the paste.
+                </p>
+              ) : null}
+              {carrierScopeLive.supplementAmounts.length > 0 ? (
+                <p className="muted" style={{ fontSize: 11, margin: "0 0 8px" }}>
+                  Supplements detected:{" "}
+                  {carrierScopeLive.supplementAmounts.map((n) => money(n)).join(", ")}
+                </p>
+              ) : null}
+              {carrierScopeLive.lineCodes.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: 10, marginRight: 4 }}>
+                    Codes
+                  </span>
+                  {carrierScopeLive.lineCodes.slice(0, 10).map((code) => (
+                    <code
+                      key={code}
+                      style={{
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: "rgba(255,255,255,0.85)",
+                        border: "1px solid rgba(203, 213, 225, 0.9)",
+                        color: "#334155",
+                      }}
+                    >
+                      {code}
+                    </code>
+                  ))}
+                  {carrierScopeLive.lineCodes.length > 10 ? (
+                    <span className="muted" style={{ fontSize: 10 }}>
+                      +{carrierScopeLive.lineCodes.length - 10}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="form-grid">
             <label>
               Carrier benchmark profile

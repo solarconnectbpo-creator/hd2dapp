@@ -3,10 +3,13 @@ export type ValuationBasis = "RCV" | "ACV" | "line-total";
 
 export interface CarrierParsed {
   valuationBasis: ValuationBasis;
+  /** Comparison total: labeled RCV/ACV when present, else summed line extensions. */
   total: number;
   rcv: number | null;
   acv: number | null;
   dep: number | null;
+  /** Sum of parsed priced-line extensions only (ignores labeled RCV/ACV row). */
+  lineExtensionSum: number;
   /** Parsed “Supplement … RCV/Total” style figures from pasted carrier scope. */
   supplementAmounts: number[];
   supplementLabeledTotal: number | null;
@@ -18,6 +21,35 @@ export interface CarrierParsed {
   lineMathTotal: number;
   lineCodes: string[];
   likelyMissingItems: string[];
+}
+
+/** Xactimate often omits a space before the unit (e.g. `27.10SQ`). */
+export function normalizeCarrierScopeLine(line: string): string {
+  return line.replace(/\b(\d+(?:\.\d+)?)(SQ|LF|SF|EA|HR|DA)\b/gi, "$1 $2");
+}
+
+function collectSupplementAmounts(text: string, into: number[], seen: Set<number>): void {
+  const push = (raw: string | undefined) => {
+    if (!raw) return;
+    const n = Number.parseFloat(raw.replace(/,/g, ""));
+    if (Number.isFinite(n) && n >= 25) {
+      const r = Math.round(n);
+      if (!seen.has(r)) {
+        seen.add(r);
+        into.push(r);
+      }
+    }
+  };
+  const patterns = [
+    /\bSupplement\s*(?:#\s*\d+)?[^\d\n$]{0,48}\$?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+    /\bSupplement\s+(?:#\s*)?\d+\s+[^\d\n$]{0,40}\$?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+    /\bSuppl\.(?:\s*)#\s*\d+\s*[^\d\n$]{0,40}\$?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+  ];
+  for (const re of patterns) {
+    for (const m of text.matchAll(re)) {
+      push(m[1]);
+    }
+  }
 }
 
 export function parseCarrierScope(text: string): CarrierParsed {
@@ -36,6 +68,7 @@ export function parseCarrierScope(text: string): CarrierParsed {
       parserConfidence: "low",
       lineMathMismatchCount: 0,
       lineMathTotal: 0,
+      lineExtensionSum: 0,
       lineCodes: [],
       likelyMissingItems: [],
     };
@@ -66,16 +99,7 @@ export function parseCarrierScope(text: string): CarrierParsed {
 
   const supplementAmounts: number[] = [];
   const seenSupp = new Set<number>();
-  for (const m of text.matchAll(/\bSupplement\s*(?:#\s*\d+)?[^\d\n$]{0,48}\$?\s*([\d,]+(?:\.\d{1,2})?)/gi)) {
-    const n = Number.parseFloat(m[1]!.replace(/,/g, ""));
-    if (Number.isFinite(n) && n >= 25) {
-      const r = Math.round(n);
-      if (!seenSupp.has(r)) {
-        seenSupp.add(r);
-        supplementAmounts.push(r);
-      }
-    }
-  }
+  collectSupplementAmounts(text, supplementAmounts, seenSupp);
 
   let parsedLineCount = 0;
   let total = 0;
@@ -85,32 +109,33 @@ export function parseCarrierScope(text: string): CarrierParsed {
   let lineText = "";
 
   for (const line of lines) {
+    const normLine = normalizeCarrierScopeLine(line);
     lineText += ` ${line.toLowerCase()}`;
-    const leadXact = line.match(/^([A-Z]{2,4}(?:\s+[A-Z][A-Z0-9]{1,6}){0,3})\s+/);
+    const leadXact = normLine.match(/^([A-Z]{2,4}(?:\s+[A-Z][A-Z0-9]{1,6}){0,3})\s+/);
     if (leadXact?.[1]) {
       codes.add(leadXact[1].replace(/\s+/g, " ").trim());
     } else {
-      const code = line.match(/\b([A-Z]{2,4}\s?[A-Z0-9]{2,6})\b/)?.[1];
+      const code = normLine.match(/\b([A-Z]{2,4}\s?[A-Z0-9]{2,6})\b/)?.[1];
       if (code) codes.add(code.replace(/\s+/g, " "));
     }
 
     // Skip carrier summary / valuation lines so we do not double-count RCV/ACV into line-item totals.
-    const hasXactimateQty = /\d+(?:\.\d+)?\s+(?:SQ|LF|SF|EA|HR|DA)\s+\d+(?:\.\d+)/i.test(line);
+    const hasXactimateQty = /\d+(?:\.\d+)?\s+(?:SQ|LF|SF|EA|HR|DA)\s+\d+(?:\.\d+)/i.test(normLine);
     if (!hasXactimateQty) {
-      if (/(?:^|\s)(?:RCV|ACV|Depreciation|Deductible|Net\s+Claim)\s*[:#]?\s*\$?[\d,]/i.test(line)) {
+      if (/(?:^|\s)(?:RCV|ACV|Depreciation|Deductible|Net\s+Claim)\s*[:#]?\s*\$?[\d,]/i.test(normLine)) {
         continue;
       }
-      if (/\bSupplement\b/i.test(line) && /\$?[\d,]+(?:\.\d{1,2})?/.test(line)) {
+      if (/\bSupplement\b/i.test(normLine) && /\$?[\d,]+(?:\.\d{1,2})?/.test(normLine)) {
         continue;
       }
-      if (/\b(total|grand total|subtotal|replacement cost value|actual cash value)\b/i.test(line)) {
+      if (/\b(total|grand total|subtotal|replacement cost value|actual cash value)\b/i.test(normLine)) {
         continue;
       }
-    } else if (/\b(total|grand total|subtotal)\b/i.test(line)) {
+    } else if (/\b(total|grand total|subtotal)\b/i.test(normLine)) {
       continue;
     }
 
-    const nums = line.replace(/,/g, "").match(/\$?\s*(\d+(?:\.\d{1,2})?)/g) || [];
+    const nums = normLine.replace(/,/g, "").match(/\$?\s*(\d+(?:\.\d{1,2})?)/g) || [];
     if (!nums.length) continue;
     const n = Number.parseFloat(nums[nums.length - 1]!.replace(/[$\s]/g, ""));
     if (!Number.isFinite(n)) continue;
@@ -118,7 +143,7 @@ export function parseCarrierScope(text: string): CarrierParsed {
     parsedLineCount += 1;
     total += n;
 
-    const flat = line.replace(/,/g, "");
+    const flat = normLine.replace(/,/g, "");
     const qTrail = flat.match(/(\d+(?:\.\d+)?)\s*(SQ|LF|SF|EA|HR|DA)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*$/i);
     if (qTrail?.[1] && qTrail[3] && qTrail[4]) {
       const qty = Number.parseFloat(qTrail[1]);
@@ -157,7 +182,8 @@ export function parseCarrierScope(text: string): CarrierParsed {
   }
 
   const valuationBasis: ValuationBasis = rcv != null ? "RCV" : acv != null ? "ACV" : "line-total";
-  const parsedTotal = valuationBasis === "RCV" ? rcv! : valuationBasis === "ACV" ? acv! : Math.round(total);
+  const lineExtensionSum = Math.round(total);
+  const parsedTotal = valuationBasis === "RCV" ? rcv! : valuationBasis === "ACV" ? acv! : lineExtensionSum;
 
   const missing: string[] = [];
   const addMissing = (rx: RegExp, label: string) => {
@@ -178,6 +204,7 @@ export function parseCarrierScope(text: string): CarrierParsed {
     rcv,
     acv,
     dep,
+    lineExtensionSum,
     supplementAmounts,
     supplementLabeledTotal,
     deductibleFromCarrier,

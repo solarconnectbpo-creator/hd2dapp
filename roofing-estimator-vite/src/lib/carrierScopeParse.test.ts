@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { parseCarrierScope } from "./carrierScopeParse";
+import { normalizeCarrierScopeLine, parseCarrierScope } from "./carrierScopeParse";
+
+describe("normalizeCarrierScopeLine", () => {
+  it("inserts space between quantity and unit when glued", () => {
+    expect(normalizeCarrierScopeLine("RFG 240SQ 120.00 28800.00")).toBe("RFG 240 SQ 120.00 28800.00");
+  });
+});
 
 describe("parseCarrierScope", () => {
   it("returns empty parse for blank input", () => {
     expect(parseCarrierScope("")).toMatchObject({
       valuationBasis: "line-total",
       total: 0,
+      lineExtensionSum: 0,
       parsedLineCount: 0,
       parserConfidence: "low",
       lineCodes: [],
@@ -38,6 +45,26 @@ RFG DRPE 180 LF 4.50 810.00
       "Supplement #1 paid $1,250.00\nSupplement #2 amount $ 900.00",
     );
     expect(p.supplementAmounts).toEqual(expect.arrayContaining([1250, 900]));
+  });
+
+  it("parses Supplement N $amount without hash", () => {
+    const p = parseCarrierScope("Supplement 2 $ 900");
+    expect(p.supplementAmounts).toContain(900);
+  });
+
+  it("parses glued SQ quantity lines", () => {
+    const p = parseCarrierScope("RFG 240SQ 120.00 28800.00");
+    expect(p.parsedLineCount).toBeGreaterThanOrEqual(1);
+    expect(p.lineExtensionSum).toBeGreaterThan(1000);
+  });
+
+  it("exposes lineExtensionSum alongside labeled RCV", () => {
+    const p = parseCarrierScope(
+      "RFG X 10 SQ 100 1000\nRCV: 50000",
+    );
+    expect(p.valuationBasis).toBe("RCV");
+    expect(p.total).toBe(50000);
+    expect(p.lineExtensionSum).toBe(1000);
   });
 
   it("extracts leading Xactimate-style codes", () => {
