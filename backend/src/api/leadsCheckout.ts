@@ -77,7 +77,8 @@ export async function handleLeadsCheckoutSession(
     });
   }
 
-  const successUrl = `${origin}/leads?checkout=success`;
+  // Stripe replaces {CHECKOUT_SESSION_ID} when redirecting (fulfillment / support reference).
+  const successUrl = `${origin}/leads?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${origin}/leads?checkout=cancel`;
 
   const params = new URLSearchParams();

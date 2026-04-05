@@ -11,6 +11,7 @@
     "deploy": "node scripts/wrangler-run.mjs deploy --env=\"\"",
     "deploy:all": "npm run deploy && npm --prefix ../roofing-estimator-vite run pages:deploy",
     "build": "npx wrangler build",
+    "smoke:health": "node scripts/health-smoke.mjs",
     "verify:worker": "node scripts/check-worker-deploy.mjs",
     "preflight:eagleview-embedded": "node scripts/eagleview-embedded-preflight.mjs",
     "smoke:eagleview-token": "node scripts/eagleview-token-smoke.mjs",

@@ -125,7 +125,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // CORS headers
+    // CORS: `*` matches Bearer-token SPA clients (no cookies). To harden, set Allow-Origin to APP_PUBLIC_ORIGIN only.
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
