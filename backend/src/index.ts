@@ -20,6 +20,7 @@ import { handleStlIntel, handleStlStormReports } from "./api/stlIntel";
 import { handleAuthRequest, type AuthEnv as AuthEnvBearer } from "./api/authRoutes";
 import { handleOsmBuildingAtPointGet } from "./api/osmBuildingFootprint";
 import { handleAdminUserRoutes } from "./api/adminUserRoutes";
+import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/coursesCatalogRoutes";
 import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
 
 interface Env {
@@ -157,6 +158,8 @@ export default {
         return await handleArcgisRequest(request, env as ArcgisEnv, path, corsHeaders);
       } else if (path.startsWith("/api/admin/users")) {
         return await handleAdminUserRoutes(request, env as AuthEnv, path, corsHeaders);
+      } else if (path.startsWith("/api/admin/courses")) {
+        return await handleAdminCoursesCatalogRoutes(request, env as AuthEnv, path, corsHeaders);
       } else if (path.startsWith("/api/admin")) {
         return await handleAdmin(request, env, path, corsHeaders);
       } else if (path === "/api/ai/roof-damage") {
@@ -193,6 +196,8 @@ export default {
         return await handleOsmBuildingAtPointGet(request, env as AuthEnvBearer, corsHeaders);
       } else if (path === "/api/dealmachine/property") {
         return await handleDealMachinePropertyPost(request, env, corsHeaders);
+      } else if (path.startsWith("/api/courses/catalog")) {
+        return await handleCoursesCatalogGet(request, env as AuthEnvBearer, path, corsHeaders);
       } else if (path.startsWith("/webhook/")) {
         return await handleWebhooks(request, env, path, corsHeaders);
       } else if (path === "/" || path === "/api") {
