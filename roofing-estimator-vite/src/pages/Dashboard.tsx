@@ -4,6 +4,7 @@ import {
   FileSignature,
   FileText,
   Folder,
+  GraduationCap,
   HardDriveDownload,
   MapPinned,
   Megaphone,
@@ -167,6 +168,12 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <Megaphone className="w-4 h-4 mr-2" />
                 Marketing &amp; social / ads
+              </Button>
+            </Link>
+            <Link to="/courses">
+              <Button className="w-full justify-start" variant="outline">
+                <GraduationCap className="w-4 h-4 mr-2" />
+                Courses &amp; training hub
               </Button>
             </Link>
           </CardContent>

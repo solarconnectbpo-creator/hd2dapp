@@ -12,4 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_INTEL_API_BASE?: string;
   /** When "true", hides Places / PDL UI (CSV-only + manual enrichment). */
   readonly VITE_PROPERTY_SCRAPER_OFFLINE?: string;
+  /** YouTube video id (e.g. `dQw4w9WgXcQ`) for optional /courses hero "Watch trailer" embed. */
+  readonly VITE_COURSES_TRAILER_ID?: string;
 }

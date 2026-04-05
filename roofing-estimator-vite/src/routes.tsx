@@ -28,6 +28,7 @@ const AdMakerAutomationRoute = lazyRoute(() =>
   import("./pages/AdMakerAutomation").then((m) => ({ default: m.AdMakerAutomation })),
 );
 const AdminUsersRoute = lazyRoute(() => import("./pages/AdminUsers").then((m) => ({ default: m.AdminUsers })));
+const CoursesRoute = lazyRoute(() => import("./pages/Courses").then((m) => ({ default: m.Courses })));
 
 export const router = createBrowserRouter([
   {
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
           { path: "marketing/social", Component: SocialMediaAutomationRoute },
           { path: "marketing/ads", Component: AdMakerAutomationRoute },
           { path: "marketing", Component: MarketingRoute },
+          { path: "courses", Component: CoursesRoute },
           { path: "admin/users", Component: AdminUsersRoute },
           { path: "*", Component: NotFound },
         ],

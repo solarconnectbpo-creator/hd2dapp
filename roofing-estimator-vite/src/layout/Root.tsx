@@ -4,6 +4,7 @@ import {
   FileSignature,
   FileText,
   Folder,
+  GraduationCap,
   Home,
   MapPinned,
   Megaphone,
@@ -31,6 +32,7 @@ const navItems = [
   { path: "/property-lookup", label: "Property records", icon: Search },
   { path: "/canvassing", label: "Canvassing", icon: MapPinned },
   { path: "/marketing", label: "Marketing", icon: Megaphone },
+  { path: "/courses", label: "Courses", icon: GraduationCap },
 ] as const;
 
 const ADMIN_USERS_PATH = "/admin/users";
