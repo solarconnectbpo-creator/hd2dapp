@@ -12,7 +12,9 @@ export function Projects() {
     <div className="px-4 py-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <h1 className="mb-2 text-2xl text-black sm:text-3xl">Projects &amp; Reports</h1>
-        <p className="text-black">Field jobs with damage photos, pipeline stages, and saved measurements</p>
+        <p className="text-black">
+          Field jobs with list/board pipeline, deal value &amp; tags, damage photos, and saved measurements
+        </p>
       </div>
 
       <Tabs defaultValue="field" className="space-y-6">

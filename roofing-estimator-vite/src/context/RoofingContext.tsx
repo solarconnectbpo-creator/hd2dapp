@@ -6,6 +6,7 @@ import {
   type FieldProject,
   MAX_FIELD_PROJECT_PHOTOS,
   normalizeFieldProject,
+  normalizeTagList,
   optHttpsUrl,
 } from "../lib/fieldProjectTypes";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
@@ -88,12 +89,19 @@ interface RoofingContextType {
     notes?: string;
     ghlUrl?: string;
     ghlEmbedUrl?: string;
+    monetaryValueUsd?: number;
+    ownerLabel?: string;
+    tags?: string | string[];
   }) => FieldProject;
   updateFieldProject: (
     id: string,
     patch: Partial<
       Pick<FieldProject, "name" | "address" | "notes" | "linkedMeasurementId" | "ghlUrl" | "ghlEmbedUrl">
-    >,
+    > & {
+      monetaryValueUsd?: number | null;
+      ownerLabel?: string | null;
+      tags?: string[] | null;
+    },
   ) => void;
   deleteFieldProject: (id: string) => void;
   setFieldProjectPipelineStage: (id: string, stage: FieldPipelineStage) => void;
@@ -246,6 +254,13 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         const now = new Date().toISOString();
         const ghlUrl = input.ghlUrl ? optHttpsUrl(input.ghlUrl.trim()) : undefined;
         const ghlEmbedUrl = input.ghlEmbedUrl ? optHttpsUrl(input.ghlEmbedUrl.trim()) : undefined;
+        const tags = normalizeTagList(input.tags);
+        const ownerLabel = input.ownerLabel?.trim().slice(0, 120);
+        let monetaryValueUsd: number | undefined;
+        if (typeof input.monetaryValueUsd === "number" && Number.isFinite(input.monetaryValueUsd)) {
+          const v = Math.max(0, input.monetaryValueUsd);
+          monetaryValueUsd = Math.round(v * 100) / 100;
+        }
         const p: FieldProject = {
           id: newFieldProjectId(),
           name: input.name.trim().slice(0, 200),
@@ -256,6 +271,9 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           pipelineStage: "intake",
           photos: [],
           linkedMeasurementId: null,
+          tags,
+          ...(monetaryValueUsd != null ? { monetaryValueUsd } : {}),
+          ...(ownerLabel ? { ownerLabel } : {}),
           ...(ghlUrl ? { ghlUrl } : {}),
           ...(ghlEmbedUrl ? { ghlEmbedUrl } : {}),
         };
@@ -291,6 +309,27 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
               const u = raw ? optHttpsUrl(raw) : undefined;
               next = { ...next, ...(u ? { ghlEmbedUrl: u } : {}) };
               if (!u) delete next.ghlEmbedUrl;
+            }
+            if (patch.monetaryValueUsd !== undefined) {
+              if (patch.monetaryValueUsd === null) {
+                delete next.monetaryValueUsd;
+              } else if (typeof patch.monetaryValueUsd === "number" && Number.isFinite(patch.monetaryValueUsd)) {
+                const v = Math.max(0, patch.monetaryValueUsd);
+                next = { ...next, monetaryValueUsd: Math.round(v * 100) / 100 };
+              }
+            }
+            if (patch.ownerLabel !== undefined) {
+              if (patch.ownerLabel === null || patch.ownerLabel === "") {
+                delete next.ownerLabel;
+              } else {
+                next = { ...next, ownerLabel: patch.ownerLabel.trim().slice(0, 120) };
+              }
+            }
+            if (patch.tags !== undefined) {
+              next = {
+                ...next,
+                tags: patch.tags === null ? [] : normalizeTagList(patch.tags),
+              };
             }
             return next;
           }),

@@ -21,6 +21,7 @@ describe("normalizeFieldProject", () => {
     updatedAt: "2026-01-02T00:00:00.000Z",
     pipelineStage: "intake",
     photos: [],
+    tags: [],
   };
 
   it("preserves valid ghlUrl and ghlEmbedUrl", () => {
@@ -41,5 +42,17 @@ describe("normalizeFieldProject", () => {
     });
     expect(p?.ghlUrl).toBeUndefined();
     expect(p?.ghlEmbedUrl).toBeUndefined();
+  });
+
+  it("normalizes tags and deal value", () => {
+    const p = normalizeFieldProject({
+      ...base,
+      tags: "hail, priority, hail",
+      monetaryValueUsd: 12500.456,
+      ownerLabel: "Alex",
+    });
+    expect(p?.tags).toEqual(["hail", "priority"]);
+    expect(p?.monetaryValueUsd).toBe(12500.46);
+    expect(p?.ownerLabel).toBe("Alex");
   });
 });

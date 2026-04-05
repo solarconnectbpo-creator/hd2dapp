@@ -3,6 +3,8 @@ import {
   Camera,
   ExternalLink,
   ImagePlus,
+  LayoutGrid,
+  List,
   Loader2,
   Sparkles,
   Trash2,
@@ -16,6 +18,7 @@ import {
   FIELD_PROJECT_PIPELINE_STAGES,
   MAX_FIELD_PROJECT_PHOTOS,
   fieldProjectStageLabel,
+  normalizeTagList,
   type FieldPipelineStage,
   type FieldProject,
 } from "../../lib/fieldProjectTypes";
@@ -24,6 +27,19 @@ import { postRoofDamageDraft } from "../../lib/roofDamageClient";
 import { loadOrgSettings } from "../../lib/orgSettings";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
+
+const usdFmt = new Intl.NumberFormat(undefined, {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+function formatUsd(n: number): string {
+  return usdFmt.format(n);
+}
+
+type ProjectsViewMode = "board" | "list";
+type ListSortKey = "updated" | "name" | "value" | "stage";
 
 function resolveGhlOpenUrl(project: FieldProject, ghlBaseUrl: string): string | null {
   const direct = project.ghlUrl?.trim();
@@ -115,16 +131,26 @@ export function FieldProjectsPanel() {
   const [newNotes, setNewNotes] = useState("");
   const [newGhlUrl, setNewGhlUrl] = useState("");
   const [newGhlEmbedUrl, setNewGhlEmbedUrl] = useState("");
+  const [newMonetaryStr, setNewMonetaryStr] = useState("");
+  const [newOwnerLabel, setNewOwnerLabel] = useState("");
+  const [newTagsComma, setNewTagsComma] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [boardQuery, setBoardQuery] = useState("");
+  const [projectsView, setProjectsView] = useState<ProjectsViewMode>("list");
+  const [stageFilter, setStageFilter] = useState<FieldPipelineStage | "all">("all");
+  const [listSortKey, setListSortKey] = useState<ListSortKey>("updated");
+  const [listSortDesc, setListSortDesc] = useState(true);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<FieldPipelineStage | null>(null);
   const [ghlEmbedOpen, setGhlEmbedOpen] = useState(false);
   const [detailGhlUrl, setDetailGhlUrl] = useState("");
   const [detailGhlEmbedUrl, setDetailGhlEmbedUrl] = useState("");
+  const [detailMonetaryStr, setDetailMonetaryStr] = useState("");
+  const [detailOwnerLabel, setDetailOwnerLabel] = useState("");
+  const [detailTagsComma, setDetailTagsComma] = useState("");
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -140,29 +166,90 @@ export function FieldProjectsPanel() {
     }
     setDetailGhlUrl(selected.ghlUrl ?? "");
     setDetailGhlEmbedUrl(selected.ghlEmbedUrl ?? "");
+    setDetailMonetaryStr(
+      selected.monetaryValueUsd != null && Number.isFinite(selected.monetaryValueUsd)
+        ? String(selected.monetaryValueUsd)
+        : "",
+    );
+    setDetailOwnerLabel(selected.ownerLabel ?? "");
+    setDetailTagsComma(selected.tags?.length ? selected.tags.join(", ") : "");
     setGhlEmbedOpen(false);
-  }, [selected?.id, selected?.ghlUrl, selected?.ghlEmbedUrl]);
+  }, [
+    selectedId,
+    selected?.ghlUrl,
+    selected?.ghlEmbedUrl,
+    selected?.monetaryValueUsd,
+    selected?.ownerLabel,
+    selected ? selected.tags.join("\0") : "",
+  ]);
 
   const sorted = useMemo(
     () => [...fieldProjects].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
     [fieldProjects],
   );
 
-  const boardProjects = useMemo(() => {
+  const filteredProjects = useMemo(() => {
     const q = boardQuery.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.address?.toLowerCase().includes(q) ?? false) ||
-        (p.notes?.toLowerCase().includes(q) ?? false),
-    );
-  }, [sorted, boardQuery]);
+    let rows = sorted;
+    if (q) {
+      rows = rows.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.address?.toLowerCase().includes(q) ?? false) ||
+          (p.notes?.toLowerCase().includes(q) ?? false) ||
+          (p.ownerLabel?.toLowerCase().includes(q) ?? false) ||
+          p.tags.some((t) => t.toLowerCase().includes(q)),
+      );
+    }
+    if (stageFilter !== "all") {
+      rows = rows.filter((p) => p.pipelineStage === stageFilter);
+    }
+    return rows;
+  }, [sorted, boardQuery, stageFilter]);
+
+  const stageCounts = useMemo(() => {
+    const m = new Map<FieldPipelineStage, number>();
+    for (const s of FIELD_PROJECT_PIPELINE_STAGES) m.set(s, 0);
+    for (const p of fieldProjects) {
+      m.set(p.pipelineStage, (m.get(p.pipelineStage) ?? 0) + 1);
+    }
+    return m;
+  }, [fieldProjects]);
+
+  const listSortedProjects = useMemo(() => {
+    const rows = [...filteredProjects];
+    const stageIdx = (s: FieldPipelineStage) => FIELD_PROJECT_PIPELINE_STAGES.indexOf(s);
+    const dir = listSortDesc ? -1 : 1;
+    rows.sort((a, b) => {
+      let c = 0;
+      switch (listSortKey) {
+        case "name":
+          c = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+          break;
+        case "value": {
+          const va = a.monetaryValueUsd ?? 0;
+          const vb = b.monetaryValueUsd ?? 0;
+          c = va === vb ? 0 : va < vb ? -1 : 1;
+          break;
+        }
+        case "stage":
+          c = stageIdx(a.pipelineStage) - stageIdx(b.pipelineStage);
+          break;
+        case "updated":
+        default:
+          c = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+          break;
+      }
+      if (c === 0) c = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      return c * dir;
+    });
+    return rows;
+  }, [filteredProjects, listSortKey, listSortDesc]);
 
   const byStage = useMemo(() => {
     const m = new Map<FieldPipelineStage, FieldProject[]>();
     for (const s of FIELD_PROJECT_PIPELINE_STAGES) m.set(s, []);
-    for (const p of boardProjects) {
+    for (const p of filteredProjects) {
       const list = m.get(p.pipelineStage);
       if (list) list.push(p);
     }
@@ -173,23 +260,41 @@ export function FieldProjectsPanel() {
       );
     }
     return m;
-  }, [boardProjects]);
+  }, [filteredProjects]);
+
+  const toggleListSort = (key: ListSortKey) => {
+    if (listSortKey === key) setListSortDesc((d) => !d);
+    else {
+      setListSortKey(key);
+      setListSortDesc(key === "name" ? false : true);
+    }
+  };
 
   const onCreate = () => {
     const name = newName.trim();
     if (!name) return;
+    const mvRaw = newMonetaryStr.trim();
+    const monetaryParsed = mvRaw === "" ? undefined : Number.parseFloat(mvRaw);
     const p = addFieldProject({
       name,
       address: newAddress.trim() || undefined,
       notes: newNotes.trim() || undefined,
       ghlUrl: newGhlUrl.trim() || undefined,
       ghlEmbedUrl: newGhlEmbedUrl.trim() || undefined,
+      ...(monetaryParsed != null && Number.isFinite(monetaryParsed) && monetaryParsed >= 0
+        ? { monetaryValueUsd: monetaryParsed }
+        : {}),
+      ownerLabel: newOwnerLabel.trim() || undefined,
+      tags: newTagsComma.trim() || undefined,
     });
     setNewName("");
     setNewAddress("");
     setNewNotes("");
     setNewGhlUrl("");
     setNewGhlEmbedUrl("");
+    setNewMonetaryStr("");
+    setNewOwnerLabel("");
+    setNewTagsComma("");
     setCreateOpen(false);
     setSelectedId(p.id);
   };
@@ -264,10 +369,10 @@ export function FieldProjectsPanel() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-black">Field jobs</h2>
+          <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
           <p className="text-sm text-black/80">
-            Take damage photos on your phone (camera opens on iOS/Android), track pipeline stages for roofing and
-            insurance. Drag cards between columns or open a job for details.
+            Opportunities-style <strong>list</strong> or <strong>board</strong> views (local CRM). Add deal value,
+            owner, and tags; link each job to GoHighLevel. Photos and AI notes stay on device until you export.
           </p>
         </div>
         <Button type="button" className="bg-black text-white hover:bg-black/90" onClick={() => setCreateOpen(true)}>
@@ -285,19 +390,76 @@ export function FieldProjectsPanel() {
       ) : null}
 
       {sorted.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="inline-flex rounded-lg border border-black/15 bg-white p-0.5 shadow-sm">
+              <button
+                type="button"
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                  projectsView === "list" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
+                }`}
+                onClick={() => setProjectsView("list")}
+              >
+                <List className="h-4 w-4" />
+                List
+              </button>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                  projectsView === "board" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
+                }`}
+                onClick={() => setProjectsView("board")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Board
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  stageFilter === "all"
+                    ? "border-black bg-black text-white"
+                    : "border-black/15 bg-white text-black/80 hover:bg-black/5"
+                }`}
+                onClick={() => setStageFilter("all")}
+              >
+                All ({fieldProjects.length})
+              </button>
+              {FIELD_PROJECT_PIPELINE_STAGES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    stageFilter === s
+                      ? "border-black bg-black text-white"
+                      : "border-black/15 bg-white text-black/80 hover:bg-black/5"
+                  }`}
+                  onClick={() => setStageFilter(s)}
+                >
+                  {fieldProjectStageLabel(s)} ({stageCounts.get(s) ?? 0})
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="block text-sm font-medium text-black">
-            Search / filter
+            Search
             <input
               className="mt-1 w-full max-w-md rounded-md border border-black/20 px-3 py-2 text-black"
               value={boardQuery}
               onChange={(e) => setBoardQuery(e.target.value)}
-              placeholder="Name, address, or notes"
+              placeholder="Name, address, owner, tags, notes…"
             />
           </label>
-          <p className="text-xs text-black/60">
-            Drag-and-drop works on desktop; on phones use the pipeline dropdown inside a job.
-          </p>
+          {projectsView === "board" ? (
+            <p className="text-xs text-black/60">
+              Drag-and-drop between columns on desktop; on phones use the pipeline dropdown inside a job.
+            </p>
+          ) : (
+            <p className="text-xs text-black/60">
+              Click column headers to sort. Stage changes apply immediately from the dropdown.
+            </p>
+          )}
         </div>
       ) : null}
 
@@ -308,6 +470,137 @@ export function FieldProjectsPanel() {
             <p className="text-center text-black">No field projects yet. Create one to add site photos and pipeline.</p>
           </CardContent>
         </Card>
+      ) : projectsView === "list" ? (
+        <div className="overflow-x-auto rounded-lg border border-black/10 bg-white shadow-sm">
+          <table className="w-full min-w-[720px] border-collapse text-left text-sm text-black">
+            <thead>
+              <tr className="border-b border-black/10 bg-black/[0.03]">
+                <th className="px-3 py-2.5">
+                  <button
+                    type="button"
+                    className="font-semibold hover:underline"
+                    onClick={() => toggleListSort("name")}
+                  >
+                    Opportunity {listSortKey === "name" ? (listSortDesc ? "↓" : "↑") : ""}
+                  </button>
+                </th>
+                <th className="px-3 py-2.5">
+                  <button
+                    type="button"
+                    className="font-semibold hover:underline"
+                    onClick={() => toggleListSort("stage")}
+                  >
+                    Stage {listSortKey === "stage" ? (listSortDesc ? "↓" : "↑") : ""}
+                  </button>
+                </th>
+                <th className="px-3 py-2.5">
+                  <button
+                    type="button"
+                    className="font-semibold hover:underline"
+                    onClick={() => toggleListSort("value")}
+                  >
+                    Value {listSortKey === "value" ? (listSortDesc ? "↓" : "↑") : ""}
+                  </button>
+                </th>
+                <th className="px-3 py-2.5 font-semibold">Owner</th>
+                <th className="px-3 py-2.5 font-semibold">Tags</th>
+                <th className="px-3 py-2.5 font-semibold">Photos</th>
+                <th className="px-3 py-2.5">
+                  <button
+                    type="button"
+                    className="font-semibold hover:underline"
+                    onClick={() => toggleListSort("updated")}
+                  >
+                    Updated {listSortKey === "updated" ? (listSortDesc ? "↓" : "↑") : ""}
+                  </button>
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {listSortedProjects.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-10 text-center text-black/60">
+                    No jobs match this filter.
+                  </td>
+                </tr>
+              ) : (
+                listSortedProjects.map((p) => (
+                  <tr key={p.id} className="border-b border-black/[0.06] hover:bg-black/[0.02]">
+                    <td className="max-w-[200px] px-3 py-2 align-top">
+                      <p className="font-medium leading-snug">{p.name}</p>
+                      {p.address ? (
+                        <p className="mt-0.5 line-clamp-2 text-xs text-black/60">{p.address}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <select
+                        className="max-w-[140px] rounded-md border border-black/20 bg-white px-2 py-1 text-xs text-black"
+                        value={p.pipelineStage}
+                        onChange={(e) =>
+                          setFieldProjectPipelineStage(p.id, e.target.value as FieldPipelineStage)
+                        }
+                      >
+                        {FIELD_PROJECT_PIPELINE_STAGES.map((s) => (
+                          <option key={s} value={s}>
+                            {fieldProjectStageLabel(s)}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-black/90">
+                      {p.monetaryValueUsd != null ? formatUsd(p.monetaryValueUsd) : "—"}
+                    </td>
+                    <td className="max-w-[120px] px-3 py-2 align-top text-xs text-black/80">
+                      {p.ownerLabel ?? "—"}
+                    </td>
+                    <td className="max-w-[160px] px-3 py-2 align-top">
+                      <div className="flex flex-wrap gap-1">
+                        {p.tags.length ? (
+                          p.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-black/80"
+                            >
+                              {t}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-black/40">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-black/80">{p.photos.length}</td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-black/70">
+                      {new Date(p.updatedAt).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2 align-top text-right">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelectedId(p.id)}>
+                          Open
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs text-red-700"
+                          onClick={() => {
+                            if (window.confirm(`Delete field project “${p.name}” and all its photos?`)) {
+                              deleteFieldProject(p.id);
+                              if (selectedId === p.id) setSelectedId(null);
+                            }
+                          }}
+                        >
+                          Del
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="overflow-x-auto pb-2">
           <div className="flex min-h-[min(480px,70vh)] gap-3" style={{ minWidth: "min(100%, 920px)" }}>
@@ -412,6 +705,36 @@ export function FieldProjectsPanel() {
                 />
               </label>
               <label className="block text-sm font-medium text-black">
+                Deal value USD (optional)
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  value={newMonetaryStr}
+                  onChange={(e) => setNewMonetaryStr(e.target.value)}
+                  placeholder="e.g. 45000"
+                />
+              </label>
+              <label className="block text-sm font-medium text-black">
+                Owner / assignee (optional)
+                <input
+                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  value={newOwnerLabel}
+                  onChange={(e) => setNewOwnerLabel(e.target.value)}
+                  placeholder="Rep or crew lead"
+                />
+              </label>
+              <label className="block text-sm font-medium text-black">
+                Tags (optional, comma-separated)
+                <input
+                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  value={newTagsComma}
+                  onChange={(e) => setNewTagsComma(e.target.value)}
+                  placeholder="hail, insurance, commercial"
+                />
+              </label>
+              <label className="block text-sm font-medium text-black">
                 GHL deep link (optional, https)
                 <input
                   className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
@@ -483,6 +806,58 @@ export function FieldProjectsPanel() {
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div className="rounded-lg border border-black/10 bg-black/[0.02] p-3 space-y-3">
+                <p className="text-sm font-medium text-black">Deal fields</p>
+                <label className="block text-sm text-black">
+                  Value (USD)
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    value={detailMonetaryStr}
+                    onChange={(e) => setDetailMonetaryStr(e.target.value)}
+                    placeholder="Leave empty to clear"
+                  />
+                </label>
+                <label className="block text-sm text-black">
+                  Owner / assignee
+                  <input
+                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    value={detailOwnerLabel}
+                    onChange={(e) => setDetailOwnerLabel(e.target.value)}
+                  />
+                </label>
+                <label className="block text-sm text-black">
+                  Tags (comma-separated)
+                  <input
+                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    value={detailTagsComma}
+                    onChange={(e) => setDetailTagsComma(e.target.value)}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const mvRaw = detailMonetaryStr.trim();
+                    const monetaryValueUsd =
+                      mvRaw === "" ? null : Number.parseFloat(mvRaw);
+                    updateFieldProject(selected.id, {
+                      monetaryValueUsd:
+                        monetaryValueUsd != null && Number.isFinite(monetaryValueUsd) && monetaryValueUsd >= 0
+                          ? monetaryValueUsd
+                          : null,
+                      ownerLabel: detailOwnerLabel.trim() === "" ? null : detailOwnerLabel,
+                      tags: normalizeTagList(detailTagsComma),
+                    });
+                  }}
+                >
+                  Save deal fields
+                </Button>
               </div>
 
               <div>
@@ -767,6 +1142,27 @@ function KanbanCard({
         </div>
         {project.address ? (
           <CardDescription className="line-clamp-2 text-xs text-black/75">{project.address}</CardDescription>
+        ) : null}
+        {project.monetaryValueUsd != null ? (
+          <p className="text-xs font-semibold text-emerald-800">{formatUsd(project.monetaryValueUsd)}</p>
+        ) : null}
+        {project.ownerLabel ? (
+          <p className="text-[11px] text-black/60">Owner: {project.ownerLabel}</p>
+        ) : null}
+        {project.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {project.tags.slice(0, 4).map((t) => (
+              <span
+                key={t}
+                className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-black/70"
+              >
+                {t}
+              </span>
+            ))}
+            {project.tags.length > 4 ? (
+              <span className="text-[9px] text-black/50">+{project.tags.length - 4}</span>
+            ) : null}
+          </div>
         ) : null}
         <p className="text-[11px] text-black/50">{new Date(project.updatedAt).toLocaleDateString()}</p>
       </CardHeader>

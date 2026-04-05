@@ -46,6 +46,12 @@ export interface FieldProject {
   pipelineStage: FieldPipelineStage;
   photos: DamagePhoto[];
   linkedMeasurementId?: string | null;
+  /** Optional deal-style value for list/board (USD). */
+  monetaryValueUsd?: number;
+  /** Assignee or rep label (local CRM-style). */
+  ownerLabel?: string;
+  /** Short labels, e.g. hail, insurance, commercial. */
+  tags: string[];
   /** Deep link to opportunity/contact/board in GoHighLevel (https only). */
   ghlUrl?: string;
   /** Optional separate URL for iframe embed; if unset, embed is not suggested when only ghlUrl is set. */
@@ -59,6 +65,38 @@ function optString(v: unknown, max: number): string | undefined {
   const t = v.trim();
   if (!t) return undefined;
   return t.slice(0, max);
+}
+
+const MAX_TAGS = 12;
+const MAX_TAG_LEN = 32;
+
+export function normalizeTagList(raw: unknown): string[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    const out: string[] = [];
+    for (const x of raw) {
+      if (typeof x !== "string") continue;
+      const t = x.trim().slice(0, MAX_TAG_LEN);
+      if (t && !out.includes(t)) out.push(t);
+      if (out.length >= MAX_TAGS) break;
+    }
+    return out;
+  }
+  if (typeof raw === "string") {
+    const parts = raw.split(/[,;]/).map((s) => s.trim().slice(0, MAX_TAG_LEN)).filter(Boolean);
+    const out: string[] = [];
+    for (const t of parts) {
+      if (!out.includes(t)) out.push(t);
+      if (out.length >= MAX_TAGS) break;
+    }
+    return out;
+  }
+  return [];
+}
+
+function optNonNegativeMoney(v: unknown): number | undefined {
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 0) return undefined;
+  return Math.round(v * 100) / 100;
 }
 
 const MAX_GHL_URL = 2048;
@@ -139,6 +177,9 @@ export function normalizeFieldProject(raw: Record<string, unknown>): FieldProjec
 
   const ghlUrl = optHttpsUrl(raw.ghlUrl);
   const ghlEmbedUrl = optHttpsUrl(raw.ghlEmbedUrl);
+  const monetaryValueUsd = optNonNegativeMoney(raw.monetaryValueUsd);
+  const ownerLabel = optString(raw.ownerLabel, 120);
+  const tags = normalizeTagList(raw.tags);
 
   return {
     id,
@@ -150,6 +191,9 @@ export function normalizeFieldProject(raw: Record<string, unknown>): FieldProjec
     pipelineStage,
     photos: photos.slice(0, MAX_FIELD_PROJECT_PHOTOS),
     linkedMeasurementId: linked,
+    tags,
+    ...(monetaryValueUsd != null ? { monetaryValueUsd } : {}),
+    ...(ownerLabel ? { ownerLabel } : {}),
     ...(ghlUrl ? { ghlUrl } : {}),
     ...(ghlEmbedUrl ? { ghlEmbedUrl } : {}),
   };

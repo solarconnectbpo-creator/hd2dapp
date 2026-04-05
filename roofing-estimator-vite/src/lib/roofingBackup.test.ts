@@ -58,6 +58,7 @@ const sampleFp: FieldProject = {
   pipelineStage: "intake",
   photos: [],
   linkedMeasurementId: null,
+  tags: [],
 };
 
 describe("parseRoofingBackupJson", () => {
