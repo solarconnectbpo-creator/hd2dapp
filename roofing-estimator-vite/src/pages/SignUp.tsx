@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { AuthDivider } from "../components/auth/AuthDivider";
 import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
 import { AUTH_FIELD_CLASS, AUTH_SECONDARY_BTN } from "../components/auth/authFieldStyles";
+import { BrowseWithoutSignInNav } from "../components/auth/BrowseWithoutSignInNav";
 import { PasswordField } from "../components/auth/PasswordField";
 import { useAuth } from "../context/AuthContext";
 import { fetchAuthCapabilities } from "../lib/authClient";
@@ -64,6 +65,7 @@ export function SignUp() {
             if you have an admin account.
           </div>
         ) : null}
+        <BrowseWithoutSignInNav />
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-[#e7e9ea]">Display name</span>

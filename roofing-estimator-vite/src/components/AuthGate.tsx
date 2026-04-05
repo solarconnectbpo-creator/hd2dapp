@@ -1,14 +1,25 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 
-/** Map-first tools (public, like Atlas “enter the map”) — no account required for field use / local data. */
+/**
+ * Paths reachable without signing in.
+ * Map/tools: field use with local data.
+ * Courses / call center / leads / marketing: browse and read-only UI; purchases and admin still require the right role inside each page.
+ */
 function isPublicAppPath(pathname: string): boolean {
-  return (
+  if (
     pathname === "/measurement/new" ||
     pathname.startsWith("/measurement/new/") ||
     pathname === "/canvassing" ||
     pathname.startsWith("/canvassing/")
-  );
+  ) {
+    return true;
+  }
+  if (pathname === "/courses" || pathname.startsWith("/courses/")) return true;
+  if (pathname === "/call-center" || pathname.startsWith("/call-center/")) return true;
+  if (pathname === "/leads" || pathname.startsWith("/leads/")) return true;
+  if (pathname === "/marketing" || pathname.startsWith("/marketing/")) return true;
+  return false;
 }
 
 export function AuthGate() {

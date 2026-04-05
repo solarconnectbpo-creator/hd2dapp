@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { AuthDivider } from "../components/auth/AuthDivider";
 import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
 import { AUTH_FIELD_CLASS, AUTH_SIGNUP_CTA } from "../components/auth/authFieldStyles";
+import { BrowseWithoutSignInNav } from "../components/auth/BrowseWithoutSignInNav";
 import { PasswordField } from "../components/auth/PasswordField";
 import { useAuth } from "../context/AuthContext";
 import { getExternalCareersUrl } from "../lib/careersLink";
@@ -68,6 +69,7 @@ export function Login() {
             Admin sign in
           </Link>
         </p>
+        <BrowseWithoutSignInNav />
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-[#e7e9ea]">Email</span>
