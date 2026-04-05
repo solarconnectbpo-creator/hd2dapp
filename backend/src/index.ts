@@ -23,6 +23,8 @@ import { handleAdminUserRoutes } from "./api/adminUserRoutes";
 import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/coursesCatalogRoutes";
 import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCheckout";
 import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
+import { handleEstimatorChatAi } from "./api/estimatorChatAi";
+import { handleGhlSubmitLead } from "./api/ghlSubmitLead";
 
 interface Env {
   DB: any;
@@ -80,6 +82,10 @@ interface Env {
   LEADS_STRIPE_PRICE_IDS?: string;
   /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
   APP_PUBLIC_ORIGIN?: string;
+  /** GoHighLevel Private Integration token (Bearer) for POST /api/ghl/submit-lead */
+  GHL_PRIVATE_INTEGRATION_TOKEN?: string;
+  /** GHL location id (sub-account) */
+  GHL_LOCATION_ID?: string;
 }
 
 type AuthEnv = Pick<
@@ -186,6 +192,10 @@ export default {
         return await handleRoofSegmentProxy(request, env, corsHeaders);
       } else if (path === "/api/ai/bedtime-story") {
         return await handleBedtimeStoryAi(request, env, corsHeaders);
+      } else if (path === "/api/ai/estimator-chat") {
+        return await handleEstimatorChatAi(request, env, corsHeaders);
+      } else if (path === "/api/ghl/submit-lead") {
+        return await handleGhlSubmitLead(request, env, corsHeaders);
       } else if (path === "/api/measurements/hybrid") {
         return await handleMeasurementsHybrid(request, env, corsHeaders);
       } else if (path === "/api/property-scraper/listing") {

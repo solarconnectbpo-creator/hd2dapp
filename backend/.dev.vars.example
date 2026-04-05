@@ -61,6 +61,11 @@
 # APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
 # Production example: APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com
 
+# --- GoHighLevel (POST /api/ghl/submit-lead from roofing estimator chat) ---
+# Private Integration token from GHL Settings → Private Integrations; Location id from sub-account URL or API.
+# GHL_PRIVATE_INTEGRATION_TOKEN=
+# GHL_LOCATION_ID=
+
 # Optional ArcGIS MapServer / ImageServer cached tiles for Canvassing (slippy XYZ; exposed in GET /api/health, no secrets in URL):
 # ARCGIS_MAPSERVER_TILE_URL=https://your-host/arcgis/rest/services/YourMap/MapServer/tile/{z}/{y}/{x}
 # ARCGIS_MAPSERVER_TILE_ATTRIBUTION=County GIS
