@@ -5,6 +5,7 @@ import { NotFound } from "./pages/NotFound";
 import { AdminLogin } from "./pages/AdminLogin";
 import { Login } from "./pages/Login";
 import { SignUp } from "./pages/SignUp";
+import { Careers } from "./pages/Careers";
 import { AuthGate } from "./components/AuthGate";
 import { lazyRoute } from "./routes/lazyRoute";
 
@@ -28,12 +29,21 @@ const AdMakerAutomationRoute = lazyRoute(() =>
   import("./pages/AdMakerAutomation").then((m) => ({ default: m.AdMakerAutomation })),
 );
 const AdminUsersRoute = lazyRoute(() => import("./pages/AdminUsers").then((m) => ({ default: m.AdminUsers })));
+const AdminCoursesRoute = lazyRoute(() => import("./pages/AdminCourses").then((m) => ({ default: m.AdminCourses })));
 const CoursesRoute = lazyRoute(() => import("./pages/Courses").then((m) => ({ default: m.Courses })));
+const CallCenterRoute = lazyRoute(() => import("./pages/CallCenter").then((m) => ({ default: m.CallCenter })));
+const LeadMarketplaceRoute = lazyRoute(() =>
+  import("./pages/LeadMarketplace").then((m) => ({ default: m.LeadMarketplace })),
+);
 
 export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/careers",
+    Component: Careers,
   },
   {
     path: "/admin/login",
@@ -62,6 +72,9 @@ export const router = createBrowserRouter([
           { path: "marketing/ads", Component: AdMakerAutomationRoute },
           { path: "marketing", Component: MarketingRoute },
           { path: "courses", Component: CoursesRoute },
+          { path: "call-center", Component: CallCenterRoute },
+          { path: "leads", Component: LeadMarketplaceRoute },
+          { path: "admin/courses", Component: AdminCoursesRoute },
           { path: "admin/users", Component: AdminUsersRoute },
           { path: "*", Component: NotFound },
         ],

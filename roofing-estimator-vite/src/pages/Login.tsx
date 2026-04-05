@@ -5,8 +5,10 @@ import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
 import { AUTH_FIELD_CLASS, AUTH_SIGNUP_CTA } from "../components/auth/authFieldStyles";
 import { PasswordField } from "../components/auth/PasswordField";
 import { useAuth } from "../context/AuthContext";
+import { getExternalCareersUrl } from "../lib/careersLink";
 
 export function Login() {
+  const externalCareers = getExternalCareersUrl();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -39,7 +41,26 @@ export function Login() {
       <div className="rounded-2xl border border-[#2f3336] bg-[#16181c]/90 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-md">
         <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Sign in</h1>
         <p className="mb-6 text-center text-sm text-[#71767b]">Use your HD2D Closers account</p>
-        <p className="-mt-4 mb-6 text-center">
+        <p className="-mt-4 mb-4 text-center text-sm text-[#71767b]">
+          {externalCareers ? (
+            <a
+              href={externalCareers}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#1d9bf0] underline-offset-2 hover:underline"
+            >
+              Looking for a roofing company to work for?
+            </a>
+          ) : (
+            <Link
+              to="/careers"
+              className="font-medium text-[#1d9bf0] underline-offset-2 hover:underline"
+            >
+              Looking for a roofing company to work for?
+            </Link>
+          )}
+        </p>
+        <p className="mb-6 text-center">
           <Link
             to="/admin/login"
             className="text-sm font-medium text-[#71767b] underline-offset-2 hover:text-[#1d9bf0] hover:underline"

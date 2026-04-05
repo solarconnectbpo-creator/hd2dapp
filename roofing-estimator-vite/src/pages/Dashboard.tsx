@@ -6,8 +6,10 @@ import {
   Folder,
   GraduationCap,
   HardDriveDownload,
+  Headphones,
   MapPinned,
   Megaphone,
+  PhoneForwarded,
   Ruler,
   Search,
   TrendingUp,
@@ -174,6 +176,18 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <GraduationCap className="w-4 h-4 mr-2" />
                 Courses &amp; training hub
+              </Button>
+            </Link>
+            <Link to="/call-center">
+              <Button className="w-full justify-start" variant="outline">
+                <Headphones className="w-4 h-4 mr-2" />
+                Call center reports
+              </Button>
+            </Link>
+            <Link to="/leads">
+              <Button className="w-full justify-start" variant="outline">
+                <PhoneForwarded className="w-4 h-4 mr-2" />
+                Buy leads
               </Button>
             </Link>
           </CardContent>

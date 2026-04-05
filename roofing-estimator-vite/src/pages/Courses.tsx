@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   BookOpen,
@@ -13,17 +13,13 @@ import {
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import {
-  coursesCategories,
-  coursesClosingCta,
-  coursesFaq,
-  coursesHero,
-  coursesImmersiveBand,
-  coursesNarrativeBand,
-  coursesTrainerLinks,
-  coursesValueProps,
-  getCoursesTrailerYoutubeId,
+  DEFAULT_COURSES_CATALOG,
+  resolveTrailerYoutubeId,
   type CourseProgram,
+  type CoursesCatalogData,
 } from "../data/coursesCatalog";
+import { fetchCoursesCatalog } from "../lib/coursesCatalogClient";
+import { useAuth } from "../context/AuthContext";
 
 function ProgramCard({
   program,
@@ -74,12 +70,55 @@ function ProgramCard({
 }
 
 export function Courses() {
+  const { session } = useAuth();
+  const token = session?.token ?? "";
+  const [catalog, setCatalog] = useState<CoursesCatalogData>(DEFAULT_COURSES_CATALOG);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogNotice, setCatalogNotice] = useState("");
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [comingSoonProgram, setComingSoonProgram] = useState<string | null>(null);
-  const trailerId = getCoursesTrailerYoutubeId();
+  const trailerId = resolveTrailerYoutubeId(catalog);
+
+  useEffect(() => {
+    if (!token) {
+      setCatalog(DEFAULT_COURSES_CATALOG);
+      setCatalogLoading(false);
+      setCatalogNotice("");
+      return;
+    }
+    let cancelled = false;
+    setCatalogLoading(true);
+    setCatalogNotice("");
+    void (async () => {
+      try {
+        const { catalog: remote } = await fetchCoursesCatalog(token);
+        if (cancelled) return;
+        setCatalog(remote ?? DEFAULT_COURSES_CATALOG);
+      } catch (e) {
+        if (cancelled) return;
+        setCatalog(DEFAULT_COURSES_CATALOG);
+        setCatalogNotice(e instanceof Error ? e.message : "Could not load catalog from server.");
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   return (
     <div className="px-4 py-4 sm:p-6 lg:p-8">
+      {catalogNotice ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status">
+          Showing built-in catalog: {catalogNotice}
+        </div>
+      ) : null}
+      {catalogLoading ? (
+        <p className="mb-6 text-sm text-black/60" aria-live="polite">
+          Loading catalog…
+        </p>
+      ) : null}
       {/* Hero */}
       <section className="relative mb-12 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-12 text-white sm:px-10 sm:py-16">
         <div className="relative z-10 max-w-3xl">
@@ -87,15 +126,15 @@ export function Courses() {
             <GraduationCap className="h-4 w-4" aria-hidden />
             HD2D Skill Hub
           </p>
-          <h1 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">{coursesHero.headline}</h1>
-          <p className="mb-8 text-lg text-slate-300">{coursesHero.subhead}</p>
+          <h1 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">{catalog.hero.headline}</h1>
+          <p className="mb-8 text-lg text-slate-300">{catalog.hero.subhead}</p>
           <div className="flex flex-wrap gap-3">
             <Button
               asChild
               size="lg"
               className="bg-sky-500 text-white hover:bg-sky-600"
             >
-              <Link to={coursesHero.primaryCtaPath}>{coursesHero.primaryCtaLabel}</Link>
+              <Link to={catalog.hero.primaryCtaPath}>{catalog.hero.primaryCtaLabel}</Link>
             </Button>
             {trailerId ? (
               <Button
@@ -119,7 +158,7 @@ export function Courses() {
 
       {/* Value pillars */}
       <section className="mb-14 grid gap-6 sm:grid-cols-3">
-        {coursesValueProps.map((p) => (
+        {catalog.valueProps.map((p) => (
           <Card key={p.title} className="border-slate-200 bg-slate-50/80">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg text-black">
@@ -134,13 +173,13 @@ export function Courses() {
 
       {/* Narrative */}
       <section className="mb-14 text-center">
-        <h2 className="mb-3 text-2xl font-semibold text-black sm:text-3xl">{coursesNarrativeBand.title}</h2>
-        <p className="mx-auto max-w-2xl text-black/75">{coursesNarrativeBand.body}</p>
+        <h2 className="mb-3 text-2xl font-semibold text-black sm:text-3xl">{catalog.narrativeBand.title}</h2>
+        <p className="mx-auto max-w-2xl text-black/75">{catalog.narrativeBand.body}</p>
       </section>
 
       {/* Category grids */}
       <div className="mb-14 space-y-14">
-        {coursesCategories.map((cat) => (
+        {catalog.categories.map((cat) => (
           <section key={cat.id} id={cat.id}>
             <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -162,10 +201,10 @@ export function Courses() {
       {/* Immersive band */}
       <section className="mb-14 rounded-2xl border border-sky-200 bg-sky-50/60 px-6 py-10 sm:px-10">
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="mb-3 text-2xl font-semibold text-black">{coursesImmersiveBand.title}</h2>
-          <p className="mb-6 text-black/75">{coursesImmersiveBand.body}</p>
+          <h2 className="mb-3 text-2xl font-semibold text-black">{catalog.immersiveBand.title}</h2>
+          <p className="mb-6 text-black/75">{catalog.immersiveBand.body}</p>
           <Button type="button" variant="outline" className="border-slate-300" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-            {coursesImmersiveBand.ctaLabel}
+            {catalog.immersiveBand.ctaLabel}
           </Button>
         </div>
       </section>
@@ -174,10 +213,10 @@ export function Courses() {
       <section className="mb-14">
         <h2 className="mb-2 text-center text-2xl font-semibold text-black">Coaches &amp; contributors</h2>
         <p className="mb-8 text-center text-sm text-black/65">
-          Link your own SMEs in <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">coursesCatalog.ts</code>
+          Admins can edit names and links in <strong className="font-medium">Admin — courses</strong>.
         </p>
         <div className="flex flex-wrap justify-center gap-2">
-          {coursesTrainerLinks.map((t) =>
+          {catalog.trainerLinks.map((t) =>
             t.href ? (
               <a
                 key={t.name}
@@ -207,7 +246,7 @@ export function Courses() {
           <h2 className="text-2xl font-semibold text-black">Frequently asked questions</h2>
         </div>
         <div className="space-y-2">
-          {coursesFaq.map((item) => (
+          {catalog.faq.map((item) => (
             <details
               key={item.question}
               className="group rounded-lg border border-slate-200 bg-white px-4 py-3 open:bg-slate-50/80"
@@ -226,10 +265,10 @@ export function Courses() {
 
       {/* Closing CTA */}
       <section className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-10 text-center text-white sm:px-10">
-        <h2 className="mb-3 text-2xl font-semibold">{coursesClosingCta.title}</h2>
-        <p className="mx-auto mb-6 max-w-xl text-slate-300">{coursesClosingCta.body}</p>
+        <h2 className="mb-3 text-2xl font-semibold">{catalog.closingCta.title}</h2>
+        <p className="mx-auto mb-6 max-w-xl text-slate-300">{catalog.closingCta.body}</p>
         <Button asChild className="bg-sky-500 text-white hover:bg-sky-600">
-          <Link to={coursesClosingCta.ctaPath}>{coursesClosingCta.ctaLabel}</Link>
+          <Link to={catalog.closingCta.ctaPath}>{catalog.closingCta.ctaLabel}</Link>
         </Button>
       </section>
 

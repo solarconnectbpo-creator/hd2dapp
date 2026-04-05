@@ -275,9 +275,53 @@ export const coursesClosingCta = {
   ctaPath: "/contacts",
 } as const;
 
+/** Shape stored in D1 and edited in Admin — courses (must stay aligned with Worker `validateCoursesCatalogPayload`). */
+export type CoursesCatalogData = {
+  hero: {
+    headline: string;
+    subhead: string;
+    primaryCtaLabel: string;
+    primaryCtaPath: string;
+  };
+  valueProps: ValueProp[];
+  narrativeBand: { title: string; body: string };
+  immersiveBand: { title: string; body: string; ctaLabel: string };
+  categories: CourseCategory[];
+  trainerLinks: TrainerLink[];
+  faq: FaqItem[];
+  closingCta: {
+    title: string;
+    body: string;
+    ctaLabel: string;
+    ctaPath: string;
+  };
+  /** Optional; also overridable via `VITE_COURSES_TRAILER_ID`. */
+  trailerYoutubeId?: string;
+};
+
+/** Built-in catalog when D1 has no row or fetch fails. */
+export const DEFAULT_COURSES_CATALOG: CoursesCatalogData = {
+  hero: { ...coursesHero },
+  valueProps: coursesValueProps,
+  narrativeBand: { ...coursesNarrativeBand },
+  immersiveBand: { ...coursesImmersiveBand },
+  categories: coursesCategories,
+  trainerLinks: coursesTrainerLinks,
+  faq: coursesFaq,
+  closingCta: { ...coursesClosingCta },
+};
+
 export function getCoursesTrailerYoutubeId(): string | undefined {
   const raw = import.meta.env.VITE_COURSES_TRAILER_ID;
   if (typeof raw !== "string") return undefined;
   const t = raw.trim();
   return t || undefined;
+}
+
+/** Env wins over catalog so deployers can override without editing JSON. */
+export function resolveTrailerYoutubeId(catalog: CoursesCatalogData): string | undefined {
+  const fromEnv = getCoursesTrailerYoutubeId();
+  if (fromEnv) return fromEnv;
+  const id = catalog.trailerYoutubeId?.trim();
+  return id || undefined;
 }

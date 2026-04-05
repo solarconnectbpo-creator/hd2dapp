@@ -6,9 +6,12 @@ import {
   Folder,
   GraduationCap,
   Home,
+  Library,
+  Headphones,
   MapPinned,
   Megaphone,
   Menu,
+  PhoneForwarded,
   Ruler,
   Search,
   Shield,
@@ -33,10 +36,14 @@ const navItems = [
   { path: "/canvassing", label: "Canvassing", icon: MapPinned },
   { path: "/marketing", label: "Marketing", icon: Megaphone },
   { path: "/courses", label: "Courses", icon: GraduationCap },
+  { path: "/call-center", label: "Call center", icon: Headphones },
+  { path: "/leads", label: "Buy leads", icon: PhoneForwarded },
 ] as const;
 
 const ADMIN_USERS_PATH = "/admin/users";
 const ADMIN_USERS_LABEL = "Admin — users";
+const ADMIN_COURSES_PATH = "/admin/courses";
+const ADMIN_COURSES_LABEL = "Admin — courses";
 
 function NavLinks({
   onNavigate,
@@ -179,20 +186,36 @@ export function Root() {
         <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="Main">
           <NavLinks currentPath={location.pathname} onNavigate={() => setMobileOpen(false)} />
           {user?.user_type === "admin" ? (
-            <Link
-              to={ADMIN_USERS_PATH}
-              onClick={() => setMobileOpen(false)}
-              aria-current={isNavActive(ADMIN_USERS_PATH, location.pathname) ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
-                isNavActive(ADMIN_USERS_PATH, location.pathname)
-                  ? "bg-[#1d9bf0] text-white"
-                  : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
-              )}
-            >
-              <Shield className="h-5 w-5 shrink-0" aria-hidden />
-              <span>{ADMIN_USERS_LABEL}</span>
-            </Link>
+            <>
+              <Link
+                to={ADMIN_COURSES_PATH}
+                onClick={() => setMobileOpen(false)}
+                aria-current={isNavActive(ADMIN_COURSES_PATH, location.pathname) ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                  isNavActive(ADMIN_COURSES_PATH, location.pathname)
+                    ? "bg-[#1d9bf0] text-white"
+                    : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
+                )}
+              >
+                <Library className="h-5 w-5 shrink-0" aria-hidden />
+                <span>{ADMIN_COURSES_LABEL}</span>
+              </Link>
+              <Link
+                to={ADMIN_USERS_PATH}
+                onClick={() => setMobileOpen(false)}
+                aria-current={isNavActive(ADMIN_USERS_PATH, location.pathname) ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                  isNavActive(ADMIN_USERS_PATH, location.pathname)
+                    ? "bg-[#1d9bf0] text-white"
+                    : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
+                )}
+              >
+                <Shield className="h-5 w-5 shrink-0" aria-hidden />
+                <span>{ADMIN_USERS_LABEL}</span>
+              </Link>
+            </>
           ) : null}
         </nav>
         <div className="border-t border-[#2f3336] p-4">
