@@ -12,6 +12,7 @@ export function LeadMarketplace() {
   const token = session?.token ?? "";
   const [searchParams] = useSearchParams();
   const checkout = searchParams.get("checkout");
+  const checkoutSessionId = searchParams.get("session_id");
   const packages = parseLeadPackagesFromEnv();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -48,7 +49,17 @@ export function LeadMarketplace() {
 
       {checkout === "success" ? (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900" role="status">
-          Checkout completed. If you do not receive leads within the promised window, contact support.
+          <p className="font-medium">Checkout completed.</p>
+          <p className="mt-1 text-green-900/90">
+            Your team can match this payment to Stripe using the session id below. Fulfillment (file delivery, CRM) runs on your
+            process until Worker webhooks are enabled.
+          </p>
+          {checkoutSessionId ? (
+            <p className="mt-2 font-mono text-xs text-green-950/80 break-all" title="Stripe Checkout session id">
+              Session: {checkoutSessionId}
+            </p>
+          ) : null}
+          <p className="mt-2 text-green-900/90">If you do not receive leads within the promised window, contact support.</p>
         </div>
       ) : null}
       {checkout === "cancel" ? (

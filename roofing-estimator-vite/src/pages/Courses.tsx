@@ -69,6 +69,25 @@ function ProgramCard({
   );
 }
 
+function CoursesCatalogSkeleton() {
+  return (
+    <div className="mb-8 space-y-6" aria-busy="true">
+      <p className="sr-only">Loading course catalog…</p>
+      <div className="h-52 animate-pulse rounded-2xl bg-slate-200 sm:h-56" />
+      <div className="grid gap-6 sm:grid-cols-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-36 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+        ))}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-44 animate-pulse rounded-lg border border-slate-200 bg-slate-100" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Courses() {
   const { session } = useAuth();
   const token = session?.token ?? "";
@@ -114,11 +133,9 @@ export function Courses() {
           Showing built-in catalog: {catalogNotice}
         </div>
       ) : null}
-      {catalogLoading ? (
-        <p className="mb-6 text-sm text-black/60" aria-live="polite">
-          Loading catalog…
-        </p>
-      ) : null}
+      {catalogLoading && token ? <CoursesCatalogSkeleton /> : null}
+      {!catalogLoading || !token ? (
+        <>
       {/* Hero */}
       <section className="relative mb-12 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-12 text-white sm:px-10 sm:py-16">
         <div className="relative z-10 max-w-3xl">
@@ -271,6 +288,8 @@ export function Courses() {
           <Link to={catalog.closingCta.ctaPath}>{catalog.closingCta.ctaLabel}</Link>
         </Button>
       </section>
+        </>
+      ) : null}
 
       {/* Trailer modal */}
       {trailerOpen && trailerId ? (

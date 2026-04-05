@@ -17,6 +17,7 @@
     "vercel:deploy": "npx vercel deploy --yes --prod",
     "vercel:preview": "npx vercel deploy --yes",
     "lint": "eslint .",
+    "lint:ci": "eslint \"src/lib/**/*.{ts,tsx}\" \"src/components/auth/**/*.{ts,tsx}\" \"src/components/AuthGate.tsx\" \"src/context/AuthContext.tsx\" \"src/pages/{Login,SignUp,AdminLogin,Courses,LeadMarketplace,CallCenter}.tsx\" \"src/layout/Root.tsx\"",
     "preview": "vite preview",
     "test": "vitest run",
     "pricing:import-ai-cheatsheet": "node scripts/import-ai-cheatsheet-pricing.mjs",

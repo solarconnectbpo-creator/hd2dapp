@@ -40,8 +40,8 @@ export function Login() {
     >
       <div className="rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-md">
         <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Sign in</h1>
-        <p className="mb-6 text-center text-sm text-[#71767b]">Use your HD2D Closers account</p>
-        <p className="-mt-4 mb-4 text-center text-sm text-[#71767b]">
+        <p className="mb-6 text-center text-sm text-[#8b9199]">Use your HD2D Closers account</p>
+        <p className="-mt-4 mb-4 text-center text-sm text-[#8b9199]">
           {externalCareers ? (
             <a
               href={externalCareers}
@@ -63,7 +63,7 @@ export function Login() {
         <p className="mb-6 text-center">
           <Link
             to="/admin/login"
-            className="text-sm font-medium text-[#71767b] underline-offset-2 hover:text-[#1d9bf0] hover:underline"
+            className="text-sm font-medium text-[#8b9199] underline-offset-2 hover:text-[#1d9bf0] hover:underline"
           >
             Admin sign in
           </Link>
@@ -79,6 +79,8 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "login-error" : undefined}
             />
           </label>
           <PasswordField
@@ -86,9 +88,16 @@ export function Login() {
             value={password}
             onChange={setPassword}
             autoComplete="current-password"
+            invalid={error ? true : undefined}
+            ariaDescribedBy={error ? "login-error" : undefined}
           />
           {error ? (
-            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            <div
+              id="login-error"
+              role="alert"
+              aria-live="assertive"
+              className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+            >
               {error}
             </div>
           ) : null}

@@ -27,9 +27,9 @@ jobs:
           cache-dependency-path: roofing-estimator-vite/package-lock.json
       - run: npm ci
       - run: npm run test
+      - run: npm run lint:ci
       - run: npm run build
-      # ESLint has known debt in App.tsx / contexts; run locally with `npm run lint`.
-      # Goal: keep `npm run test` + `npm run build` green in CI.
+      # Full-tree `npm run lint` still has known debt in App.tsx / older pages; `lint:ci` covers auth, shell, and touched libs.
 
   backend-worker:
     name: backend (wrangler build)

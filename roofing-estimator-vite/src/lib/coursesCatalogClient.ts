@@ -2,6 +2,7 @@ import { HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
 import type { CoursesCatalogData } from "../data/coursesCatalog";
+import { safeUserFacingApiMessage } from "./safeApiError";
 
 function apiBase(): string {
   return getHd2dApiBase().replace(/\/$/, "");
@@ -41,7 +42,7 @@ export async function fetchCoursesCatalog(token: string): Promise<CoursesCatalog
     error?: string;
   }>(res);
   if (!res.ok || data.success !== true) {
-    throw new Error(data.error || `Could not load catalog (${res.status}).`);
+    throw new Error(safeUserFacingApiMessage(data.error || "", res.status));
   }
   return {
     catalog: data.catalog ?? null,
@@ -60,7 +61,7 @@ export async function adminGetCoursesCatalog(token: string): Promise<CoursesCata
     error?: string;
   }>(res);
   if (!res.ok || data.success !== true) {
-    throw new Error(data.error || `Could not load catalog (${res.status}).`);
+    throw new Error(safeUserFacingApiMessage(data.error || "", res.status));
   }
   return {
     catalog: data.catalog ?? null,
@@ -80,7 +81,7 @@ export async function adminPutCoursesCatalog(token: string, catalog: CoursesCata
   });
   const data = await readJsonResponseBody<{ success?: boolean; updatedAt?: number; error?: string }>(res);
   if (!res.ok || data.success !== true || data.updatedAt == null) {
-    throw new Error(data.error || `Save failed (${res.status}).`);
+    throw new Error(safeUserFacingApiMessage(data.error || "", res.status));
   }
   return data.updatedAt;
 }
@@ -92,6 +93,6 @@ export async function adminDeleteCoursesCatalog(token: string): Promise<void> {
   });
   const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
   if (!res.ok || data.success !== true) {
-    throw new Error(data.error || `Clear failed (${res.status}).`);
+    throw new Error(safeUserFacingApiMessage(data.error || "", res.status));
   }
 }

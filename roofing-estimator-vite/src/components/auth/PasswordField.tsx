@@ -10,6 +10,8 @@ type PasswordFieldProps = {
   required?: boolean;
   minLength?: number;
   maxLength?: number;
+  invalid?: boolean;
+  ariaDescribedBy?: string;
 };
 
 export function PasswordField({
@@ -20,6 +22,8 @@ export function PasswordField({
   required = true,
   minLength,
   maxLength,
+  invalid,
+  ariaDescribedBy,
 }: PasswordFieldProps) {
   const [show, setShow] = useState(false);
   const reactId = useId();
@@ -41,6 +45,8 @@ export function PasswordField({
           required={required}
           minLength={minLength}
           maxLength={maxLength}
+          aria-invalid={invalid ? true : undefined}
+          aria-describedby={ariaDescribedBy}
         />
         <button
           type="button"

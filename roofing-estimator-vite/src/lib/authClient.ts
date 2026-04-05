@@ -1,6 +1,7 @@
 import { HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
+import { safeUserFacingApiMessage } from "./safeApiError";
 
 const AUTH_STORAGE_KEY = "hd2d-auth-session-v1";
 
@@ -133,7 +134,7 @@ export async function loginWithPassword(email: string, password: string): Promis
   const data = parseFetchedJson<LoginResponse>(text, res, "login");
   if (!res.ok || data.success !== true || !data.token || !data.user || !data.expiresAt) {
     const msg = [data.error || `Login failed (${res.status}).`, data.detail].filter(Boolean).join(" — ");
-    throw new Error(msg);
+    throw new Error(safeUserFacingApiMessage(msg, res.status, { skipStatusHints: true }));
   }
   const session: AuthSession = {
     token: data.token,
@@ -153,7 +154,11 @@ export async function fetchCurrentUser(token: string): Promise<AuthUser> {
   const text = await res.text();
   const data = parseFetchedJson<{ success?: boolean; user?: AuthUser; error?: string }>(text, res, "/api/auth/me");
   if (!res.ok || data.success !== true || !data.user) {
-    throw new Error(data.error || `Session validation failed (${res.status}).`);
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Session validation failed (${res.status}).`, res.status, {
+        skipStatusHints: true,
+      }),
+    );
   }
   return data.user;
 }
@@ -182,7 +187,7 @@ export async function registerAccount(email: string, password: string, name: str
   const data = await readJsonResponseBody<LoginResponse>(res);
   if (!res.ok || data.success !== true || !data.token || !data.user || !data.expiresAt) {
     const msg = [data.error || `Sign up failed (${res.status}).`, data.detail].filter(Boolean).join(" — ");
-    throw new Error(msg);
+    throw new Error(safeUserFacingApiMessage(msg, res.status, { skipStatusHints: true }));
   }
   const session: AuthSession = {
     token: data.token,
@@ -210,7 +215,11 @@ export async function adminListUsers(token: string): Promise<AdminUserRow[]> {
   });
   const data = await readJsonResponseBody<{ success?: boolean; users?: AdminUserRow[]; error?: string }>(res);
   if (!res.ok || data.success !== true || !data.users) {
-    throw new Error(data.error || `Could not load users (${res.status}).`);
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Could not load users (${res.status}).`, res.status, {
+        skipStatusHints: true,
+      }),
+    );
   }
   return data.users;
 }
@@ -232,7 +241,9 @@ export async function adminCreateUser(
   });
   const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
   if (!res.ok || data.success !== true) {
-    throw new Error(data.error || `Create failed (${res.status}).`);
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Create failed (${res.status}).`, res.status, { skipStatusHints: true }),
+    );
   }
 }
 
@@ -245,7 +256,9 @@ export async function adminDeleteUser(token: string, userId: string): Promise<vo
   });
   const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
   if (!res.ok || data.success !== true) {
-    throw new Error(data.error || `Delete failed (${res.status}).`);
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Delete failed (${res.status}).`, res.status, { skipStatusHints: true }),
+    );
   }
 }
 
@@ -271,6 +284,8 @@ export async function adminUpdateUser(
   });
   const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
   if (!res.ok || data.success !== true) {
-    throw new Error(data.error || `Update failed (${res.status}).`);
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Update failed (${res.status}).`, res.status, { skipStatusHints: true }),
+    );
   }
 }

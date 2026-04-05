@@ -73,6 +73,7 @@ export function CallCenter() {
                 type="button"
                 className="w-full gap-2 sm:w-auto"
                 onClick={openRealtime}
+                aria-label="Open call center realtime report in a new tab"
               >
                 Open realtime report
                 <ExternalLink className="h-4 w-4" aria-hidden />
@@ -84,6 +85,7 @@ export function CallCenter() {
                     title="Call center realtime report"
                     src={realtimeUrl}
                     className="h-full min-h-[240px] w-full border-0"
+                    loading="lazy"
                     sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                     referrerPolicy="no-referrer-when-downgrade"
                   />

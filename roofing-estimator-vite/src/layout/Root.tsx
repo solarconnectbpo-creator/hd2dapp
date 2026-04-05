@@ -91,7 +91,9 @@ export function Root() {
     });
   }, []);
 
+  // Close the drawer on any navigation (e.g. back/forward), not only sidebar link clicks.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync drawer to location without remounting the sidebar
     setMobileOpen(false);
   }, [location.pathname]);
 
@@ -137,9 +139,11 @@ export function Root() {
             className="h-8 w-auto max-w-[min(8.5rem,42vw)] shrink-0 object-contain object-left"
             width={136}
             height={40}
+            decoding="async"
+            fetchPriority="high"
           />
           <div className="min-w-0 hidden min-[380px]:block">
-            <p className="truncate text-xs text-[#71767b]">Roofing suite</p>
+            <p className="truncate text-xs text-[#8b9199]">Roofing suite</p>
           </div>
         </div>
       </header>
@@ -171,8 +175,10 @@ export function Root() {
               className="h-auto w-full max-w-[12.5rem] object-contain object-left"
               width={200}
               height={120}
+              decoding="async"
+              loading="lazy"
             />
-            <p className="text-sm text-[#71767b]">Roofing Pro suite</p>
+            <p className="text-sm text-[#8b9199]">Roofing Pro suite</p>
           </div>
           <button
             type="button"
@@ -221,7 +227,7 @@ export function Root() {
         <div className="border-t border-white/[0.06] p-4">
           {user ? (
             <>
-              <p className="text-xs text-[#71767b] mb-2">
+              <p className="mb-2 text-xs text-[#8b9199]">
                 Signed in as <span className="text-[#e7e9ea]">{user.email}</span>
               </p>
               <button type="button" className="secondary-btn w-full" onClick={() => void logout()}>
@@ -230,7 +236,7 @@ export function Root() {
             </>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs text-[#71767b]">
+              <p className="text-xs text-[#8b9199]">
                 Sign in to save estimates, canvassing, and storm intel across devices.
               </p>
               <Link

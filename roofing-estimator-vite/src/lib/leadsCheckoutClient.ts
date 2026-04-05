@@ -1,6 +1,7 @@
 import { HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
+import { safeUserFacingApiMessage } from "./safeApiError";
 
 function apiBase(): string {
   return getHd2dApiBase().replace(/\/$/, "");
@@ -34,7 +35,7 @@ export async function createLeadsCheckoutSession(token: string, priceId: string)
   });
   const data = await readJsonResponseBody<{ success?: boolean; url?: string; error?: string }>(res);
   if (!res.ok || data.success !== true || !data.url) {
-    throw new Error(data.error || `Checkout failed (${res.status}).`);
+    throw new Error(safeUserFacingApiMessage(data.error || "", res.status));
   }
   return data.url;
 }

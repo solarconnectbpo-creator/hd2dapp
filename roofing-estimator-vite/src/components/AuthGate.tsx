@@ -17,8 +17,15 @@ export function AuthGate() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#000000] text-[#e7e9ea]">
-        <p className="text-sm text-[#71767b]">Checking session...</p>
+      <div
+        className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#030406] px-6 text-[#e7e9ea]"
+        role="status"
+        aria-busy="true"
+        aria-live="polite"
+        aria-label="Checking session"
+      >
+        <div className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08] ring-2 ring-[#1d9bf0]/30" />
+        <p className="text-sm text-[#8b9199]">Checking session…</p>
       </div>
     );
   }

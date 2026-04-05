@@ -44,7 +44,7 @@ export function AdminLogin() {
     >
       <div className="rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-md">
         <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Admin sign in</h1>
-        <p className="mb-6 text-center text-sm text-[#71767b]">HD2D Closers team dashboard</p>
+        <p className="mb-6 text-center text-sm text-[#8b9199]">HD2D Closers team dashboard</p>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-[#e7e9ea]">Admin email</span>
@@ -56,6 +56,8 @@ export function AdminLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "admin-login-error" : undefined}
             />
           </label>
           <PasswordField
@@ -63,9 +65,16 @@ export function AdminLogin() {
             value={password}
             onChange={setPassword}
             autoComplete="current-password"
+            invalid={error ? true : undefined}
+            ariaDescribedBy={error ? "admin-login-error" : undefined}
           />
           {error ? (
-            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            <div
+              id="admin-login-error"
+              role="alert"
+              aria-live="assertive"
+              className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+            >
               {error}
             </div>
           ) : null}
@@ -73,7 +82,7 @@ export function AdminLogin() {
             <button type="submit" className="run-btn w-full min-h-[48px]" disabled={busy}>
               {busy ? "Signing in..." : "Sign in to admin"}
             </button>
-            <p className="text-center text-xs text-[#71767b]">
+            <p className="text-center text-xs text-[#8b9199]">
               Default dev email is pre-filled; production uses{" "}
               <code className="text-[#a8b0b8]">AUTH_ADMIN_EMAIL</code> /{" "}
               <code className="text-[#a8b0b8]">AUTH_ADMIN_PASSWORD</code> on the Worker.

@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   clearSession,
   fetchCurrentUser,
@@ -25,6 +26,38 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<AuthSession | null>(null);
+  const expiryWarnedRef = useRef(false);
+
+  useEffect(() => {
+    expiryWarnedRef.current = false;
+  }, [session?.token]);
+
+  useEffect(() => {
+    const exp = session?.expiresAt;
+    if (!exp || !session?.token) return;
+
+    const tick = () => {
+      const msLeft = exp - Date.now();
+      if (msLeft <= 0) {
+        clearSession();
+        setSession(null);
+        toast.error("Your session expired. Sign in again.");
+        const p = window.location.pathname;
+        if (!p.startsWith("/login") && !p.startsWith("/admin/login") && !p.startsWith("/signup") && p !== "/careers") {
+          window.location.assign(p.startsWith("/admin") ? "/admin/login" : "/login");
+        }
+        return;
+      }
+      if (msLeft < 5 * 60 * 1000 && !expiryWarnedRef.current) {
+        expiryWarnedRef.current = true;
+        toast.message("Session expires in under 5 minutes — save your work.", { duration: 8000 });
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, [session?.expiresAt, session?.token]);
 
   useEffect(() => {
     let mounted = true;
@@ -89,6 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/** Consumer hook for {@link AuthProvider}. */
+// eslint-disable-next-line react-refresh/only-export-components -- hook is the public API for this module
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider.");
