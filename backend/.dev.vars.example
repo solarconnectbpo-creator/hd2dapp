@@ -53,6 +53,14 @@
 # Optional: append county parcel layers (JSON array). Each entry: id, layerUrl (…/FeatureServer/N or …/MapServer/N), west, south, east, north (WGS84).
 # ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON=[{"id":"sample_county","layerUrl":"https://example.org/arcgis/rest/services/Parcels/FeatureServer/0","west":-91,"south":40,"east":-90.5,"north":40.5}]
 
+# --- Lead marketplace (Stripe Checkout via POST /api/leads/checkout-session) ---
+# STRIPE_SECRET_KEY=sk_test_...
+# Comma-separated Price IDs that match VITE_LEAD_PACKAGES_JSON stripePriceId values:
+# LEADS_STRIPE_PRICE_IDS=price_abc,price_def
+# Public site origin (no trailing slash) for Stripe redirect after payment:
+# APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
+# Production example: APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com
+
 # Optional ArcGIS MapServer / ImageServer cached tiles for Canvassing (slippy XYZ; exposed in GET /api/health, no secrets in URL):
 # ARCGIS_MAPSERVER_TILE_URL=https://your-host/arcgis/rest/services/YourMap/MapServer/tile/{z}/{y}/{x}
 # ARCGIS_MAPSERVER_TILE_ATTRIBUTION=County GIS

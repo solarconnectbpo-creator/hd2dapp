@@ -76,6 +76,11 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 # Avoid putting secrets only on `--env production` unless you deploy that environment — that creates a separate Worker name.
 # - npx wrangler secret put OPENAI_API_KEY --env production --config wrangler.toml
 #
+# Lead marketplace — POST /api/leads/checkout-session (Stripe Checkout):
+# - wrangler secret put STRIPE_SECRET_KEY --env ""
+# Non-secrets (top [vars] or env-specific vars): LEADS_STRIPE_PRICE_IDS=price_abc,price_def
+#   APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com  (no trailing slash; must match SPA URL)
+#
 # EagleView API Center (TrueDesign) — /api/eagleview/apicenter/* on this Worker:
 # - wrangler secret put EAGLEVIEW_CLIENT_SECRET
 # - wrangler secret put EAGLEVIEW_CLIENT_ID   (or EAGLEVIEW_OAUTH_CLIENT_ID if it differs from the app URL slug)

@@ -21,6 +21,7 @@ import { handleAuthRequest, type AuthEnv as AuthEnvBearer } from "./api/authRout
 import { handleOsmBuildingAtPointGet } from "./api/osmBuildingFootprint";
 import { handleAdminUserRoutes } from "./api/adminUserRoutes";
 import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/coursesCatalogRoutes";
+import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCheckout";
 import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
 
 interface Env {
@@ -73,6 +74,12 @@ interface Env {
   DEALMACHINE_API_BASE?: string;
   DEALMACHINE_PROPERTY_PATH?: string;
   DEALMACHINE_AUTH_MODE?: string;
+  /** Stripe secret for POST /api/leads/checkout-session (wrangler secret). */
+  STRIPE_SECRET_KEY?: string;
+  /** Comma-separated Price ids allowed for lead checkout (e.g. price_abc,price_def). */
+  LEADS_STRIPE_PRICE_IDS?: string;
+  /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
+  APP_PUBLIC_ORIGIN?: string;
 }
 
 type AuthEnv = Pick<
@@ -136,6 +143,11 @@ export default {
       // Include `/api/auth` (no trailing slash) — `startsWith("/api/auth/")` alone misses it and returns 404.
       if (path === "/api/auth" || path === "/api/auth/" || path.startsWith("/api/auth/")) {
         return await handleAuthRequest(request, env as AuthEnv, path, corsHeaders);
+      } else if (
+        (path === "/api/leads/checkout-session" || path === "/api/leads/checkout-session/") &&
+        request.method === "POST"
+      ) {
+        return await handleLeadsCheckoutSession(request, env as LeadsCheckoutEnv, corsHeaders);
       } else if (path.startsWith("/api/leads")) {
         return await handleLeads(request, env, path, corsHeaders);
       } else if (path.startsWith("/api/deals")) {
