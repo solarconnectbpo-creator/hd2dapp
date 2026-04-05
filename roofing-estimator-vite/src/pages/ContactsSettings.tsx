@@ -205,7 +205,7 @@ export function ContactsSettings() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 sm:p-6 lg:p-8">
+    <div className="hd2d-page-shell max-w-5xl">
       <div className="mb-8">
         <h1 className="mb-2 text-2xl text-black sm:text-3xl">Contacts &amp; settings</h1>
         <p className="text-black">

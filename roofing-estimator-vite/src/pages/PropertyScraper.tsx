@@ -647,7 +647,7 @@ export function PropertyScraper() {
   }, [applyMergedPreviewToTable, manualFpsOwnerName, preview]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 text-black sm:p-6 lg:p-8">
+    <div className="hd2d-page-shell max-w-5xl text-black">
       <div className="mb-8">
         <h1 className="mb-2 text-2xl font-semibold text-black sm:text-3xl">Property records</h1>
         <p className="text-black max-w-3xl">

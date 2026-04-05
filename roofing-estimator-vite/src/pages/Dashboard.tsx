@@ -91,38 +91,42 @@ export function Dashboard() {
   };
 
   return (
-    <div className="px-4 py-4 sm:p-6 lg:p-8">
-      <div className="mb-6 sm:mb-8">
+    <div className="hd2d-page-shell">
+      <div className="mb-8 border-b border-white/[0.06] pb-8 sm:mb-10 sm:pb-10">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#71767b]">Overview</p>
         <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Dashboard</h1>
-        <p className="text-black">
+        <p className="max-w-2xl text-sm leading-relaxed text-[#71767b]">
           Measurements, estimates, and field tools — data stays in this browser unless you export.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title}>
+            <Card
+              key={stat.title}
+              className="overflow-hidden border-white/[0.07] ring-1 ring-white/[0.04] transition-shadow duration-200 hover:ring-sky-400/15"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm text-black">{stat.title}</CardTitle>
-                <div className={`${stat.color} p-2 rounded-lg`}>
-                  <Icon className="w-4 h-4 text-white" />
+                <CardTitle className="text-sm font-medium text-black">{stat.title}</CardTitle>
+                <div className={`${stat.color} rounded-xl p-2.5 shadow-lg shadow-black/20`}>
+                  <Icon className="h-4 w-4 text-white" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl text-black">{stat.value}</div>
+                <div className="text-2xl font-semibold tabular-nums tracking-tight text-black">{stat.value}</div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card>
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Get started with common tasks</CardDescription>
+            <CardTitle className="text-lg">Quick actions</CardTitle>
+            <CardDescription>Jump into the tools you use most</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Link to="/measurement/new">
@@ -193,9 +197,9 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
           <CardHeader>
-            <CardTitle>Recent Measurements</CardTitle>
+            <CardTitle className="text-lg">Recent measurements</CardTitle>
             <CardDescription>
               {recentMeasurements.length > 0 ? "Your latest roof measurements" : "No measurements yet"}
             </CardDescription>
@@ -224,13 +228,13 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <Card className="mb-8 border-blue-100 bg-gradient-to-br from-white to-blue-50/40">
+      <Card className="mb-8 border-sky-500/25 bg-gradient-to-br from-[#12141a] via-[#161a22] to-[#12141a] ring-1 ring-sky-500/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HardDriveDownload className="h-5 w-5 text-black" />
+          <CardTitle className="flex items-center gap-2 text-black">
+            <HardDriveDownload className="h-5 w-5 text-sky-400" />
             Backup &amp; restore
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[#8b9199]">
             Download a JSON copy of measurements, estimates, and contracts. Restore replaces everything in
             this browser — use after a new device or if data was cleared.
           </CardDescription>

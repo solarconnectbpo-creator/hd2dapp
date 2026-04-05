@@ -14,7 +14,7 @@ import {
  */
 export function AdMakerAutomation() {
   return (
-    <div className="px-4 py-4 sm:p-6 lg:p-8">
+    <div className="hd2d-page-shell">
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4 text-black hover:bg-slate-100">
           <Link to="/marketing" className="gap-2">

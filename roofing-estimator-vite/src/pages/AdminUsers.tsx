@@ -97,7 +97,7 @@ export function AdminUsers() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 sm:space-y-8 sm:p-6 lg:p-8">
+    <div className="hd2d-page-shell max-w-5xl space-y-6 sm:space-y-8">
       <div>
         <h1 className="text-2xl font-semibold text-[#e7e9ea]">User accounts</h1>
         <p className="text-sm text-[#71767b] mt-1">
@@ -109,7 +109,7 @@ export function AdminUsers() {
         <p className="text-sm text-[#f4212e] rounded-lg border border-[#f4212e]/40 bg-[#f4212e]/10 px-4 py-2">{error}</p>
       ) : null}
 
-      <section className="rounded-2xl border border-[#2f3336] bg-[#0f1419] p-6 space-y-4">
+      <section className="space-y-4 rounded-2xl border border-white/[0.08] bg-[#0f1419] p-6 ring-1 ring-white/[0.04]">
         <h2 className="text-lg font-semibold text-[#e7e9ea]">Create user</h2>
         <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block sm:col-span-2">
@@ -165,7 +165,7 @@ export function AdminUsers() {
         </form>
       </section>
 
-      <section className="rounded-2xl border border-[#2f3336] bg-[#0f1419] overflow-hidden">
+      <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0f1419] ring-1 ring-white/[0.04]">
         <div className="px-6 py-4 border-b border-[#2f3336] flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-[#e7e9ea]">All users</h2>
           <button type="button" className="secondary-btn text-sm" onClick={() => void refresh()} disabled={loading || busy}>

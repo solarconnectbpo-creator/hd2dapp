@@ -4945,7 +4945,7 @@ function App() {
     setForm((curr) => ({ ...curr, roofStructure: roofStructureSuggestion.mode }));
   };
   return (
-    <div className="min-w-0 flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:p-8">
+    <div className="hd2d-page-shell min-w-0 flex-1">
       <div className="mx-auto max-w-[1400px]">
         <header className="top">
           <h1>Roofing Measurement & Estimate Pro</h1>

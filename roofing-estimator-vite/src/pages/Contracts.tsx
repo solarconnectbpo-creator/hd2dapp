@@ -6,7 +6,7 @@ export function Contracts() {
   const { contracts } = useRoofing();
 
   return (
-    <div className="px-4 py-4 sm:p-6 lg:p-8">
+    <div className="hd2d-page-shell">
       <div className="mb-8">
         <h1 className="mb-2 text-2xl text-black sm:text-3xl">Contracts &amp; Proposals</h1>
         <p className="text-black">Generated proposals from your estimates</p>

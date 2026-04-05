@@ -7,11 +7,19 @@
 
 body {
   margin: 0;
-  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  background: #000000;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #030406;
   color: #e7e9ea;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+::selection {
+  background: rgba(29, 155, 240, 0.35);
+  color: #ffffff;
 }
 
 #root {
@@ -20,15 +28,48 @@ body {
   min-width: 0;
 }
 
-/* X-inspired global skin */
+/* HD2D production shell (hardcoredoortodoorclosers.com) */
 :root {
-  --x-bg: #000000;
-  --x-surface: #16181c;
-  --x-surface-hover: #1d1f23;
-  --x-border: #2f3336;
+  --x-bg: #030406;
+  --x-surface: #12141a;
+  --x-surface-hover: #1a1d26;
+  --x-border: rgba(255, 255, 255, 0.08);
   --x-text: #e7e9ea;
-  --x-muted: #71767b;
+  --x-muted: #8b9199;
   --x-accent: #1d9bf0;
+  --x-accent-soft: rgba(29, 155, 240, 0.14);
+  --x-glow: 0 0 32px rgba(29, 155, 240, 0.22);
+}
+
+/**
+ * Standard content width for dashboard-style routes (Vercel / production).
+ * Full-bleed views (Canvassing, map measurement) should not use this class.
+ */
+.hd2d-page-shell {
+  width: 100%;
+  max-width: 88rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem 1rem 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .hd2d-page-shell {
+    padding: 1.5rem 1.5rem 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hd2d-page-shell {
+    padding: 2rem 2rem 2.5rem;
+  }
+}
+
+/* shadcn Card — depth on dark chrome */
+[data-slot="card"] {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 16px 48px rgba(0, 0, 0, 0.35);
 }
 
 .text-black {

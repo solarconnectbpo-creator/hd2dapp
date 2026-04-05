@@ -6,8 +6,8 @@
   "start_url": "https://hardcoredoortodoorclosers.com/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#030406",
+  "theme_color": "#030406",
   "icons": [
     {
       "src": "/favicon.svg",

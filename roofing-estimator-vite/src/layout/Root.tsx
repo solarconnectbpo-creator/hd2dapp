@@ -64,10 +64,10 @@ function NavLinks({
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+              "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200",
               active
-                ? "bg-[#1d9bf0] text-white"
-                : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
+                ? "bg-[#1d9bf0] text-white shadow-[0_0_28px_rgba(29,155,240,0.28)] ring-1 ring-sky-400/35"
+                : "text-[#e7e9ea] hover:bg-white/[0.06]",
             )}
           >
             <Icon className="h-5 w-5 shrink-0" aria-hidden />
@@ -110,7 +110,7 @@ export function Root() {
   }, [mobileOpen]);
 
   return (
-    <div className="flex h-[100dvh] bg-[#000000] text-[#e7e9ea]">
+    <div className="flex h-[100dvh] bg-[#030406] text-[#e7e9ea]">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
@@ -119,7 +119,7 @@ export function Root() {
       </a>
 
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] items-center gap-3 border-b border-[#2f3336] bg-[#000000]/95 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] items-center gap-3 border-b border-white/[0.06] bg-[#030406]/90 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md lg:hidden">
         <button
           type="button"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#e7e9ea] hover:bg-[#1f1f1f]"
@@ -159,11 +159,11 @@ export function Root() {
       <aside
         id="app-sidebar"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-[#2f3336] bg-[#000000] pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] transition-transform duration-200 ease-out lg:static lg:translate-x-0 lg:pt-0 lg:pb-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-white/[0.06] bg-[#050608]/95 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] shadow-[4px_0_48px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-transform duration-200 ease-out lg:static lg:translate-x-0 lg:pt-0 lg:pb-0",
           mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full lg:shadow-none",
         )}
       >
-        <div className="flex items-start justify-between gap-2 border-b border-[#2f3336] p-6">
+        <div className="flex items-start justify-between gap-2 border-b border-white/[0.06] p-6">
           <div className="min-w-0 flex flex-col gap-2">
             <img
               src={hd2dLogoUrl}
@@ -192,10 +192,10 @@ export function Root() {
                 onClick={() => setMobileOpen(false)}
                 aria-current={isNavActive(ADMIN_COURSES_PATH, location.pathname) ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200",
                   isNavActive(ADMIN_COURSES_PATH, location.pathname)
-                    ? "bg-[#1d9bf0] text-white"
-                    : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
+                    ? "bg-[#1d9bf0] text-white shadow-[0_0_28px_rgba(29,155,240,0.28)] ring-1 ring-sky-400/35"
+                    : "text-[#e7e9ea] hover:bg-white/[0.06]",
                 )}
               >
                 <Library className="h-5 w-5 shrink-0" aria-hidden />
@@ -206,10 +206,10 @@ export function Root() {
                 onClick={() => setMobileOpen(false)}
                 aria-current={isNavActive(ADMIN_USERS_PATH, location.pathname) ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200",
                   isNavActive(ADMIN_USERS_PATH, location.pathname)
-                    ? "bg-[#1d9bf0] text-white"
-                    : "text-[#e7e9ea] hover:bg-[#1a1a1a]",
+                    ? "bg-[#1d9bf0] text-white shadow-[0_0_28px_rgba(29,155,240,0.28)] ring-1 ring-sky-400/35"
+                    : "text-[#e7e9ea] hover:bg-white/[0.06]",
                 )}
               >
                 <Shield className="h-5 w-5 shrink-0" aria-hidden />
@@ -218,7 +218,7 @@ export function Root() {
             </>
           ) : null}
         </nav>
-        <div className="border-t border-[#2f3336] p-4">
+        <div className="border-t border-white/[0.06] p-4">
           {user ? (
             <>
               <p className="text-xs text-[#71767b] mb-2">
@@ -253,11 +253,17 @@ export function Root() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto pt-[calc(3.5rem+env(safe-area-inset-top,0px))] pb-[env(safe-area-inset-bottom,0px)] outline-none focus-visible:ring-2 focus-visible:ring-[#1d9bf0] focus-visible:ring-offset-2 focus-visible:ring-offset-black lg:pt-0 lg:pb-0"
+        className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-auto pt-[calc(3.5rem+env(safe-area-inset-top,0px))] pb-[env(safe-area-inset-bottom,0px)] outline-none focus-visible:ring-2 focus-visible:ring-[#1d9bf0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#030406] lg:pt-0 lg:pb-0"
       >
-        <ErrorBoundary title="Something went wrong in this view">
-          <Outlet />
-        </ErrorBoundary>
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_55%_at_50%_-8%,rgba(29,155,240,0.11),transparent_52%)]"
+          aria-hidden
+        />
+        <div className="relative z-[1] min-h-0 min-w-0 flex-1">
+          <ErrorBoundary title="Something went wrong in this view">
+            <Outlet />
+          </ErrorBoundary>
+        </div>
       </main>
     </div>
   );

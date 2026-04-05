@@ -38,7 +38,7 @@ export function Login() {
         </>
       }
     >
-      <div className="rounded-2xl border border-[#2f3336] bg-[#16181c]/90 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-md">
+      <div className="rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-md">
         <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Sign in</h1>
         <p className="mb-6 text-center text-sm text-[#71767b]">Use your HD2D Closers account</p>
         <p className="-mt-4 mb-4 text-center text-sm text-[#71767b]">

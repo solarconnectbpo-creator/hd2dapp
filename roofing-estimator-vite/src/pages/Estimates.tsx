@@ -10,7 +10,7 @@ export function Estimates() {
   const money = (value: number) => `$${value.toLocaleString()}`;
 
   return (
-    <div className="px-4 py-4 sm:p-6 lg:p-8">
+    <div className="hd2d-page-shell">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-2 text-2xl text-black sm:text-3xl">Estimates</h1>

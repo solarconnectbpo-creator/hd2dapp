@@ -33,7 +33,7 @@ export function LeadMarketplace() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 text-black sm:px-6">
+    <div className="hd2d-page-shell max-w-4xl text-black">
       <div className="mb-8">
         <p className="mb-1 inline-flex items-center gap-2 text-sm font-medium text-sky-700">
           <ShoppingBag className="h-4 w-4" aria-hidden />

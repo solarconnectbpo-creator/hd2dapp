@@ -11,9 +11,13 @@ type AuthScreenLayoutProps = {
  */
 export function AuthScreenLayout({ tagline, children }: AuthScreenLayoutProps) {
   return (
-    <div className="auth-page relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#000000] px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] text-[#e7e9ea]">
+    <div className="auth-page relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#030406] px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] text-[#e7e9ea]">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_-15%,rgba(29,155,240,0.12),transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_60%_at_50%_-18%,rgba(29,155,240,0.16),transparent_50%)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_55%_40%_at_100%_100%,rgba(29,155,240,0.06),transparent_55%)]"
         aria-hidden
       />
       <div className="relative z-[1] mb-8 flex w-full max-w-md flex-col items-center gap-4">
