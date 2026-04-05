@@ -644,7 +644,21 @@ interface MaterialLineItem {
     | "wallflash"
     | "stepflash"
     | "fixed1"
-    | "dumpster";
+    | "dumpster"
+    /** Eaves + rakes (starter, drip edge companion qty). */
+    | "starterlf"
+    /** Plan area SF from form (re-nail, deck scope). */
+    | "plansf"
+    /** Ice & water shield SF (eave + valley strips model). */
+    | "icwsf"
+    /** Eaves LF only (peel-and-stick starter at eaves). */
+    | "eavesonly"
+    /** Kick-out diverters from wall flashing context. */
+    | "kickoutea"
+    /** Steep surcharge 7/12–9/12 (qty = effective SQ when pitch in band). */
+    | "steep79sq"
+    /** Steep surcharge 10/12+ */
+    | "steep10sq";
 }
 
 interface MaterialProfile {
@@ -668,16 +682,150 @@ const GENERAL_CONDITIONS: MaterialLineItem[] = [
   { code: "GEN-CLN", description: "Final cleaning", unit: "SQ", replace: 4.50, qtyFn: "sq" },
 ];
 
+/**
+ * Asphalt laminated system — line structure aligned to carrier / Xactimate-style scopes (SQ, LF, EA, SF).
+ * Unit costs are reference retail/replace figures; regional multiplier still applies in `buildScopeLines`.
+ */
 const SHINGLE_PROFILE: MaterialProfile = {
-  label: "Asphalt Shingle", category: "asphalt", tearOffRate: 140,
+  label: "Asphalt Shingle (laminated)", category: "asphalt", tearOffRate: 93,
   items: [
-    /** $/SQ material + accessories bucket (aligns with TPO/PVC line-item magnitude; labor is LAB-SQ) */
-    { code: "RFG300", description: "Architectural shingle system (field + starter)", unit: "SQ", replace: 285, tax: 21.78, qtyFn: "sq" },
-    { code: "RFGDRP", description: "Drip edge / edge metal", unit: "LF", replace: 4.25, tax: 0.32, qtyFn: "perim" },
-    { code: "RFGCAP", description: "Ridge cap shingles", unit: "LF", replace: 8.40, tax: 0.64, qtyFn: "ridge" },
-    { code: "RFGVLY", description: "Valley metal / membrane", unit: "LF", replace: 11.50, tax: 0.88, qtyFn: "valley" },
-    { code: "RFGSFL", description: "Step / wall flashing", unit: "LF", replace: 9.25, tax: 0.71, qtyFn: "stepflash" },
-    { code: "RFGFLS", description: "Flashing and seal updates", unit: "EA", replace: 55, tax: 4.2, qtyFn: "fixed1" },
+    {
+      code: "RFG-LAM",
+      description: "Laminated comp shingle roofing — field + underlayment per manufacturer (IRC R905.2)",
+      unit: "SQ",
+      replace: 286.65,
+      tax: 21.9,
+      qtyFn: "sq",
+    },
+    {
+      code: "RFG-UNSY",
+      description: "Roofing felt — synthetic underlayment (ASTM D226 Type I / manufacturer equiv.)",
+      unit: "SQ",
+      replace: 45.53,
+      tax: 3.48,
+      qtyFn: "sq",
+    },
+    {
+      code: "RFG-RDG-HP",
+      description: "Hip / ridge cap — high-profile laminated shingles",
+      unit: "LF",
+      replace: 10.16,
+      tax: 0.78,
+      qtyFn: "ridge",
+    },
+    {
+      code: "RFG-RDGV",
+      description: "Continuous ridge vent — shingle-over style",
+      unit: "LF",
+      replace: 10.57,
+      tax: 0.81,
+      qtyFn: "ridge",
+    },
+    {
+      code: "RFG-STRT",
+      description: "Asphalt starter — universal starter course at eaves / rakes",
+      unit: "LF",
+      replace: 1.67,
+      tax: 0.13,
+      qtyFn: "starterlf",
+    },
+    {
+      code: "RFG-DRPE",
+      description: "R&R drip edge — eave / rake metal (IRC R905.2.8.5)",
+      unit: "LF",
+      replace: 3.1,
+      tax: 0.24,
+      qtyFn: "perim",
+    },
+    {
+      code: "RFGVLY",
+      description: "Valley metal / W-valley liner — open valley protection",
+      unit: "LF",
+      replace: 11.5,
+      tax: 0.88,
+      qtyFn: "valley",
+    },
+    {
+      code: "FLS-PJ",
+      description: "Flashing — pipe jack / plumbing penetration (allowance)",
+      unit: "EA",
+      replace: 55.94,
+      tax: 4.27,
+      qtyFn: "fixed1",
+    },
+    {
+      code: "FLS-STEP",
+      description: "Step flashing — wall intersection (IRC R903.2.1)",
+      unit: "LF",
+      replace: 9.5,
+      tax: 0.73,
+      qtyFn: "stepflash",
+    },
+    {
+      code: "RFG-ICWS",
+      description:
+        "Ice & water shield (self-adhered) — eaves & valleys per IRC R905.1 (modeled SF from eave + valley LF × width)",
+      unit: "SF",
+      replace: 1.53,
+      tax: 0.12,
+      qtyFn: "icwsf",
+    },
+    {
+      code: "RFG-STRT-PS",
+      description: "Peel & stick starter — enhanced wind resistance at eaves (IRC R905.2.8.1)",
+      unit: "LF",
+      replace: 1.77,
+      tax: 0.14,
+      qtyFn: "eavesonly",
+    },
+    {
+      code: "FLS-KICK",
+      description: "Kick-out diverter — roof-to-wall at gutter (IRC R903.2.1)",
+      unit: "EA",
+      replace: 32.94,
+      tax: 2.52,
+      qtyFn: "kickoutea",
+    },
+    {
+      code: "RFG-RENAIL",
+      description: "Re-nail roof sheathing — code nailing pattern after tear-off (IRC R803.2.1)",
+      unit: "SF",
+      replace: 0.21,
+      tax: 0.016,
+      qtyFn: "plansf",
+    },
+    {
+      code: "RFG-NAIL14",
+      description: "Nailer board at ridge — ridge vent / cap attachment (IRC R905)",
+      unit: "LF",
+      replace: 1.9,
+      tax: 0.15,
+      qtyFn: "ridge",
+    },
+    {
+      code: "RFG-STORAGE",
+      description: "Material storage / staging — jobsite handling (per roofing scope)",
+      unit: "EA",
+      replace: 150,
+      tax: 11.46,
+      qtyFn: "fixed1",
+    },
+    {
+      code: "RFG-STEEP7",
+      description: "Additional charge — steep roof 7/12 to 9/12 slope (when pitch in range)",
+      unit: "SQ",
+      replace: 61.49,
+      tax: 0,
+      qtyFn: "steep79sq",
+    },
+    {
+      code: "RFG-STEEP10",
+      description: "Additional charge — steep roof 10/12 and above (when pitch in range)",
+      unit: "SQ",
+      replace: 55,
+      tax: 0,
+      qtyFn: "steep10sq",
+    },
   ],
 };
 
@@ -1414,6 +1562,15 @@ function buildScopeLines(
     scope === "repair" ? clamp(0.25 + severity * 0.05, 0.2, 0.55) : 1;
   const accessoryLaborSqBasis = effectiveSquares * repairPortion;
 
+  const pitchRise = parsePitchRise(form.roofPitch);
+  const planAreaSfRaw = Number.parseFloat(form.areaSqFt);
+  const planSf =
+    Number.isFinite(planAreaSfRaw) && planAreaSfRaw > 0
+      ? planAreaSfRaw
+      : effectiveSquares > 0
+        ? effectiveSquares * 100
+        : 0;
+
   const qtyFor = (fn: MaterialLineItem["qtyFn"], sqBasis: number): number => {
     switch (fn) {
       case "sq": return sqBasis;
@@ -1429,13 +1586,35 @@ function buildScopeLines(
       case "fixed1": return sqBasis > 0 ? 1 : 0;
       case "dumpster":
         return sqBasis > 0 ? Math.max(1, Math.ceil(sqBasis / 25)) : 0;
+      case "starterlf":
+        return Math.max(0, lengths.eaves + lengths.rakes);
+      case "plansf":
+        return planSf;
+      case "icwsf":
+        // ~3' treated width along eaves & valleys; partial along rakes (wind / transition zones).
+        return Math.max(0, lengths.eaves * 3 + lengths.valleys * 3 + lengths.rakes * 1.5);
+      case "eavesonly":
+        return Math.max(0, lengths.eaves);
+      case "kickoutea":
+        return lengths.wallFlashing + lengths.stepFlashing > 0
+          ? Math.min(8, Math.max(2, Math.ceil((lengths.wallFlashing + lengths.stepFlashing) / 12)))
+          : 0;
+      case "steep79sq":
+        return pitchRise != null && pitchRise >= 7 && pitchRise < 10 ? sqBasis : 0;
+      case "steep10sq":
+        return pitchRise != null && pitchRise >= 10 ? sqBasis : 0;
     }
   };
 
   if (scope === "replace" && profile.tearOffRate > 0 && effectiveSquares > 0 && !modBitDetailed) {
+    const tearDesc =
+      profile.category === "asphalt"
+        ? "RFG TEAR LAM — Tear off, haul & dispose comp shingles — laminated"
+        : `Tear-off cost & disposal (${profile.category.toUpperCase()})`;
+    const tearCode = profile.category === "asphalt" ? "RFG-TEAR-LAM" : `${profile.category.toUpperCase()}-RMV`;
     lines.push({
-      code: `${profile.category.toUpperCase()}-RMV`,
-      description: `Tear-off cost & disposal (${profile.category.toUpperCase()})`,
+      code: tearCode,
+      description: tearDesc,
       quantity: round2(effectiveSquares),
       unit: "SQ",
       unitCost: round2(profile.tearOffRate * regional),
@@ -1588,8 +1767,13 @@ function parseCarrierScope(text: string): CarrierParsed {
 
   for (const line of lines) {
     lineText += ` ${line.toLowerCase()}`;
-    const code = line.match(/\b([A-Z]{2,4}\s?[A-Z0-9]{2,6})\b/)?.[1];
-    if (code) codes.add(code.replace(/\s+/g, ""));
+    const leadXact = line.match(/^([A-Z]{2,4}(?:\s+[A-Z][A-Z0-9]{1,6}){0,3})\s+/);
+    if (leadXact?.[1]) {
+      codes.add(leadXact[1].replace(/\s+/g, " ").trim());
+    } else {
+      const code = line.match(/\b([A-Z]{2,4}\s?[A-Z0-9]{2,6})\b/)?.[1];
+      if (code) codes.add(code.replace(/\s+/g, " "));
+    }
 
     // Skip carrier summary / valuation lines so we do not double-count RCV/ACV into line-item totals.
     const hasXactimateQty = /\d+(?:\.\d+)?\s+(?:SQ|LF|SF|EA|HR|DA)\s+\d+(?:\.\d+)/i.test(line);
@@ -1615,17 +1799,35 @@ function parseCarrierScope(text: string): CarrierParsed {
     parsedLineCount += 1;
     total += n;
 
-    const q = line.replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*(SQ|LF|SF|EA)\s+(\d+(?:\.\d{1,2})?)/i);
-    if (q?.[1] && q[3]) {
-      const qty = Number.parseFloat(q[1]);
-      const unitPrice = Number.parseFloat(q[3]);
-      if (Number.isFinite(qty) && Number.isFinite(unitPrice)) {
+    const flat = line.replace(/,/g, "");
+    const qTrail = flat.match(/(\d+(?:\.\d+)?)\s*(SQ|LF|SF|EA|HR|DA)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*$/i);
+    if (qTrail?.[1] && qTrail[3] && qTrail[4]) {
+      const qty = Number.parseFloat(qTrail[1]);
+      const unitPrice = Number.parseFloat(qTrail[3]);
+      const ext = Number.parseFloat(qTrail[4]);
+      if (Number.isFinite(qty) && Number.isFinite(unitPrice) && Number.isFinite(ext)) {
         const derived = qty * unitPrice;
         lineMathTotal += derived;
-        if (Math.abs(derived - n) > Math.max(3, n * 0.04)) mismatch += 1;
+        if (
+          Math.abs(derived - n) > Math.max(3, n * 0.04) &&
+          Math.abs(ext - n) > Math.max(3, n * 0.04)
+        ) {
+          mismatch += 1;
+        }
       }
     } else {
-      lineMathTotal += n;
+      const q = flat.match(/(\d+(?:\.\d+)?)\s*(SQ|LF|SF|EA)\s+(\d+(?:\.\d{1,2})?)/i);
+      if (q?.[1] && q[3]) {
+        const qty = Number.parseFloat(q[1]);
+        const unitPrice = Number.parseFloat(q[3]);
+        if (Number.isFinite(qty) && Number.isFinite(unitPrice)) {
+          const derived = qty * unitPrice;
+          lineMathTotal += derived;
+          if (Math.abs(derived - n) > Math.max(3, n * 0.04)) mismatch += 1;
+        }
+      } else {
+        lineMathTotal += n;
+      }
     }
   }
 
@@ -1642,12 +1844,14 @@ function parseCarrierScope(text: string): CarrierParsed {
   const addMissing = (rx: RegExp, label: string) => {
     if (!rx.test(lineText)) missing.push(label);
   };
-  addMissing(/tear|remove|demo|disposal/, "Tear-off and disposal");
-  addMissing(/drip edge|edge metal/, "Drip edge / edge metal");
-  addMissing(/flashing|step flashing|counter flashing/, "Flashing upgrades");
-  addMissing(/ridge vent|ventilation|soffit/, "Ventilation line items");
-  addMissing(/ice|water shield|self-adhered/, "Ice and water shield");
-  addMissing(/overhead|profit|o&p|supervision/, "Overhead and profit");
+  addMissing(/tear|remove|demo|disposal|tear off/i, "Tear-off and disposal");
+  addMissing(/drip edge|edge metal|rfg drpe/i, "Drip edge / edge metal");
+  addMissing(/flashing|step flashing|counter flashing|fls step|fls pj/i, "Flashing upgrades");
+  addMissing(/ridge vent|ventilation|soffit|rdgv/i, "Ventilation line items");
+  addMissing(/starter|strt|eaves/i, "Starter course at eaves/rakes");
+  addMissing(/ice\s*&?\s*water|self-adhered|icws|rfg icw/i, "Ice and water shield");
+  addMissing(/synthetic|underlay|unsy/i, "Synthetic underlayment");
+  addMissing(/overhead|profit|o&p|supervision|storage/i, "Overhead, profit, or staging");
 
   return {
     valuationBasis,
@@ -2580,6 +2784,19 @@ function formatFeetInchesFromDecimalFeet(ft: number): string {
   return `${fe}' ${inch}"`;
 }
 
+/** Geodesic edge length in feet (WGS84 sphere), for diagram dimensions on lng/lat segments. */
+function haversineFeetLngLat(a: [number, number], b: [number, number]): number {
+  const toR = (d: number) => (d * Math.PI) / 180;
+  const dLat = toR(b[1] - a[1]);
+  const dLng = toR(b[0] - a[0]);
+  const sinHalfLat = Math.sin(dLat / 2);
+  const sinHalfLng = Math.sin(dLng / 2);
+  const hav =
+    sinHalfLat * sinHalfLat +
+    Math.cos(toR(a[1])) * Math.cos(toR(b[1])) * sinHalfLng * sinHalfLng;
+  return 2 * 6371000 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav)) * 3.28084;
+}
+
 function buildAccurateDiagramSvg(
   polygonFeature: GeoJSON.Feature<GeoJSON.Polygon> | null,
   drawnLines: DrawnRoofLine[],
@@ -2645,7 +2862,8 @@ function buildAccurateDiagramSvg(
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
   svg += `<rect width="${W}" height="${H}" fill="${c.bg}" rx="8"/>`;
-  svg += `<text x="${W / 2}" y="22" fill="${c.fg}" font-size="14" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="700">Roof Measurement Diagram — ${roofType}</text>`;
+  svg += `<text x="${W / 2}" y="22" fill="${c.fg}" font-size="14" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="700">Roof measurement diagram — ${roofType}</text>`;
+  svg += `<text x="${W / 2}" y="38" fill="${light ? "#64748b" : "#94a3b8"}" font-size="10" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle">Blue: footprint &amp; segment dimensions (LF) • Solid colors: drawn ridge / eave / hip / valley / rake / flashing runs</text>`;
 
   const svgPts = localPts.map(toSvg);
   const polyPoints = svgPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -2657,12 +2875,7 @@ function buildAccurateDiagramSvg(
     const b = svgPts[i + 1]!;
     const aGeo = ring[i]!;
     const bGeo = ring[i + 1]!;
-    const dLat = toR(bGeo[1] - aGeo[1]);
-    const dLng = toR(bGeo[0] - aGeo[0]);
-    const sinHalfLat = Math.sin(dLat / 2);
-    const sinHalfLng = Math.sin(dLng / 2);
-    const hav = sinHalfLat * sinHalfLat + Math.cos(toR(aGeo[1])) * Math.cos(toR(bGeo[1])) * sinHalfLng * sinHalfLng;
-    const distFt = 2 * 6371000 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav)) * 3.28084;
+    const distFt = haversineFeetLngLat(aGeo, bGeo);
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const elen = Math.sqrt(dx * dx + dy * dy);
@@ -2687,18 +2900,47 @@ function buildAccurateDiagramSvg(
     ridge: c.ridge, hip: c.hip, valley: c.valley,
     eave: c.eave, rake: c.rake, "wall-flashing": c.wflash, "step-flashing": c.sflash,
   };
+  const typeShort = (t: string) =>
+    ({ ridge: "RDG", hip: "HIP", valley: "VLY", eave: "EAVE", rake: "RAKE", "wall-flashing": "W.FL", "step-flashing": "ST.FL" } as Record<string, string>)[t] ??
+    t.slice(0, 4).toUpperCase();
+
   for (const line of drawnLines) {
     const coords = line.geometry?.coordinates as [number, number][] | undefined;
     if (!coords || coords.length < 2) continue;
-    const color = lineTypeColors[line.type] || "#999";
+    const color = lineTypeColors[line.type] || "#64748b";
     const linePts = coords.map(([lng, lat]) =>
       toSvg({ x: (lng - centLng) * FT_PER_DEG_LNG, y: (lat - centLat) * FT_PER_DEG_LAT }),
     );
     const points = linePts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-    svg += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="6,3"/>`;
-    const mid = { x: (linePts[0].x + linePts[linePts.length - 1].x) / 2, y: (linePts[0].y + linePts[linePts.length - 1].y) / 2 };
-    const lfLab = formatFeetInchesFromDecimalFeet(line.lengthFt);
-    svg += `<text x="${mid.x.toFixed(1)}" y="${(mid.y - 6).toFixed(1)}" fill="${color}" font-size="10" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="600">${line.type}: ${lfLab}</text>`;
+    svg += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+    const segDimBase = dimOffset + 14;
+    for (let si = 0; si < linePts.length - 1; si++) {
+      const pa = linePts[si]!;
+      const pb = linePts[si + 1]!;
+      const ga = coords[si]!;
+      const gb = coords[si + 1]!;
+      const distFt = haversineFeetLngLat(ga, gb);
+      const dx = pb.x - pa.x;
+      const dy = pb.y - pa.y;
+      const elen = Math.sqrt(dx * dx + dy * dy);
+      const side = si % 2 === 0 ? 1 : -1;
+      const unx = elen > 0 ? (-dy / elen) * side : 0;
+      const uny = elen > 0 ? (dx / elen) * side : side;
+      const off = segDimBase + si * 6;
+      const aOff = { x: pa.x + unx * off, y: pa.y + uny * off };
+      const bOff = { x: pb.x + unx * off, y: pb.y + uny * off };
+      const lab = formatFeetInchesFromDecimalFeet(distFt);
+      const tcx = (aOff.x + bOff.x) / 2;
+      const tcy = (aOff.y + bOff.y) / 2;
+      svg += `<line x1="${pa.x.toFixed(1)}" y1="${pa.y.toFixed(1)}" x2="${aOff.x.toFixed(1)}" y2="${aOff.y.toFixed(1)}" stroke="${dimBlue}" stroke-width="1.1"/>`;
+      svg += `<line x1="${pb.x.toFixed(1)}" y1="${pb.y.toFixed(1)}" x2="${bOff.x.toFixed(1)}" y2="${bOff.y.toFixed(1)}" stroke="${dimBlue}" stroke-width="1.1"/>`;
+      svg += `<line x1="${aOff.x.toFixed(1)}" y1="${aOff.y.toFixed(1)}" x2="${bOff.x.toFixed(1)}" y2="${bOff.y.toFixed(1)}" stroke="${dimBlue}" stroke-width="1.25"/>`;
+      svg += `<text x="${tcx.toFixed(1)}" y="${(tcy - 5).toFixed(1)}" fill="${dimBlue}" font-size="10" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="700">${lab}</text>`;
+      const smx = (pa.x + pb.x) / 2;
+      const smy = (pa.y + pb.y) / 2;
+      svg += `<text x="${smx.toFixed(1)}" y="${(smy - 5).toFixed(1)}" fill="${color}" font-size="9" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-weight="800">${typeShort(line.type)}</text>`;
+    }
   }
 
   const legendItems = [
@@ -2749,7 +2991,7 @@ function buildProposalHtml(
   const scopeRows = result.scopeLines
     .map(
       (l) =>
-        `<tr><td>${esc(l.code)}</td><td>${esc(l.description)}</td><td class="r">${l.quantity} ${esc(l.unit)}</td><td class="r">${money(l.unitCost)}</td><td class="r">${money(l.total)}</td></tr>`,
+        `<tr><td class="mono">${esc(l.code)}</td><td>${esc(l.description)}</td><td class="r">${l.quantity} ${esc(l.unit)}</td><td class="r">${money(l.unitCost)}</td><td class="r">${money(l.total)}</td></tr>`,
     )
     .join("");
 
@@ -2830,6 +3072,11 @@ function buildProposalHtml(
     th{background:#f0f4f8;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#000000}
     .r{text-align:right}
     .total-row td{font-weight:700;background:#f8fafc;border-top:2px solid #000000}
+    table.scope-xact{font-size:11px;margin-top:10px;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+    table.scope-xact thead th{background:#1e3a5f;color:#ffffff;border:1px solid #153050;font-weight:700;letter-spacing:.02em}
+    table.scope-xact tbody tr:nth-child(even){background:#f8fafc}
+    table.scope-xact tbody tr:hover{background:#eff6ff}
+    table.scope-xact td.mono{font-family:ui-monospace,Consolas,monospace;font-weight:600;color:#0f172a}
     .highlight{background:#fffde7;font-weight:700;font-size:14px;padding:10px;border:2px solid #d4af37;margin-top:12px;text-align:center}
     .terms{margin-top:8px;font-size:12px;line-height:1.5}
     .terms h2{font-size:13px}
@@ -2898,8 +3145,9 @@ function buildProposalHtml(
   </table>
 
   <h2>Scope of Work</h2>
-  <table>
-    <thead><tr><th>Code</th><th>Description</th><th class="r">Qty</th><th class="r">Unit Cost</th><th class="r">Total</th></tr></thead>
+  <p class="subtitle" style="margin:0 0 8px;font-size:11px;color:#334155">Line-item format aligned to carrier / Xactimate-style scopes (code, description, quantity, unit price, extension). IRC references in descriptions are illustrative — verify against AHJ amendments.</p>
+  <table class="scope-xact">
+    <thead><tr><th>Code</th><th>Description</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Total</th></tr></thead>
     <tbody>${scopeRows}
       <tr class="total-row"><td colspan="4">Line Item Subtotal</td><td class="r">${money(result.lineItemTotal)}</td></tr>
       <tr class="total-row"><td colspan="4">Material Sales Tax</td><td class="r">${money(result.materialSalesTax)}</td></tr>
@@ -6000,7 +6248,7 @@ function App() {
           <p className="muted" style={{ marginTop: -6, marginBottom: 10, fontSize: 12 }}>
             Pricing source: <strong>{CARRIER_BENCHMARK_SOURCE_LABEL}</strong>
           </p>
-          <label>Carrier Line Items (Xactimate style)<textarea rows={10} value={form.carrierScopeText} onChange={(e) => setForm((curr) => ({ ...curr, carrierScopeText: e.target.value }))} placeholder={"RFG250 Tear Off 42.00 SQ 100.00 4200.00\nRFGDRP Drip Edge 220.00 LF 3.09 679.80\nRCV: 16480  ACV: 13900  Depreciation: 2580\nSupplement RCV: 4200  Deductible: 2500\nNet Claim: 11800"} /></label>
+          <label>Carrier Line Items (Xactimate style)<textarea rows={10} value={form.carrierScopeText} onChange={(e) => setForm((curr) => ({ ...curr, carrierScopeText: e.target.value }))} placeholder={"RFG LAM Laminated comp shingle 27.10 SQ 286.65 7768.22\nRFG TEAR LAM Tear off laminated 24.20 SQ 93.00 2250.60\nRFG DRPE Drip edge 187.80 LF 3.10 582.18\nRCV: 45000  ACV: 38000  Depreciation: 7000\nDeductible: 2500  Net Claim: 35500"} /></label>
           <div className="form-grid">
             <label>
               Carrier benchmark profile
