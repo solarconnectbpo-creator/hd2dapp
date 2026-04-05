@@ -1,7 +1,13 @@
 import { Link } from "react-router";
-import { ArrowLeft, Layers, Palette, Target, Zap } from "lucide-react";
+import { ArrowLeft, BookOpen, ExternalLink, Layers, Palette, Target, Zap } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  HUGO_CONTENT_MANAGEMENT,
+  HUGO_DOCS_REPO,
+  HUGO_DOCS_SITE,
+  HUGO_QUICK_START,
+} from "../config/hugoMarketingRefs";
 
 /**
  * Ad maker automation — UI scaffold for creative variants, audiences, and export to ad platforms.
@@ -108,6 +114,46 @@ export function AdMakerAutomation() {
           </Card>
         </div>
       </div>
+
+      <Card className="mt-8 border-slate-200">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-slate-700" aria-hidden />
+            <CardTitle className="text-black">Hugo reference — ad landing pages</CardTitle>
+          </div>
+          <CardDescription className="text-black/75">
+            Use this app for ad copy, variants, and export. Build fast, versioned <strong className="text-black">campaign
+            destinations</strong> (landing pages, storm microsites) with{" "}
+            <span className="font-medium text-black">Hugo</span> static sites — same references as the Marketing hub.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <a href={HUGO_DOCS_SITE} target="_blank" rel="noreferrer" className="gap-1.5">
+              gohugo.io
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={HUGO_DOCS_REPO} target="_blank" rel="noreferrer" className="gap-1.5">
+              hugoDocs on GitHub
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={HUGO_QUICK_START} target="_blank" rel="noreferrer" className="gap-1.5">
+              Quick start
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={HUGO_CONTENT_MANAGEMENT} target="_blank" rel="noreferrer" className="gap-1.5">
+              Content management
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

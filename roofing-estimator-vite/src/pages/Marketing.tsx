@@ -2,9 +2,7 @@ import { Link } from "react-router";
 import { BookOpen, ExternalLink, Megaphone, Share2, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-
-const HUGO_DOCS_SITE = "https://gohugo.io/";
-const HUGO_DOCS_REPO = "https://github.com/gohugoio/hugoDocs";
+import { HUGO_DOCS_REPO, HUGO_DOCS_SITE } from "../config/hugoMarketingRefs";
 
 /**
  * Marketing hub — links to Hugo documentation (static sites / content workflows) and in-app automation sections.
