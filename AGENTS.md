@@ -4,17 +4,19 @@
 
 | Path | Role |
 |------|------|
-| `roofing-estimator-vite/` | React + Vite SPA (Vercel and/or Cloudflare Pages) |
+| `roofing-estimator-vite/` | React + Vite SPA — **production on Cloudflare Pages** (`hd2d-closers`; see `wrangler.toml`) |
 | `backend/` | Cloudflare Worker API (`wrangler`), D1, KV |
 | `backend/ml-vision-service/` | Optional Python vision service (Fly, etc.) |
 
 ## Deploy (typical)
 
-- **Worker:** from `backend/`: `npm run deploy` (see `wrangler.toml`, custom routes for `/api/*` on apex).
-- **SPA (Vercel):** from `roofing-estimator-vite/`: `npm run vercel:deploy` or connect Git → Vercel.
-- **SPA (Cloudflare Pages):** `npm run pages:deploy` from `roofing-estimator-vite/` (see repo scripts).
+**Canonical production:** Cloudflare **Pages** project `hd2d-closers` serves the SPA at `https://hardcoredoortodoorclosers.com`. In DNS, point apex (and optional `www`) only at this Pages project in the Cloudflare dashboard—one canonical host, one provider for HTML.
 
-Production site: `https://hardcoredoortodoorclosers.com` (SPA) with API on same host `/api/*` or Worker URL via `VITE_INTEL_API_BASE`.
+- **SPA (production):** from `roofing-estimator-vite/`: `npm run pages:deploy` after `npm run build`, or connect the Git repo to Pages (build: `npm run build`, output: `dist`). Same-origin `/api/*` can be handled by `roofing-estimator-vite/functions/api/*` (see `wrangler.toml`).
+- **Worker:** from `backend/`: `npm run deploy` (see `backend/wrangler.toml`, custom routes for `/api/*` on apex when not using Pages Functions).
+- **Vercel (optional):** `npm run vercel:deploy` or Git → Vercel for **preview / alternate URLs** only. `vercel.json` redirects `hd2d-closers.vercel.app` → apex; keep Vercel env vars in sync if you still build there.
+
+Production API: same host `/api/*` (Pages Functions → Worker) when `VITE_HD2D_SAME_ORIGIN_API=true`, or direct Worker URL via `VITE_INTEL_API_BASE`.
 
 ## Secrets / env (Worker)
 
