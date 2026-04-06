@@ -5,7 +5,7 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-05-openai-health";
+export const WORKER_BUILD_TAG = "2026-04-05-access-gate";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
@@ -26,6 +26,8 @@ type HealthEnv = {
   ARCGIS_MAPSERVER_TILE_OPACITY?: string;
   /** When "false", self-service registration is off. */
   AUTH_SIGNUP_ENABLED?: string;
+  STRIPE_SECRET_KEY?: string;
+  MEMBERSHIP_STRIPE_PRICE_ID?: string;
 };
 
 type CorsHeaders = Record<string, string>;
@@ -79,6 +81,10 @@ export function handleHealthGet(
         arcgisMapServerTileOpacity: tileOk ? tileOpacity : undefined,
         authSignup:
           (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false",
+        /** True when Stripe + membership Price id are set (POST /api/billing/membership-checkout-session). */
+        membershipCheckout: Boolean(
+          (env.STRIPE_SECRET_KEY || "").trim() && (env.MEMBERSHIP_STRIPE_PRICE_ID || "").trim(),
+        ),
       },
     },
     200,

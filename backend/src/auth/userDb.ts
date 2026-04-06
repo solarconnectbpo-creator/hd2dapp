@@ -8,6 +8,11 @@ export type DbUserRow = {
   salt: string;
   name: string;
   user_type: AuthRole;
+  /** pending | approved | rejected */
+  approval_status: string;
+  /** unpaid | active | past_due | canceled */
+  billing_status: string;
+  stripe_customer_id: string | null;
   created_at: number;
   updated_at: number;
 };
@@ -23,7 +28,7 @@ export async function findUserByEmail(db: D1, email: string): Promise<DbUserRow 
   const normalized = email.trim().toLowerCase();
   const row = await db
     .prepare(
-      `SELECT id, email, password_hash, salt, name, user_type, created_at, updated_at FROM users WHERE lower(email) = ? LIMIT 1`,
+      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, created_at, updated_at FROM users WHERE lower(email) = ? LIMIT 1`,
     )
     .bind(normalized)
     .first<DbUserRow>();
@@ -34,7 +39,7 @@ export async function findUserById(db: D1, id: string): Promise<DbUserRow | null
   if (db == null) return null;
   const row = await db
     .prepare(
-      `SELECT id, email, password_hash, salt, name, user_type, created_at, updated_at FROM users WHERE id = ? LIMIT 1`,
+      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, created_at, updated_at FROM users WHERE id = ? LIMIT 1`,
     )
     .bind(id)
     .first<DbUserRow>();
@@ -43,7 +48,16 @@ export async function findUserById(db: D1, id: string): Promise<DbUserRow | null
 
 export async function insertUser(
   db: D1,
-  args: { id: string; email: string; plainPassword: string; name: string; user_type: AuthRole },
+  args: {
+    id: string;
+    email: string;
+    plainPassword: string;
+    name: string;
+    user_type: AuthRole;
+    /** Defaults: admin-created accounts are approved + active. */
+    approval_status?: string;
+    billing_status?: string;
+  },
 ): Promise<void> {
   const normalized = args.email.trim().toLowerCase();
   const t = now();
@@ -55,6 +69,8 @@ export async function insertUser(
     salt: saltHex,
     name: args.name.trim() || normalized.split("@")[0],
     user_type: args.user_type,
+    approval_status: args.approval_status ?? "approved",
+    billing_status: args.billing_status ?? "active",
     created_at: t,
     updated_at: t,
   });
@@ -70,14 +86,18 @@ export async function insertUserHashed(
     salt: string;
     name: string;
     user_type: AuthRole;
+    approval_status?: string;
+    billing_status?: string;
     created_at: number;
     updated_at: number;
   },
 ): Promise<void> {
+  const approval = args.approval_status ?? "approved";
+  const billing = args.billing_status ?? "active";
   await db
     .prepare(
-      `INSERT INTO users (id, email, password_hash, salt, name, user_type, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       args.id,
@@ -86,6 +106,8 @@ export async function insertUserHashed(
       args.salt,
       args.name,
       args.user_type,
+      approval,
+      billing,
       args.created_at,
       args.updated_at,
     )
@@ -119,21 +141,79 @@ export function rowToAuthUser(row: DbUserRow): AuthUser {
 }
 
 export async function listUsersPublic(db: D1): Promise<
-  Array<{ id: string; email: string; name: string; user_type: AuthRole; created_at: number; updated_at: number }>
+  Array<{
+    id: string;
+    email: string;
+    name: string;
+    user_type: AuthRole;
+    approval_status: string;
+    billing_status: string;
+    created_at: number;
+    updated_at: number;
+  }>
 > {
   const res = (await db
-    .prepare(`SELECT id, email, name, user_type, created_at, updated_at FROM users ORDER BY email ASC`)
+    .prepare(
+      `SELECT id, email, name, user_type, approval_status, billing_status, created_at, updated_at FROM users ORDER BY email ASC`,
+    )
     .all()) as {
     results?: Array<{
       id: string;
       email: string;
       name: string;
       user_type: AuthRole;
+      approval_status: string;
+      billing_status: string;
       created_at: number;
       updated_at: number;
     }>;
   };
   return res.results ?? [];
+}
+
+export async function updateUserApprovalStatus(
+  db: D1,
+  id: string,
+  approval_status: "pending" | "approved" | "rejected",
+): Promise<boolean> {
+  const row = await findUserById(db, id);
+  if (!row) return false;
+  const t = now();
+  await db
+    .prepare(`UPDATE users SET approval_status = ?, updated_at = ? WHERE id = ?`)
+    .bind(approval_status, t, id)
+    .run();
+  return true;
+}
+
+export async function updateUserBillingAndStripe(
+  db: D1,
+  id: string,
+  patch: { billing_status: string; stripe_customer_id?: string | null },
+): Promise<boolean> {
+  const row = await findUserById(db, id);
+  if (!row) return false;
+  const t = now();
+  if (patch.stripe_customer_id !== undefined) {
+    await db
+      .prepare(`UPDATE users SET billing_status = ?, stripe_customer_id = ?, updated_at = ? WHERE id = ?`)
+      .bind(patch.billing_status, patch.stripe_customer_id, t, id)
+      .run();
+  } else {
+    await db.prepare(`UPDATE users SET billing_status = ?, updated_at = ? WHERE id = ?`).bind(patch.billing_status, t, id).run();
+  }
+  return true;
+}
+
+export async function findUserIdByStripeCustomerId(db: D1, customerId: string): Promise<string | null> {
+  if (db == null) return null;
+  const c = customerId.trim();
+  if (!c) return null;
+  const row = await db
+    .prepare(`SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1`)
+    .bind(c)
+    .first<{ id: string }>();
+  return row?.id ?? null;
 }
 
 export async function updateUserFields(

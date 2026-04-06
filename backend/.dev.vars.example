@@ -26,6 +26,8 @@
 # SESSION_SECRET=change-me
 # Optional: GET /api/auth/me returns 401 if user was removed from D1 (503 if D1 errors). Can force re-auth after deletes:
 # AUTH_REQUIRE_DB_USER_FOR_ME=true
+# Skip approval + paid-membership gate for company/rep (local dev only):
+# AUTH_SKIP_ACCESS_GATE=true
 
 # ML vision — Worker proxies /api/ai/roof-vision + /api/ai/roof-segment → ml-vision-service (see backend/ml-vision-service/README.md).
 # Same-origin app flow: Vite `/intel-proxy` → Worker → ROOF_VISION_SERVICE_URL (local default: http://127.0.0.1:18090).
@@ -64,6 +66,12 @@
 # Public site origin (no trailing slash) for Stripe redirect after payment:
 # APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
 # Production example: APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com
+#
+# --- Platform membership (subscription) — gate company/rep until admin approves + Stripe subscription active ---
+# Create a recurring Price in Stripe Dashboard → Products → copy price_… id:
+# MEMBERSHIP_STRIPE_PRICE_ID=price_...
+# Webhook endpoint: POST https://<your-worker>/api/webhooks/stripe — events: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted
+# STRIPE_WEBHOOK_SECRET=whsec_...
 
 # --- Marketing images (POST /api/marketing/generate-image — company/admin; rate-limited in KV) ---
 # OPENAI_API_KEY=sk-...

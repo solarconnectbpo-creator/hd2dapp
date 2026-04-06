@@ -23,6 +23,8 @@ import { handleOsmBuildingAtPointGet } from "./api/osmBuildingFootprint";
 import { handleAdminUserRoutes } from "./api/adminUserRoutes";
 import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/coursesCatalogRoutes";
 import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCheckout";
+import { handleMembershipCheckoutSession, type PlatformBillingEnv } from "./api/platformBilling";
+import { handleStripeWebhook, type StripeWebhookEnv } from "./api/stripeWebhook";
 import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
 import { handleEstimatorChatAi } from "./api/estimatorChatAi";
 import { handleGhlSubmitLead } from "./api/ghlSubmitLead";
@@ -40,6 +42,8 @@ interface Env {
   AUTH_ENV_LOGIN_ENABLED?: string;
   /** Set "true" to require a D1 user row for GET /api/auth/me (401 if removed). */
   AUTH_REQUIRE_DB_USER_FOR_ME?: string;
+  /** Set "true" locally to skip approval + paid-membership gating for company/rep. */
+  AUTH_SKIP_ACCESS_GATE?: string;
   /** EagleView API Center OAuth (see `eagleviewApicenterProxy.ts`). */
   EAGLEVIEW_CLIENT_ID?: string;
   EAGLEVIEW_OAUTH_CLIENT_ID?: string;
@@ -87,6 +91,10 @@ interface Env {
   STRIPE_SECRET_KEY?: string;
   /** Comma-separated Price ids allowed for lead checkout (e.g. price_abc,price_def). */
   LEADS_STRIPE_PRICE_IDS?: string;
+  /** Stripe Price id for platform membership subscription (POST /api/billing/membership-checkout-session). */
+  MEMBERSHIP_STRIPE_PRICE_ID?: string;
+  /** Stripe webhook signing secret (whsec_…) for POST /api/webhooks/stripe. */
+  STRIPE_WEBHOOK_SECRET?: string;
   /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
   APP_PUBLIC_ORIGIN?: string;
   /** Meta Marketing API — Facebook Login + scheduled Page posts (see metaMarketing.ts). */
@@ -107,6 +115,7 @@ type AuthEnv = Pick<
   | "AUTH_SIGNUP_ENABLED"
   | "AUTH_ENV_LOGIN_ENABLED"
   | "AUTH_REQUIRE_DB_USER_FOR_ME"
+  | "AUTH_SKIP_ACCESS_GATE"
   | "AUTH_ADMIN_EMAIL"
   | "AUTH_ADMIN_PASSWORD"
   | "AUTH_ADMIN_NAME"
@@ -159,6 +168,17 @@ export default {
     }
 
     try {
+      if (
+        (path === "/api/webhooks/stripe" || path === "/api/webhooks/stripe/") &&
+        request.method === "POST"
+      ) {
+        return await handleStripeWebhook(request, env as StripeWebhookEnv, corsHeaders);
+      } else if (
+        (path === "/api/billing/membership-checkout-session" || path === "/api/billing/membership-checkout-session/") &&
+        request.method === "POST"
+      ) {
+        return await handleMembershipCheckoutSession(request, env as PlatformBillingEnv, corsHeaders);
+      }
       // Route requests to appropriate handlers (await async handlers so rejections hit catch below — avoids CF 1101).
       // Include `/api/auth` (no trailing slash) — `startsWith("/api/auth/")` alone misses it and returns 404.
       if (path === "/api/auth" || path === "/api/auth/" || path.startsWith("/api/auth/")) {

@@ -1,6 +1,13 @@
 import type { AuthEnv } from "./authRoutes";
 import { getBearerPayload } from "./authRoutes";
-import { deleteUserById, findUserByEmail, insertUser, listUsersPublic, updateUserFields } from "../auth/userDb";
+import {
+  deleteUserById,
+  findUserByEmail,
+  insertUser,
+  listUsersPublic,
+  updateUserApprovalStatus,
+  updateUserFields,
+} from "../auth/userDb";
 import type { AuthRole } from "../auth/token";
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -100,6 +107,36 @@ export async function handleAdminUserRoutes(
   const userId = segments[0];
   if (!userId) {
     return new Response(JSON.stringify({ success: false, error: "Invalid path." }), { status: 400, headers: j });
+  }
+
+  if (segments.length === 2 && segments[1] === "approval") {
+    if (request.method !== "PATCH") {
+      return new Response(JSON.stringify({ success: false, error: "Method not allowed." }), {
+        status: 405,
+        headers: j,
+      });
+    }
+    let body: { approval_status?: string } = {};
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const st = (body.approval_status || "").trim().toLowerCase();
+    if (st !== "pending" && st !== "approved" && st !== "rejected") {
+      return new Response(
+        JSON.stringify({ success: false, error: "approval_status must be pending, approved, or rejected." }),
+        { status: 400, headers: j },
+      );
+    }
+    const ok = await updateUserApprovalStatus(env.DB, userId, st);
+    if (!ok) {
+      return new Response(JSON.stringify({ success: false, error: "User not found." }), { status: 404, headers: j });
+    }
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: j });
   }
 
   if (request.method === "PATCH") {

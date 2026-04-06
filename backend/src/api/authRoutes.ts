@@ -8,6 +8,7 @@ import {
   insertUser,
   rowToAuthUser,
 } from "../auth/userDb";
+import { evaluateAccess } from "../auth/access";
 import { isValidUsStateCode, normalizeState, type PlacementPref } from "../auth/orgDb";
 
 export type AuthEnv = {
@@ -33,6 +34,11 @@ export type AuthEnv = {
    * D1 query errors return 503 so clients can retry instead of forcing logout.
    */
   AUTH_REQUIRE_DB_USER_FOR_ME?: string;
+  /**
+   * When "true", skip approval + paid-membership gating (local dev / break-glass).
+   * Production should leave unset so company/rep need admin approval + active billing.
+   */
+  AUTH_SKIP_ACCESS_GATE?: string;
 };
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -145,8 +151,15 @@ export async function handleAuthRequest(
       } catch (e) {
         console.error("ensureDbUserFromEnvLogin:", e);
       }
+      let envRow: Awaited<ReturnType<typeof findUserById>> = null;
+      try {
+        envRow = await findUserById(env.DB, matched.user.id);
+      } catch {
+        envRow = null;
+      }
+      const access = evaluateAccess(env, matched.user.user_type, envRow);
       const { token, expiresAt } = await issueToken(env, matched.user);
-      return new Response(JSON.stringify({ success: true, token, user: matched.user, expiresAt }), {
+      return new Response(JSON.stringify({ success: true, token, user: matched.user, expiresAt, access }), {
         status: 200,
         headers: j,
       });
@@ -185,8 +198,9 @@ export async function handleAuthRequest(
         });
       }
       const user = rowToAuthUser(dbUser);
+      const access = evaluateAccess(env, user.user_type, dbUser);
       const { token, expiresAt } = await issueToken(env, user);
-      return new Response(JSON.stringify({ success: true, token, user, expiresAt }), { status: 200, headers: j });
+      return new Response(JSON.stringify({ success: true, token, user, expiresAt, access }), { status: 200, headers: j });
     }
     return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
       status: 401,
@@ -301,8 +315,8 @@ export async function handleAuthRequest(
         await env.DB.batch([
           env.DB
             .prepare(
-              `INSERT INTO users (id, email, password_hash, salt, name, user_type, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, 'company', ?, ?)`,
+              `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, 'company', 'pending', 'unpaid', ?, ?)`,
             )
             .bind(id, email, hashHex, saltHex, displayName, t, t),
           env.DB
@@ -319,8 +333,8 @@ export async function handleAuthRequest(
         await env.DB.batch([
           env.DB
             .prepare(
-              `INSERT INTO users (id, email, password_hash, salt, name, user_type, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, 'sales_rep', ?, ?)`,
+              `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, 'sales_rep', 'pending', 'unpaid', ?, ?)`,
             )
             .bind(id, email, hashHex, saltHex, displayName, t, t),
           env.DB
@@ -350,8 +364,15 @@ export async function handleAuthRequest(
       name: displayName,
       user_type: isCompany ? "company" : "sales_rep",
     };
+    let regRow: Awaited<ReturnType<typeof findUserById>> = null;
+    try {
+      regRow = await findUserById(env.DB, id);
+    } catch {
+      regRow = null;
+    }
+    const access = evaluateAccess(env, user.user_type, regRow);
     const { token, expiresAt } = await issueToken(env, user);
-    return new Response(JSON.stringify({ success: true, token, user, expiresAt }), { status: 201, headers: j });
+    return new Response(JSON.stringify({ success: true, token, user, expiresAt, access }), { status: 201, headers: j });
   }
 
   if (p === "/api/auth/me" && request.method === "GET") {
@@ -409,7 +430,8 @@ export async function handleAuthRequest(
           name: payload.email.split("@")[0],
           user_type: payload.user_type,
         };
-    return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: j });
+    const access = evaluateAccess(env, payload.user_type, row);
+    return new Response(JSON.stringify({ success: true, user, access }), { status: 200, headers: j });
   }
 
   if (p === "/api/auth/logout" && request.method === "POST") {
