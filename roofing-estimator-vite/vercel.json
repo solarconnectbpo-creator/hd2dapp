@@ -6,7 +6,7 @@
       "has": [{ "type": "host", "value": "hd2d-closers.vercel.app" }],
       "destination": "https://hardcoredoortodoorclosers.com/:path*",
       "permanent": true
-    },
+    }
   ],
   "rewrites": [
     {
