@@ -321,7 +321,9 @@ export function FieldProjectsPanel() {
     setDragOverStage(null);
   };
 
-  const modalMount = typeof document !== "undefined" ? document.body : null;
+  /** Mount into `#root` so `.canvass-light-sheet` + theme stack consistently; `body` portals miss some #root-scoped fixes. */
+  const modalMount =
+    typeof document !== "undefined" ? document.getElementById("root") ?? document.body : null;
 
   return (
     <div className="space-y-6">
@@ -631,14 +633,14 @@ export function FieldProjectsPanel() {
       {createOpen && modalMount
         ? createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/80 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fp-create-title"
           onClick={() => setCreateOpen(false)}
         >
           <Card
-            className="canvass-light-sheet relative my-auto w-full max-w-md min-h-0 max-h-[min(100dvh-2rem,640px)] flex flex-col gap-0 overflow-hidden border border-black/10 shadow-lg"
+            className="canvass-light-sheet relative my-auto w-full max-w-md min-h-0 max-h-[min(100dvh-2rem,640px)] flex flex-col gap-0 overflow-hidden border border-black/10 bg-white shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -656,43 +658,56 @@ export function FieldProjectsPanel() {
                 create it.
               </CardDescription>
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain pt-6">
-              <label className="block text-sm font-medium text-black">
-                Project name *
-                <input
-                  className={FP_MODAL_FIELD}
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g. 123 Oak — hail inspection"
-                />
-              </label>
-              <label className="block text-sm font-medium text-black">
-                Address (optional)
-                <input
-                  className={FP_MODAL_FIELD}
-                  value={newAddress}
-                  onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="Street, city, state"
-                />
-              </label>
-              <label className="block text-sm font-medium text-black">
-                Notes (optional)
-                <textarea
-                  className={FP_MODAL_FIELD}
-                  rows={3}
-                  value={newNotes}
-                  onChange={(e) => setNewNotes(e.target.value)}
-                  placeholder="Claim #, adjuster, access notes…"
-                />
-              </label>
-              <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
-                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="button" disabled={!newName.trim()} onClick={onCreate}>
-                  Create
-                </Button>
-              </div>
+            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pt-6">
+              <form
+                className="space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onCreate();
+                }}
+              >
+                <label className="block text-sm font-medium text-black">
+                  Project name *
+                  <input
+                    className={FP_MODAL_FIELD}
+                    name="name"
+                    autoComplete="off"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="e.g. 123 Oak — hail inspection"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-black">
+                  Address (optional)
+                  <input
+                    className={FP_MODAL_FIELD}
+                    name="address"
+                    autoComplete="street-address"
+                    value={newAddress}
+                    onChange={(e) => setNewAddress(e.target.value)}
+                    placeholder="Street, city, state"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-black">
+                  Notes (optional)
+                  <textarea
+                    className={FP_MODAL_FIELD}
+                    name="notes"
+                    rows={3}
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                    placeholder="Claim #, adjuster, access notes…"
+                  />
+                </label>
+                <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={!newName.trim()}>
+                    Create
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </div>,
@@ -703,14 +718,14 @@ export function FieldProjectsPanel() {
       {selected && modalMount
         ? createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/80 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fp-detail-title"
           onClick={() => setSelectedId(null)}
         >
           <Card
-            className="canvass-light-sheet relative my-4 w-full max-w-3xl border border-black/10 shadow-lg"
+            className="canvass-light-sheet relative my-4 w-full max-w-3xl border border-black/10 bg-white shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <button
