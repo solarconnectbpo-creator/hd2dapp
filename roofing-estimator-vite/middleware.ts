@@ -29,8 +29,9 @@ export default async function middleware(request: Request): Promise<Response> {
   for (const name of HOP_BY_HOP) {
     headers.delete(name);
   }
-  const id = process.env.HD2D_ACCESS_CLIENT_ID?.trim();
-  const secret = process.env.HD2D_ACCESS_CLIENT_SECRET?.trim();
+  // Bracket keys so the Vercel Edge bundler does not replace these with `undefined` at build time.
+  const id = process.env["HD2D_ACCESS_CLIENT_ID"]?.trim();
+  const secret = process.env["HD2D_ACCESS_CLIENT_SECRET"]?.trim();
   if (id && secret) {
     headers.set("CF-Access-Client-Id", id);
     headers.set("CF-Access-Client-Secret", secret);
