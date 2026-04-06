@@ -22,6 +22,14 @@ export function safeUserFacingApiMessage(
   }
 
   const lower = t.toLowerCase();
+  /** Vercel middleware 503 when CF Access blocks the Worker — not a wrong password. */
+  if (
+    lower.includes("cloudflare access rejected") ||
+    lower.includes("cloudflare access blocked") ||
+    (lower.includes("service auth") && lower.includes("zero trust"))
+  ) {
+    return "Sign-in can’t reach the server yet: Cloudflare is blocking the API proxy. Your admin needs a Service Auth policy on the Worker app and matching secrets in Vercel—not a wrong password.";
+  }
   if (
     lower.includes("stripe") ||
     lower.includes("invalid_request") ||
