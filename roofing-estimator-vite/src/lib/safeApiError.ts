@@ -24,11 +24,16 @@ export function safeUserFacingApiMessage(
   const lower = t.toLowerCase();
   /** Vercel middleware 503 when CF Access blocks the Worker — not a wrong password. */
   if (
-    lower.includes("cloudflare access rejected") ||
-    lower.includes("cloudflare access blocked") ||
+    lower.includes("cloudflare access") ||
+    lower.includes("cloudflareaccess.com") ||
+    (lower.includes("service token") && (lower.includes("vercel") || lower.includes("zero trust"))) ||
     (lower.includes("service auth") && lower.includes("zero trust"))
   ) {
-    return "Sign-in can’t reach the server yet: Cloudflare is blocking the API proxy. Your admin needs a Service Auth policy on the Worker app and matching secrets in Vercel—not a wrong password.";
+    return "Sign-in can’t reach the server yet: Cloudflare is blocking the API proxy. Your admin needs a Service Auth policy on the Worker app and matching HD2D_ACCESS_* secrets in Vercel—not a wrong password.";
+  }
+  /** Login/sign-up use skipStatusHints — long bodies used to hit the 200-char trim and showed a useless generic line. */
+  if (options?.skipStatusHints && status === 503) {
+    return "Sign-in can’t reach the server right now (service unavailable). If this keeps happening, the API proxy or Cloudflare Access setup needs to be fixed.";
   }
   if (
     lower.includes("stripe") ||
