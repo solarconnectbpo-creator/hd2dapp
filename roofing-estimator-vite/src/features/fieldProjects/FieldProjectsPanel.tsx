@@ -1,17 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
-import {
-  Camera,
-  ExternalLink,
-  ImagePlus,
-  LayoutGrid,
-  List,
-  Loader2,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Camera, ImagePlus, LayoutGrid, List, Loader2, Sparkles, Trash2, X } from "lucide-react";
 import { useRoofing } from "../../context/RoofingContext";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -26,7 +16,6 @@ import {
 } from "../../lib/fieldProjectTypes";
 import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
 import { postRoofDamageDraft } from "../../lib/roofDamageClient";
-import { loadOrgSettings } from "../../lib/orgSettings";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
 
@@ -63,74 +52,6 @@ function formatUsd(n: number): string {
 type ProjectsViewMode = "board" | "list";
 type ListSortKey = "updated" | "name" | "value" | "stage";
 
-function resolveGhlOpenUrl(project: FieldProject, ghlBaseUrl: string): string | null {
-  const direct = project.ghlUrl?.trim();
-  if (direct) return direct;
-  const base = ghlBaseUrl.trim();
-  if (!base) return null;
-  try {
-    const u = new URL(base);
-    return u.protocol === "https:" ? base : null;
-  } catch {
-    return null;
-  }
-}
-
-function resolveGhlEmbedUrl(project: FieldProject, ghlBaseUrl: string): string | null {
-  const embed = project.ghlEmbedUrl?.trim();
-  if (embed) return embed;
-  const direct = project.ghlUrl?.trim();
-  if (direct) return direct;
-  const base = ghlBaseUrl.trim();
-  try {
-    return base && new URL(base).protocol === "https:" ? base : null;
-  } catch {
-    return null;
-  }
-}
-
-function GhlEmbedPanel({ src, openFallbackUrl }: { src: string; openFallbackUrl: string }) {
-  const [loaded, setLoaded] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
-
-  useEffect(() => {
-    setLoaded(false);
-    setTimedOut(false);
-    const t = window.setTimeout(() => setTimedOut(true), 10000);
-    return () => clearTimeout(t);
-  }, [src]);
-
-  const showSlowWarning = timedOut && !loaded;
-
-  return (
-    <div className="space-y-2 rounded-lg border border-black/15 bg-[#f1f5f9] p-3">
-      <p className="text-xs text-black/70">
-        Embedded CRM pages often fail here because many external systems send{" "}
-        <code className="text-[11px]">X-Frame-Options: DENY</code>. If the frame stays blank, use{" "}
-        <strong>Open in new tab</strong>.
-      </p>
-      <iframe
-        title="External CRM"
-        src={src}
-        className="h-[min(420px,55vh)] w-full rounded-md border border-black/10 bg-[#ffffff]"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
-        onLoad={() => setLoaded(true)}
-      />
-      {showSlowWarning ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          The frame is still empty after a few seconds — it may be blocked. Use open in new tab.
-        </div>
-      ) : null}
-      <Button type="button" size="sm" variant="outline" asChild>
-        <a href={openFallbackUrl} target="_blank" rel="noopener noreferrer">
-          <ExternalLink className="mr-2 h-4 w-4" />
-          Open in new tab
-        </a>
-      </Button>
-    </div>
-  );
-}
-
 export function FieldProjectsPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -147,17 +68,10 @@ export function FieldProjectsPanel() {
     updateFieldProject,
   } = useRoofing();
 
-  const org = loadOrgSettings();
-
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newNotes, setNewNotes] = useState("");
-  const [newGhlUrl, setNewGhlUrl] = useState("");
-  const [newGhlEmbedUrl, setNewGhlEmbedUrl] = useState("");
-  const [newMonetaryStr, setNewMonetaryStr] = useState("");
-  const [newOwnerLabel, setNewOwnerLabel] = useState("");
-  const [newTagsComma, setNewTagsComma] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -169,9 +83,6 @@ export function FieldProjectsPanel() {
   const [listSortDesc, setListSortDesc] = useState(true);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<FieldPipelineStage | null>(null);
-  const [ghlEmbedOpen, setGhlEmbedOpen] = useState(false);
-  const [detailGhlUrl, setDetailGhlUrl] = useState("");
-  const [detailGhlEmbedUrl, setDetailGhlEmbedUrl] = useState("");
   const [detailMonetaryStr, setDetailMonetaryStr] = useState("");
   const [detailOwnerLabel, setDetailOwnerLabel] = useState("");
   const [detailTagsComma, setDetailTagsComma] = useState("");
@@ -231,13 +142,11 @@ export function FieldProjectsPanel() {
 
   useEffect(() => {
     if (!selected) {
-      setGhlEmbedOpen(false);
-      setDetailGhlUrl("");
-      setDetailGhlEmbedUrl("");
+      setDetailMonetaryStr("");
+      setDetailOwnerLabel("");
+      setDetailTagsComma("");
       return;
     }
-    setDetailGhlUrl(selected.ghlUrl ?? "");
-    setDetailGhlEmbedUrl(selected.ghlEmbedUrl ?? "");
     setDetailMonetaryStr(
       selected.monetaryValueUsd != null && Number.isFinite(selected.monetaryValueUsd)
         ? String(selected.monetaryValueUsd)
@@ -245,15 +154,7 @@ export function FieldProjectsPanel() {
     );
     setDetailOwnerLabel(selected.ownerLabel ?? "");
     setDetailTagsComma(selected.tags?.length ? selected.tags.join(", ") : "");
-    setGhlEmbedOpen(false);
-  }, [
-    selectedId,
-    selected?.ghlUrl,
-    selected?.ghlEmbedUrl,
-    selected?.monetaryValueUsd,
-    selected?.ownerLabel,
-    selected ? selected.tags.join("\0") : "",
-  ]);
+  }, [selectedId, selected?.monetaryValueUsd, selected?.ownerLabel, selected ? selected.tags.join("\0") : ""]);
 
   const sorted = useMemo(
     () => [...fieldProjects].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
@@ -345,28 +246,14 @@ export function FieldProjectsPanel() {
   const onCreate = () => {
     const name = newName.trim();
     if (!name) return;
-    const mvRaw = newMonetaryStr.trim();
-    const monetaryParsed = mvRaw === "" ? undefined : Number.parseFloat(mvRaw);
     const p = addFieldProject({
       name,
       address: newAddress.trim() || undefined,
       notes: newNotes.trim() || undefined,
-      ghlUrl: newGhlUrl.trim() || undefined,
-      ghlEmbedUrl: newGhlEmbedUrl.trim() || undefined,
-      ...(monetaryParsed != null && Number.isFinite(monetaryParsed) && monetaryParsed >= 0
-        ? { monetaryValueUsd: monetaryParsed }
-        : {}),
-      ownerLabel: newOwnerLabel.trim() || undefined,
-      tags: newTagsComma.trim() || undefined,
     });
     setNewName("");
     setNewAddress("");
     setNewNotes("");
-    setNewGhlUrl("");
-    setNewGhlEmbedUrl("");
-    setNewMonetaryStr("");
-    setNewOwnerLabel("");
-    setNewTagsComma("");
     setCreateOpen(false);
     setSelectedId(p.id);
   };
@@ -434,25 +321,22 @@ export function FieldProjectsPanel() {
     setDragOverStage(null);
   };
 
-  const selectedOpenUrl = selected ? resolveGhlOpenUrl(selected, org.ghlBaseUrl) : null;
-  const selectedEmbedSrc = selected ? resolveGhlEmbedUrl(selected, org.ghlBaseUrl) : null;
-
   const modalMount = typeof document !== "undefined" ? document.body : null;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
-          <p className="max-w-2xl text-sm leading-relaxed text-[#71767b]">
-            Opportunities-style <strong className="text-[#e7e9ea]">list</strong> or{" "}
-            <strong className="text-[#e7e9ea]">board</strong> views (local CRM). Add deal value, owner, and tags;
-            optionally link each job to your CRM. Photos and AI notes stay on device until you export.
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#71767b]">
+            <strong className="text-[#e7e9ea]">List</strong> or{" "}
+            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Data stays in this browser
+            until you export.
           </p>
         </div>
         <Button
           type="button"
-          className="shrink-0 bg-[#1d9bf0] text-white shadow-[0_0_24px_rgba(29,155,240,0.28)] hover:bg-[#1a8cd8]"
+          className="shrink-0 whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-semibold bg-[#1d9bf0] text-white shadow-[0_0_24px_rgba(29,155,240,0.28)] hover:bg-[#1a8cd8] sm:mt-0.5"
           onClick={() => setCreateOpen(true)}
         >
           New field project
@@ -754,7 +638,7 @@ export function FieldProjectsPanel() {
           onClick={() => setCreateOpen(false)}
         >
           <Card
-            className="canvass-light-sheet relative my-auto w-full max-w-md min-h-0 max-h-[min(100dvh-2rem,920px)] flex flex-col gap-0 overflow-hidden border border-black/10 shadow-lg"
+            className="canvass-light-sheet relative my-auto w-full max-w-md min-h-0 max-h-[min(100dvh-2rem,640px)] flex flex-col gap-0 overflow-hidden border border-black/10 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -767,9 +651,12 @@ export function FieldProjectsPanel() {
             </button>
             <CardHeader className="shrink-0 border-b border-black/10">
               <CardTitle id="fp-create-title">New field project</CardTitle>
-              <CardDescription>Job name, optional site address, notes, and optional CRM links.</CardDescription>
+              <CardDescription>
+                Name the job and optional address or notes. Add deal value, tags, and photos on the job after you
+                create it.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain pt-6">
+            <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain pt-6">
               <label className="block text-sm font-medium text-black">
                 Project name *
                 <input
@@ -798,55 +685,7 @@ export function FieldProjectsPanel() {
                   placeholder="Claim #, adjuster, access notes…"
                 />
               </label>
-              <label className="block text-sm font-medium text-black">
-                Deal value USD (optional)
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  className={FP_MODAL_FIELD}
-                  value={newMonetaryStr}
-                  onChange={(e) => setNewMonetaryStr(e.target.value)}
-                  placeholder="e.g. 45000"
-                />
-              </label>
-              <label className="block text-sm font-medium text-black">
-                Owner / assignee (optional)
-                <input
-                  className={FP_MODAL_FIELD}
-                  value={newOwnerLabel}
-                  onChange={(e) => setNewOwnerLabel(e.target.value)}
-                  placeholder="Rep or crew lead"
-                />
-              </label>
-              <label className="block text-sm font-medium text-black">
-                Tags (optional, comma-separated)
-                <input
-                  className={FP_MODAL_FIELD}
-                  value={newTagsComma}
-                  onChange={(e) => setNewTagsComma(e.target.value)}
-                  placeholder="hail, insurance, commercial"
-                />
-              </label>
-              <label className="block text-sm font-medium text-black">
-                CRM job link (optional, https)
-                <input
-                  className={FP_MODAL_FIELD}
-                  value={newGhlUrl}
-                  onChange={(e) => setNewGhlUrl(e.target.value)}
-                  placeholder="https://…"
-                />
-              </label>
-              <label className="block text-sm font-medium text-black">
-                CRM embed URL (optional)
-                <input
-                  className={FP_MODAL_FIELD}
-                  value={newGhlEmbedUrl}
-                  onChange={(e) => setNewGhlEmbedUrl(e.target.value)}
-                  placeholder="Often same as deep link; some dashboards allow iframes"
-                />
-              </label>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 border-t border-black/10 pt-4">
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
                   Cancel
                 </Button>
@@ -979,67 +818,6 @@ export function FieldProjectsPanel() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className={FP_MODAL_INNER}>
-                <p className="text-sm font-medium text-black">CRM</p>
-                <label className="block text-sm text-black">
-                  Job deep link (https)
-                  <input
-                    className={FP_MODAL_FIELD}
-                    value={detailGhlUrl}
-                    onChange={(e) => setDetailGhlUrl(e.target.value)}
-                    placeholder="https://…"
-                  />
-                </label>
-                <label className="block text-sm text-black">
-                  Embed URL (optional)
-                  <input
-                    className={FP_MODAL_FIELD}
-                    value={detailGhlEmbedUrl}
-                    onChange={(e) => setDetailGhlEmbedUrl(e.target.value)}
-                    placeholder="Leave empty to use deep link for embed attempts"
-                  />
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      updateFieldProject(selected.id, { ghlUrl: detailGhlUrl, ghlEmbedUrl: detailGhlEmbedUrl });
-                    }}
-                  >
-                    Save CRM links
-                  </Button>
-                  {selectedOpenUrl ? (
-                    <Button type="button" size="sm" asChild>
-                      <a href={selectedOpenUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Open in CRM
-                      </a>
-                    </Button>
-                  ) : (
-                    <p className="text-xs text-black/60 self-center">
-                      Set a job link or add a base URL under Contacts &amp; settings → CRM.
-                    </p>
-                  )}
-                </div>
-                {selectedEmbedSrc ? (
-                  <div className="space-y-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setGhlEmbedOpen((v) => !v)}
-                    >
-                      {ghlEmbedOpen ? "Hide embedded view" : "Try embedded view"}
-                    </Button>
-                    {ghlEmbedOpen ? (
-                      <GhlEmbedPanel src={selectedEmbedSrc} openFallbackUrl={selectedOpenUrl ?? selectedEmbedSrc} />
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
 
               {selected.notes ? (
