@@ -3,14 +3,17 @@ main = "src/index.ts"
 compatibility_date = "2024-12-02"
 compatibility_flags = ["nodejs_compat"]
 
+workers_dev = true
+preview_urls = true
+
+# Public API hostname on your zone (no Access app on this host). Vercel: HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com
+routes = [
+  { pattern = "api.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+]
+
 # Retry Meta Page posts that failed Graph API (pending rows in D1).
 [triggers]
 crons = ["*/10 * * * *"]
-# Avoid Wrangler warnings.
-workers_dev = true
-# Browser traffic uses Pages same-origin /api → proxy to this host. If Access blocks that server fetch, set
-# HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET on the Pages project (see roofing-estimator-vite functions/lib/workerUpstream.ts).
-preview_urls = true
 
 # `/api/*` on hardcoredoortodoorclosers.com is NOT routed here — it is served by Cloudflare Pages
 # (`functions/api/*` proxies to this Worker’s *.workers.dev URL). That avoids Worker + Pages fighting
@@ -121,16 +124,4 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 [build]
 command = "npm install"
 
-# Custom domain routing (recommended):
-# 1) Frontend app on root domain (e.g. https://hardcoredoortodoorclosers.com)
-# 2) Worker API on same domain path /api/*, or API subdomain.
-#
-# Option A: same-origin API path (best for CORS simplicity)
-# routes = [
-#   { pattern = "hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" }
-# ]
-#
-# Option B: API subdomain
-# routes = [
-#   { pattern = "api.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" }
-# ]
+# Custom domain routing (see top-level `routes` for api subdomain).
