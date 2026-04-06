@@ -48,6 +48,32 @@ export async function insertUser(
   const normalized = args.email.trim().toLowerCase();
   const t = now();
   const { saltHex, hashHex } = await hashPassword(args.plainPassword);
+  await insertUserHashed(db, {
+    id: args.id,
+    email: normalized,
+    passwordHash: hashHex,
+    salt: saltHex,
+    name: args.name.trim() || normalized.split("@")[0],
+    user_type: args.user_type,
+    created_at: t,
+    updated_at: t,
+  });
+}
+
+/** Pre-hashed insert for transactional batch registration with org/rep rows. */
+export async function insertUserHashed(
+  db: D1,
+  args: {
+    id: string;
+    email: string;
+    passwordHash: string;
+    salt: string;
+    name: string;
+    user_type: AuthRole;
+    created_at: number;
+    updated_at: number;
+  },
+): Promise<void> {
   await db
     .prepare(
       `INSERT INTO users (id, email, password_hash, salt, name, user_type, created_at, updated_at)
@@ -55,13 +81,13 @@ export async function insertUser(
     )
     .bind(
       args.id,
-      normalized,
-      hashHex,
-      saltHex,
-      args.name.trim() || normalized.split("@")[0],
+      args.email,
+      args.passwordHash,
+      args.salt,
+      args.name,
       args.user_type,
-      t,
-      t,
+      args.created_at,
+      args.updated_at,
     )
     .run();
 }

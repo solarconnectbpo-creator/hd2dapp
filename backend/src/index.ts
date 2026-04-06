@@ -18,6 +18,7 @@ import { handleDealMachinePropertyPost } from "./api/dealmachineProxy";
 import { handleHealthD1Probe, handleHealthGet } from "./api/health";
 import { handleStlIntel, handleStlStormReports } from "./api/stlIntel";
 import { handleAuthRequest, type AuthEnv as AuthEnvBearer } from "./api/authRoutes";
+import { handleAdminRepPlacementRequest, handleOrgDirectoryRequest } from "./api/orgDirectoryRoutes";
 import { handleOsmBuildingAtPointGet } from "./api/osmBuildingFootprint";
 import { handleAdminUserRoutes } from "./api/adminUserRoutes";
 import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/coursesCatalogRoutes";
@@ -162,6 +163,10 @@ export default {
       // Include `/api/auth` (no trailing slash) — `startsWith("/api/auth/")` alone misses it and returns 404.
       if (path === "/api/auth" || path === "/api/auth/" || path.startsWith("/api/auth/")) {
         return await handleAuthRequest(request, env as AuthEnv, path, corsHeaders);
+      } else if (path.startsWith("/api/orgs/directory")) {
+        return await handleOrgDirectoryRequest(request, env as AuthEnv, path, corsHeaders);
+      } else if (path.startsWith("/api/admin/rep-placement")) {
+        return await handleAdminRepPlacementRequest(request, env as AuthEnv, path, corsHeaders);
       } else if (
         (path === "/api/leads/checkout-session" || path === "/api/leads/checkout-session/") &&
         request.method === "POST"

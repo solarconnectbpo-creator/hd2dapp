@@ -1,4 +1,4 @@
-import { verifyPassword } from "../auth/password";
+import { hashPassword, verifyPassword } from "../auth/password";
 import { signAuthPayload, verifyAuthToken, type AuthUser } from "../auth/token";
 import { isValidEmail, normalizeDisplayName } from "../auth/validation";
 import {
@@ -8,6 +8,7 @@ import {
   insertUser,
   rowToAuthUser,
 } from "../auth/userDb";
+import { isValidUsStateCode, normalizeState, type PlacementPref } from "../auth/orgDb";
 
 export type AuthEnv = {
   DB: any;
@@ -201,9 +202,18 @@ export async function handleAuthRequest(
         headers: j,
       });
     }
-    let body: { email?: string; password?: string; name?: string } = {};
+    let body: {
+      email?: string;
+      password?: string;
+      name?: string;
+      /** "company" | "rep" — default rep (field sales) for backward compatibility. */
+      accountType?: string;
+      companyName?: string;
+      homeState?: string;
+      placementPref?: string;
+    } = {};
     try {
-      body = (await request.json()) as { email?: string; password?: string; name?: string };
+      body = (await request.json()) as typeof body;
     } catch {
       return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
         status: 400,
@@ -213,6 +223,8 @@ export async function handleAuthRequest(
     const email = (body.email || "").trim().toLowerCase();
     const password = body.password || "";
     const nameRaw = normalizeDisplayName(body.name || "");
+    const accountType = (body.accountType || "rep").trim().toLowerCase();
+    const isCompany = accountType === "company";
     if (!email || !password) {
       return new Response(JSON.stringify({ success: false, error: "Email and password are required." }), {
         status: 400,
@@ -245,31 +257,98 @@ export async function handleAuthRequest(
     }
     const displayName = nameRaw || email.split("@")[0];
     const id = crypto.randomUUID();
-    try {
-      await insertUser(env.DB, {
-        id,
-        email,
-        plainPassword: password,
-        name: displayName,
-        user_type: "sales_rep",
+    const companyNameTrim = (body.companyName || "").trim();
+    if (isCompany && companyNameTrim.length < 2) {
+      return new Response(JSON.stringify({ success: false, error: "Company name is required (at least 2 characters)." }), {
+        status: 400,
+        headers: j,
       });
+    }
+    let homeState = normalizeState(body.homeState || "");
+    let placementPref: PlacementPref = "either";
+    if (!isCompany) {
+      const pp = (body.placementPref || "either").trim().toLowerCase();
+      if (pp === "local" || pp === "storm" || pp === "either") placementPref = pp;
+      else {
+        return new Response(JSON.stringify({ success: false, error: "placementPref must be local, storm, or either." }), {
+          status: 400,
+          headers: j,
+        });
+      }
+      if (!isValidUsStateCode(homeState)) {
+        return new Response(JSON.stringify({ success: false, error: "Select a valid 2-letter US home state." }), {
+          status: 400,
+          headers: j,
+        });
+      }
+    }
+
+    const t = Math.floor(Date.now() / 1000);
+    let saltHex: string;
+    let hashHex: string;
+    try {
+      const h = await hashPassword(password);
+      saltHex = h.saltHex;
+      hashHex = h.hashHex;
     } catch (e) {
-      console.error("insertUser register:", e);
+      console.error("hashPassword register:", e);
+      return new Response(JSON.stringify({ success: false, error: "Could not create account." }), { status: 500, headers: j });
+    }
+
+    try {
+      if (isCompany) {
+        const orgId = crypto.randomUUID();
+        await env.DB.batch([
+          env.DB
+            .prepare(
+              `INSERT INTO users (id, email, password_hash, salt, name, user_type, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, 'company', ?, ?)`,
+            )
+            .bind(id, email, hashHex, saltHex, displayName, t, t),
+          env.DB
+            .prepare(
+              `INSERT INTO organizations (id, name, service_states, org_kind, created_at, updated_at)
+               VALUES (?, ?, '[]', 'local', ?, ?)`,
+            )
+            .bind(orgId, companyNameTrim, t, t),
+          env.DB
+            .prepare(`INSERT INTO org_members (org_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)`)
+            .bind(orgId, id, t),
+        ]);
+      } else {
+        await env.DB.batch([
+          env.DB
+            .prepare(
+              `INSERT INTO users (id, email, password_hash, salt, name, user_type, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, 'sales_rep', ?, ?)`,
+            )
+            .bind(id, email, hashHex, saltHex, displayName, t, t),
+          env.DB
+            .prepare(
+              `INSERT INTO rep_profiles (user_id, home_state, placement_pref, status, matched_org_id, created_at, updated_at)
+               VALUES (?, ?, ?, 'pending', NULL, ?, ?)`,
+            )
+            .bind(id, homeState, placementPref, t, t),
+        ]);
+      }
+    } catch (e) {
+      console.error("register batch:", e);
       const detail = e instanceof Error ? e.message : String(e);
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Could not create account.",
+          error: "Could not create account. If this persists, ensure D1 migrations are applied (orgs/rep_profiles tables).",
           detail,
         }),
         { status: 500, headers: j },
       );
     }
+
     const user: AuthUser = {
       id,
       email,
       name: displayName,
-      user_type: "sales_rep",
+      user_type: isCompany ? "company" : "sales_rep",
     };
     const { token, expiresAt } = await issueToken(env, user);
     return new Response(JSON.stringify({ success: true, token, user, expiresAt }), { status: 201, headers: j });
