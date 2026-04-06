@@ -169,6 +169,39 @@ export function FieldProjectsPanel() {
 
   const selected = selectedId ? fieldProjects.find((p) => p.id === selectedId) : undefined;
 
+  const modalLayerOpen = createOpen || Boolean(selectedId) || Boolean(lightboxUrl);
+
+  useEffect(() => {
+    if (!modalLayerOpen) return;
+    const main = document.getElementById("main-content");
+    const prevBody = document.body.style.overflow;
+    const prevMain = main?.style.overflow ?? "";
+    document.body.style.overflow = "hidden";
+    if (main) main.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      if (main) main.style.overflow = prevMain;
+    };
+  }, [modalLayerOpen]);
+
+  useEffect(() => {
+    if (!modalLayerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (lightboxUrl) {
+        setLightboxUrl(null);
+        return;
+      }
+      if (createOpen) {
+        setCreateOpen(false);
+        return;
+      }
+      if (selectedId) setSelectedId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalLayerOpen, lightboxUrl, createOpen, selectedId]);
+
   useEffect(() => {
     const openId = searchParams.get("openProject")?.trim();
     if (!openId) return;
@@ -684,25 +717,29 @@ export function FieldProjectsPanel() {
 
       {createOpen ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fp-create-title"
+          onClick={() => setCreateOpen(false)}
         >
-          <Card className="canvass-light-sheet relative w-full max-w-md border border-black/10 shadow-lg">
+          <Card
+            className="canvass-light-sheet relative my-auto w-full max-w-md min-h-0 max-h-[min(100dvh-2rem,920px)] flex flex-col gap-0 overflow-hidden border border-black/10 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
-              className="absolute right-3 top-3 rounded p-1 text-black/60 hover:bg-black/5"
+              className="absolute right-3 top-3 z-10 rounded p-1 text-black/60 hover:bg-black/5"
               aria-label="Close"
               onClick={() => setCreateOpen(false)}
             >
               <X className="h-5 w-5" />
             </button>
-            <CardHeader>
+            <CardHeader className="shrink-0 border-b border-black/10">
               <CardTitle id="fp-create-title">New field project</CardTitle>
               <CardDescription>Job name, optional site address, notes, and optional CRM links.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain pt-6">
               <label className="block text-sm font-medium text-black">
                 Project name *
                 <input
@@ -794,12 +831,16 @@ export function FieldProjectsPanel() {
 
       {selected ? (
         <div
-          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:items-center"
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fp-detail-title"
+          onClick={() => setSelectedId(null)}
         >
-          <Card className="canvass-light-sheet relative my-4 w-full max-w-3xl border border-black/10 shadow-lg">
+          <Card
+            className="canvass-light-sheet relative my-4 w-full max-w-3xl border border-black/10 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               className="absolute right-3 top-3 z-10 rounded p-1 text-black/60 hover:bg-black/5"
@@ -1122,9 +1163,6 @@ export function FieldProjectsPanel() {
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
           role="presentation"
           onClick={() => setLightboxUrl(null)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setLightboxUrl(null);
-          }}
         >
           <img
             src={lightboxUrl}
