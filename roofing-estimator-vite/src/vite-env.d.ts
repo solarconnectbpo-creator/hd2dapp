@@ -22,6 +22,4 @@ interface ImportMetaEnv {
   readonly VITE_CALLCENTER_EXTRA_REPORTS_JSON?: string;
   /** JSON array of lead packages for `/leads`: `[{ "key": "…", "title": "…", "description": "…", "stripePriceId": "price_…", "priceLabel": "…" }]`. */
   readonly VITE_LEAD_PACKAGES_JSON?: string;
-  /** Injected in `vite.config.ts`: `"true"` when `vendor/hugo-docs/README.md` exists (official hugoDocs clone). */
-  readonly VITE_HUGO_DOCS_LOCAL?: string;
 }

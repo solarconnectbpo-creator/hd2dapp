@@ -2,9 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowLeft,
-  BookOpen,
   CalendarClock,
-  ExternalLink,
   Hash,
   ImageIcon,
   MessageSquare,
@@ -15,14 +13,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { HugoDocsLocalPanel } from "../components/marketing/HugoDocsLocalPanel";
 import { useAuth } from "../context/AuthContext";
-import {
-  HUGO_CONTENT_MANAGEMENT,
-  HUGO_DOCS_REPO,
-  HUGO_DOCS_SITE,
-  HUGO_QUICK_START,
-} from "../config/hugoMarketingRefs";
 import {
   AD_CREATIVE_DRAFTS_STORAGE_KEY,
   type AdCreativeDraftStored,
@@ -546,48 +537,6 @@ export function SocialMediaAutomation() {
           </CardContent>
         </Card>
       </div>
-
-      <Card className={`mt-8 ${cardChrome}`}>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-sky-400" aria-hidden />
-            <CardTitle className="text-black">Hugo reference — blog &amp; news for social</CardTitle>
-          </div>
-          <CardDescription className="text-[#8b9199]">
-            Draft captions and queues here; publish long-form stories, case studies, and SEO pages on a{" "}
-            <span className="font-medium text-black">Hugo</span> site, then link those canonical URLs in your posts.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <a href={HUGO_DOCS_SITE} target="_blank" rel="noreferrer" className="gap-1.5">
-              gohugo.io
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <a href={HUGO_DOCS_REPO} target="_blank" rel="noreferrer" className="gap-1.5">
-              hugoDocs on GitHub
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <a href={HUGO_QUICK_START} target="_blank" rel="noreferrer" className="gap-1.5">
-              Quick start
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <a href={HUGO_CONTENT_MANAGEMENT} target="_blank" rel="noreferrer" className="gap-1.5">
-              Content management
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </Button>
-        </CardContent>
-        <CardContent className="border-t border-white/[0.06] pt-6">
-          <HugoDocsLocalPanel />
-        </CardContent>
-      </Card>
     </div>
   );
 }

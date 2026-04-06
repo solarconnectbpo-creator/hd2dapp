@@ -32,6 +32,3 @@ dist-ssr
 /data/leads-sample-10000.csv
 
 .vercel
-
-# Local clone of gohugoio/hugoDocs (npm run hugo:docs:sync)
-/vendor/hugo-docs

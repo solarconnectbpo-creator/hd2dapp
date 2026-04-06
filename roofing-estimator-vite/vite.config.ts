@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import sirv from "sirv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,36 +84,6 @@ function raybevelDiagramPlugin(): Plugin {
   };
 }
 
-/** Serves `vendor/hugo-docs` at `/hugo-docs/*` after `npm run hugo:docs:sync` (dev only). */
-function hugoDocsLocalPlugin(): Plugin {
-  const hugoDir = path.join(__dirname, "vendor/hugo-docs");
-  return {
-    name: "hugo-docs-local",
-    apply: "serve",
-    configureServer(server) {
-      if (!fs.existsSync(path.join(hugoDir, "README.md"))) return;
-      const serve = sirv(hugoDir, { dev: true, etag: true });
-      server.middlewares.use((req, res, next) => {
-        const raw = req.url ?? "/";
-        const qIdx = raw.indexOf("?");
-        const pathnameOnly = qIdx >= 0 ? raw.slice(0, qIdx) : raw;
-        const query = qIdx >= 0 ? raw.slice(qIdx) : "";
-        if (!pathnameOnly.startsWith("/hugo-docs")) {
-          next();
-          return;
-        }
-        const rest = pathnameOnly.slice("/hugo-docs".length) || "/";
-        const prev = req.url;
-        req.url = rest + query;
-        serve(req, res, () => {
-          req.url = prev;
-          next();
-        });
-      });
-    },
-  };
-}
-
 /** HTTP proxies: same-origin to HD2D Worker (intel routes) and third-party APIs via `/intel-proxy` → Worker. */
 const allowGeolocationHeader = {
   /** Lets the browser prompt for Geolocation API (Mapbox Geolocate control). */
@@ -123,7 +92,6 @@ const allowGeolocationHeader = {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const hugoDocsReadme = path.join(__dirname, "vendor/hugo-docs", "README.md");
   const intelProxyTarget = (env.INTEL_PROXY_TARGET || "http://127.0.0.1:8787").replace(/\/$/, "");
   const intelProxy = {
     target: intelProxyTarget,
@@ -136,9 +104,8 @@ export default defineConfig(({ mode }) => {
   return {
   define: {
     "import.meta.env.VERCEL_ENV": JSON.stringify(process.env.VERCEL_ENV ?? ""),
-    "import.meta.env.VITE_HUGO_DOCS_LOCAL": JSON.stringify(fs.existsSync(hugoDocsReadme) ? "true" : "false"),
   },
-  plugins: [react(), tailwindcss(), raybevelDiagramPlugin(), hugoDocsLocalPlugin()],
+  plugins: [react(), tailwindcss(), raybevelDiagramPlugin()],
   server: {
     headers: allowGeolocationHeader,
     proxy: {
