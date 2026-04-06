@@ -5,9 +5,11 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-04-roof-vision-health";
+export const WORKER_BUILD_TAG = "2026-04-05-openai-health";
 
 type HealthEnv = {
+  /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
+  OPENAI_API_KEY?: string;
   /** When set, Worker proxies `/api/ai/roof-vision` and `/api/ai/roof-segment` to ml-vision-service. */
   ROOF_VISION_SERVICE_URL?: string;
   ROOF_VISION_SERVICE_SECRET?: string;
@@ -66,6 +68,8 @@ export function handleHealthGet(
         /** True when `ROOF_VISION_SERVICE_SECRET` is set (sent to vision service as `X-HD2D-Secret`). */
         roofVisionSharedSecret: Boolean((env.ROOF_VISION_SERVICE_SECRET || "").trim()),
         dealmachineServerKey: Boolean(env.DEALMACHINE_API_KEY?.trim()),
+        /** True when `OPENAI_API_KEY` secret is set (marketing images, estimator chat, roof AI). */
+        openaiConfigured: Boolean(env.OPENAI_API_KEY?.trim()),
         arcgisParcelLayer: Boolean(resolveArcgisParcelLayerUrl(env)),
         /** Public tile URL for optional county / reference raster on the Canvassing map (no token in URL). */
         arcgisMapServerTileUrl: tileOk ? tileRaw : null,
