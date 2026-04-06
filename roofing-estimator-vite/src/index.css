@@ -65,23 +65,8 @@ body {
   }
 }
 
-/* shadcn Card — depth on dark chrome */
-[data-slot="card"] {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 16px 48px rgba(0, 0, 0, 0.35);
-}
-
-.text-black {
-  color: var(--x-text) !important;
-}
-
-.bg-white,
-.bg-slate-50,
-.bg-gray-50,
-.bg-gray-100 {
-  background: var(--x-surface) !important;
-}
+/* Shell overrides for cards / “bg-white” live in @layer utilities at the END of this file so Tailwind v4
+   utility classes cannot paint true white over HD2D dark surfaces in production. */
 
 /* Canvassing route: Root layout uses text-[#e7e9ea]; reset so overlays/sheet inherit real ink (ghost buttons etc. otherwise stay light). */
 [data-canvass-route] {
@@ -909,4 +894,42 @@ html body #root .canvass-light-sheet button.bg-zinc-900 svg {
 
 html body #root .canvass-paper {
   color: #0f172a !important;
+}
+
+/*
+ * Must load AFTER Tailwind @import so these merge into the utilities layer LAST and win in production.
+ * Fixes white cards / invisible “text-black” on hardcoredoortodoorclosers.com when utility CSS order shifts.
+ */
+@layer utilities {
+  .text-black {
+    color: var(--x-text) !important;
+  }
+
+  .bg-white,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-gray-50,
+  .bg-gray-100 {
+    background-color: var(--x-surface) !important;
+  }
+
+  [data-slot="card"] {
+    background-color: var(--x-surface) !important;
+    color: var(--x-text) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 16px 48px rgba(0, 0, 0, 0.35);
+  }
+
+  [data-slot="card-description"] {
+    color: var(--x-muted) !important;
+  }
+}
+
+/* Light paper surfaces: restore literal white where canvass-* + bg-white (also used outside [data-canvass-route], e.g. FieldProjects modals). */
+.canvass-paper.bg-white,
+.canvass-light-sheet.bg-white,
+.canvass-paper .bg-white,
+.canvass-light-sheet .bg-white {
+  background-color: #ffffff !important;
 }

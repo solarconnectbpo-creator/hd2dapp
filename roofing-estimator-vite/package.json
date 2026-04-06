@@ -12,6 +12,8 @@
     "pages:create": "npx wrangler pages project create hd2d-closers --production-branch main",
     "pages:add-domain": "node scripts/cloudflare-pages-add-domain.mjs",
     "pages:purge-cache": "node scripts/cloudflare-purge-zone-cache.mjs",
+    "pages:check-origin": "node scripts/check-production-origin.mjs",
+    "pages:fix-dns": "node scripts/fix-apex-dns-for-pages.mjs",
     "pages:deploy": "npm run build && node scripts/pages-deploy.mjs",
     "deploy:all": "npm --prefix ../backend run deploy && npm run pages:deploy",
     "vercel:deploy": "npx vercel deploy --yes --prod",

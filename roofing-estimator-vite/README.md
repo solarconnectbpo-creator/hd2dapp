@@ -45,6 +45,21 @@ cd roofing-estimator-vite && npm run pages:deploy
 
 **Only one** host stack should own the apex (Cloudflare Pages **or** Vercel). If both try to use the same hostname, DNS/SSL will conflict.
 
+**Apex still on Vercel (looks different from `main.hd2d-closers.pages.dev`):**
+
+Run `npm run pages:check-origin`. If the apex response has **`Server: Vercel`** while the Pages URL shows **Cloudflare**, **DNS is still sending the hostname to Vercel**, not to Cloudflare Pages.
+
+**Order matters:** do **not** remove the domain from Vercel **until** Cloudflare DNS sends traffic to **Pages** (`hd2d-closers`). If you remove Vercel first while DNS still points at Vercel’s edge, the apex can return **404** (`DEPLOYMENT_NOT_FOUND`) until DNS is fixed.
+
+1. **Cloudflare** → **DNS** → delete **Vercel** rows for `@` / `www` (e.g. **A** → `76.76.21.21`, **CNAME** → `*.vercel-dns.com`). Ensure **Workers & Pages** → **hd2d-closers** → **Custom domains** has **`hardcoredoortodoorclosers.com`** **Active** (Cloudflare will add or show the correct **CNAME** to **`hd2d-closers.pages.dev`**).
+2. Wait until `npm run pages:check-origin` shows **Cloudflare** for the apex (and the site loads the Pages build).
+3. **Then** remove the domain from **Vercel** → **hd2d-closers** → **Settings → Domains** (or `npx vercel domains remove hardcoredoortodoorclosers.com --yes` from a machine logged into Vercel), so Vercel does not re-bind the hostname later.
+4. **Caching** → **Configuration** → **Purge Everything** on the zone.
+
+**Automated DNS cleanup (optional):** with a **Zone → DNS → Edit** API token, run `npm run pages:fix-dns` from this directory. It deletes apex/`www` rows that point at **Vercel** (`A` → `76.76.21.21`, `CNAME` → `*.vercel-dns.com`). Wrangler OAuth alone may not be allowed — set `CLOUDFLARE_API_TOKEN` first.
+
+**Login / API parity:** `npm run pages:deploy` and `npm run build` (non-Vercel) embed the same-origin `/api/*` behavior as `main.hd2d-closers.pages.dev` so the **login** flow matches once the apex is served by Pages. Vercel production builds still set `VERCEL` and call the Worker URL directly.
+
 **Attach the domain in the Cloudflare Dashboard (no CLI):**
 
 1. Open [Cloudflare Dashboard](https://dash.cloudflare.com/) and select account **`2b2f31d4f2fd46db5be5d72e772ecac5`** (or your team account that owns the zone `hardcoredoortodoorclosers.com`).
@@ -77,18 +92,14 @@ cd roofing-estimator-vite && npm run pages:deploy
 - If your API is on subdomain, set:
   - `VITE_INTEL_API_BASE=https://api.hardcoredoortodoorclosers.com`
 
-### Vercel — point **hardcoredoortodoorclosers.com** at this project
+### Vercel — optional previews only (do **not** point the apex at Vercel if Pages owns production)
 
-The domain is already added on project **`hd2d-closers`**. If **`https://hardcoredoortodoorclosers.com`** does not load the app but **`https://hd2d-closers.vercel.app`** does, **DNS is still pointing away from Vercel** (common with Cloudflare).
+Canonical **apex** production should be **Cloudflare Pages** (`npm run pages:deploy`). If the apex DNS still targets **Vercel** (`A` → `76.76.21.21` or Vercel CNAME), users will see the **Vercel** build, not **`main.hd2d-closers.pages.dev`**. See **“Apex still on Vercel”** above.
 
-1. In **Cloudflare** → **DNS** for `hardcoredoortodoorclosers.com`, add (or fix) the **apex** record:
-   - **Type:** `A`
-   - **Name:** `@` (or `hardcoredoortodoorclosers.com`)
-   - **IPv4:** `76.76.21.21` (Vercel — run `npx vercel domains inspect hardcoredoortodoorclosers.com` if this ever changes)
-   - **Proxy:** **DNS only** (grey cloud) until Vercel shows the domain as verified; then you can experiment with orange cloud if needed.
-2. Remove or change any **other** apex `A`/`AAAA`/`CNAME` that pointed the domain at **Cloudflare Pages** or another host, or only one stack can own the apex.
-3. Wait for propagation; Vercel → **Project → Settings → Domains** should show the domain as valid.
-4. `vercel.json` redirects **`hd2d-closers.vercel.app`** and **`www`** → **`https://hardcoredoortodoorclosers.com`** so the canonical URL is the custom domain.
+If you use Vercel only for **`*.vercel.app`** previews or an **`app.`** subdomain:
+
+- **`vercel.json`** can redirect **`hd2d-closers.vercel.app`** → **`https://hardcoredoortodoorclosers.com`** once the apex is actually served by Pages.
+- Do **not** add the apex domain on Vercel while Cloudflare Pages is meant to serve it.
 
 ### Vercel (optional — `app` subdomain)
 

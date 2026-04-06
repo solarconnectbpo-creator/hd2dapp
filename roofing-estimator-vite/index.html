@@ -34,6 +34,24 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#030406" />
     <title>HD2D Closers — Roofing Pro</title>
+    <!-- First-paint shell: avoids white flash if a cached CSS bundle is stale after deploy. -->
+    <style>
+      :root {
+        --x-bg: #030406;
+        --x-surface: #12141a;
+        --x-text: #e7e9ea;
+        --x-muted: #8b9199;
+      }
+      html {
+        background-color: #030406;
+        color: #e7e9ea;
+      }
+      body {
+        margin: 0;
+        background-color: #030406 !important;
+        color: #e7e9ea !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

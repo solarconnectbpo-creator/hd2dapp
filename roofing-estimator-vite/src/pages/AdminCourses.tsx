@@ -103,16 +103,16 @@ export function AdminCourses() {
   };
 
   return (
-    <div className="hd2d-page-shell max-w-4xl text-black">
+    <div className="hd2d-page-shell max-w-4xl text-[var(--x-text)]">
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Admin — courses catalog</h1>
-          <p className="mt-1 text-sm text-black/70">
+          <p className="mt-1 text-sm text-[var(--x-muted)]">
             JSON for the Skill Hub (<Link to="/courses" className="text-sky-700 underline">/courses</Link>). Invalid
             shapes are rejected by the server.
           </p>
         </div>
-        <p className="text-xs text-black/60">
+        <p className="text-xs text-[var(--x-muted)]">
           Last saved: {formatTs(updatedAt ?? 0)}
           {!serverHadRow ? " (using built-in default on server)" : ""}
         </p>
@@ -125,11 +125,11 @@ export function AdminCourses() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-black/60">Loading…</p>
+        <p className="text-sm text-[var(--x-muted)]">Loading…</p>
       ) : (
         <>
           <textarea
-            className="mb-4 min-h-[28rem] w-full rounded-lg border border-slate-200 bg-white p-3 font-mono text-xs leading-relaxed text-black"
+            className="mb-4 min-h-[28rem] w-full rounded-lg border border-slate-200 bg-[#ffffff] p-3 font-mono text-xs leading-relaxed text-[#0f172a]"
             spellCheck={false}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -146,7 +146,7 @@ export function AdminCourses() {
             </button>
             <button
               type="button"
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-full border border-slate-300 bg-[#ffffff] px-4 py-2 text-sm font-semibold text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-50"
               disabled={busy}
               onClick={() => void loadFromServer()}
             >
@@ -154,7 +154,7 @@ export function AdminCourses() {
             </button>
             <button
               type="button"
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-full border border-slate-300 bg-[#ffffff] px-4 py-2 text-sm font-semibold text-[#0f172a] hover:bg-[#f8fafc] disabled:opacity-50"
               disabled={busy}
               onClick={onResetEditor}
             >
@@ -162,7 +162,7 @@ export function AdminCourses() {
             </button>
             <button
               type="button"
-              className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
+              className="rounded-full border border-red-200 bg-[#ffffff] px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
               disabled={busy || !serverHadRow}
               onClick={() => void onClearServer()}
             >

@@ -17,7 +17,7 @@ export function Projects() {
     <div className="hd2d-page-shell">
       <div className="mb-8 border-b border-white/[0.06] pb-8 sm:mb-10 sm:pb-10">
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#71767b]">Pipeline</p>
-        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Projects &amp; Reports</h1>
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--x-text)] sm:text-3xl">Projects &amp; Reports</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-[#71767b]">
           Field jobs with list/board pipeline, deal value &amp; tags, damage photos, and saved measurements
         </p>
@@ -62,9 +62,9 @@ export function Projects() {
               {measurements.length === 0 ? (
                 <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
                   <CardContent className="flex flex-col items-center justify-center py-16">
-                    <Ruler className="mb-4 h-16 w-16 text-black" />
-                    <h3 className="mb-2 text-xl text-black">No measurements yet</h3>
-                    <p className="text-black">Create a measurement from the estimator to see it here</p>
+                    <Ruler className="mb-4 h-16 w-16 text-[var(--x-text)]" />
+                    <h3 className="mb-2 text-xl text-[var(--x-text)]">No measurements yet</h3>
+                    <p className="text-[var(--x-text)]">Create a measurement from the estimator to see it here</p>
                   </CardContent>
                 </Card>
               ) : (
@@ -82,7 +82,7 @@ export function Projects() {
                               {measurement.date}
                             </CardDescription>
                           </div>
-                          <Badge variant="outline" className="border-gray-200 bg-gray-100 text-black">
+                          <Badge variant="outline" className="border-gray-200 bg-gray-100 text-[var(--x-text)]">
                             {measurement.roofMaterial}
                           </Badge>
                         </div>
@@ -90,33 +90,33 @@ export function Projects() {
                       <CardContent>
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
                           <div>
-                            <p className="mb-1 text-sm text-black">Dimensions</p>
-                            <p className="text-lg text-black">
+                            <p className="mb-1 text-sm text-[var(--x-text)]">Dimensions</p>
+                            <p className="text-lg text-[var(--x-text)]">
                               {measurement.length}&apos; × {measurement.width}&apos;
                             </p>
-                            <p className="text-sm text-black">
+                            <p className="text-sm text-[var(--x-text)]">
                               {(measurement.length * measurement.width).toFixed(0)} sq ft base
                             </p>
                           </div>
                           <div>
-                            <p className="mb-1 text-sm text-black">Roof Pitch</p>
-                            <p className="text-lg text-black">{measurement.pitch}/12</p>
-                            <p className="text-sm text-black">
+                            <p className="mb-1 text-sm text-[var(--x-text)]">Roof Pitch</p>
+                            <p className="text-lg text-[var(--x-text)]">{measurement.pitch}/12</p>
+                            <p className="text-sm text-[var(--x-text)]">
                               {(Math.atan(measurement.pitch / 12) * (180 / Math.PI)).toFixed(1)}° angle
                             </p>
                           </div>
                           <div>
-                            <p className="mb-1 text-sm text-black">Adjusted Area</p>
-                            <p className="text-lg text-black">{measurement.adjustedArea.toFixed(0)} sq ft</p>
-                            <p className="text-sm text-black">+{measurement.wastePercentage}% waste factor</p>
+                            <p className="mb-1 text-sm text-[var(--x-text)]">Adjusted Area</p>
+                            <p className="text-lg text-[var(--x-text)]">{measurement.adjustedArea.toFixed(0)} sq ft</p>
+                            <p className="text-sm text-[var(--x-text)]">+{measurement.wastePercentage}% waste factor</p>
                           </div>
                           <div>
-                            <p className="mb-1 flex items-center gap-1 text-sm text-black">
+                            <p className="mb-1 flex items-center gap-1 text-sm text-[var(--x-text)]">
                               <Layers className="h-4 w-4" />
                               Roofing Squares
                             </p>
-                            <p className="text-2xl text-black">{(measurement.adjustedArea / 100).toFixed(2)}</p>
-                            <p className="text-sm text-black">100 sq ft = 1 square</p>
+                            <p className="text-2xl text-[var(--x-text)]">{(measurement.adjustedArea / 100).toFixed(2)}</p>
+                            <p className="text-sm text-[var(--x-text)]">100 sq ft = 1 square</p>
                           </div>
                         </div>
                       </CardContent>
@@ -136,7 +136,7 @@ export function Projects() {
                         <CardDescription>{measurement.date}</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-black">
+                        <p className="text-[var(--x-text)]">
                           Area: {measurement.adjustedArea.toFixed(0)} sq ft (
                           {(measurement.adjustedArea / 100).toFixed(2)} squares)
                         </p>
@@ -144,7 +144,7 @@ export function Projects() {
                     </Card>
                   ))}
                 {measurements.filter((m) => m.roofForm === type).length === 0 ? (
-                  <p className="py-8 text-center text-black">No {type} roof measurements</p>
+                  <p className="py-8 text-center text-[var(--x-text)]">No {type} roof measurements</p>
                 ) : null}
               </TabsContent>
             ))}

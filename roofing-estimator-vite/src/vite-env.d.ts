@@ -3,11 +3,13 @@
 interface ImportMetaEnv {
   /** Injected in `vite.config.ts` from `process.env.VERCEL_ENV` (`production` | `preview` | …). */
   readonly VERCEL_ENV?: string;
+  /** Injected in `vite.config.ts` from `process.env.VERCEL` — truthy on Vercel so builds skip same-origin `/api`. */
+  readonly VERCEL?: string;
   readonly VITE_GOOGLE_MAPS_API_KEY?: string;
   readonly VITE_GOOGLE_PLACES_API_KEY?: string;
   readonly VITE_PDL_API_KEY?: string;
   readonly VITE_USE_API_PROXY?: string;
-  /** When "true", production builds on hardcoredoortodoorclosers.com use same-origin `/api/*` (Cloudflare Pages Functions). */
+  /** When "true", production builds on hardcoredoortodoorclosers.com use same-origin `/api/*` (Worker zone routes, not Pages). */
   readonly VITE_HD2D_SAME_ORIGIN_API?: string;
   readonly VITE_INTEL_API_BASE?: string;
   /** When "true", hides Places / PDL UI (CSV-only + manual enrichment). */

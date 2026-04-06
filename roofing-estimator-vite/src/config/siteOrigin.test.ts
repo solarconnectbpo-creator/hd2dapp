@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HD2D_WORKER_API_ORIGIN, apiOriginForHostname, isHd2dZoneHostname } from "./siteOrigin";
+import { HD2D_PUBLIC_API_ORIGIN, apiOriginForHostname, isHd2dZoneHostname } from "./siteOrigin";
 
 describe("isHd2dZoneHostname", () => {
   it("matches apex, www, and subdomains", () => {
@@ -11,14 +11,14 @@ describe("isHd2dZoneHostname", () => {
 });
 
 describe("apiOriginForHostname", () => {
-  it("maps Vercel preview to Worker API origin", () => {
-    expect(apiOriginForHostname("hd2d-closers.vercel.app")).toBe(HD2D_WORKER_API_ORIGIN);
-    expect(apiOriginForHostname("foo-bar-123-solar.vercel.app")).toBe(HD2D_WORKER_API_ORIGIN);
+  it("maps Vercel preview to public API origin (apex /api/*, not workers.dev)", () => {
+    expect(apiOriginForHostname("hd2d-closers.vercel.app")).toBe(HD2D_PUBLIC_API_ORIGIN);
+    expect(apiOriginForHostname("foo-bar-123-solar.vercel.app")).toBe(HD2D_PUBLIC_API_ORIGIN);
   });
 
-  it("maps Cloudflare Pages *.pages.dev to Worker API origin", () => {
-    expect(apiOriginForHostname("main.hd2d-closers.pages.dev")).toBe(HD2D_WORKER_API_ORIGIN);
-    expect(apiOriginForHostname("08fa9b7d.hd2d-closers.pages.dev")).toBe(HD2D_WORKER_API_ORIGIN);
+  it("maps Cloudflare Pages *.pages.dev to null when same-origin /api proxy is default", () => {
+    expect(apiOriginForHostname("main.hd2d-closers.pages.dev")).toBeNull();
+    expect(apiOriginForHostname("08fa9b7d.hd2d-closers.pages.dev")).toBeNull();
   });
 
   it("returns null for HD2D zone so the SPA uses same-origin /api/*", () => {

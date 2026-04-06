@@ -39,9 +39,9 @@ import { isHd2dApiConfigured } from "../lib/hd2dApiBase";
 
 const cardChrome = "border-white/[0.07] ring-1 ring-white/[0.04]";
 const inputClass =
-  "w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-black placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
+  "w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-[var(--x-text)] placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
 const textareaClass =
-  "min-h-[100px] w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-black placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
+  "min-h-[100px] w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-[var(--x-text)] placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
 const codeChip = "rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-xs text-[#e7e9ea]";
 
 function draftLabel(d: AdCreativeDraftStored): string {
@@ -166,14 +166,14 @@ export function AdMakerAutomation() {
   return (
     <div className="hd2d-page-shell">
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4 text-black hover:bg-white/[0.06]">
+        <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4 text-[var(--x-text)] hover:bg-white/[0.06]">
           <Link to="/marketing" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Marketing
           </Link>
         </Button>
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#8b9199]">Marketing</p>
-        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Ad maker automation</h1>
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--x-text)] sm:text-3xl">Ad maker automation</h1>
         <p className="max-w-3xl text-sm text-[#8b9199]">
           Build headline, CTA, and body variants locally. Connect Meta on Social media, then create a PAUSED draft campaign in
           your ad account from this page (company/admin). Saved in this browser only.
@@ -185,10 +185,10 @@ export function AdMakerAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Share2 className="h-5 w-5 text-blue-400" aria-hidden />
-              <CardTitle className="text-black">Meta Ads — draft campaign</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">Meta Ads — draft campaign</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
-              Creates a <strong className="text-black">PAUSED</strong> traffic campaign in the ad account set as{" "}
+              Creates a <strong className="text-[var(--x-text)]">PAUSED</strong> traffic campaign in the ad account set as{" "}
               <code className={codeChip}>META_DEFAULT_AD_ACCOUNT_ID</code> on the Worker. Finish targeting and creative in Ads
               Manager. Requires Meta connected (Marketing → Social) and <code className={codeChip}>ads_management</code>{" "}
               approval on your Meta app.
@@ -247,7 +247,7 @@ export function AdMakerAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-violet-400" aria-hidden />
-              <CardTitle className="text-black">AI image for ads</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">AI image for ads</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               Generates a PNG via the Worker (OpenAI Images). Images stay in this browser until you upload to Meta or save a
@@ -257,7 +257,7 @@ export function AdMakerAutomation() {
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-3">
               <label className="min-w-[200px] flex-1 text-sm">
-                <span className="mb-1 block font-medium text-black">Prompt</span>
+                <span className="mb-1 block font-medium text-[var(--x-text)]">Prompt</span>
                 <input
                   type="text"
                   className={inputClass}
@@ -267,7 +267,7 @@ export function AdMakerAutomation() {
                 />
               </label>
               <label className="w-full sm:w-40 text-sm">
-                <span className="mb-1 block font-medium text-black">Size</span>
+                <span className="mb-1 block font-medium text-[var(--x-text)]">Size</span>
                 <select
                   className={inputClass}
                   value={imageSize}
@@ -331,7 +331,7 @@ export function AdMakerAutomation() {
                 {metaConnected && metaHasAdAccount ? (
                   <div className="flex min-w-[200px] flex-col justify-center gap-2 text-xs text-[#8b9199]">
                     <p>
-                      <strong className="text-black">Meta hash:</strong> {lastImageHash || "— upload to get hash"}
+                      <strong className="text-[var(--x-text)]">Meta hash:</strong> {lastImageHash || "— upload to get hash"}
                     </p>
                     <Button
                       type="button"
@@ -376,7 +376,7 @@ export function AdMakerAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Share2 className="h-5 w-5 text-emerald-400" aria-hidden />
-              <CardTitle className="text-black">Meta — PAUSED ad set + creative + ad</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">Meta — PAUSED ad set + creative + ad</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               Uses an existing campaign (create one above first). Uploads optional image hash, then creates a minimal PAUSED ad
@@ -386,7 +386,7 @@ export function AdMakerAutomation() {
           <CardContent className="space-y-3 text-sm">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium text-black">Campaign ID</span>
+                <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Campaign ID</span>
                 <input
                   type="text"
                   className={inputClass}
@@ -396,7 +396,7 @@ export function AdMakerAutomation() {
                 />
               </label>
               <label className="block sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium text-black">Facebook Page</span>
+                <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Facebook Page</span>
                 <select
                   className={inputClass}
                   value={adBundlePageId}
@@ -414,7 +414,7 @@ export function AdMakerAutomation() {
                 </select>
               </label>
               <label className="block sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium text-black">Landing URL (required)</span>
+                <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Landing URL (required)</span>
                 <input
                   type="url"
                   className={inputClass}
@@ -426,7 +426,7 @@ export function AdMakerAutomation() {
             </div>
             <p className="text-xs text-[#8b9199]">
               Ad primary text defaults to headline + body + CTA from the editor above. Set{" "}
-              <strong className="text-black">Landing URL</strong> here (or fill <strong className="text-black">Landing page</strong>{" "}
+              <strong className="text-[var(--x-text)]">Landing URL</strong> here (or fill <strong className="text-[var(--x-text)]">Landing page</strong>{" "}
               in the creative form — ad bundle uses the field below if set, otherwise the creative form link).
             </p>
             <Button
@@ -482,7 +482,7 @@ export function AdMakerAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-amber-400" />
-              <CardTitle className="text-black">Creative variants</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">Creative variants</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               Headline + body + CTA combinations for A/B tests. Start from a template per service line (repair, replace,
@@ -492,7 +492,7 @@ export function AdMakerAutomation() {
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm">
-                <span className="mb-1 block font-medium text-black">Headline</span>
+                <span className="mb-1 block font-medium text-[var(--x-text)]">Headline</span>
                 <input
                   type="text"
                   className={inputClass}
@@ -502,7 +502,7 @@ export function AdMakerAutomation() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block font-medium text-black">Primary CTA</span>
+                <span className="mb-1 block font-medium text-[var(--x-text)]">Primary CTA</span>
                 <input
                   type="text"
                   className={inputClass}
@@ -513,7 +513,7 @@ export function AdMakerAutomation() {
               </label>
             </div>
             <label className="block text-sm">
-              <span className="mb-1 block font-medium text-black">Body copy</span>
+              <span className="mb-1 block font-medium text-[var(--x-text)]">Body copy</span>
               <textarea
                 className={textareaClass}
                 placeholder="Short value prop + offer + local proof…"
@@ -523,7 +523,7 @@ export function AdMakerAutomation() {
               />
             </label>
             <label className="block text-sm">
-              <span className="mb-1 block font-medium text-black">Landing page (optional)</span>
+              <span className="mb-1 block font-medium text-[var(--x-text)]">Landing page (optional)</span>
               <input
                 type="url"
                 className={inputClass}
@@ -553,7 +553,7 @@ export function AdMakerAutomation() {
                         />
                       ) : null}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-black">{draftLabel(d)}</p>
+                        <p className="text-sm font-medium text-[var(--x-text)]">{draftLabel(d)}</p>
                         {d.cta ? <p className="mt-0.5 text-xs text-sky-400">CTA: {d.cta}</p> : null}
                         {d.body ? <p className="mt-1 line-clamp-2 text-xs text-[#8b9199]">{d.body}</p> : null}
                         {d.linkUrl ? (
@@ -595,7 +595,7 @@ export function AdMakerAutomation() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-rose-400" />
-                <CardTitle className="text-base text-black">Audiences</CardTitle>
+                <CardTitle className="text-base text-[var(--x-text)]">Audiences</CardTitle>
               </div>
               <CardDescription className="text-[#8b9199]">
                 Radius around canvass pins, ZIP lists, or storm polygons.
@@ -609,7 +609,7 @@ export function AdMakerAutomation() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Palette className="h-5 w-5 text-indigo-400" />
-                <CardTitle className="text-base text-black">Brand kit</CardTitle>
+                <CardTitle className="text-base text-[var(--x-text)]">Brand kit</CardTitle>
               </div>
               <CardDescription className="text-[#8b9199]">Logo and colors from Contacts &amp; settings.</CardDescription>
             </CardHeader>
@@ -621,7 +621,7 @@ export function AdMakerAutomation() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Layers className="h-5 w-5 text-teal-400" />
-                <CardTitle className="text-base text-black">Export</CardTitle>
+                <CardTitle className="text-base text-[var(--x-text)]">Export</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="text-sm text-[#8b9199]">

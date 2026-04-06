@@ -64,17 +64,8 @@ function reindexPreviewAfterRank(
   return { nextIndex: idx, nextPreview: ranked[idx]! };
 }
 
-function sourceLabel(source: PropertyImportPayload["source"]): string {
-  if (source === "csv-upload") return "CSV upload";
-  if (source === "json-paste") return "JSON paste";
-  if (source === "import") return "Import";
-  if (source === "rentcast") return "Legacy import";
-  if (source === "batchdata") return "BatchData";
-  if (source === "dealmachine") return "DealMachine";
-  return "Import";
-}
-
-const FPS_MANUAL_SOURCE = "FastPeopleSearch";
+/** Internal merge tag only — not shown in the UI. */
+const MANUAL_LOOKUP_SOURCE = "manual";
 
 /** Browser read + string size guard for huge CSVs (memory is still ~file size + parsed rows). */
 const MAX_PROPERTY_CSV_BYTES = 180 * 1024 * 1024;
@@ -116,7 +107,7 @@ export function PropertyScraper() {
   const [dealmachineDelayMs, setDealmachineDelayMs] = useState(350);
   const [dealmachineSkipIfOwner, setDealmachineSkipIfOwner] = useState(false);
 
-  /** Typed after manual lookup on FastPeopleSearch (pasted name optional; phones via clipboard). */
+  /** Typed after manual people search (pasted name optional; phones via clipboard). */
   const [manualFpsOwnerName, setManualFpsOwnerName] = useState("");
 
   useEffect(() => {
@@ -160,13 +151,13 @@ export function PropertyScraper() {
     try {
       const k = getGooglePlacesKeyStorageKey();
       if (!k) {
-        setMessage({ kind: "err", text: "Sign in to save your Places key." });
+        setMessage({ kind: "err", text: "Sign in to save your phone lookup key." });
         return;
       }
       window.localStorage.setItem(k, placesKey.trim());
-      setMessage({ kind: "ok", text: "Google Places API key saved in this browser." });
+      setMessage({ kind: "ok", text: "Phone lookup API key saved in this browser." });
     } catch {
-      setMessage({ kind: "err", text: "Could not save Places key." });
+      setMessage({ kind: "err", text: "Could not save phone lookup key." });
     }
   }, [placesKey]);
 
@@ -174,13 +165,13 @@ export function PropertyScraper() {
     try {
       const k = getPdlKeyStorageKey();
       if (!k) {
-        setMessage({ kind: "err", text: "Sign in to save your PDL key." });
+        setMessage({ kind: "err", text: "Sign in to save your contact enrichment key." });
         return;
       }
       window.localStorage.setItem(k, pdlKey.trim());
-      setMessage({ kind: "ok", text: "People Data Labs API key saved in this browser." });
+      setMessage({ kind: "ok", text: "Contact enrichment API key saved in this browser." });
     } catch {
-      setMessage({ kind: "err", text: "Could not save PDL key." });
+      setMessage({ kind: "err", text: "Could not save contact enrichment key." });
     }
   }, [pdlKey]);
 
@@ -212,7 +203,7 @@ export function PropertyScraper() {
         setSelectedRowIndex(null);
         setMessage({
           kind: "ok",
-          text: "Loaded property row from DealMachine. Open in measurement or export when ready.",
+          text: "Loaded property row from lookup. Open in measurement or export when ready.",
         });
         return;
       }
@@ -231,7 +222,7 @@ export function PropertyScraper() {
       setPreview(nextPreview ?? rankedOne);
       setMessage({
         kind: "ok",
-        text: "Merged DealMachine fields into the selected / matching row (empty fields only).",
+        text: "Merged lookup fields into the selected / matching row (empty fields only).",
       });
     } finally {
       setDealmachineBusy(false);
@@ -264,7 +255,7 @@ export function PropertyScraper() {
       }
       setMessage({
         kind: "ok",
-        text: `DealMachine: filled ${filled} row(s); skipped ${skipped}; errors ${failed}. Max ${dealmachineLimit} API calls this run.`,
+        text: `Lookup: filled ${filled} row(s); skipped ${skipped}; errors ${failed}. Max ${dealmachineLimit} API calls this run.`,
       });
     } finally {
       setDealmachineBusy(false);
@@ -273,7 +264,7 @@ export function PropertyScraper() {
 
   const onEnrichBulk = useCallback(async () => {
     if (!commResults.length) {
-      setMessage({ kind: "err", text: "Load rows first (CSV or Parallel-enriched CSV)." });
+      setMessage({ kind: "err", text: "Load rows first (CSV or enriched CSV)." });
       return;
     }
     setEnrichBusy(true);
@@ -298,7 +289,7 @@ export function PropertyScraper() {
       }
       setMessage({
         kind: "ok",
-        text: `Places enhancement: filled phone on ${filled} row(s); skipped ${skipped}; no phone for ${failed} attempt(s). Max ${enrichLimit} calls per run.`,
+        text: `Phone lookup: filled phone on ${filled} row(s); skipped ${skipped}; no phone for ${failed} attempt(s). Max ${enrichLimit} calls per run.`,
       });
     } finally {
       setEnrichBusy(false);
@@ -328,8 +319,8 @@ export function PropertyScraper() {
         kind: "ok",
         text:
           next.ownerPhone !== prevPhone
-            ? "Updated phone from Google Places (see Phones and notes)."
-            : "No new phone returned from Places for this owner/location.",
+            ? "Updated phone from lookup (see Phones and notes)."
+            : "No new phone returned for this owner/location.",
       });
     } finally {
       setEnrichBusy(false);
@@ -342,7 +333,7 @@ export function PropertyScraper() {
       return;
     }
     if (!pdlCompanyRows && !pdlIncludeIndividuals) {
-      setMessage({ kind: "err", text: "Enable company rows and/or individual owners for PDL." });
+      setMessage({ kind: "err", text: "Enable organization rows and/or individual owners for contact enrichment." });
       return;
     }
     setPdlEnrichBusy(true);
@@ -368,7 +359,7 @@ export function PropertyScraper() {
       }
       setMessage({
         kind: "ok",
-        text: `PDL enhancement: updated ${filled} row(s); skipped ${skipped}; no match / error on ${failed} attempt(s). Max ${pdlEnrichLimit} calls per run.`,
+        text: `Contact enrichment: updated ${filled} row(s); skipped ${skipped}; no match / error on ${failed} attempt(s). Max ${pdlEnrichLimit} calls per run.`,
       });
     } finally {
       setPdlEnrichBusy(false);
@@ -378,7 +369,7 @@ export function PropertyScraper() {
   const onEnrichPreviewPdl = useCallback(async () => {
     if (!preview) return;
     if (!pdlCompanyRows && !pdlIncludeIndividuals) {
-      setMessage({ kind: "err", text: "Enable company and/or individual PDL lookups." });
+      setMessage({ kind: "err", text: "Enable organization and/or individual contact enrichment." });
       return;
     }
     const prevPhone = preview.ownerPhone;
@@ -408,10 +399,10 @@ export function PropertyScraper() {
           next.ownerPhone !== prevPhone ||
           next.contactPersonPhone !== prevContactPhone ||
           next.contactPersonName !== preview.contactPersonName
-            ? "Updated contact fields from People Data Labs (see Phones, contact person, Email, notes)."
+            ? "Updated contact fields from enrichment (see Phones, contact person, Email, notes)."
             : notesChanged
-              ? "PDL details in notes (match may lack phone — check notes)."
-              : "PDL did not add new contact fields for this row.",
+              ? "Extra details in notes (match may lack phone — check notes)."
+              : "Enrichment did not add new contact fields for this row.",
       });
     } finally {
       setPdlEnrichBusy(false);
@@ -450,7 +441,7 @@ export function PropertyScraper() {
         setSelectedRowIndex(null);
         setMessage({
           kind: "ok",
-          text: "Loaded 200-row Missouri open-data sample (St. Louis City + Kansas City parcels). For the full ~333k-row file, run npm run data:mo-parcels and import data/mo-stl-kc-open-data-import.csv.",
+          text: "Loaded 200-row Missouri open-data sample. For the full file, run npm run data:mo-parcels and import the generated CSV.",
         });
       } catch (err) {
         setMessage({
@@ -509,7 +500,7 @@ export function PropertyScraper() {
           const n = ranked.length.toLocaleString();
           setMessage({
             kind: "ok",
-            text: `Imported ${n} row(s) from ${file.name}; ranked by commercial lead score. Table uses virtual scrolling for large lists. Enhance with Places/PDL/DealMachine as needed.`,
+            text: `Imported ${n} row(s) from ${file.name}; ranked by commercial lead score. Table uses virtual scrolling for large lists. Use optional enrichment after import as needed.`,
           });
         } catch (err) {
           setMessage({
@@ -547,7 +538,7 @@ export function PropertyScraper() {
     setCommResults([]);
     setPreview(rankCommercialPropertyLeads([p])[0] ?? p);
     setSelectedRowIndex(null);
-    setMessage({ kind: "ok", text: "Parsed JSON. Enhance with Places/PDL if you have keys, then open in measurement." });
+    setMessage({ kind: "ok", text: "Parsed JSON. Add optional enrichment if you have keys, then open in measurement." });
   }, [jsonPaste]);
 
   const sendToMeasurement = useCallback(() => {
@@ -561,7 +552,7 @@ export function PropertyScraper() {
     if (!rows.length) {
       setMessage({
         kind: "err",
-        text: "Nothing to export. Import a CSV (or Parallel-enriched CSV) or load a property preview first.",
+        text: "Nothing to export. Import a CSV (or enriched CSV) or load a property preview first.",
       });
       return;
     }
@@ -623,15 +614,15 @@ export function PropertyScraper() {
       if (!phones.length) {
         setMessage({
           kind: "err",
-          text: "No US phone numbers in clipboard. On FastPeopleSearch, select and copy the block of text that includes numbers, then try again.",
+          text: "No US phone numbers in clipboard. On the people-search site, select and copy the block of text that includes numbers, then try again.",
         });
         return;
       }
-      const merged = mergePhonesFromManualResearch(preview, phones, FPS_MANUAL_SOURCE);
+      const merged = mergePhonesFromManualResearch(preview, phones, MANUAL_LOOKUP_SOURCE);
       applyMergedPreviewToTable(merged);
       setMessage({
         kind: "ok",
-        text: `Merged ${phones.length} phone number(s) into contact person phone (source: ${FPS_MANUAL_SOURCE}). Company/main lines stay in Phone(s).`,
+        text: `Merged ${phones.length} phone number(s) into contact person phone. Main lines stay in Phone(s).`,
       });
     } catch {
       setMessage({
@@ -650,68 +641,55 @@ export function PropertyScraper() {
     if (!n) {
       setMessage({
         kind: "err",
-        text: `Type the owner or contact name you found on ${FPS_MANUAL_SOURCE}, then click Add name.`,
+        text: "Type the owner or contact name from your lookup, then click Add name.",
       });
       return;
     }
     setMessage(null);
-    const merged = mergeOwnerNameFromManualResearch(preview, n, FPS_MANUAL_SOURCE);
+    const merged = mergeOwnerNameFromManualResearch(preview, n, MANUAL_LOOKUP_SOURCE);
     applyMergedPreviewToTable(merged);
     setManualFpsOwnerName("");
     setMessage({
       kind: "ok",
-      text: `Contact person name saved (deed / company name unchanged). Source: ${FPS_MANUAL_SOURCE}.`,
+      text: "Contact person name saved (owner of record on deed unchanged).",
     });
   }, [applyMergedPreviewToTable, manualFpsOwnerName, preview]);
 
   return (
-    <div className="hd2d-page-shell max-w-5xl text-black">
+    <div className="hd2d-page-shell max-w-5xl text-[var(--x-text)]">
       <div className="mb-8">
-        <h1 className="mb-2 text-2xl font-semibold text-black sm:text-3xl">Property records</h1>
-        <p className="text-black max-w-3xl">
-          <strong>Open parcel data does not include owner phone numbers.</strong> The app cannot invent 50,000 accurate
-          phones or contacts — that requires a <strong>file you are licensed to use</strong> (CRM export, dialer list, data
-          vendor, etc.) with <code className="text-xs bg-gray-100 px-1 rounded">phone</code>,{" "}
-          <code className="text-xs bg-gray-100 px-1 rounded">contact_person_name</code>, and{" "}
-          <code className="text-xs bg-gray-100 px-1 rounded">email</code> columns, or slow manual / SOS research per row.
+        <h1 className="mb-2 text-2xl font-semibold text-[var(--x-text)] sm:text-3xl">Property records</h1>
+        <p className="max-w-3xl text-[var(--x-muted)]">
+          <strong className="text-[var(--x-text)]">Open parcel data does not include owner phone numbers.</strong> The app cannot invent 50,000 accurate
+          phones or contacts — that requires a <strong className="text-[var(--x-text)]">file you are licensed to use</strong> (CRM export, dialer list, data
+          vendor, etc.) with <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">phone</code>,{" "}
+          <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">contact_person_name</code>, and{" "}
+          <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">email</code> columns, or slow manual / SOS research per row.
         </p>
-        <p className="text-black max-w-3xl mt-3">
-          <strong>No RentCast.</strong> Import a <strong>CSV</strong> with property address, owner / entity name, mailing
-          address, and any phones you already have. For bulk web-sourced fields (where allowed), use Cursor{" "}
-          <strong>Parallel</strong> in the terminal (
-          <code className="text-xs bg-gray-100 px-1 rounded">/parallel-setup</code>,{" "}
-          <code className="text-xs bg-gray-100 px-1 rounded">/parallel-enrich</code>) and <strong>re-upload</strong> the
-          enriched file.
+        <p className="max-w-3xl mt-3 text-[var(--x-muted)]">
+          Import a <strong>CSV</strong> with property address, owner / entity name, mailing address, and any phones you
+          already have. For bulk web-sourced fields (where allowed), use your editor&apos;s bulk-enrichment workflow and{" "}
+          <strong>re-upload</strong> the enriched file.
           {isAdmin && !propertyScraperOffline ? (
-            <>
-              {" "}
-              Optional in-browser <strong>DealMachine</strong>, <strong>Google Places</strong>, and{" "}
-              <strong>People Data Labs</strong> can fill some gaps when you add keys (localhost dev proxy).
-            </>
+            <> Optional in-browser API-assisted enrichment is available when you add keys (localhost dev proxy).</>
           ) : propertyScraperOffline ? (
             <>
               {" "}
-              <strong>DealMachine / Places / PDL</strong> panels are off (
-              <code className="text-xs bg-gray-100 px-1 rounded">VITE_PROPERTY_SCRAPER_OFFLINE=true</code>).
+              API enrichment panels are off (
+              <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">VITE_PROPERTY_SCRAPER_OFFLINE=true</code>).
             </>
           ) : (
             <> Administrator accounts can enable optional API-assisted enrichment after CSV import.</>
           )}{" "}
-          <strong>FastPeopleSearch</strong> (
-          <a
-            href="https://www.fastpeoplesearch.com/?lang=en"
-            className="text-black underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            fastpeoplesearch.com/?lang=en
-          </a>
-          ): manual lookup + <strong>merge phones from clipboard</strong> per preview row.
+          <a href={FAST_PEOPLE_SEARCH_HOME_LANG_EN} className="text-[var(--x-accent)] underline hover:opacity-90" target="_blank" rel="noreferrer">
+            People search
+          </a>{" "}
+          (manual): open links from the preview row, then <strong>merge phones from clipboard</strong> per row.
         </p>
       </div>
 
       {csvParseProgress ? (
-        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-black">
+        <div className="mb-4 rounded-lg border border-blue-500/35 bg-blue-950/40 px-4 py-2 text-sm text-[var(--x-text)]">
           {csvParseProgress.phase === "parsing"
             ? `Parsing CSV… ${csvParseProgress.rows.toLocaleString()} rows converted so far (large files may take a minute).`
             : `Ranking ${csvParseProgress.rows.toLocaleString()} rows by commercial lead score…`}
@@ -722,8 +700,8 @@ export function PropertyScraper() {
         <div
           className={
             message.kind === "err"
-              ? "mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-black"
-              : "mb-4 rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm text-black"
+              ? "mb-4 rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-2 text-sm text-[var(--x-text)]"
+              : "mb-4 rounded-lg border border-emerald-500/35 bg-emerald-950/35 px-4 py-2 text-sm text-[var(--x-text)]"
           }
         >
           {message.text}
@@ -731,28 +709,26 @@ export function PropertyScraper() {
       ) : null}
 
       <div className="space-y-6">
-        <Card className="text-black border-emerald-200 bg-emerald-50/35">
+        <Card className="border-emerald-500/30 bg-emerald-950/25 text-[var(--x-text)]">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-black">
+            <CardTitle className="flex items-center gap-2">
               <Landmark className="w-5 h-5" />
               County assessor &amp; free public records
             </CardTitle>
-            <CardDescription className="text-black">
-              No API keys required. Use your county <strong>assessor</strong> (or cadastral) site for owner, mailing address,
-              parcel, and building use; use state <strong>Secretary of State</strong> (or business registry) for registered
-              agent and entity address. Download <strong>Blank template (manual research)</strong> under Upload CSV, fill
+            <CardDescription className="text-[var(--x-muted)]">
+              No API keys required. Use your county <strong className="text-[var(--x-text)]">assessor</strong> (or cadastral) site for owner, mailing address,
+              parcel, and building use; use state <strong className="text-[var(--x-text)]">Secretary of State</strong> (or business registry) for registered
+              agent and entity address. Download <strong className="text-[var(--x-text)]">Blank template (manual research)</strong> under Upload CSV, fill
               columns, then re-import. Extra columns (registered agent, brokerage) map into notes automatically.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-black space-y-2">
+          <CardContent className="space-y-2 text-sm">
             {isAdmin ? (
               <>
-                <p className="font-medium">Optional bulk web enrichment (Cursor + Parallel)</p>
-                <p className="text-neutral-800">
-                  After you <strong>Export outreach CSV</strong>, you can run Parallel bulk enrichment from the editor (e.g.{" "}
-                  <code className="text-xs bg-white px-1 rounded border border-gray-200">/parallel-setup</code> then{" "}
-                  <code className="text-xs bg-white px-1 rounded border border-gray-200">/parallel-enrich</code> with the
-                  fields you want). Comply with Parallel&apos;s terms and each website&apos;s rules.
+                <p className="font-medium">Optional bulk web enrichment</p>
+                <p className="text-[var(--x-muted)]">
+                  After you <strong>Export outreach CSV</strong>, you can run bulk enrichment from your editor using your
+                  team&apos;s tooling. Comply with each provider&apos;s terms and each website&apos;s rules.
                 </p>
               </>
             ) : null}
@@ -761,37 +737,27 @@ export function PropertyScraper() {
 
         {showVendorEnrichment ? (
           <>
-          <Card className="text-black border-blue-200 bg-blue-50/40">
+          <Card className="border-blue-500/30 bg-blue-950/25 text-[var(--x-text)]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-black">
+              <CardTitle className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5" />
                 API keys &amp; data enhancement
               </CardTitle>
-              <CardDescription className="text-black">
+              <CardDescription className="text-[var(--x-muted)]">
                 Optional in-browser enrichers after CSV import. Keys stay in this browser (localStorage) or{" "}
-                <code className="text-xs bg-white px-1 rounded">.env.local</code> (
-                <code className="text-xs bg-white px-1 rounded">VITE_GOOGLE_PLACES_API_KEY</code>,{" "}
-                <code className="text-xs bg-white px-1 rounded">VITE_PDL_API_KEY</code>). DealMachine uses the Worker
-                only (<code className="text-xs bg-white px-1 rounded">DEALMACHINE_API_KEY</code>). For{" "}
-              <a
-                href={FAST_PEOPLE_SEARCH_HOME_LANG_EN}
-                className="underline text-black"
-                target="_blank"
-                rel="noreferrer"
-              >
-                FastPeopleSearch
-              </a>
-              , use the preview links — manual browser tabs only.
+                <code className="text-xs rounded bg-[#1a1d26] px-1 text-[var(--x-text)]">.env.local</code>. Set phone and contact API keys per your
+                env file; address lookup uses the Worker&apos;s property-record secret. For manual people search, use the
+                preview links — new tabs only.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6 text-black">
+          <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
               <label className="text-sm block">
-                <span className="text-black block mb-1 font-medium">Google Places (phones)</span>
+                <span className="mb-1 block font-medium">Phone lookup (maps API key)</span>
                 <input
                   type="password"
                   autoComplete="off"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={placesKey}
                   onChange={(e) => setPlacesKey(e.target.value)}
                   placeholder="API key"
@@ -801,11 +767,11 @@ export function PropertyScraper() {
                 </Button>
               </label>
               <label className="text-sm block">
-                <span className="text-black block mb-1 font-medium">People Data Labs</span>
+                <span className="mb-1 block font-medium">Contact enrichment API key</span>
                 <input
                   type="password"
                   autoComplete="off"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={pdlKey}
                   onChange={(e) => setPdlKey(e.target.value)}
                   placeholder="X-Api-Key"
@@ -815,8 +781,8 @@ export function PropertyScraper() {
                 </Button>
               </label>
             </div>
-            <div className="border-t border-gray-200 pt-4 space-y-3">
-              <p className="text-sm font-medium text-black">PDL enhancement options (bulk + preview)</p>
+            <div className="border-t border-white/[0.08] pt-4 space-y-3">
+              <p className="text-sm font-medium">Contact enrichment options (bulk + preview)</p>
               <div className="flex flex-wrap gap-4 items-center text-sm">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -824,7 +790,7 @@ export function PropertyScraper() {
                     checked={pdlCompanyRows}
                     onChange={(e) => setPdlCompanyRows(e.target.checked)}
                   />
-                  Company / LLC / org rows
+                  Organization / LLC rows
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -832,7 +798,7 @@ export function PropertyScraper() {
                     checked={pdlIncludeIndividuals}
                     onChange={(e) => setPdlIncludeIndividuals(e.target.checked)}
                   />
-                  Individual owners (Person API)
+                  Individual owners
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -840,26 +806,26 @@ export function PropertyScraper() {
                     checked={enrichBusinessOnly}
                     onChange={(e) => setEnrichBusinessOnly(e.target.checked)}
                   />
-                  Places: LLC / org-style names only
+                  Phone lookup: LLC / org-style names only
                 </label>
                 <label className="flex items-center gap-2">
-                  <span>Places max/run</span>
+                  <span>Phone lookup max/run</span>
                   <input
                     type="number"
                     min={1}
                     max={100}
-                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-black"
+                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
                     value={enrichLimit}
                     onChange={(e) => setEnrichLimit(Number.parseInt(e.target.value, 10) || 25)}
                   />
                 </label>
                 <label className="flex items-center gap-2">
-                  <span>PDL max/run</span>
+                  <span>Contact enrichment max/run</span>
                   <input
                     type="number"
                     min={1}
                     max={100}
-                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-black"
+                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
                     value={pdlEnrichLimit}
                     onChange={(e) => setPdlEnrichLimit(Number.parseInt(e.target.value, 10) || 15)}
                   />
@@ -869,31 +835,28 @@ export function PropertyScraper() {
           </CardContent>
         </Card>
 
-        <Card className="text-black border-amber-200 bg-amber-50/40">
+        <Card className="border-amber-500/30 bg-amber-950/25 text-[var(--x-text)]">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-black">
+            <CardTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5" />
-              DealMachine — fetch property records
+              Address lookup — property records
             </CardTitle>
-            <CardDescription className="text-black">
-              Uses the DealMachine public API (proxied by the HD2D Worker). Parsed US address (commas required; ZIP optional).
-              Merged rows only fill <strong>empty</strong> fields. Configure{" "}
-              <code className="text-xs bg-white px-1 rounded">DEALMACHINE_API_KEY</code> on the Worker (wrangler secret or{" "}
-              <code className="text-xs bg-white px-1 rounded">.dev.vars</code>) and set <code className="text-xs bg-white px-1 rounded">VITE_INTEL_API_BASE</code>{" "}
-              for local dev.
+            <CardDescription className="text-[var(--x-muted)]">
+              Parsed US address (commas required; ZIP optional). Merged rows only fill <strong className="text-[var(--x-text)]">empty</strong> fields.
+              Configure the Worker secret and API base for local dev.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 text-black">
+          <CardContent className="space-y-4">
             <label className="text-sm block">
-              <span className="block mb-1 font-medium">Address line</span>
+              <span className="mb-1 block font-medium">Address line</span>
               <input
                 type="text"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                 value={dealmachineAddressLine}
                 onChange={(e) => setDealmachineAddressLine(e.target.value)}
                 placeholder="123 Main St, City, ST 12345 — or without ZIP"
               />
-              <span className="text-xs text-neutral-600 mt-1 block">
+              <span className="mt-1 block text-xs text-[var(--x-muted)]">
                 Format: <strong>Street, City, ST</strong> or <strong>Street, City, ST ZIP</strong>. Fills from the selected row or
                 preview when this field is empty.
               </span>
@@ -916,17 +879,17 @@ export function PropertyScraper() {
                 }
                 onClick={() => void onFetchDealMachineBulk()}
               >
-                DealMachine table (up to {dealmachineLimit} calls)
+                Table batch (up to {dealmachineLimit} calls)
               </Button>
             </div>
-            <div className="flex flex-wrap gap-4 items-center text-sm border-t border-amber-200/80 pt-3">
+            <div className="flex flex-wrap gap-4 items-center border-t border-amber-500/25 pt-3 text-sm">
               <label className="flex items-center gap-2">
                 <span>Max calls</span>
                 <input
                   type="number"
                   min={1}
                   max={100}
-                  className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm text-black"
+                  className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
                   value={dealmachineLimit}
                   onChange={(e) => setDealmachineLimit(Number.parseInt(e.target.value, 10) || 15)}
                 />
@@ -937,7 +900,7 @@ export function PropertyScraper() {
                   type="number"
                   min={0}
                   max={5000}
-                  className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-black"
+                  className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
                   value={dealmachineDelayMs}
                   onChange={(e) => setDealmachineDelayMs(Number.parseInt(e.target.value, 10) || 0)}
                 />
@@ -957,33 +920,30 @@ export function PropertyScraper() {
         ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="text-black">
+          <Card className="bg-[var(--x-surface)] text-[var(--x-text)]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-black">
+              <CardTitle className="flex items-center gap-2">
                 <Upload className="w-5 h-5" />
                 Upload CSV
               </CardTitle>
-              <CardDescription className="text-black">
+              <CardDescription className="text-[var(--x-muted)]">
                 Headers: Address, Owner, Phone, Email, State, etc. No API call. You can import very large lists (e.g.{" "}
-                <strong>100,000</strong> commercial / PM rows): parsing yields to the UI, the table is{" "}
-                <strong>virtualized</strong> (only visible rows render), and the full file must stay under ~180MB. For
+                <strong className="text-[var(--x-text)]">100,000</strong> commercial / PM rows): parsing yields to the UI, the table is{" "}
+                <strong className="text-[var(--x-text)]">virtualized</strong> (only visible rows render), and the full file must stay under ~180MB. For
                 free manual research, download the template (assessor + SOS columns) and re-upload when filled.
                 {isAdmin ? (
                   <>
                     {" "}
-                    <strong>St. Louis City</strong> and <strong>Kansas City MO</strong> open parcels:{" "}
-                    <code className="text-xs bg-gray-100 px-1 rounded">npm run data:mo-parcels</code> →{" "}
-                    <code className="text-xs bg-gray-100 px-1 rounded">data/mo-stl-kc-open-data-import.csv</code>. Up to{" "}
-                    <strong>50,000</strong> LLC / large-building / multifamily-style rows (still{" "}
-                    <strong>no phones in source</strong>):{" "}
-                    <code className="text-xs bg-gray-100 px-1 rounded">npm run data:mo-commercial-50k</code> →{" "}
-                    <code className="text-xs bg-gray-100 px-1 rounded">data/mo-commercial-pm-candidates-50k.csv</code>{" "}
-                    (empty phone / contact / email columns for you to fill from a licensed list).
+                    Missouri open-parcel scripts:{" "}
+                    <code className="rounded bg-gray-100 px-1 text-xs text-[var(--x-text)]">npm run data:mo-parcels</code> → import the generated
+                    CSV. Large-building sample:{" "}
+                    <code className="rounded bg-gray-100 px-1 text-xs text-[var(--x-text)]">npm run data:mo-commercial-50k</code> (empty phone /
+                    contact / email columns for you to fill from a licensed list).
                   </>
                 ) : null}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-3 text-black">
+            <CardContent className="flex flex-wrap items-center gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1005,17 +965,17 @@ export function PropertyScraper() {
             </CardContent>
           </Card>
 
-          <Card className="text-black">
+          <Card className="bg-[var(--x-surface)] text-[var(--x-text)]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-black">
+              <CardTitle className="flex items-center gap-2">
                 <ClipboardPaste className="w-5 h-5" />
                 Paste JSON
               </CardTitle>
-              <CardDescription className="text-black">Single property object; clears the results table.</CardDescription>
+              <CardDescription className="text-[var(--x-muted)]">Single property object; clears the results table.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-black">
+            <CardContent className="space-y-3">
               <textarea
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono min-h-[100px] text-black placeholder:text-neutral-500"
+                className="min-h-[100px] w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm placeholder:text-[var(--x-muted)]"
                 value={jsonPaste}
                 onChange={(e) => setJsonPaste(e.target.value)}
                 placeholder='{ "formattedAddress": "123 Main St, City, ST 12345" }'
@@ -1028,42 +988,30 @@ export function PropertyScraper() {
         </div>
 
         {isAdmin ? (
-        <Card className="text-black border-violet-200 bg-violet-50/30">
+        <Card className="border-violet-500/30 bg-violet-950/25 text-[var(--x-text)]">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-black">
+            <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5" />
-              Parallel — bulk property / owner / PM enrichment
+              Bulk enrichment (editor)
             </CardTitle>
-            <CardDescription className="text-black">
-              Run from <strong>Cursor</strong> (not inside this page). Example intent for B2B commercial roofing:{" "}
-              <em>
-                property mailing address; assessor-style owner LLC; main business phone; property manager company if
-                visible; principal or registered-agent contact name
-              </em>
-              . Start with a CSV that has at least <code className="text-xs bg-white px-1 rounded">property_address</code>{" "}
-              or company + city columns, then import the enriched file here.
+            <CardDescription className="text-[var(--x-muted)]">
+              Run bulk owner / phone / contact enrichment from your development environment (not on this page). Example
+              intent: property mailing address; assessor-style owner entity; main phone; registered-agent or principal
+              contact where visible. Start with a CSV that has at least <code className="rounded bg-[#1a1d26] px-1 text-xs text-[var(--x-text)]">property_address</code>{" "}
+              or owner + city columns, then import the enriched file here.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-black space-y-3 bg-white/60 rounded-md border border-violet-100 p-4">
+          <CardContent className="space-y-3 rounded-md border border-white/[0.08] bg-black/25 p-4 text-sm">
             <ol className="list-decimal pl-5 space-y-2">
+              <li>Install and configure your team&apos;s bulk-enrichment CLI in the editor.</li>
               <li>
-                In Cursor, run <code className="text-xs bg-gray-100 px-1 rounded">/parallel-setup</code> once (installs{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">parallel-cli</code>).
+                Run it with a seed CSV (property address and/or owner entity) and the fields you need for outreach.
               </li>
               <li>
-                Run <code className="text-xs bg-gray-100 px-1 rounded">/parallel-enrich</code> with a seed CSV (columns
-                like property address and/or owner LLC) and an intent such as: owner entity name, main phone, property
-                management company if visible, and decision-maker or registered-agent style contact for commercial roofing
-                outreach.
-              </li>
-              <li>
-                Poll to completion, then use <strong>Choose CSV</strong> above to import the enriched file (map headers to
-                our template if needed).
+                When the job finishes, use <strong>Choose CSV</strong> above to import the enriched file (map headers to the
+                template if needed).
               </li>
             </ol>
-            <p className="text-xs text-neutral-600 font-mono break-all">
-              parallel-cli enrich poll &quot;$TASKGROUP_ID&quot; --timeout 540
-            </p>
           </CardContent>
         </Card>
         ) : null}
@@ -1076,7 +1024,7 @@ export function PropertyScraper() {
                 ? `Export outreach CSV (${commResults.length} rows)`
                 : "Export outreach CSV (current preview)"}
             </Button>
-            <span className="text-xs text-neutral-600">
+            <span className="text-xs text-[var(--x-muted)]">
               Spreadsheet / mail merge — same columns as the manual-research template.
             </span>
           </div>
@@ -1087,7 +1035,7 @@ export function PropertyScraper() {
             <div className="flex flex-wrap gap-2 items-center">
               {showVendorEnrichment ? (
                 <>
-                  <span className="text-sm font-medium text-black">Data enhancement (loaded rows)</span>
+                  <span className="text-sm font-medium text-[var(--x-text)]">Data enhancement (loaded rows)</span>
                   <Button
                     type="button"
                     variant="secondary"
@@ -1100,7 +1048,7 @@ export function PropertyScraper() {
                     ) : (
                       <Phone className="w-4 h-4 mr-2" />
                     )}
-                    Places (up to {enrichLimit})
+                    Phone lookup (up to {enrichLimit})
                   </Button>
                   <Button
                     type="button"
@@ -1120,33 +1068,33 @@ export function PropertyScraper() {
                     ) : (
                       <UserSearch className="w-4 h-4 mr-2" />
                     )}
-                    PDL (up to {pdlEnrichLimit})
+                    Contact enrichment (up to {pdlEnrichLimit})
                   </Button>
-                  <span className="text-xs text-neutral-600">Skips rows that already have digits in Phone(s).</span>
+                  <span className="text-xs text-[var(--x-muted)]">Skips rows that already have digits in Phone(s).</span>
                 </>
               ) : propertyScraperOffline ? (
-                <span className="text-xs text-neutral-700">
-                  CSV-only mode: add <code className="text-xs bg-gray-100 px-1 rounded">phone</code> / contact columns in
-                  your spreadsheet, then re-import — or use manual FPS / clipboard merge below.
+                <span className="text-xs text-[var(--x-muted)]">
+                  CSV-only mode: add <code className="rounded bg-gray-100 px-1 text-xs text-[var(--x-text)]">phone</code> / contact columns in
+                  your spreadsheet, then re-import — or use manual people search / clipboard merge below.
                 </span>
               ) : (
-                <span className="text-xs text-neutral-700">
+                <span className="text-xs text-[var(--x-muted)]">
                   API-assisted row enrichment is limited to administrator accounts. Add phone and contact columns in your CSV,
-                  or use manual FastPeopleSearch below.
+                  or use manual people search below.
                 </span>
               )}
             </div>
-            <p className="text-xs text-neutral-700">
-              <strong>FastPeopleSearch</strong> (manual): open{" "}
+            <p className="text-xs text-[var(--x-muted)]">
+              Manual people search: use the preview row shortcuts below, or open{" "}
               <a
-                className="text-black underline"
+                className="text-[var(--x-accent)] underline hover:opacity-90"
                 href={FAST_PEOPLE_SEARCH_HOME_LANG_EN}
                 target="_blank"
                 rel="noreferrer noopener"
               >
-                fastpeoplesearch.com/?lang=en
+                a search site
               </a>{" "}
-              or use the preview row for owner/address Google → FPS shortcuts.
+              in a new tab.
             </p>
             <VirtualizedPropertyLeadTable
               rows={commResults}
@@ -1160,12 +1108,12 @@ export function PropertyScraper() {
         ) : null}
 
         {preview ? (
-          <Card className="text-black">
+          <Card className="bg-[var(--x-surface)] text-[var(--x-text)]">
             <CardHeader>
-              <CardTitle className="text-black">Preview</CardTitle>
-              <CardDescription className="text-black">Source: {sourceLabel(preview.source)}</CardDescription>
+              <CardTitle>Preview</CardTitle>
+              <CardDescription className="text-[var(--x-muted)]">Selected property row</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 text-black">
+            <CardContent className="space-y-4">
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="font-medium block">Address</span>
@@ -1216,7 +1164,7 @@ export function PropertyScraper() {
                   </div>
                 ) : null}
                 <div className="sm:col-span-2">
-                  <span className="font-medium block">Owner / company (deed or assessor)</span>
+                  <span className="font-medium block">Owner name (deed or assessor)</span>
                   <div className="whitespace-pre-wrap">{preview.ownerName || "—"}</div>
                 </div>
                 <div>
@@ -1232,7 +1180,7 @@ export function PropertyScraper() {
                   <div className="whitespace-pre-wrap">{preview.ownerMailingAddress || "—"}</div>
                 </div>
                 <div className="sm:col-span-2">
-                  <span className="font-medium block">Phone(s) — main / company</span>
+                  <span className="font-medium block">Phone(s) — main / alternate</span>
                   <div className="whitespace-pre-wrap">{preview.ownerPhone || "—"}</div>
                 </div>
                 <div className="sm:col-span-2">
@@ -1249,21 +1197,21 @@ export function PropertyScraper() {
                 </div>
               </dl>
               {preview.notes ? (
-                <p className="text-xs whitespace-pre-wrap border-t border-gray-300 pt-3">{preview.notes}</p>
+                <p className="border-t border-white/[0.1] pt-3 text-xs whitespace-pre-wrap text-[var(--x-muted)]">{preview.notes}</p>
               ) : null}
-              <div className="border-t border-gray-200 pt-3 space-y-2">
-                <p className="text-xs font-medium text-black">Manual data enhancement — FastPeopleSearch</p>
-                <p className="text-xs text-neutral-600">
-                  Opens new tabs only — this app does not request FastPeopleSearch servers.                   After you find a match, type the <strong>person&apos;s name</strong> below and/or copy a snippet with
-                  their numbers, then <strong>Merge phones from clipboard</strong> (saved as contact person phone; company
-                  lines stay in Phone(s)).
-                  Lead score updates when numbers are added. Comply with FPS terms and privacy law.
+              <div className="space-y-2 border-t border-white/[0.08] pt-3">
+                <p className="text-xs font-medium text-[var(--x-text)]">Manual people search</p>
+                <p className="text-xs text-[var(--x-muted)]">
+                  Opens new tabs only — this app does not scrape third-party sites. After you find a match, type the{" "}
+                  <strong>person&apos;s name</strong> below and/or copy a snippet with their numbers, then{" "}
+                  <strong>Merge phones from clipboard</strong> (saved as contact person phone; main lines stay in Phone(s)).
+                  Lead score updates when numbers are added. Comply with site terms and privacy law.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" asChild>
                     <a href={FAST_PEOPLE_SEARCH_HOME_LANG_EN} target="_blank" rel="noreferrer noopener">
                       <ExternalLink className="w-4 h-4" />
-                      FPS home (?lang=en)
+                      People search (home)
                     </a>
                   </Button>
                   {(() => {
@@ -1284,13 +1232,13 @@ export function PropertyScraper() {
                           rel="noreferrer noopener"
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Google → FPS (owner + area)
+                          Search (owner + area)
                         </a>
                       </Button>
                     ) : (
                       <Button type="button" variant="outline" size="sm" disabled title="Need owner name for this search">
                         <ExternalLink className="w-4 h-4" />
-                        Google → FPS (owner + area)
+                        Search (owner + area)
                       </Button>
                     );
                   })()}
@@ -1302,24 +1250,24 @@ export function PropertyScraper() {
                         rel="noreferrer noopener"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        Google → FPS (property address)
+                        Search (property address)
                       </a>
                     </Button>
                   ) : (
                     <Button type="button" variant="outline" size="sm" disabled title="Need property address">
                       <ExternalLink className="w-4 h-4" />
-                      Google → FPS (property address)
+                      Search (property address)
                     </Button>
                   )}
                 </div>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                   <label className="text-xs flex-1 min-w-[220px]">
-                    <span className="font-medium text-black block mb-1">Contact person name (from FPS)</span>
+                    <span className="mb-1 block font-medium">Contact person name (from lookup)</span>
                     <input
-                      className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm text-black"
+                      className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                       value={manualFpsOwnerName}
                       onChange={(e) => setManualFpsOwnerName(e.target.value)}
-                      placeholder="Type what you see on FastPeopleSearch…"
+                      placeholder="Type the name from your search…"
                     />
                   </label>
                   <Button type="button" variant="secondary" size="sm" onClick={onApplyManualOwnerNameFps}>
@@ -1346,7 +1294,7 @@ export function PropertyScraper() {
                       ) : (
                         <Phone className="w-4 h-4 mr-2" />
                       )}
-                      Enhance: Places
+                      Enhance: phone lookup
                     </Button>
                     <Button
                       type="button"
@@ -1366,7 +1314,7 @@ export function PropertyScraper() {
                       ) : (
                         <UserSearch className="w-4 h-4 mr-2" />
                       )}
-                      Enhance: PDL
+                      Enhance: contacts
                     </Button>
                   </>
                 ) : null}

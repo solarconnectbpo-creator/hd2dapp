@@ -7,7 +7,8 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-2xl border border-white/[0.08]",
+        /* !bg/!text: must win over shadcn theme bg-card / Tailwind bg-white in production so we never get light text on white. */
+        "flex flex-col gap-6 rounded-2xl border border-white/[0.08] !bg-[var(--x-surface)] !text-[var(--x-text)]",
         className,
       )}
       {...props}
@@ -33,7 +34,9 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return <p data-slot="card-description" className={cn("text-muted-foreground", className)} {...props} />;
+  return (
+    <p data-slot="card-description" className={cn("!text-[var(--x-muted)]", className)} {...props} />
+  );
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {

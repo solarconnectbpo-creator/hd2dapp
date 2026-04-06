@@ -2,18 +2,19 @@
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: #000000;
-  --card: #ffffff;
-  --card-foreground: #000000;
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  /* App shell is dark; align shadcn surfaces so bg-card/popover aren’t white next to --x-text / .text-black remaps. */
+  --background: #030406;
+  --foreground: #e7e9ea;
+  --card: #12141a;
+  --card-foreground: #e7e9ea;
+  --popover: #12141a;
+  --popover-foreground: #e7e9ea;
   --primary: #030213;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.95 0.0058 264.53);
   --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #000000;
+  --muted: #1a1d26;
+  --muted-foreground: #8b9199;
   --accent: #e9ebef;
   --accent-foreground: #030213;
   --destructive: #d4183d;

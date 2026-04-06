@@ -1,8 +1,7 @@
-import { HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
 import type { CoursesCatalogData } from "../data/coursesCatalog";
-import { safeUserFacingApiMessage } from "./safeApiError";
+import { networkFetchFailureHint, safeUserFacingApiMessage } from "./safeApiError";
 
 function apiBase(): string {
   return getHd2dApiBase().replace(/\/$/, "");
@@ -19,9 +18,7 @@ async function workerFetch(path: string, init?: RequestInit): Promise<Response> 
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `Network error: ${msg}. Set VITE_INTEL_API_BASE=${HD2D_WORKER_API_ORIGIN} if needed.`,
-    );
+    throw new Error(networkFetchFailureHint(base, msg));
   }
 }
 

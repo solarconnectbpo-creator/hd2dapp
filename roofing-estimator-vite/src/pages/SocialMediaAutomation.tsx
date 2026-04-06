@@ -39,9 +39,9 @@ import { getScopedStorageKey } from "../lib/userScopedStorage";
 
 const cardChrome = "border-white/[0.07] ring-1 ring-white/[0.04]";
 const fieldClass =
-  "min-h-[120px] w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-black placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
+  "min-h-[120px] w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-[var(--x-text)] placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
 const inputRowClass =
-  "w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-black placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
+  "w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-[var(--x-text)] placeholder:text-[#8b9199] focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/30";
 
 type SocialDraft = {
   id: string;
@@ -196,14 +196,14 @@ export function SocialMediaAutomation() {
   return (
     <div className="hd2d-page-shell">
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4 text-black hover:bg-white/[0.06]">
+        <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4 text-[var(--x-text)] hover:bg-white/[0.06]">
           <Link to="/marketing" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Marketing
           </Link>
         </Button>
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#8b9199]">Marketing</p>
-        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--x-text)] sm:text-3xl">
           Social media posting &amp; automation
         </h1>
         <p className="max-w-3xl text-sm text-[#8b9199]">
@@ -217,7 +217,7 @@ export function SocialMediaAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Share2 className="h-5 w-5 text-blue-400" aria-hidden />
-              <CardTitle className="text-black">Meta (Facebook) — schedule Page posts</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">Meta (Facebook) — schedule Page posts</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               {isAdmin ? (
@@ -328,7 +328,7 @@ export function SocialMediaAutomation() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block sm:col-span-2">
-                    <span className="mb-1 block text-xs font-medium text-black">Creative pack (from Ad maker)</span>
+                    <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Creative pack (from Ad maker)</span>
                     <select
                       className={inputRowClass}
                       value={selectedPackId}
@@ -360,7 +360,7 @@ export function SocialMediaAutomation() {
                     </span>
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="mb-1 block text-xs font-medium text-black">Facebook Page</span>
+                    <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Facebook Page</span>
                     <select
                       className={inputRowClass}
                       value={schedulePageId}
@@ -374,7 +374,7 @@ export function SocialMediaAutomation() {
                     </select>
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="mb-1 block text-xs font-medium text-black">Post text</span>
+                    <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Post text</span>
                     <textarea
                       className={fieldClass}
                       rows={4}
@@ -384,7 +384,7 @@ export function SocialMediaAutomation() {
                     />
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="mb-1 block text-xs font-medium text-black">Link (optional)</span>
+                    <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Link (optional)</span>
                     <input
                       type="url"
                       className={inputRowClass}
@@ -394,7 +394,7 @@ export function SocialMediaAutomation() {
                     />
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="mb-1 block text-xs font-medium text-black">Publish on Meta at (local time)</span>
+                    <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Publish on Meta at (local time)</span>
                     <input
                       type="datetime-local"
                       className={inputRowClass}
@@ -448,7 +448,7 @@ export function SocialMediaAutomation() {
                             className="flex items-start justify-between gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-[#8b9199]"
                           >
                             <span className="min-w-0 flex-1">
-                              <span className="block font-medium text-black">{formatScheduledRow(r)}</span>
+                              <span className="block font-medium text-[var(--x-text)]">{formatScheduledRow(r)}</span>
                               {preview ? (
                                 <span className="mt-1 block whitespace-pre-wrap text-[11px] leading-snug text-[#8b9199]">
                                   {preview}
@@ -493,8 +493,8 @@ export function SocialMediaAutomation() {
         </Card>
       ) : (
         <p className="mb-8 text-sm text-[#8b9199]">
-          Meta scheduling is available to <strong className="text-black">company</strong> and{" "}
-          <strong className="text-black">admin</strong> accounts.
+          Meta scheduling is available to <strong className="text-[var(--x-text)]">company</strong> and{" "}
+          <strong className="text-[var(--x-text)]">admin</strong> accounts.
         </p>
       )}
 
@@ -503,7 +503,7 @@ export function SocialMediaAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <CalendarClock className="h-5 w-5 text-sky-400" />
-              <CardTitle className="text-black">Content queue</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">Content queue</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               Save drafts locally. Copy into your scheduler or connect an API when ready.
@@ -511,7 +511,7 @@ export function SocialMediaAutomation() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-black">Next post draft</span>
+              <span className="mb-1 block text-xs font-medium text-[var(--x-text)]">Next post draft</span>
               <textarea
                 className={fieldClass}
                 placeholder="e.g. Storm season roof check — book a free inspection in [city]…"
@@ -534,7 +534,7 @@ export function SocialMediaAutomation() {
                       className="flex gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 text-left"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-black">{titleFromBody(d.body)}</p>
+                        <p className="truncate text-sm font-medium text-[var(--x-text)]">{titleFromBody(d.body)}</p>
                         <p className="mt-1 line-clamp-2 text-xs text-[#8b9199]">{d.body}</p>
                         <p className="mt-1 text-[10px] text-[#8b9199]">
                           {new Date(d.savedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
@@ -562,7 +562,7 @@ export function SocialMediaAutomation() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Repeat className="h-5 w-5 text-violet-400" />
-              <CardTitle className="text-black">Automation</CardTitle>
+              <CardTitle className="text-[var(--x-text)]">Automation</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               Triggers: new estimate closed, job completed, review received — map to social actions in a future workflow

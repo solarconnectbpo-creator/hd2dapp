@@ -2,15 +2,14 @@
  * Base URL for the HD2D Cloudflare Worker (intel, auth, DealMachine proxy, AI routes, etc.).
  *
  * - **Development (`vite`):** `VITE_INTEL_API_BASE` if set, else same-origin `/intel-proxy` (see `INTEL_PROXY_TARGET` in `vite.config.ts`).
- * - **Production on hardcoredoortodoorclosers.com:** by default `HD2D_WORKER_API_ORIGIN` (Vercel has no `/api` proxy).
- *   For Cloudflare Pages + `functions/api/*`, set `VITE_HD2D_SAME_ORIGIN_API=true` to use same-origin `/api/*`.
- * - **Preview** (`*.pages.dev`, `*.vercel.app`): direct Worker URL from `siteOrigin.ts`.
+ * - **Production:** same-origin `/api/*` on Cloudflare Pages (proxy to Worker) or apex cross-origin for Vercel — never browser → `*.workers.dev`.
+ * - **Preview** (`*.pages.dev`, `*.vercel.app`): resolved in `siteOrigin.ts`.
  * - **Override:** Set `VITE_INTEL_API_BASE` to a full origin if the API lives elsewhere.
  */
 
 import {
   apiOriginForHostname,
-  HD2D_WORKER_API_ORIGIN,
+  HD2D_PUBLIC_API_ORIGIN,
   isHd2dZoneHostname,
   resolveProductionApiOrigin,
 } from "../config/siteOrigin";
@@ -35,25 +34,43 @@ function isAbsoluteHttpUrl(s: string): boolean {
 }
 
 /**
- * On preview hosts (`*.vercel.app`, `*.pages.dev`), if the base is still the SPA origin, force the Worker URL.
- * Production apex uses `resolveProductionApiOrigin()` (Worker by default); this mainly helps dev/preview edge cases.
+ * On preview hosts (`*.vercel.app`, `*.pages.dev`), if the base is still the SPA origin, force the public API origin (apex `/api/*`), not `workers.dev`.
  */
 function coerceWorkerIfShadowedSite(base: string): string {
   if (typeof window === "undefined") return base;
   const h = (window.location.hostname || "").trim().toLowerCase();
   if (apiOriginForHostname(h) === null) return base;
 
+  const pub = HD2D_PUBLIC_API_ORIGIN.replace(/\/$/, "");
   if (!base.trim() || !isAbsoluteHttpUrl(base)) {
-    return HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
+    return pub;
   }
   try {
     if (new URL(base).origin === window.location.origin) {
-      return HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
+      return pub;
     }
   } catch {
-    return HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
+    return pub;
   }
   return base;
+}
+
+/** Production: browsers should not use `*.workers.dev`. On Pages/HD2D zone use same-origin `/api` (proxy). */
+function rewriteWorkersDevToPublicApi(base: string): string {
+  if (import.meta.env.DEV) return base;
+  if (typeof window === "undefined") return base;
+  try {
+    const u = new URL(base);
+    if (!u.hostname.endsWith(".workers.dev")) return base;
+    const h = (window.location.hostname || "").trim().toLowerCase();
+    const onPagesOrZone = h.endsWith(".pages.dev") || isHd2dZoneHostname(h);
+    if (onPagesOrZone) {
+      return window.location.origin.replace(/\/$/, "");
+    }
+    return HD2D_PUBLIC_API_ORIGIN.replace(/\/$/, "");
+  } catch {
+    return base;
+  }
 }
 
 export function getHd2dApiBase(): string {
@@ -77,9 +94,10 @@ export function getHd2dApiBase(): string {
       base = resolveProductionApiOrigin();
     }
   } else {
-    base = raw ? raw.replace(/\/$/, "") : HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
+    base = raw ? raw.replace(/\/$/, "") : HD2D_PUBLIC_API_ORIGIN.replace(/\/$/, "");
   }
-  return coerceWorkerIfShadowedSite(base);
+  const coerced = coerceWorkerIfShadowedSite(base);
+  return rewriteWorkersDevToPublicApi(coerced);
 }
 
 /** True when intel Worker routes have a resolvable base (`/intel-proxy` in dev, or configured production base). */

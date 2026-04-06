@@ -207,8 +207,8 @@ export function ContactsSettings() {
   return (
     <div className="hd2d-page-shell max-w-5xl">
       <div className="mb-8">
-        <h1 className="mb-2 text-2xl text-black sm:text-3xl">Contacts &amp; settings</h1>
-        <p className="text-black">
+        <h1 className="mb-2 text-2xl text-[var(--x-text)] sm:text-3xl">Contacts &amp; settings</h1>
+        <p className="text-[var(--x-text)]">
           Upload a contact list (CSV), set company branding and report defaults. Everything is stored locally in your
           browser.
         </p>
@@ -238,7 +238,7 @@ export function ContactsSettings() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="text-sm">
-                <span className="text-black block mb-1">Company name</span>
+                <span className="text-[var(--x-text)] block mb-1">Company name</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.companyName}
@@ -246,7 +246,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-black block mb-1">Prepared by</span>
+                <span className="text-[var(--x-text)] block mb-1">Prepared by</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.preparedBy}
@@ -254,7 +254,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm md:col-span-2">
-                <span className="text-black block mb-1">Company address</span>
+                <span className="text-[var(--x-text)] block mb-1">Company address</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="Street, City, ST ZIP"
@@ -263,7 +263,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-black block mb-1">Website</span>
+                <span className="text-[var(--x-text)] block mb-1">Website</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="https://"
@@ -272,7 +272,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm md:col-span-2">
-                <span className="text-black block mb-1">CRM base URL (optional)</span>
+                <span className="text-[var(--x-text)] block mb-1">CRM base URL (optional)</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="https://your-crm.example.com/…"
@@ -280,13 +280,13 @@ export function ContactsSettings() {
                   onChange={(e) => setOrg((o) => ({ ...o, ghlBaseUrl: e.target.value }))}
                 />
                 <span className="mt-1 block text-xs text-gray-600 leading-relaxed">
-                  Used for <strong className="text-black">Open in CRM</strong> on field jobs that do not have their own
+                  Used for <strong className="text-[var(--x-text)]">Open in CRM</strong> on field jobs that do not have their own
                   link. Must be <code className="text-xs">https://</code>. This app only stores URLs; sign-in to your CRM
                   happens in the browser.
                 </span>
               </label>
               <label className="text-sm">
-                <span className="text-black block mb-1">Estimator email</span>
+                <span className="text-[var(--x-text)] block mb-1">Estimator email</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.contactEmail}
@@ -294,7 +294,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-black block mb-1">Estimator phone</span>
+                <span className="text-[var(--x-text)] block mb-1">Estimator phone</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.contactPhone}
@@ -302,7 +302,7 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm">
-                <span className="text-black block mb-1">Default report template</span>
+                <span className="text-[var(--x-text)] block mb-1">Default report template</span>
                 <select
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={org.defaultTemplateProfile}
@@ -315,17 +315,17 @@ export function ContactsSettings() {
                 </select>
               </label>
               <p className="text-xs text-gray-600 md:col-span-2 leading-relaxed">
-                <strong className="text-black">Canvassing:</strong> Owner and parcel details are filled from map and
+                <strong className="text-[var(--x-text)]">Canvassing:</strong> Owner and parcel details are filled from map and
                 property data your organization enables on the server — not from keys typed into this browser app.
               </p>
             </div>
             <div>
-              <span className="text-black text-sm block mb-2">Logo (PNG/JPG, shown on proposals)</span>
+              <span className="text-[var(--x-text)] text-sm block mb-2">Logo (PNG/JPG, shown on proposals)</span>
               <div className="flex flex-wrap items-center gap-4">
                 {org.logoDataUrl ? (
                   <img src={org.logoDataUrl} alt="Logo" className="h-16 w-auto max-w-[200px] object-contain border rounded" />
                 ) : (
-                  <span className="text-sm text-black">No logo uploaded</span>
+                  <span className="text-sm text-[var(--x-text)]">No logo uploaded</span>
                 )}
                 <input
                   ref={logoInputRef}
@@ -389,11 +389,11 @@ export function ContactsSettings() {
             </div>
 
             <div className="border-t border-gray-100 pt-6">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-black">
-                <Layers className="h-4 w-4 text-black" />
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--x-text)]">
+                <Layers className="h-4 w-4 text-[var(--x-text)]" />
                 Canvassing map — parcel layers
               </h3>
-              <p className="mb-4 text-xs text-black">
+              <p className="mb-4 text-xs text-[var(--x-text)]">
                 Parcel outlines, optional reference imagery, and building footprints are configured on your HD2D backend
                 (not in this browser). Your administrator can adjust coverage and credentials in the server environment.
                 The map loads data through your signed-in session.
@@ -450,23 +450,23 @@ export function ContactsSettings() {
                 {geocodeBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MapPin className="w-4 h-4 mr-2" />}
                 Geocode addresses
               </Button>
-              <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-[var(--x-text)] cursor-pointer">
                 <input type="checkbox" checked={replaceOnImport} onChange={(e) => setReplaceOnImport(e.target.checked)} />
                 Replace all contacts (otherwise append)
               </label>
-              <span className="text-sm text-black">{contacts.length} saved</span>
+              <span className="text-sm text-[var(--x-text)]">{contacts.length} saved</span>
             </div>
 
             {contactRows.length === 0 ? (
-              <p className="text-sm text-black">No contacts yet. Upload a CSV or add rows from the estimator map page.</p>
+              <p className="text-sm text-[var(--x-text)]">No contacts yet. Upload a CSV or add rows from the estimator map page.</p>
             ) : (
               <>
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-black flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-[var(--x-text)] flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     Leads map
                   </h3>
-                  <p className="text-xs text-black">
+                  <p className="text-xs text-[var(--x-text)]">
                     Click a marker or a table row to highlight a lead. Popups can open the estimator for that property.
                   </p>
                   <LeadsMap
@@ -479,7 +479,7 @@ export function ContactsSettings() {
 
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-black">
+                    <thead className="bg-gray-50 text-left text-[var(--x-text)]">
                       <tr>
                         <th className="p-2 font-medium">Name</th>
                         <th className="p-2 font-medium">Location</th>
@@ -495,17 +495,17 @@ export function ContactsSettings() {
                           onClick={() => setSelectedLeadId(c.id)}
                         >
                           <td className="p-2">
-                            <div className="font-medium text-black">{c.name || "—"}</div>
-                            <div className="space-y-0.5 text-xs text-black">
+                            <div className="font-medium text-[var(--x-text)]">{c.name || "—"}</div>
+                            <div className="space-y-0.5 text-xs text-[var(--x-text)]">
                               {c.email.trim() ? <div>{c.email.trim()}</div> : null}
                               {c.phone.trim() ? <div>{c.phone.trim()}</div> : null}
                               {!c.email.trim() && !c.phone.trim() ? <div className="text-gray-500">—</div> : null}
                             </div>
                           </td>
-                          <td className="p-2 text-black">
+                          <td className="p-2 text-[var(--x-text)]">
                             {[c.address, c.city, c.state].filter(Boolean).join(", ") || "—"}
                           </td>
-                          <td className="p-2 text-black">
+                          <td className="p-2 text-[var(--x-text)]">
                             {c.areaSqFt ? `${c.areaSqFt} SF` : "—"}
                             {c.measuredSquares ? ` · ${c.measuredSquares} SQ` : ""}
                           </td>
@@ -545,9 +545,9 @@ export function ContactsSettings() {
               </>
             )}
 
-            <p className="text-xs text-black">
+            <p className="text-xs text-[var(--x-text)]">
               Tip: Use <strong>Geocode addresses</strong> above (or bulk geocode on{" "}
-              <Link className="text-black underline" to="/measurement/new">
+              <Link className="text-[var(--x-text)] underline" to="/measurement/new">
                 New Measurement
               </Link>
               ) so leads appear on the map.

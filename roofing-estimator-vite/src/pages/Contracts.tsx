@@ -6,37 +6,43 @@ export function Contracts() {
   const { contracts } = useRoofing();
 
   return (
-    <div className="hd2d-page-shell">
+    <div className="hd2d-page-shell text-[var(--x-text)]">
       <div className="mb-8">
-        <h1 className="mb-2 text-2xl text-black sm:text-3xl">Contracts &amp; Proposals</h1>
-        <p className="text-black">Generated proposals from your estimates</p>
+        <h1 className="mb-2 text-2xl font-semibold sm:text-3xl">Contracts &amp; Proposals</h1>
+        <p className="text-[var(--x-muted)]">Generated proposals from your estimates</p>
       </div>
 
       {contracts.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-black">
+        <Card className="border-white/[0.07] bg-[var(--x-surface)] ring-1 ring-white/[0.04]">
+          <CardContent className="py-16 text-center text-[var(--x-muted)]">
             No proposals yet. Create one from the Measurement page.
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {contracts.slice().reverse().map((c) => (
-            <Card key={c.id}>
+            <Card
+              key={c.id}
+              className="border-white/[0.07] bg-[var(--x-surface)] ring-1 ring-white/[0.04] transition-shadow hover:shadow-lg hover:ring-violet-400/15"
+            >
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <CardTitle className="text-lg">{c.projectName}</CardTitle>
-                    <CardDescription className="mt-1">{c.date}</CardDescription>
+                    <CardDescription className="mt-1 text-[var(--x-muted)]">{c.date}</CardDescription>
                   </div>
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 border-violet-500/35 bg-violet-950/50 capitalize text-violet-200"
+                  >
                     {c.status}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="text-sm text-black">Client</div>
-                <div className="text-black">{c.clientName || "N/A"}</div>
-                <div className="text-black">${c.totalAmount.toLocaleString()}</div>
+                <div className="text-sm text-[var(--x-muted)]">Client</div>
+                <div className="font-medium">{c.clientName || "—"}</div>
+                <div className="text-lg font-semibold tabular-nums">${c.totalAmount.toLocaleString()}</div>
               </CardContent>
             </Card>
           ))}
@@ -45,4 +51,3 @@ export function Contracts() {
     </div>
   );
 }
-

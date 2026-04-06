@@ -1,8 +1,8 @@
-/** Proxies `GET/POST /api` (exact) to the HD2D Worker. See `[[catchall]].ts` for `/api/*`. */
-const HD2D_WORKER_API_ORIGIN = "https://hd2d-backend.solarconnectbpo.workers.dev";
+/** Proxies `GET/POST /api` (exact). See `[[catchall]].ts`. */
+import { type PagesProxyEnv, proxyToWorker } from "../lib/workerUpstream";
 
-export async function onRequest(context: { request: Request }): Promise<Response> {
-  const url = new URL(context.request.url);
-  const target = new URL(url.pathname + url.search, HD2D_WORKER_API_ORIGIN);
-  return fetch(target.toString(), context.request);
+type PagesCtx = { request: Request; env: PagesProxyEnv };
+
+export async function onRequest(context: PagesCtx): Promise<Response> {
+  return proxyToWorker(context.request, context.env);
 }

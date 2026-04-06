@@ -94,7 +94,7 @@ export function Dashboard() {
     <div className="hd2d-page-shell">
       <div className="mb-8 border-b border-white/[0.06] pb-8 sm:mb-10 sm:pb-10">
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#71767b]">Overview</p>
-        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Dashboard</h1>
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--x-text)] sm:text-3xl">Dashboard</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-[#71767b]">
           Measurements, estimates, and field tools — data stays in this browser unless you export.
         </p>
@@ -106,16 +106,16 @@ export function Dashboard() {
           return (
             <Card
               key={stat.title}
-              className="overflow-hidden border-white/[0.07] ring-1 ring-white/[0.04] transition-shadow duration-200 hover:ring-sky-400/15"
+              className="overflow-hidden border-white/[0.07] bg-[var(--x-surface)] text-[var(--x-text)] ring-1 ring-white/[0.04] transition-shadow duration-200 hover:ring-sky-400/15"
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-black">{stat.title}</CardTitle>
+                <CardTitle className="text-sm font-medium text-[var(--x-text)]">{stat.title}</CardTitle>
                 <div className={`${stat.color} rounded-xl p-2.5 shadow-lg shadow-black/20`}>
                   <Icon className="h-4 w-4 text-white" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-tight text-black">{stat.value}</div>
+                <div className="text-2xl font-semibold tabular-nums tracking-tight text-[var(--x-text)]">{stat.value}</div>
               </CardContent>
             </Card>
           );
@@ -123,10 +123,10 @@ export function Dashboard() {
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
+        <Card className="border-white/[0.07] bg-[var(--x-surface)] text-[var(--x-text)] ring-1 ring-white/[0.04]">
           <CardHeader>
             <CardTitle className="text-lg">Quick actions</CardTitle>
-            <CardDescription>Jump into the tools you use most</CardDescription>
+            <CardDescription className="text-[var(--x-muted)]">Jump into the tools you use most</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Link to="/measurement/new">
@@ -197,10 +197,10 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
+        <Card className="border-white/[0.07] bg-[var(--x-surface)] text-[var(--x-text)] ring-1 ring-white/[0.04]">
           <CardHeader>
             <CardTitle className="text-lg">Recent measurements</CardTitle>
-            <CardDescription>
+            <CardDescription className="text-[var(--x-muted)]">
               {recentMeasurements.length > 0 ? "Your latest roof measurements" : "No measurements yet"}
             </CardDescription>
           </CardHeader>
@@ -208,19 +208,22 @@ export function Dashboard() {
             {recentMeasurements.length > 0 ? (
               <div className="space-y-3">
                 {recentMeasurements.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-black/20 p-3"
+                  >
                     <div>
-                      <p className="text-sm text-black">{m.projectName}</p>
-                      <p className="text-xs text-black">
+                      <p className="text-sm text-[var(--x-text)]">{m.projectName}</p>
+                      <p className="text-xs text-[var(--x-muted)]">
                         {m.adjustedArea.toFixed(0)} sq ft • {m.roofMaterial}
                       </p>
                     </div>
-                    <span className="text-xs text-black">{m.date}</span>
+                    <span className="text-xs text-[var(--x-muted)]">{m.date}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-black text-center py-4">
+              <p className="py-4 text-center text-sm text-[var(--x-muted)]">
                 Start by creating your first measurement
               </p>
             )}
@@ -230,11 +233,11 @@ export function Dashboard() {
 
       <Card className="mb-8 border-sky-500/25 bg-gradient-to-br from-[#12141a] via-[#161a22] to-[#12141a] ring-1 ring-sky-500/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-black">
+          <CardTitle className="flex items-center gap-2 text-[var(--x-text)]">
             <HardDriveDownload className="h-5 w-5 text-sky-400" />
             Backup &amp; restore
           </CardTitle>
-          <CardDescription className="text-[#8b9199]">
+          <CardDescription className="text-[var(--x-muted)]">
             Download a JSON copy of measurements, estimates, and contracts. Restore replaces everything in
             this browser — use after a new device or if data was cleared.
           </CardDescription>
@@ -266,7 +269,7 @@ export function Dashboard() {
           </Button>
           {backupNote ? (
             <p
-              className={`text-sm ${backupNote.kind === "ok" ? "text-green-700" : "text-red-700"}`}
+              className={`text-sm ${backupNote.kind === "ok" ? "text-emerald-400" : "text-red-400"}`}
               role="status"
             >
               {backupNote.text}

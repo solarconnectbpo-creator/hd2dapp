@@ -1,7 +1,7 @@
-import { HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
+import { HD2D_PUBLIC_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
-import { safeUserFacingApiMessage } from "./safeApiError";
+import { networkFetchFailureHint, safeUserFacingApiMessage } from "./safeApiError";
 
 const AUTH_STORAGE_KEY = "hd2d-auth-session-v1";
 
@@ -47,7 +47,7 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new Error(
-      `Empty response (${res.status} ${res.statusText || ""}). Point VITE_INTEL_API_BASE at the Worker (${HD2D_WORKER_API_ORIGIN}) if /api/* returns HTML.`,
+      `Empty response (${res.status} ${res.statusText || ""}). Point VITE_INTEL_API_BASE at ${HD2D_PUBLIC_API_ORIGIN} (not ${HD2D_WORKER_API_ORIGIN}) if /api/* returns HTML.`,
     );
   }
   try {
@@ -55,7 +55,7 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   } catch {
     const hint = trimmed.startsWith("<") ? " (received HTML, not JSON)" : "";
     throw new Error(
-      `Invalid JSON from ${label} (${res.status})${hint}. Check VITE_INTEL_API_BASE=${HD2D_WORKER_API_ORIGIN}.`,
+      `Invalid JSON from ${label} (${res.status})${hint}. Check VITE_INTEL_API_BASE=${HD2D_PUBLIC_API_ORIGIN}.`,
     );
   }
 }
@@ -71,9 +71,7 @@ async function authFetch(input: string, init?: RequestInit): Promise<Response> {
   } catch (e) {
     const base = getAuthApiBase() || "(unknown)";
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `Network error: ${msg}. API base is ${base}. Set VITE_INTEL_API_BASE=${HD2D_WORKER_API_ORIGIN} if needed.`,
-    );
+    throw new Error(networkFetchFailureHint(base, msg));
   }
 }
 

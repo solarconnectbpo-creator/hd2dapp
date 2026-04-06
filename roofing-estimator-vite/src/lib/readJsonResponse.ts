@@ -1,4 +1,4 @@
-import { HD2D_PRODUCTION_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
+import { HD2D_PRODUCTION_ORIGIN, HD2D_PUBLIC_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 
 /**
  * Parse JSON from any `fetch` response (Nominatim, localhost, etc.).
@@ -23,7 +23,7 @@ export async function readJsonResponseBody<T>(res: Response): Promise<T> {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new Error(
-      `Empty response (${res.status} ${res.statusText || ""}). On ${HD2D_PRODUCTION_ORIGIN} the app should call same-origin /api/* (Pages proxy). On preview hosts set VITE_INTEL_API_BASE=${HD2D_WORKER_API_ORIGIN} if /api/* returns HTML.`,
+      `Empty response (${res.status} ${res.statusText || ""}). On ${HD2D_PRODUCTION_ORIGIN} deploy Worker + Pages /api proxy. Preview: same-origin /api or VITE_INTEL_API_BASE=${HD2D_PUBLIC_API_ORIGIN}. Avoid browser → ${HD2D_WORKER_API_ORIGIN} if Access blocks it.`,
     );
   }
   try {
@@ -31,7 +31,7 @@ export async function readJsonResponseBody<T>(res: Response): Promise<T> {
   } catch {
     const hint = trimmed.startsWith("<") ? " (received HTML, not JSON)" : "";
     throw new Error(
-      `Invalid JSON from server (${res.status})${hint}. Expected JSON from /api/* — on ${HD2D_PRODUCTION_ORIGIN} confirm Pages Functions include /api; on preview use VITE_INTEL_API_BASE=${HD2D_WORKER_API_ORIGIN}.`,
+      `Invalid JSON from server (${res.status})${hint}. Expected JSON from /api/* — deploy Worker + Pages Functions proxy; preview can use VITE_INTEL_API_BASE=${HD2D_PUBLIC_API_ORIGIN}.`,
     );
   }
 }

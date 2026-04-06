@@ -67,7 +67,7 @@ export function CallCenter() {
             <Headphones className="h-4 w-4" aria-hidden />
             Call center
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight text-black">Reports &amp; live monitoring</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--x-text)]">Reports &amp; live monitoring</h1>
           <p className="mt-1 max-w-2xl text-sm text-[#8b9199]">
             Open your VICIdial / Gradient realtime view in a new tab (recommended). Embedded previews are often blocked by the
             remote host — that is expected.
@@ -77,7 +77,7 @@ export function CallCenter() {
 
       <Card className={`mb-6 ${cardChrome}`}>
         <CardHeader>
-          <CardTitle className="text-black">Realtime report</CardTitle>
+          <CardTitle className="text-[var(--x-text)]">Realtime report</CardTitle>
           <CardDescription className="text-[#8b9199]">
             Log in on the call-center host if prompted. This app does not store your VICIdial credentials.
           </CardDescription>
@@ -103,7 +103,7 @@ export function CallCenter() {
               <div>
                 <button
                   type="button"
-                  className="mb-2 flex w-full items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-left text-sm font-medium text-black transition hover:bg-white/[0.06] sm:w-auto"
+                  className="mb-2 flex w-full items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-left text-sm font-medium text-[var(--x-text)] transition hover:bg-white/[0.06] sm:w-auto"
                   onClick={() => setShowEmbed((v) => !v)}
                   aria-expanded={showEmbed}
                 >
@@ -149,7 +149,7 @@ export function CallCenter() {
       {extras.length > 0 ? (
         <Card className={cardChrome}>
           <CardHeader>
-            <CardTitle className="text-black">More reports</CardTitle>
+            <CardTitle className="text-[var(--x-text)]">More reports</CardTitle>
             <CardDescription className="text-[#8b9199]">Additional links from configuration.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">

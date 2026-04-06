@@ -105,6 +105,8 @@ export default defineConfig(({ mode }) => {
   return {
   define: {
     "import.meta.env.VERCEL_ENV": JSON.stringify(process.env.VERCEL_ENV ?? ""),
+    /** Set by Vercel builds; used to disable same-origin `/api` on static Vercel hosting. */
+    "import.meta.env.VERCEL": JSON.stringify(process.env.VERCEL ?? ""),
   },
   plugins: [react(), tailwindcss(), raybevelDiagramPlugin()],
   server: {

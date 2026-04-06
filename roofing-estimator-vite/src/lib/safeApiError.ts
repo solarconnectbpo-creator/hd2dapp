@@ -1,3 +1,5 @@
+import { HD2D_PUBLIC_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
+
 export type SafeApiErrorOptions = {
   /** When true, do not replace messages from HTTP status (use on login/sign-up forms where 401 ≠ “sign in again”). */
   skipStatusHints?: boolean;
@@ -31,4 +33,28 @@ export function safeUserFacingApiMessage(
   }
   if (t.length > 200) return "Something went wrong. Try again or contact support.";
   return t || "Something went wrong.";
+}
+
+/**
+ * User-facing message when `fetch` throws (e.g. offline, blocked, or CORS on Cloudflare Access).
+ * When the API base already matches the Worker, omit the misleading “set VITE_INTEL_API_BASE” hint.
+ */
+export function networkFetchFailureHint(apiBase: string, errorMessage: string): string {
+  const msg = (errorMessage || "").trim();
+  const base = (apiBase || "").trim().replace(/\/$/, "");
+  const pub = HD2D_PUBLIC_API_ORIGIN.replace(/\/$/, "");
+  const worker = HD2D_WORKER_API_ORIGIN.replace(/\/$/, "");
+  const parts: string[] = [`Network error: ${msg}.`];
+  if (apiBase?.trim()) {
+    parts.push(`API base is ${apiBase.trim()}.`);
+  }
+  if (base !== pub && base !== worker) {
+    parts.push(`Set VITE_INTEL_API_BASE=${HD2D_PUBLIC_API_ORIGIN} for the public API (avoid *.workers.dev if Access is on).`);
+  }
+  if (msg === "Failed to fetch") {
+    parts.push(
+      "Check network, DNS, and that Cloudflare Pages /api proxy is deployed; if Zero Trust blocks the Worker host, set HD2D_ACCESS_* service tokens on the Pages project.",
+    );
+  }
+  return parts.join(" ");
 }

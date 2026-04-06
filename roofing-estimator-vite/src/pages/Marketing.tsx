@@ -11,7 +11,7 @@ export function Marketing() {
     <div className="hd2d-page-shell">
       <div className="mb-8">
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#8b9199]">Growth</p>
-        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Marketing &amp; growth</h1>
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--x-text)] sm:text-3xl">Marketing &amp; growth</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-[#8b9199]">
           Social posting, ad workflows, and content tools — connect APIs and automations when you are ready.
         </p>
@@ -22,7 +22,7 @@ export function Marketing() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Megaphone className="h-5 w-5 text-emerald-400" aria-hidden />
-              <CardTitle className="text-black">In-app tools</CardTitle>
+              <CardTitle>In-app tools</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
               Draft social posts and ad copy in the browser; add Meta, Google, or Buffer-style APIs when you wire credentials.
@@ -47,7 +47,7 @@ export function Marketing() {
 
       <Card className={cardChrome}>
         <CardHeader>
-          <CardTitle className="text-base text-black">Suggested rollout</CardTitle>
+          <CardTitle className="text-base">Suggested rollout</CardTitle>
           <CardDescription className="text-[#8b9199]">
             1) Version campaign pages and landing content where you host static marketing. 2) Draft posts and ad variants in
             the sections below. 3) Connect OAuth / API keys in environment or a future settings panel.

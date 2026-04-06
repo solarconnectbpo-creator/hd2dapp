@@ -31,10 +31,10 @@ function ProgramCard({
   const hasHref = Boolean(program.href?.trim());
 
   return (
-    <Card className="flex h-full flex-col border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+    <Card className="flex h-full flex-col border-white/10 shadow-sm transition-shadow hover:shadow-md">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base leading-snug text-black">{program.title}</CardTitle>
-        <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-black/70">
+        <CardTitle className="text-base leading-snug text-[var(--x-text)]">{program.title}</CardTitle>
+        <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--x-muted)]">
           <span className="inline-flex items-center gap-1">
             <Layers className="h-3.5 w-3.5" aria-hidden />
             {program.lessonCount} lesson{program.lessonCount !== 1 ? "s" : ""}
@@ -176,13 +176,13 @@ export function Courses() {
       {/* Value pillars */}
       <section className="mb-14 grid gap-6 sm:grid-cols-3">
         {catalog.valueProps.map((p) => (
-          <Card key={p.title} className="border-slate-200 bg-slate-50/80">
+          <Card key={p.title} className="border-white/10 bg-[var(--x-surface)]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg text-black">
+              <CardTitle className="flex items-center gap-2 text-lg text-[var(--x-text)]">
                 <Sparkles className="h-5 w-5 text-amber-500" aria-hidden />
                 {p.title}
               </CardTitle>
-              <CardDescription className="text-base leading-relaxed text-black/75">{p.body}</CardDescription>
+              <CardDescription className="text-base leading-relaxed text-[var(--x-muted)]">{p.body}</CardDescription>
             </CardHeader>
           </Card>
         ))}
@@ -190,8 +190,8 @@ export function Courses() {
 
       {/* Narrative */}
       <section className="mb-14 text-center">
-        <h2 className="mb-3 text-2xl font-semibold text-black sm:text-3xl">{catalog.narrativeBand.title}</h2>
-        <p className="mx-auto max-w-2xl text-black/75">{catalog.narrativeBand.body}</p>
+        <h2 className="mb-3 text-2xl font-semibold text-[var(--x-text)] sm:text-3xl">{catalog.narrativeBand.title}</h2>
+        <p className="mx-auto max-w-2xl text-[var(--x-muted)]">{catalog.narrativeBand.body}</p>
       </section>
 
       {/* Category grids */}
@@ -200,9 +200,9 @@ export function Courses() {
           <section key={cat.id} id={cat.id}>
             <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold text-black">{cat.title}</h2>
+                <h2 className="text-2xl font-semibold text-[var(--x-text)]">{cat.title}</h2>
                 {cat.description ? (
-                  <p className="mt-1 max-w-2xl text-black/70">{cat.description}</p>
+                  <p className="mt-1 max-w-2xl text-[var(--x-muted)]">{cat.description}</p>
                 ) : null}
               </div>
             </div>
@@ -216,10 +216,10 @@ export function Courses() {
       </div>
 
       {/* Immersive band */}
-      <section className="mb-14 rounded-2xl border border-sky-200 bg-sky-50/60 px-6 py-10 sm:px-10">
+      <section className="mb-14 rounded-2xl border border-sky-500/25 bg-[rgba(29,155,240,0.06)] px-6 py-10 sm:px-10">
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="mb-3 text-2xl font-semibold text-black">{catalog.immersiveBand.title}</h2>
-          <p className="mb-6 text-black/75">{catalog.immersiveBand.body}</p>
+          <h2 className="mb-3 text-2xl font-semibold text-[var(--x-text)]">{catalog.immersiveBand.title}</h2>
+          <p className="mb-6 text-[var(--x-muted)]">{catalog.immersiveBand.body}</p>
           <Button type="button" variant="outline" className="border-slate-300" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
             {catalog.immersiveBand.ctaLabel}
           </Button>
@@ -228,8 +228,8 @@ export function Courses() {
 
       {/* Trainers */}
       <section className="mb-14">
-        <h2 className="mb-2 text-center text-2xl font-semibold text-black">Coaches &amp; contributors</h2>
-        <p className="mb-8 text-center text-sm text-black/65">
+        <h2 className="mb-2 text-center text-2xl font-semibold text-[var(--x-text)]">Coaches &amp; contributors</h2>
+        <p className="mb-8 text-center text-sm text-[var(--x-muted)]">
           Admins can edit names and links in <strong className="font-medium">Admin — courses</strong>.
         </p>
         <div className="flex flex-wrap justify-center gap-2">
@@ -240,14 +240,14 @@ export function Courses() {
                 href={t.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-slate-50"
+                className="rounded-full border border-white/15 bg-[var(--x-surface-hover)] px-3 py-1.5 text-sm font-medium text-sky-300 hover:bg-[var(--x-surface)]"
               >
                 {t.name}
               </a>
             ) : (
               <span
                 key={t.name}
-                className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5 text-sm text-black/70"
+                className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5 text-sm text-[var(--x-muted)]"
               >
                 {t.name}
               </span>
@@ -260,21 +260,21 @@ export function Courses() {
       <section className="mb-14">
         <div className="mb-6 flex items-center gap-2">
           <BookOpen className="h-6 w-6 text-slate-700" aria-hidden />
-          <h2 className="text-2xl font-semibold text-black">Frequently asked questions</h2>
+          <h2 className="text-2xl font-semibold text-[var(--x-text)]">Frequently asked questions</h2>
         </div>
         <div className="space-y-2">
           {catalog.faq.map((item) => (
             <details
               key={item.question}
-              className="group rounded-lg border border-slate-200 bg-white px-4 py-3 open:bg-slate-50/80"
+              className="group rounded-lg border border-white/10 bg-[var(--x-surface)] px-4 py-3 open:bg-[var(--x-surface-hover)]"
             >
-              <summary className="cursor-pointer list-none font-medium text-black marker:hidden [&::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none font-medium text-[var(--x-text)] marker:hidden [&::-webkit-details-marker]:hidden">
                 <span className="flex items-center justify-between gap-2">
                   {item.question}
                   <span className="text-slate-400 transition group-open:rotate-180">▼</span>
                 </span>
               </summary>
-              <p className="mt-3 border-t border-slate-100 pt-3 text-sm leading-relaxed text-black/75">{item.answer}</p>
+              <p className="mt-3 border-t border-slate-100 pt-3 text-sm leading-relaxed text-[var(--x-muted)]">{item.answer}</p>
             </details>
           ))}
         </div>
@@ -332,21 +332,21 @@ export function Courses() {
           aria-modal="true"
           aria-labelledby="courses-soon-title"
         >
-          <Card className="relative w-full max-w-md border-slate-200 shadow-xl">
+          <Card className="relative w-full max-w-md border-white/10 shadow-xl">
             <button
               type="button"
-              className="absolute right-3 top-3 rounded p-1 text-black/50 hover:bg-black/5"
+              className="absolute right-3 top-3 rounded p-1 text-[var(--x-muted)] hover:bg-black/5"
               aria-label="Close"
               onClick={() => setComingSoonProgram(null)}
             >
               <X className="h-5 w-5" />
             </button>
             <CardHeader>
-              <CardTitle id="courses-soon-title" className="text-black pr-8">
+              <CardTitle id="courses-soon-title" className="text-[var(--x-text)] pr-8">
                 Coming soon
               </CardTitle>
-              <CardDescription className="text-base text-black/80">
-                <strong className="text-black">{comingSoonProgram}</strong> isn&apos;t linked yet. Check back later or ask
+              <CardDescription className="text-base text-[var(--x-muted)]">
+                <strong className="text-[var(--x-text)]">{comingSoonProgram}</strong> isn&apos;t linked yet. Check back later or ask
                 your admin to add an external URL in the course catalog.
               </CardDescription>
             </CardHeader>
