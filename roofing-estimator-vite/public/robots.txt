@@ -1,0 +1,5 @@
+# https://hardcoredoortodoorclosers.com
+User-agent: *
+Allow: /
+
+Sitemap: https://hardcoredoortodoorclosers.com/sitemap.xml

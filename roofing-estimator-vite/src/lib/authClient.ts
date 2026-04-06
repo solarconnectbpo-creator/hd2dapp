@@ -176,13 +176,42 @@ export async function logoutRemote(token: string): Promise<void> {
   }
 }
 
-export async function registerAccount(email: string, password: string, name: string): Promise<AuthSession> {
+export type RegisterAccountPayload = {
+  email: string;
+  password: string;
+  name: string;
+  /** Default "rep" (field sales). Use "company" for contractor / org owner. */
+  accountType?: "rep" | "company";
+  companyName?: string;
+  /** 2-letter US state — required for reps. */
+  homeState?: string;
+  placementPref?: "local" | "storm" | "either";
+};
+
+export async function registerAccount(payload: RegisterAccountPayload): Promise<AuthSession> {
   const apiBase = getAuthApiBase();
   if (!apiBase) throw new Error("Backend API base is not configured.");
+  const {
+    email,
+    password,
+    name,
+    accountType = "rep",
+    companyName,
+    homeState,
+    placementPref,
+  } = payload;
   const res = await authFetch(`${apiBase}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({
+      email,
+      password,
+      name,
+      accountType,
+      companyName,
+      homeState,
+      placementPref,
+    }),
   });
   const data = await readJsonResponseBody<LoginResponse>(res);
   if (!res.ok || data.success !== true || !data.token || !data.user || !data.expiresAt) {

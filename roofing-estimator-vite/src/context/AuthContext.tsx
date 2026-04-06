@@ -9,6 +9,7 @@ import {
   registerAccount,
   type AuthSession,
   type AuthUser,
+  type RegisterAccountPayload,
 } from "../lib/authClient";
 import { setActiveStorageUserId } from "../lib/userScopedStorage";
 
@@ -17,7 +18,7 @@ type AuthContextValue = {
   session: AuthSession | null;
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<AuthUser>;
-  register: (email: string, password: string, name: string) => Promise<AuthUser>;
+  register: (payload: RegisterAccountPayload) => Promise<AuthUser>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
@@ -94,8 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return next.user;
   }, []);
 
-  const register = useCallback(async (email: string, password: string, name: string) => {
-    const next = await registerAccount(email, password, name);
+  const register = useCallback(async (payload: RegisterAccountPayload) => {
+    const next = await registerAccount(payload);
     setSession(next);
     return next.user;
   }, []);
