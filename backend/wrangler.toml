@@ -8,7 +8,8 @@ preview_urls = true
 
 # Public API hostname on your zone (no Access app on this host). Vercel: HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com
 routes = [
-  { pattern = "api.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  # custom_domain: hostname only (no path/*) — Wrangler provisions DNS + routes all paths on this host to the Worker.
+  { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
 ]
 
 # Retry Meta Page posts that failed Graph API (pending rows in D1).
