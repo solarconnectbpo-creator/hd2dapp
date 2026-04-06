@@ -8,15 +8,5 @@
       "permanent": true
     }
   ],
-  "rewrites": [
-    {
-      "source": "/api",
-      "destination": "https://hd2d-backend.solarconnectbpo.workers.dev/api"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "https://hd2d-backend.solarconnectbpo.workers.dev/api/:path*"
-    },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
