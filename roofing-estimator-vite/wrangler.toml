@@ -9,11 +9,11 @@
 #   - Add www: www.hardcoredoortodoorclosers.com (optional; set redirect www → apex in Rules → Redirect Rules if you want one canonical host)
 # DNS for the zone must be on Cloudflare; proxy (orange cloud) enabled for those records.
 #
-# API: Pages Functions in `functions/api/*` proxy to Worker `hd2d-backend` (see functions/api/*.ts).
+# API: `functions/api/*` proxies `/api/*` to Worker `hd2d-backend` (*.workers.dev). Backend zone routes for /api are disabled so Pages and Worker do not conflict.
 #
-# Build-time env (Pages → Settings → Environment variables):
-#   VITE_HD2D_SAME_ORIGIN_API=true — SPA uses same-origin /api/* (this Pages project).
-#   Omit both that and VITE_INTEL_API_BASE — SPA calls HD2D_WORKER_API_ORIGIN (see src/config/siteOrigin.ts).
+# Optional Pages secrets (if Access blocks server fetch to workers.dev): HD2D_ACCESS_CLIENT_ID, HD2D_ACCESS_CLIENT_SECRET
+#
+# Build-time env: omit VITE_INTEL_API_BASE — see src/config/siteOrigin.ts
 
 name = "hd2d-closers"
 pages_build_output_dir = "dist"

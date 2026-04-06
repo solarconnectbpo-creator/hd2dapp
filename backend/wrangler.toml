@@ -6,20 +6,16 @@ compatibility_flags = ["nodejs_compat"]
 # Retry Meta Page posts that failed Graph API (pending rows in D1).
 [triggers]
 crons = ["*/10 * * * *"]
-# Avoid Wrangler warnings; custom routes still win for production domains.
+# Avoid Wrangler warnings.
 workers_dev = true
-# If Zero Trust / Cloudflare Access protects this *.workers.dev hostname, browser fetch() from other sites fails CORS.
-# Prefer apex routes below for public API, or remove Access / bypass /api/* for this app, or use Pages same-origin /api (see roofing-estimator-vite functions/api).
+# Browser traffic uses Pages same-origin /api → proxy to this host. If Access blocks that server fetch, set
+# HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET on the Pages project (see roofing-estimator-vite functions/lib/workerUpstream.ts).
 preview_urls = true
 
-# Custom domain API routes (place before [[kv_namespaces]] so TOML does not attach to KV table).
-# Zone: hardcoredoortodoorclosers.com — SPA at https://hardcoredoortodoorclosers.com (Cloudflare Pages project hd2d-closers).
-# Deploy Pages from ../roofing-estimator-vite (`npm run pages:deploy`); attach apex + www under Pages → Custom domains.
-# This Worker handles ONLY /api/* on those hostnames; Pages serves / and static assets.
-routes = [
-  { pattern = "hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" },
-  { pattern = "www.hardcoredoortodoorclosers.com/api/*", zone_name = "hardcoredoortodoorclosers.com" }
-]
+# `/api/*` on hardcoredoortodoorclosers.com is NOT routed here — it is served by Cloudflare Pages
+# (`functions/api/*` proxies to this Worker’s *.workers.dev URL). That avoids Worker + Pages fighting
+# the same path (530/HTML) and avoids cross-origin browser calls from *.pages.dev to the apex.
+# Direct Worker URL remains https://hd2d-backend.<account>.workers.dev (see roofing-estimator-vite siteOrigin).
 
 # Public EagleView API Center defaults (override with secrets if needed).
 [vars]
