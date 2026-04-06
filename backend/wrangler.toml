@@ -2,6 +2,10 @@ name = "hd2d-backend"
 main = "src/index.ts"
 compatibility_date = "2024-12-02"
 compatibility_flags = ["nodejs_compat"]
+
+# Retry Meta Page posts that failed Graph API (pending rows in D1).
+[triggers]
+crons = ["*/10 * * * *"]
 # Avoid Wrangler warnings; custom routes still win for production domains.
 workers_dev = true
 preview_urls = true

@@ -25,6 +25,7 @@ import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCh
 import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
 import { handleEstimatorChatAi } from "./api/estimatorChatAi";
 import { handleGhlSubmitLead } from "./api/ghlSubmitLead";
+import { handleMetaMarketing, processMetaScheduledRetries, type MetaMarketingEnv } from "./api/metaMarketing";
 
 interface Env {
   DB: any;
@@ -82,6 +83,11 @@ interface Env {
   LEADS_STRIPE_PRICE_IDS?: string;
   /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
   APP_PUBLIC_ORIGIN?: string;
+  /** Meta Marketing API — Facebook Login + scheduled Page posts (see metaMarketing.ts). */
+  META_APP_ID?: string;
+  META_APP_SECRET?: string;
+  /** Optional: ad account for draft campaigns (numeric or act_…). */
+  META_DEFAULT_AD_ACCOUNT_ID?: string;
   /** GoHighLevel Private Integration token (Bearer) for POST /api/ghl/submit-lead */
   GHL_PRIVATE_INTEGRATION_TOKEN?: string;
   /** GHL location id (sub-account) */
@@ -154,6 +160,8 @@ export default {
         request.method === "POST"
       ) {
         return await handleLeadsCheckoutSession(request, env as LeadsCheckoutEnv, corsHeaders);
+      } else if (path.startsWith("/api/meta")) {
+        return await handleMetaMarketing(request, env as MetaMarketingEnv, path, corsHeaders);
       } else if (path.startsWith("/api/leads")) {
         return await handleLeads(request, env, path, corsHeaders);
       } else if (path.startsWith("/api/deals")) {
@@ -262,9 +270,8 @@ export default {
     }
   },
 
-  async scheduled(event: any, env: Env): Promise<void> {
-    // Scheduled tasks for background jobs
-    console.log("Scheduled event triggered");
+  async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<void>) => void }): Promise<void> {
+    ctx.waitUntil(processMetaScheduledRetries(env as MetaMarketingEnv));
   },
 };
 

@@ -61,6 +61,13 @@
 # APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
 # Production example: APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com
 
+# --- Meta (Facebook) — scheduled Page posts + optional draft ad campaigns (see src/api/metaMarketing.ts) ---
+# Create a Meta app → Facebook Login → add Valid OAuth Redirect URI: {APP_PUBLIC_ORIGIN}/api/meta/oauth/callback
+# META_APP_ID=
+# META_APP_SECRET=
+# Optional: PAUSED draft campaigns via Marketing API (user token needs ads_management on this ad account):
+# META_DEFAULT_AD_ACCOUNT_ID=123456789
+
 # --- GoHighLevel (POST /api/ghl/submit-lead from roofing estimator chat) ---
 # Private Integration token from GHL Settings → Private Integrations; Location id from sub-account URL or API.
 # GHL_PRIVATE_INTEGRATION_TOKEN=
