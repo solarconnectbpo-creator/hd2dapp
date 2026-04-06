@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useSearchParams } from "react-router";
 import {
   Camera,
   ExternalLink,
@@ -83,12 +84,12 @@ function GhlEmbedPanel({ src, openFallbackUrl }: { src: string; openFallbackUrl:
   return (
     <div className="space-y-2 rounded-lg border border-black/15 bg-black/[0.02] p-3">
       <p className="text-xs text-black/70">
-        Embedded GoHighLevel often fails here because many GHL pages send{" "}
+        Embedded CRM pages often fail here because many external systems send{" "}
         <code className="text-[11px]">X-Frame-Options: DENY</code>. If the frame stays blank, use{" "}
         <strong>Open in new tab</strong>.
       </p>
       <iframe
-        title="GoHighLevel"
+        title="External CRM"
         src={src}
         className="h-[min(420px,55vh)] w-full rounded-md border border-black/10 bg-white"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
@@ -110,6 +111,8 @@ function GhlEmbedPanel({ src, openFallbackUrl }: { src: string; openFallbackUrl:
 }
 
 export function FieldProjectsPanel() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const {
     fieldProjects,
     measurements,
@@ -156,6 +159,21 @@ export function FieldProjectsPanel() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const selected = selectedId ? fieldProjects.find((p) => p.id === selectedId) : undefined;
+
+  useEffect(() => {
+    const openId = searchParams.get("openProject")?.trim();
+    if (!openId) return;
+    if (!fieldProjects.some((p) => p.id === openId)) return;
+    setSelectedId(openId);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("openProject");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, fieldProjects, setSearchParams]);
 
   useEffect(() => {
     if (!selected) {
@@ -372,7 +390,7 @@ export function FieldProjectsPanel() {
           <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
           <p className="text-sm text-black/80">
             Opportunities-style <strong>list</strong> or <strong>board</strong> views (local CRM). Add deal value,
-            owner, and tags; link each job to GoHighLevel. Photos and AI notes stay on device until you export.
+            owner, and tags; optionally link each job to your CRM. Photos and AI notes stay on device until you export.
           </p>
         </div>
         <Button type="button" className="bg-black text-white hover:bg-black/90" onClick={() => setCreateOpen(true)}>
@@ -673,7 +691,7 @@ export function FieldProjectsPanel() {
             </button>
             <CardHeader>
               <CardTitle id="fp-create-title">New field project</CardTitle>
-              <CardDescription>Job name, optional site address, notes, and GoHighLevel links.</CardDescription>
+              <CardDescription>Job name, optional site address, notes, and optional CRM links.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <label className="block text-sm font-medium text-black">
@@ -735,16 +753,16 @@ export function FieldProjectsPanel() {
                 />
               </label>
               <label className="block text-sm font-medium text-black">
-                GHL deep link (optional, https)
+                CRM job link (optional, https)
                 <input
                   className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
                   value={newGhlUrl}
                   onChange={(e) => setNewGhlUrl(e.target.value)}
-                  placeholder="https://app.gohighlevel.com/…"
+                  placeholder="https://…"
                 />
               </label>
               <label className="block text-sm font-medium text-black">
-                GHL embed URL (optional)
+                CRM embed URL (optional)
                 <input
                   className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
                   value={newGhlEmbedUrl}
@@ -881,14 +899,14 @@ export function FieldProjectsPanel() {
               </div>
 
               <div className="rounded-lg border border-black/10 bg-black/[0.02] p-3 space-y-3">
-                <p className="text-sm font-medium text-black">GoHighLevel</p>
+                <p className="text-sm font-medium text-black">CRM</p>
                 <label className="block text-sm text-black">
                   Job deep link (https)
                   <input
                     className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
                     value={detailGhlUrl}
                     onChange={(e) => setDetailGhlUrl(e.target.value)}
-                    placeholder="https://app.gohighlevel.com/…"
+                    placeholder="https://…"
                   />
                 </label>
                 <label className="block text-sm text-black">
@@ -909,18 +927,18 @@ export function FieldProjectsPanel() {
                       updateFieldProject(selected.id, { ghlUrl: detailGhlUrl, ghlEmbedUrl: detailGhlEmbedUrl });
                     }}
                   >
-                    Save GHL URLs
+                    Save CRM links
                   </Button>
                   {selectedOpenUrl ? (
                     <Button type="button" size="sm" asChild>
                       <a href={selectedOpenUrl} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="mr-2 h-4 w-4" />
-                        Open in GHL
+                        Open in CRM
                       </a>
                     </Button>
                   ) : (
                     <p className="text-xs text-black/60 self-center">
-                      Set a job link or add a base URL under Company settings → GoHighLevel.
+                      Set a job link or add a base URL under Contacts &amp; settings → CRM.
                     </p>
                   )}
                 </div>

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { EstimatorChatWidget } from "../components/EstimatorChatWidget";
 import { hydrateDealMachineCapabilitiesFromHealth } from "../lib/propertyDealMachineLookup";
 import { isNavActive } from "../lib/navMatch";
 import { hd2dLogoUrl } from "../branding/hd2dLogoUrl";
@@ -271,6 +272,7 @@ export function Root() {
           </ErrorBoundary>
         </div>
       </main>
+      <EstimatorChatWidget />
     </div>
   );
 }

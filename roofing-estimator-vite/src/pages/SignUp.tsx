@@ -1,16 +1,19 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { AuthDivider } from "../components/auth/AuthDivider";
 import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
 import { AUTH_FIELD_CLASS, AUTH_SECONDARY_BTN } from "../components/auth/authFieldStyles";
-import { BrowseWithoutSignInNav } from "../components/auth/BrowseWithoutSignInNav";
 import { PasswordField } from "../components/auth/PasswordField";
 import { useAuth } from "../context/AuthContext";
-import { fetchAuthCapabilities } from "../lib/authClient";
+import { fetchAuthCapabilities, safeInternalReturnPath } from "../lib/authClient";
 
 export function SignUp() {
-  const { register } = useAuth();
+  const { register, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = safeInternalReturnPath((location.state as { from?: string } | null)?.from);
+  const postAuthDest =
+    returnTo && returnTo !== "/login" && returnTo !== "/signup" ? returnTo : "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -29,6 +32,32 @@ export function SignUp() {
     };
   }, []);
 
+  if (loading) {
+    return (
+      <AuthScreenLayout
+        tagline={
+          <>
+            Create your HD2D Closers account to sync leads, storm layers, and estimates across devices.
+          </>
+        }
+      >
+        <div
+          className="flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-8 text-[#e7e9ea]"
+          role="status"
+          aria-busy="true"
+          aria-label="Checking session"
+        >
+          <div className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08] ring-2 ring-[#1d9bf0]/30" />
+          <p className="text-sm text-[#8b9199]">Checking session…</p>
+        </div>
+      </AuthScreenLayout>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to={postAuthDest} replace />;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -37,7 +66,7 @@ export function SignUp() {
     const name = displayName.trim() || local || "User";
     try {
       await register(email.trim(), password, name);
-      navigate("/", { replace: true });
+      navigate(postAuthDest, { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign up failed");
     } finally {
@@ -65,7 +94,6 @@ export function SignUp() {
             if you have an admin account.
           </div>
         ) : null}
-        <BrowseWithoutSignInNav />
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-[#e7e9ea]">Display name</span>
@@ -127,7 +155,7 @@ export function SignUp() {
               {busy ? "Creating account..." : "Create account"}
             </button>
             <AuthDivider label="Already have an account?" />
-            <Link to="/login" className={AUTH_SECONDARY_BTN}>
+            <Link to="/login" state={location.state} className={AUTH_SECONDARY_BTN}>
               Sign in instead
             </Link>
           </div>

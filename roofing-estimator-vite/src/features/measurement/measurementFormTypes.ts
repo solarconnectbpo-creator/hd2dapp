@@ -11,6 +11,14 @@ export const DAMAGE_TYPES: DamageType[] = [
   "Structural",
 ];
 
+/**
+ * How line-item scope is chosen for the estimate.
+ * - replace: full roof replacement (tear-off + system lines for full effective squares).
+ * - repair: partial / targeted repair quantities.
+ * - auto: legacy rule (severity ≥ 4 or certain damage types → replace).
+ */
+export type EstimateScopeMode = "replace" | "repair" | "auto";
+
 /** Main intake + carrier fields for the measurement / estimate screen. */
 export interface FormState {
   address: string;
@@ -36,6 +44,7 @@ export interface FormState {
   othersFt: string;
   severity: number;
   damageTypes: DamageType[];
+  estimateScopeMode: EstimateScopeMode;
   carrierScopeText: string;
   carrierBenchmarkProfileId: string;
   carrierBenchmarkRegionFactor: string;

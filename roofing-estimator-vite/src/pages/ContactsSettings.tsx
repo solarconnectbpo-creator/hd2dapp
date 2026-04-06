@@ -272,17 +272,17 @@ export function ContactsSettings() {
                 />
               </label>
               <label className="text-sm md:col-span-2">
-                <span className="text-black block mb-1">GoHighLevel base URL (optional)</span>
+                <span className="text-black block mb-1">CRM base URL (optional)</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="https://app.gohighlevel.com/…"
+                  placeholder="https://your-crm.example.com/…"
                   value={org.ghlBaseUrl}
                   onChange={(e) => setOrg((o) => ({ ...o, ghlBaseUrl: e.target.value }))}
                 />
                 <span className="mt-1 block text-xs text-gray-600 leading-relaxed">
-                  Used for <strong className="text-black">Open in GHL</strong> on field jobs that do not have their own
-                  link. Must be <code className="text-xs">https://</code>. API keys stay in GHL; this app only stores
-                  URLs.
+                  Used for <strong className="text-black">Open in CRM</strong> on field jobs that do not have their own
+                  link. Must be <code className="text-xs">https://</code>. This app only stores URLs; sign-in to your CRM
+                  happens in the browser.
                 </span>
               </label>
               <label className="text-sm">

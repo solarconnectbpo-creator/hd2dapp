@@ -1,27 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 
-/**
- * Paths reachable without signing in.
- * Map/tools: field use with local data.
- * Courses / call center / leads / marketing: browse and read-only UI; purchases and admin still require the right role inside each page.
- */
-function isPublicAppPath(pathname: string): boolean {
-  if (
-    pathname === "/measurement/new" ||
-    pathname.startsWith("/measurement/new/") ||
-    pathname === "/canvassing" ||
-    pathname.startsWith("/canvassing/")
-  ) {
-    return true;
-  }
-  if (pathname === "/courses" || pathname.startsWith("/courses/")) return true;
-  if (pathname === "/call-center" || pathname.startsWith("/call-center/")) return true;
-  if (pathname === "/leads" || pathname.startsWith("/leads/")) return true;
-  if (pathname === "/marketing" || pathname.startsWith("/marketing/")) return true;
-  return false;
-}
-
 export function AuthGate() {
   const { loading, isAuthenticated } = useAuth();
   const location = useLocation();
@@ -40,9 +19,10 @@ export function AuthGate() {
       </div>
     );
   }
-  if (!isAuthenticated && !isPublicAppPath(location.pathname)) {
+  if (!isAuthenticated) {
     const to = location.pathname.startsWith("/admin") ? "/admin/login" : "/login";
-    return <Navigate to={to} replace state={{ from: location.pathname }} />;
+    const from = `${location.pathname}${location.search || ""}`;
+    return <Navigate to={to} replace state={{ from }} />;
   }
   return <Outlet />;
 }

@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
 import { AUTH_FIELD_CLASS } from "../components/auth/authFieldStyles";
 import { PasswordField } from "../components/auth/PasswordField";
@@ -10,12 +10,35 @@ import { useAuth } from "../context/AuthContext";
  * Dedicated entry for team admins — same API as `/login`, redirects to `/admin/users` on success.
  */
 export function AdminLogin() {
-  const { login, logout } = useAuth();
+  const { login, logout, loading, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState(DEFAULT_ADMIN_EMAIL);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  if (loading) {
+    return (
+      <AuthScreenLayout tagline={<>Administrator access — manage users and roles.</>}>
+        <div
+          className="flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-8 text-[#e7e9ea]"
+          role="status"
+          aria-busy="true"
+          aria-label="Checking session"
+        >
+          <div className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08] ring-2 ring-[#1d9bf0]/30" />
+          <p className="text-sm text-[#8b9199]">Checking session…</p>
+        </div>
+      </AuthScreenLayout>
+    );
+  }
+
+  if (isAuthenticated) {
+    if (user?.user_type === "admin") {
+      return <Navigate to="/admin/users" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -83,9 +106,10 @@ export function AdminLogin() {
               {busy ? "Signing in..." : "Sign in to admin"}
             </button>
             <p className="text-center text-xs text-[#8b9199]">
-              Default dev email is pre-filled; production uses{" "}
-              <code className="text-[#a8b0b8]">AUTH_ADMIN_EMAIL</code> /{" "}
-              <code className="text-[#a8b0b8]">AUTH_ADMIN_PASSWORD</code> on the Worker.
+              Local dev: set <code className="text-[#a8b0b8]">AUTH_ENV_LOGIN_ENABLED=true</code> in{" "}
+              <code className="text-[#a8b0b8]">.dev.vars</code> to use Worker{" "}
+              <code className="text-[#a8b0b8]">AUTH_ADMIN_*</code> slots; production uses your configured secrets when env
+              login is enabled.
             </p>
             <Link
               to="/login"

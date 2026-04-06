@@ -9,6 +9,8 @@ import {
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { useRoofing } from "./context/RoofingContext";
+import { useMeasurementChatBridge } from "./context/MeasurementChatBridge";
+import { mergeFormPatch, mergeProposalPatch } from "./lib/mergeEstimatorPatches";
 import { type ContactRecord, parseContactsCsv } from "./lib/contactsCsv";
 import {
   loadContactsFromStorage,
@@ -29,6 +31,8 @@ import {
   type UsAddressSearchCriteria,
 } from "./lib/propertyAddressCriteria";
 import { fetchDealMachinePropertyByAddress, isDealMachineLikelyConfigured } from "./lib/propertyDealMachineLookup";
+import { fetchUsBuildingFootprintAtPoint, formatBuildingFootprintNotes } from "./lib/esriBuildingFootprint";
+import { fetchOsmBuildingFootprintAtPoint, formatOsmBuildingFootprintNotes } from "./lib/osmBuildingFootprint";
 import { buildParcelHandoffNotes, extractParcelAutoFill } from "./lib/canvassingParcelOwner";
 import {
   computePolygonRoofGeometry,
@@ -69,6 +73,7 @@ import {
 import {
   DAMAGE_TYPES,
   type DamageType,
+  type EstimateScopeMode,
   type FormState,
 } from "./features/measurement/measurementFormTypes";
 import { defaultFormState, hillsdaleFormTemplate } from "./features/measurement/measurementFormDefaults";
@@ -1838,9 +1843,9 @@ function defaultProposalState(profile: ProposalProfile = "residential"): Proposa
       clientPhone: "",
       contactEmail: "estimating@repairking.com",
       contactPhone: "(000) 000-0000",
-      proposalTitle: "Commercial Roof Repair/Replacement Proposal",
+      proposalTitle: "Commercial Full Roof Replacement Proposal",
       inclusions:
-        "Mobilization, safety setup, tear-off/disposal where applicable, membrane/roof installation, flashing details, and site cleanup.",
+        "Mobilization, safety setup, full tear-off and disposal as specified, new roof system installation to manufacturer specs, perimeter and penetration flashing, accessory metals, and jobsite cleanup.",
       exclusions:
         "Deck replacement beyond visible damage, latent structural defects, asbestos/lead abatement, permits/engineering unless listed.",
       paymentSchedule:
@@ -1868,9 +1873,9 @@ function defaultProposalState(profile: ProposalProfile = "residential"): Proposa
     clientPhone: "",
     contactEmail: "estimating@repairking.com",
     contactPhone: "(000) 000-0000",
-    proposalTitle: "Residential Roof Proposal",
-    inclusions:
-      "Tear-off/disposal, underlayment, ice/water protection at required areas, new roof system, flashing, ventilation tune-up, and cleanup.",
+      proposalTitle: "Residential Full Roof Replacement Proposal",
+      inclusions:
+        "Complete tear-off and disposal of existing roofing, underlayment and ice/water shield at code-typical areas, new asphalt or specified roof system, starter and ridge components, flashing at walls and penetrations, ventilation balance as specified, and thorough cleanup.",
     exclusions:
       "Rotten decking beyond visible inspection, code upgrades not known at inspection, gutter replacement unless listed, interior repairs.",
     paymentSchedule:
@@ -1939,7 +1944,14 @@ function buildResult(form: FormState): EstimateResult | null {
     others: parseLengthFeet(form.othersFt),
   };
   const hasReplaceSignal = form.damageTypes.includes("Missing Shingles") || form.damageTypes.includes("Structural");
-  const scope = form.severity >= 4 || hasReplaceSignal ? "replace" : "repair";
+  const scope: "repair" | "replace" =
+    form.estimateScopeMode === "replace"
+      ? "replace"
+      : form.estimateScopeMode === "repair"
+        ? "repair"
+        : form.severity >= 4 || hasReplaceSignal
+          ? "replace"
+          : "repair";
   const wastePct = clamp(Number.parseFloat(form.wastePercent) || 12, 0, 35);
   const baseSquares = derived.surfaceSquares;
   const effectiveSquares = baseSquares * (1 + wastePct / 100);
@@ -2143,6 +2155,7 @@ function buildReportText(form: FormState, result: EstimateResult): string {
     `  Coordinates ...... ${form.latitude || "N/A"}, ${form.longitude || "N/A"}`,
     `  Roof material .... ${form.roofType}`,
     `  Pitch ............ ${form.roofPitch || "N/A"}`,
+    `  Estimate scope ... ${form.estimateScopeMode} → line items: ${result.scope.toUpperCase()}`,
     "",
     "▸ MEASUREMENT METHODOLOGY",
     `  ${MEASUREMENT_METHODOLOGY_BLURB}`,
@@ -2216,6 +2229,48 @@ function buildReportText(form: FormState, result: EstimateResult): string {
   ].join("\n");
 }
 
+function buildReportHtml(form: FormState, result: EstimateResult): string {
+  const text = buildReportText(form, result);
+  const esc = (s: string) =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Roof estimate report</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; padding: 28px 32px; color: #0f172a; background: #f1f5f9; line-height: 1.5; }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 1.25rem; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }
+    .sub { font-size: 0.8125rem; color: #475569; margin-bottom: 18px; }
+    pre.report {
+      white-space: pre-wrap; word-break: break-word;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 11px; line-height: 1.5;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+      padding: 20px 22px; margin: 0; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    @media print {
+      body { background: #fff; padding: 14px 18px; }
+      pre.report { border: none; box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Roof measurement &amp; estimate report</h1>
+    <p class="sub">Generated ${new Date().toLocaleString()}</p>
+    <pre class="report">${esc(text)}</pre>
+  </div>
+</body>
+</html>`;
+}
+
 function buildProposalText(form: FormState, result: EstimateResult, proposal: ProposalState): string {
   const sep = "─".repeat(62);
 
@@ -2255,8 +2310,9 @@ function buildProposalText(form: FormState, result: EstimateResult, proposal: Pr
     `  State ............ ${form.stateCode || "N/A"}`,
     `  Roof material .... ${form.roofType}`,
     `  Pitch ............ ${form.roofPitch || "N/A"}`,
-    `  Squares .......... ${form.measuredSquares || "N/A"}`,
+    `  Roof surface SQ .. ${form.measuredSquares || "N/A"} (100 SF per SQ; before waste)`,
     `  Waste Factor ..... ${form.wastePercent || "N/A"}%`,
+    `  Scope setting .... ${form.estimateScopeMode === "replace" ? "Full replacement" : form.estimateScopeMode === "repair" ? "Repair / partial" : "Auto (severity & damage)"}`,
     "",
     "▸ MEASUREMENT METHODOLOGY",
     `  ${MEASUREMENT_METHODOLOGY_BLURB}`,
@@ -2905,11 +2961,15 @@ function buildProposalHtml(
     .terms{margin-top:8px;font-size:12px;line-height:1.5}
     .terms h2{font-size:13px}
     .footer{margin-top:24px;text-align:center;color:#000000;font-size:11px;border-top:1px solid #ddd;padding-top:10px}
+    .scope-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px;border-radius:999px;margin:0 0 14px}
+    .scope-badge.replace{background:#0f172a;color:#fff}
+    .scope-badge.repair{background:#9a3412;color:#fff}
     @media print{body{padding:16px 20px}}
   </style>
 </head>
 <body>
   <h1>${esc(proposal.proposalTitle)}</h1>
+  <div class="scope-badge ${result.scope === "replace" ? "replace" : "repair"}" aria-label="Scope type">${result.scope === "replace" ? "Full roof replacement" : "Repair / partial scope"}</div>
   <div class="subtitle">Prepared ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
 
   <div class="row">
@@ -2935,6 +2995,7 @@ function buildProposalHtml(
       <p><strong>${esc(form.address || "—")}</strong></p>
       <p>${esc(form.stateCode || "")} | ${esc(form.latitude || "")}, ${esc(form.longitude || "")}</p>
       <p>Roof material: ${esc(form.roofType)} | Pitch: ${esc(form.roofPitch || "N/A")} | Structure: ${esc(form.roofStructure.toUpperCase())}</p>
+      <p style="font-size:12px;margin-top:6px"><strong>Takeoff:</strong> ${round2(result.surfaceSquares)} SQ roof surface (before waste) · <strong>${round2(result.effectiveSquares)} SQ</strong> effective with ${result.wastePct}% waste factor</p>
     </div>
   </div>
 
@@ -3095,6 +3156,35 @@ function App() {
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"all" | "residential" | "commercial" | "other">("all");
   const [damagePhotos, setDamagePhotos] = useState<TaggedDamagePhoto[]>([]);
   const { addContract, addEstimate, addMeasurement } = useRoofing();
+  const { registerBridge } = useMeasurementChatBridge();
+  const formBridgeRef = useRef(form);
+  const proposalBridgeRef = useRef(proposal);
+  formBridgeRef.current = form;
+  proposalBridgeRef.current = proposal;
+
+  useEffect(() => {
+    return registerBridge({
+      getSnapshot: () => ({
+        form: { ...formBridgeRef.current },
+        proposal: {
+          clientName: proposalBridgeRef.current.clientName,
+          clientCompany: proposalBridgeRef.current.clientCompany,
+          clientEmail: proposalBridgeRef.current.clientEmail,
+          clientPhone: proposalBridgeRef.current.clientPhone,
+          companyName: proposalBridgeRef.current.companyName,
+          proposalTitle: proposalBridgeRef.current.proposalTitle,
+        },
+      }),
+      applyPatches: (formPatch, proposalPatch) => {
+        if (formPatch && typeof formPatch === "object" && Object.keys(formPatch).length > 0) {
+          setForm((f) => mergeFormPatch(f, formPatch));
+        }
+        if (proposalPatch && typeof proposalPatch === "object" && Object.keys(proposalPatch).length > 0) {
+          setProposal((p) => mergeProposalPatch(p, proposalPatch));
+        }
+      },
+    });
+  }, [registerBridge]);
 
   const measurementSectionTotals = useMemo(() => {
     const toNum = (value: string) => {
@@ -3718,13 +3808,67 @@ function App() {
       applyPropertyToForm(enriched);
       const hasTax = enriched.taxSummary.trim().length > 0;
       const hasContact = Boolean(enriched.ownerName || enriched.ownerPhone || enriched.ownerEmail);
-      if (hasTax || hasContact) {
-        setGeoStatus("Property loaded with assessor/tax and owner contact details.");
-      } else {
-        setGeoStatus(
-          "Property loaded. Use your parcel layer (Contacts & settings), regional intel when available, supplemental records lookup, or enter owner details manually.",
-        );
+      let baseGeoStatus =
+        hasTax || hasContact
+          ? "Property loaded with assessor/tax and owner contact details."
+          : "Property loaded. Use your parcel layer (Contacts & settings), regional intel when available, supplemental records lookup, or enter owner details manually.";
+
+      let footprintHint = "";
+      if (isHd2dApiConfigured()) {
+        let bf: BuildingFootprintFeature | null = null;
+        let footprintAttrsNote = "";
+        let footprintSource: "esri" | "osm" | null = null;
+        const esri = await fetchUsBuildingFootprintAtPoint(lat, lng);
+        if (esri.ok && esri.geometry && (esri.geometry.type === "Polygon" || esri.geometry.type === "MultiPolygon")) {
+          bf = { type: "Feature", properties: { source: "usgs-building-footprint" }, geometry: esri.geometry };
+          footprintAttrsNote = esri.attributes ? formatBuildingFootprintNotes(esri.attributes) : "";
+          footprintSource = "esri";
+        }
+        if (!bf) {
+          const osm = await fetchOsmBuildingFootprintAtPoint(lat, lng);
+          if (osm.ok && osm.geometry && (osm.geometry.type === "Polygon" || osm.geometry.type === "MultiPolygon")) {
+            bf = { type: "Feature", properties: { source: "osm-building" }, geometry: osm.geometry };
+            footprintAttrsNote = osm.attributes ? formatOsmBuildingFootprintNotes(osm.attributes) : formatOsmBuildingFootprintNotes({});
+            footprintSource = "osm";
+          }
+        }
+        if (bf && footprintSource) {
+          const polys = footprintToPolygonFeatures(bf);
+          const area = polys.reduce((sum, p) => sum + polygonFeaturePlanAreaSqFt(p), 0);
+          if (area > 0 && polys.length) {
+            const disclaimer =
+              footprintSource === "osm"
+                ? "Building footprint auto-loaded from OpenStreetMap — verify before bid."
+                : "Building footprint auto-loaded from USGS/Esri GIS — verify before bid.";
+            setDrawnRoofLines([]);
+            setMapboxFeatures(polys);
+            setMapboxAreaSqFt(area);
+            setForm((curr) =>
+              prepareFormFromMapMeasurements(
+                {
+                  ...curr,
+                  propertyRecordNotes: [curr.propertyRecordNotes.trim(), disclaimer, footprintAttrsNote]
+                    .filter(Boolean)
+                    .join("\n\n"),
+                },
+                { mapboxAreaSqFt: area, mapboxFeatures: polys },
+              ),
+            );
+            setMapboxStatus(
+              footprintSource === "osm"
+                ? "Auto-loaded OSM building footprint — verify outline on map."
+                : "Auto-loaded USGS/Esri building footprint — verify outline on map.",
+            );
+            queueMicrotask(() => {
+              autoCalcRef.current(polys);
+            });
+            footprintHint =
+              footprintSource === "osm" ? " OSM building footprint applied to map." : " GIS building footprint applied to map.";
+          }
+        }
       }
+
+      setGeoStatus(baseGeoStatus + footprintHint);
     } catch (e) {
       const blank = newBlankProperty("", lat, lng);
       setActiveProperty(blank);
@@ -4345,10 +4489,10 @@ function App() {
       toast.error("Run estimate first.");
       return;
     }
-    const html = buildReportText(form, result).replace(/\n/g, "<br/>");
+    const html = buildReportHtml(form, result);
     const win = window.open("", "_blank", "width=900,height=800");
     if (!win) return;
-    win.document.write(`<html><head><title>Roof Estimate Report</title><style>body{font-family:Arial,sans-serif;padding:24px;line-height:1.4}</style></head><body>${html}</body></html>`);
+    win.document.write(html);
     win.document.close();
     win.focus();
     setTimeout(() => win.print(), 250);
@@ -5085,7 +5229,14 @@ function App() {
             <label>Plan Area (sq ft)<input type="number" min={1} value={form.areaSqFt} onChange={(e) => setForm((curr) => ({ ...curr, areaSqFt: e.target.value }))} placeholder="2500" /></label>
             <label>Perimeter (ft)<input type="number" min={1} value={form.perimeterFt} onChange={(e) => setForm((curr) => ({ ...curr, perimeterFt: e.target.value }))} placeholder="220" /></label>
             <label>Pitch (rise/12)<input value={form.roofPitch} onChange={(e) => setForm((curr) => ({ ...curr, roofPitch: e.target.value }))} placeholder="6/12" /></label>
-            <label>Measured Squares (surface SQ ÷ 100 when auto)<input value={form.measuredSquares} onChange={(e) => setForm((curr) => ({ ...curr, measuredSquares: e.target.value }))} placeholder="38.38" /></label>
+            <label>
+              Roof surface squares (100 SF = 1 SQ)
+              <input
+                value={form.measuredSquares}
+                onChange={(e) => setForm((curr) => ({ ...curr, measuredSquares: e.target.value }))}
+                placeholder="e.g. 35"
+              />
+            </label>
             <label>Waste %<input value={form.wastePercent} onChange={(e) => setForm((curr) => ({ ...curr, wastePercent: e.target.value }))} placeholder="12" /></label>
             <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
@@ -5327,6 +5478,26 @@ function App() {
             Rules fired: {roofStructureSuggestion.rules.join(", ")}
           </p>
           {geoStatus ? <p className="muted">{geoStatus}</p> : null}
+          <label style={{ display: "block", marginTop: 12, marginBottom: 4 }}>
+            Estimate scope
+            <select
+              value={form.estimateScopeMode}
+              onChange={(e) =>
+                setForm((curr) => ({
+                  ...curr,
+                  estimateScopeMode: e.target.value as EstimateScopeMode,
+                }))
+              }
+              style={{ display: "block", marginTop: 6, maxWidth: "min(100%, 520px)" }}
+            >
+              <option value="replace">Full roof replacement (tear-off + new system — priced for all entered squares)</option>
+              <option value="repair">Repair / partial scope (fraction of roof by severity)</option>
+              <option value="auto">Auto (replace if severity ≥ 4 or Missing Shingles / Structural)</option>
+            </select>
+          </label>
+          <p className="muted" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+            Default is <strong>full replacement</strong>. Enter <strong>roof surface squares</strong> (100 SF per SQ) in the field below or in face sections; waste % applies on Generate Estimate.
+          </p>
           <div className="damage-wrap">
             <p>Damage Types</p>
             <div className="damage-grid">
@@ -6069,12 +6240,16 @@ function App() {
           )}
         </section>
         <section className="panel" id="section-estimate-inputs">
-          <h2>Carrier Scope & Settlement Inputs</h2>
+          <h2>Carrier scope &amp; settlement</h2>
           <p className="muted" style={{ marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+            <strong>Carrier text:</strong> paste line items, RCV/ACV, deductible, or net claim from the adjuster scope or statement — the app parses totals for comparison to your estimate (does not replace your takeoff squares above).{" "}
+            <strong>Settlement:</strong> use deductible and non-recoverable depreciation fields below; figures flow into notes and payout summary when you generate the estimate.
+          </p>
+          <p className="muted" style={{ marginTop: -4, marginBottom: 10, fontSize: 12 }}>
             Pricing source: <strong>{CARRIER_BENCHMARK_SOURCE_LABEL}</strong>
           </p>
           <label>
-            Carrier Line Items (Xactimate style)
+            Carrier line items (Xactimate-style text)
             <textarea
               rows={10}
               value={form.carrierScopeText}

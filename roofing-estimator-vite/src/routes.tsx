@@ -7,6 +7,7 @@ import { Login } from "./pages/Login";
 import { SignUp } from "./pages/SignUp";
 import { Careers } from "./pages/Careers";
 import { AuthGate } from "./components/AuthGate";
+import { MarketingOutlet } from "./layout/MarketingOutlet";
 import { lazyRoute } from "./routes/lazyRoute";
 
 /** Code-split heavy / map-heavy routes; keep dashboard + auth shells eager. */
@@ -68,9 +69,15 @@ export const router = createBrowserRouter([
           { path: "contacts", Component: ContactsSettingsRoute },
           { path: "property-lookup", Component: PropertyScraperRoute },
           { path: "canvassing", Component: CanvassingRoute },
-          { path: "marketing/social", Component: SocialMediaAutomationRoute },
-          { path: "marketing/ads", Component: AdMakerAutomationRoute },
-          { path: "marketing", Component: MarketingRoute },
+          {
+            path: "marketing",
+            Component: MarketingOutlet,
+            children: [
+              { index: true, Component: MarketingRoute },
+              { path: "social", Component: SocialMediaAutomationRoute },
+              { path: "ads", Component: AdMakerAutomationRoute },
+            ],
+          },
           { path: "courses", Component: CoursesRoute },
           { path: "call-center", Component: CallCenterRoute },
           { path: "leads", Component: LeadMarketplaceRoute },

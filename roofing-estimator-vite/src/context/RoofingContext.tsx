@@ -8,6 +8,7 @@ import {
   normalizeFieldProject,
   normalizeTagList,
   optHttpsUrl,
+  isFieldPipelineStage,
 } from "../lib/fieldProjectTypes";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
 
@@ -92,6 +93,8 @@ interface RoofingContextType {
     monetaryValueUsd?: number;
     ownerLabel?: string;
     tags?: string | string[];
+    /** Defaults to intake when omitted or invalid. */
+    pipelineStage?: FieldPipelineStage;
   }) => FieldProject;
   updateFieldProject: (
     id: string,
@@ -256,6 +259,8 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         const ghlEmbedUrl = input.ghlEmbedUrl ? optHttpsUrl(input.ghlEmbedUrl.trim()) : undefined;
         const tags = normalizeTagList(input.tags);
         const ownerLabel = input.ownerLabel?.trim().slice(0, 120);
+        const initialStage =
+          input.pipelineStage && isFieldPipelineStage(input.pipelineStage) ? input.pipelineStage : "intake";
         let monetaryValueUsd: number | undefined;
         if (typeof input.monetaryValueUsd === "number" && Number.isFinite(input.monetaryValueUsd)) {
           const v = Math.max(0, input.monetaryValueUsd);
@@ -268,7 +273,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           notes: input.notes?.trim().slice(0, 2000),
           createdAt: now,
           updatedAt: now,
-          pipelineStage: "intake",
+          pipelineStage: initialStage,
           photos: [],
           linkedMeasurementId: null,
           tags,

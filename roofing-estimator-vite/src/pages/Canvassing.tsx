@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast as sonnerToast } from "sonner";
 import {
+  Camera,
   ChevronDown,
   ChevronUp,
   FileJson,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { useRoofing } from "../context/RoofingContext";
 import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
 import { parseLeadsFromGeoJson } from "../lib/canvassingGeoJson";
@@ -182,6 +184,7 @@ const STATUS_RANK: Record<CanvassVisitStatus, number> = {
 
 export function Canvassing() {
   const navigate = useNavigate();
+  const { addFieldProject } = useRoofing();
   const viewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 38.63, lon: -90.2 });
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => ({
     lat: viewCenterRef.current.lat,
@@ -322,6 +325,41 @@ export function Canvassing() {
     },
     [navigate],
   );
+
+  const startStormDamageReport = useCallback(() => {
+    if (!lastPayload) {
+      sonnerToast.message("Select a property first");
+      return;
+    }
+    const siteAddress = (addressLine || lastPayload.address || "").trim();
+    if (!siteAddress) {
+      sonnerToast.error("Need a site address for this report");
+      return;
+    }
+    const shortAddr = siteAddress.split(/\r?\n/)[0].trim().slice(0, 120);
+    const name = `${shortAddr} — storm damage`.slice(0, 200);
+    const notesParts = [
+      `Storm damage report — ${new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`,
+      parcelIdDisplay ? `Parcel / ID: ${parcelIdDisplay}` : null,
+      selectedLead ? `Route: ${selectedLead.name || selectedLead.address || "Lead"}` : null,
+    ].filter(Boolean);
+    const p = addFieldProject({
+      name,
+      address: siteAddress.slice(0, 500),
+      notes: notesParts.join("\n"),
+      tags: ["storm", "damage-report"],
+      pipelineStage: "documentation",
+    });
+    sonnerToast.success("Field job created — add photos on Projects");
+    navigate(`/projects?openProject=${encodeURIComponent(p.id)}`);
+  }, [
+    addFieldProject,
+    addressLine,
+    lastPayload,
+    navigate,
+    parcelIdDisplay,
+    selectedLead,
+  ]);
 
   const leadsRef = useRef(leads);
   const enrichmentRef = useRef(enrichment);
@@ -1128,7 +1166,8 @@ export function Canvassing() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="canvass-sheet-body min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 pb-6 pt-3 text-sm text-zinc-950">
+              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="canvass-sheet-body min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 pb-2 pt-3 text-sm text-zinc-950">
                 {panelHint ? <p className="text-xs text-amber-900">{panelHint}</p> : null}
                 <p className="text-[11px] leading-snug text-zinc-950">
                   Owner and contact fields come from public parcel and map data where available, plus automated property
@@ -1346,7 +1385,9 @@ export function Canvassing() {
                     />
                   </div>
                 ) : null}
+              </div>
 
+              <div className="canvass-sheet-footer shrink-0 space-y-2 border-t border-gray-100 bg-gradient-to-b from-white to-slate-50/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-sm text-zinc-950 shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.06)]">
                 <Button
                   type="button"
                   size="lg"
@@ -1357,6 +1398,24 @@ export function Canvassing() {
                   <Ruler className="h-4 w-4" />
                   Instant Estimate in Measurement
                 </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  className="w-full gap-2 border-zinc-300 font-semibold text-zinc-950 hover:bg-zinc-100"
+                  disabled={
+                    panelBusy ||
+                    !lastPayload ||
+                    !(addressLine || lastPayload.address || "").trim()
+                  }
+                  onClick={startStormDamageReport}
+                >
+                  <Camera className="h-4 w-4" />
+                  Storm damage report
+                </Button>
+                <p className="text-[11px] leading-snug text-zinc-600">
+                  Creates a field job with photo documentation. Opens Projects to capture site images.
+                </p>
                 <label className="flex items-center gap-2 text-xs text-zinc-950">
                   <input
                     type="checkbox"
@@ -1373,6 +1432,7 @@ export function Canvassing() {
                   />
                   Require owner + contact info before opening Measurement
                 </label>
+              </div>
               </div>
             </aside>
             ) : null}

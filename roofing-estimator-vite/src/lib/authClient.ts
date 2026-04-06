@@ -289,3 +289,15 @@ export async function adminUpdateUser(
     );
   }
 }
+
+/**
+ * Post-login/sign-up redirect target: only same-app relative paths (blocks open redirects).
+ */
+export function safeInternalReturnPath(raw: unknown): string | null {
+  if (raw == null || typeof raw !== "string") return null;
+  const p = raw.trim();
+  if (!p.startsWith("/")) return null;
+  if (p.startsWith("//")) return null;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(p)) return null;
+  return p;
+}

@@ -3,9 +3,11 @@ import { Toaster } from "sonner";
 import { router } from "./routes";
 import { RoofingProvider } from "./context/RoofingContext";
 import { AuthProvider } from "./context/AuthContext";
+import { MeasurementChatBridgeProvider } from "./context/MeasurementChatBridge";
 
 export default function AppRouter() {
   return (
+    <MeasurementChatBridgeProvider>
     <AuthProvider>
       <RoofingProvider>
         <Toaster
@@ -23,6 +25,7 @@ export default function AppRouter() {
         <RouterProvider router={router} />
       </RoofingProvider>
     </AuthProvider>
+    </MeasurementChatBridgeProvider>
   );
 }
 
