@@ -8,6 +8,8 @@ compatibility_flags = ["nodejs_compat"]
 crons = ["*/10 * * * *"]
 # Avoid Wrangler warnings; custom routes still win for production domains.
 workers_dev = true
+# If Zero Trust / Cloudflare Access protects this *.workers.dev hostname, browser fetch() from other sites fails CORS.
+# Prefer apex routes below for public API, or remove Access / bypass /api/* for this app, or use Pages same-origin /api (see roofing-estimator-vite functions/api).
 preview_urls = true
 
 # Custom domain API routes (place before [[kv_namespaces]] so TOML does not attach to KV table).
