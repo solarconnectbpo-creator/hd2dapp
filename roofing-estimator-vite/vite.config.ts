@@ -6,6 +6,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
+/** Production: GitHub Actions “Deploy Vercel” on push to `main` (`.github/workflows/vercel-deploy.yml`). */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** POST /api/raybevel-diagram — runs roof-diagram-raybevel/generate_diagram.R (requires R + raybevel). */
