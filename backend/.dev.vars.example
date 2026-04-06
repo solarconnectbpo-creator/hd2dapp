@@ -29,6 +29,12 @@
 # Skip approval + paid-membership gate for company/rep (local dev only):
 # AUTH_SKIP_ACCESS_GATE=true
 
+# --- Sign-up email alerts (Resend — https://resend.com) ---
+# Create API key, add domain in Resend, verify DNS, then set a verified From address:
+# RESEND_API_KEY=re_...
+# SIGNUP_NOTIFY_TO=admin@hardcoredoortodoorclosers.com
+# RESEND_FROM=HD2D <noreply@hardcoredoortodoorclosers.com>
+
 # ML vision — Worker proxies /api/ai/roof-vision + /api/ai/roof-segment → ml-vision-service (see backend/ml-vision-service/README.md).
 # Same-origin app flow: Vite `/intel-proxy` → Worker → ROOF_VISION_SERVICE_URL (local default: http://127.0.0.1:18090).
 # One terminal (from roofing-estimator-vite): npm run dev:full:vision  (Worker + vision + Vite).

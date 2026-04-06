@@ -106,6 +106,12 @@ interface Env {
   GHL_PRIVATE_INTEGRATION_TOKEN?: string;
   /** GHL location id (sub-account) */
   GHL_LOCATION_ID?: string;
+  /** Resend API key — sign-up notification emails (https://resend.com). */
+  RESEND_API_KEY?: string;
+  /** Where to send new sign-up alerts (default admin@hardcoredoortodoorclosers.com). */
+  SIGNUP_NOTIFY_TO?: string;
+  /** Resend verified From header, e.g. HD2D <noreply@hardcoredoortodoorclosers.com> */
+  RESEND_FROM?: string;
 }
 
 type AuthEnv = Pick<
@@ -123,6 +129,9 @@ type AuthEnv = Pick<
   | "AUTH_COMPANY_PASSWORD"
   | "AUTH_REP_EMAIL"
   | "AUTH_REP_PASSWORD"
+  | "RESEND_API_KEY"
+  | "SIGNUP_NOTIFY_TO"
+  | "RESEND_FROM"
 >;
 
 let eagleViewEnvLogged = false;
@@ -149,7 +158,7 @@ function logEagleViewEnvSummaryOnce(env: Env): void {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     logEagleViewEnvSummaryOnce(env);
     const url = new URL(request.url);
     const path = url.pathname;
@@ -182,7 +191,7 @@ export default {
       // Route requests to appropriate handlers (await async handlers so rejections hit catch below — avoids CF 1101).
       // Include `/api/auth` (no trailing slash) — `startsWith("/api/auth/")` alone misses it and returns 404.
       if (path === "/api/auth" || path === "/api/auth/" || path.startsWith("/api/auth/")) {
-        return await handleAuthRequest(request, env as AuthEnv, path, corsHeaders);
+        return await handleAuthRequest(request, env as AuthEnv, path, corsHeaders, ctx);
       } else if (path.startsWith("/api/orgs/directory")) {
         return await handleOrgDirectoryRequest(request, env as AuthEnv, path, corsHeaders);
       } else if (path.startsWith("/api/admin/rep-placement")) {

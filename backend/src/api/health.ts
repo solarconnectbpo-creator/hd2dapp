@@ -5,7 +5,7 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-05-access-gate";
+export const WORKER_BUILD_TAG = "2026-04-05-signup-notify";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
@@ -28,6 +28,7 @@ type HealthEnv = {
   AUTH_SIGNUP_ENABLED?: string;
   STRIPE_SECRET_KEY?: string;
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
+  RESEND_API_KEY?: string;
 };
 
 type CorsHeaders = Record<string, string>;
@@ -85,6 +86,8 @@ export function handleHealthGet(
         membershipCheckout: Boolean(
           (env.STRIPE_SECRET_KEY || "").trim() && (env.MEMBERSHIP_STRIPE_PRICE_ID || "").trim(),
         ),
+        /** True when Resend is configured (POST /api/auth/register can email admin on new sign-up). */
+        signupNotifyEmail: Boolean((env.RESEND_API_KEY || "").trim()),
       },
     },
     200,

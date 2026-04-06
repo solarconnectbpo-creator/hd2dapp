@@ -10,6 +10,7 @@ import {
 } from "../auth/userDb";
 import { evaluateAccess } from "../auth/access";
 import { isValidUsStateCode, normalizeState, type PlacementPref } from "../auth/orgDb";
+import { sendSignupNotification } from "./signupNotify";
 
 export type AuthEnv = {
   DB: any;
@@ -39,6 +40,12 @@ export type AuthEnv = {
    * Production should leave unset so company/rep need admin approval + active billing.
    */
   AUTH_SKIP_ACCESS_GATE?: string;
+  /** Resend API key — when set, new sign-ups trigger an email to SIGNUP_NOTIFY_TO. */
+  RESEND_API_KEY?: string;
+  /** Recipient for sign-up alerts (default admin@hardcoredoortodoorclosers.com). */
+  SIGNUP_NOTIFY_TO?: string;
+  /** Verified Resend sender, e.g. HD2D <noreply@hardcoredoortodoorclosers.com> */
+  RESEND_FROM?: string;
 };
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -110,6 +117,7 @@ export async function handleAuthRequest(
   env: AuthEnv,
   path: string,
   corsHeaders: Record<string, string>,
+  ctx?: ExecutionContext,
 ): Promise<Response> {
   const j = jsonHeaders(corsHeaders);
   /** Ignore trailing slashes so `/api/auth/login/` matches. */
@@ -372,6 +380,20 @@ export async function handleAuthRequest(
     }
     const access = evaluateAccess(env, user.user_type, regRow);
     const { token, expiresAt } = await issueToken(env, user);
+
+    const notify = sendSignupNotification(env, {
+      newUserEmail: email,
+      name: displayName,
+      userType: isCompany ? "company" : "sales_rep",
+      companyName: isCompany ? companyNameTrim : undefined,
+      homeState: isCompany ? undefined : homeState,
+    });
+    if (ctx) {
+      ctx.waitUntil(notify);
+    } else {
+      void notify.catch((e) => console.error("[signup-notify]", e));
+    }
+
     return new Response(JSON.stringify({ success: true, token, user, expiresAt, access }), { status: 201, headers: j });
   }
 
