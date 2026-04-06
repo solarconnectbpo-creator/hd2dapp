@@ -25,7 +25,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: roofing-estimator-vite/package-lock.json
-      - run: npm ci
+      # `npm ci` can fail on Linux when the lockfile was refreshed on Windows with optional Tailwind/native entries; `npm install` respects the lockfile and completes install.
+      - run: npm install --no-audit --no-fund
       - run: npm run test
       - run: npm run lint:ci
       - run: npm run build
