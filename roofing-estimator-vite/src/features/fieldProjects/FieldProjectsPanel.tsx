@@ -29,6 +29,15 @@ import { loadOrgSettings } from "../../lib/orgSettings";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
 
+/** Opaque fields on `canvass-light-sheet` modals (global `.text-black` maps to HD2D chrome). */
+const FP_MODAL_FIELD =
+  "mt-1 w-full rounded-md border border-black/20 bg-[#f3f4f6] px-3 py-2 text-black";
+const FP_MODAL_SELECT =
+  "w-full rounded-md border border-black/20 bg-[#f3f4f6] px-3 py-2 text-black";
+const FP_MODAL_SELECT_PIPELINE =
+  "ml-0 mt-1 block w-full rounded-md border border-black/20 bg-[#f3f4f6] px-3 py-2 text-black sm:ml-2 sm:mt-0 sm:inline-block sm:w-auto";
+const FP_MODAL_INNER = "rounded-lg border border-black/10 bg-[#f1f5f9] p-3 space-y-3";
+
 const usdFmt = new Intl.NumberFormat(undefined, {
   style: "currency",
   currency: "USD",
@@ -82,7 +91,7 @@ function GhlEmbedPanel({ src, openFallbackUrl }: { src: string; openFallbackUrl:
   const showSlowWarning = timedOut && !loaded;
 
   return (
-    <div className="space-y-2 rounded-lg border border-black/15 bg-black/[0.02] p-3">
+    <div className="space-y-2 rounded-lg border border-black/15 bg-[#f1f5f9] p-3">
       <p className="text-xs text-black/70">
         Embedded CRM pages often fail here because many external systems send{" "}
         <code className="text-[11px]">X-Frame-Options: DENY</code>. If the frame stays blank, use{" "}
@@ -91,7 +100,7 @@ function GhlEmbedPanel({ src, openFallbackUrl }: { src: string; openFallbackUrl:
       <iframe
         title="External CRM"
         src={src}
-        className="h-[min(420px,55vh)] w-full rounded-md border border-black/10 bg-white"
+        className="h-[min(420px,55vh)] w-full rounded-md border border-black/10 bg-[#ffffff]"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
         onLoad={() => setLoaded(true)}
       />
@@ -675,12 +684,12 @@ export function FieldProjectsPanel() {
 
       {createOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fp-create-title"
         >
-          <Card className="relative w-full max-w-md border border-black/10 shadow-lg">
+          <Card className="canvass-light-sheet relative w-full max-w-md border border-black/10 shadow-lg">
             <button
               type="button"
               className="absolute right-3 top-3 rounded p-1 text-black/60 hover:bg-black/5"
@@ -697,7 +706,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 Project name *
                 <input
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. 123 Oak — hail inspection"
@@ -706,7 +715,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 Address (optional)
                 <input
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
                   placeholder="Street, city, state"
@@ -715,7 +724,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 Notes (optional)
                 <textarea
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   rows={3}
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
@@ -728,7 +737,7 @@ export function FieldProjectsPanel() {
                   type="number"
                   min={0}
                   step={1}
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newMonetaryStr}
                   onChange={(e) => setNewMonetaryStr(e.target.value)}
                   placeholder="e.g. 45000"
@@ -737,7 +746,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 Owner / assignee (optional)
                 <input
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newOwnerLabel}
                   onChange={(e) => setNewOwnerLabel(e.target.value)}
                   placeholder="Rep or crew lead"
@@ -746,7 +755,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 Tags (optional, comma-separated)
                 <input
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newTagsComma}
                   onChange={(e) => setNewTagsComma(e.target.value)}
                   placeholder="hail, insurance, commercial"
@@ -755,7 +764,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 CRM job link (optional, https)
                 <input
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newGhlUrl}
                   onChange={(e) => setNewGhlUrl(e.target.value)}
                   placeholder="https://…"
@@ -764,7 +773,7 @@ export function FieldProjectsPanel() {
               <label className="block text-sm font-medium text-black">
                 CRM embed URL (optional)
                 <input
-                  className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_FIELD}
                   value={newGhlEmbedUrl}
                   onChange={(e) => setNewGhlEmbedUrl(e.target.value)}
                   placeholder="Often same as deep link; some dashboards allow iframes"
@@ -785,12 +794,12 @@ export function FieldProjectsPanel() {
 
       {selected ? (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fp-detail-title"
         >
-          <Card className="relative my-4 w-full max-w-3xl border border-black/10 shadow-lg">
+          <Card className="canvass-light-sheet relative my-4 w-full max-w-3xl border border-black/10 shadow-lg">
             <button
               type="button"
               className="absolute right-3 top-3 z-10 rounded p-1 text-black/60 hover:bg-black/5"
@@ -811,7 +820,7 @@ export function FieldProjectsPanel() {
                 <label className="text-sm font-medium text-black">
                   Pipeline stage
                   <select
-                    className="ml-0 mt-1 block w-full rounded-md border border-black/20 px-3 py-2 text-black sm:ml-2 sm:mt-0 sm:inline-block sm:w-auto"
+                    className={FP_MODAL_SELECT_PIPELINE}
                     value={selected.pipelineStage}
                     onChange={(e) =>
                       setFieldProjectPipelineStage(selected.id, e.target.value as FieldPipelineStage)
@@ -826,7 +835,7 @@ export function FieldProjectsPanel() {
                 </label>
               </div>
 
-              <div className="rounded-lg border border-black/10 bg-black/[0.02] p-3 space-y-3">
+              <div className={FP_MODAL_INNER}>
                 <p className="text-sm font-medium text-black">Deal fields</p>
                 <label className="block text-sm text-black">
                   Value (USD)
@@ -834,7 +843,7 @@ export function FieldProjectsPanel() {
                     type="number"
                     min={0}
                     step={1}
-                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    className={FP_MODAL_FIELD}
                     value={detailMonetaryStr}
                     onChange={(e) => setDetailMonetaryStr(e.target.value)}
                     placeholder="Leave empty to clear"
@@ -843,7 +852,7 @@ export function FieldProjectsPanel() {
                 <label className="block text-sm text-black">
                   Owner / assignee
                   <input
-                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    className={FP_MODAL_FIELD}
                     value={detailOwnerLabel}
                     onChange={(e) => setDetailOwnerLabel(e.target.value)}
                   />
@@ -851,7 +860,7 @@ export function FieldProjectsPanel() {
                 <label className="block text-sm text-black">
                   Tags (comma-separated)
                   <input
-                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    className={FP_MODAL_FIELD}
                     value={detailTagsComma}
                     onChange={(e) => setDetailTagsComma(e.target.value)}
                   />
@@ -881,7 +890,7 @@ export function FieldProjectsPanel() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-black">Link to measurement (optional)</label>
                 <select
-                  className="w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                  className={FP_MODAL_SELECT}
                   value={selected.linkedMeasurementId ?? ""}
                   onChange={(e) =>
                     updateFieldProject(selected.id, {
@@ -898,12 +907,12 @@ export function FieldProjectsPanel() {
                 </select>
               </div>
 
-              <div className="rounded-lg border border-black/10 bg-black/[0.02] p-3 space-y-3">
+              <div className={FP_MODAL_INNER}>
                 <p className="text-sm font-medium text-black">CRM</p>
                 <label className="block text-sm text-black">
                   Job deep link (https)
                   <input
-                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    className={FP_MODAL_FIELD}
                     value={detailGhlUrl}
                     onChange={(e) => setDetailGhlUrl(e.target.value)}
                     placeholder="https://…"
@@ -912,7 +921,7 @@ export function FieldProjectsPanel() {
                 <label className="block text-sm text-black">
                   Embed URL (optional)
                   <input
-                    className="mt-1 w-full rounded-md border border-black/20 px-3 py-2 text-black"
+                    className={FP_MODAL_FIELD}
                     value={detailGhlEmbedUrl}
                     onChange={(e) => setDetailGhlEmbedUrl(e.target.value)}
                     placeholder="Leave empty to use deep link for embed attempts"
@@ -1016,7 +1025,7 @@ export function FieldProjectsPanel() {
               ) : (
                 <ul className="grid gap-4 sm:grid-cols-2">
                   {selected.photos.map((ph) => (
-                    <li key={ph.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+                    <li key={ph.id} className="overflow-hidden rounded-lg border border-black/10 bg-[#f8fafc]">
                       <button
                         type="button"
                         className="block w-full focus:outline-none focus:ring-2 focus:ring-black/20"
@@ -1030,7 +1039,7 @@ export function FieldProjectsPanel() {
                       </button>
                       <div className="space-y-2 p-2">
                         <input
-                          className="w-full rounded border border-black/15 px-2 py-1 text-sm text-black"
+                          className="w-full rounded border border-black/15 bg-[#f3f4f6] px-2 py-1 text-sm text-black"
                           placeholder="Caption"
                           value={ph.caption ?? ""}
                           onChange={(e) => updateFieldProjectPhotoCaption(selected.id, ph.id, e.target.value)}
@@ -1110,7 +1119,7 @@ export function FieldProjectsPanel() {
 
       {lightboxUrl ? (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
           role="presentation"
           onClick={() => setLightboxUrl(null)}
           onKeyDown={(e) => {
