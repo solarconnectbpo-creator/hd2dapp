@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { useAuth } from "../context/AuthContext";
 import { useRoofing } from "../context/RoofingContext";
 import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
@@ -77,9 +78,10 @@ import {
   type BuildingFootprintFeature,
 } from "../lib/geoFootprintMeasure";
 import { Map3D, type Map3DPoint } from "../components/Map3D";
+import { getScopedStorageKey } from "../lib/userScopedStorage";
 
-const AUTO_OPEN_ESTIMATE_KEY = "roofing-canvass-auto-open-estimate-v1";
-const REQUIRE_OWNER_INFO_KEY = "roofing-canvass-require-owner-info-v1";
+const AUTO_OPEN_ESTIMATE_BASE = "roofing-canvass-auto-open-estimate-v1";
+const REQUIRE_OWNER_INFO_BASE = "roofing-canvass-require-owner-info-v1";
 
 /** Best-effort lot size (ft²) from assessor-style parcel attributes for footprint fallback. */
 function guessLotSqFtFromParcel(parcel: Record<string, unknown> | null): number | null {
@@ -184,6 +186,7 @@ const STATUS_RANK: Record<CanvassVisitStatus, number> = {
 
 export function Canvassing() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { addFieldProject } = useRoofing();
   const viewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 38.63, lon: -90.2 });
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => ({
@@ -196,9 +199,9 @@ export function Canvassing() {
   const mapBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null);
   const arcgisSyncDebounceRef = useRef<number | null>(null);
 
-  const [leads, setLeads] = useState<ContactRecord[]>(() => loadCanvassLeads());
-  const [states, setStates] = useState<Record<string, CanvassLeadState>>(() => loadCanvassStates());
-  const [enrichment, setEnrichment] = useState<Record<string, CanvassLeadEnrichment>>(() => loadCanvassEnrichment());
+  const [leads, setLeads] = useState<ContactRecord[]>([]);
+  const [states, setStates] = useState<Record<string, CanvassLeadState>>({});
+  const [enrichment, setEnrichment] = useState<Record<string, CanvassLeadEnrichment>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [panelBusy, setPanelBusy] = useState(false);
@@ -216,24 +219,8 @@ export function Canvassing() {
   const [geoBusy, setGeoBusy] = useState(false);
   const [toast, setToast] = useState("");
 
-  const [autoOpenEstimate, setAutoOpenEstimate] = useState<boolean>(() => {
-    try {
-      if (typeof window === "undefined") return true;
-      const raw = window.localStorage.getItem(AUTO_OPEN_ESTIMATE_KEY);
-      return raw == null ? true : raw === "1";
-    } catch {
-      return true;
-    }
-  });
-  const [requireOwnerInfoBeforeOpen, setRequireOwnerInfoBeforeOpen] = useState<boolean>(() => {
-    try {
-      if (typeof window === "undefined") return true;
-      const raw = window.localStorage.getItem(REQUIRE_OWNER_INFO_KEY);
-      return raw == null ? true : raw === "1";
-    } catch {
-      return true;
-    }
-  });
+  const [autoOpenEstimate, setAutoOpenEstimate] = useState(true);
+  const [requireOwnerInfoBeforeOpen, setRequireOwnerInfoBeforeOpen] = useState(true);
   const [arcgisBusy, setArcgisBusy] = useState(false);
   const [arcgisHint, setArcgisHint] = useState("");
   /** GeoJSON from Contacts & settings parcel layer — rendered on the satellite map. */
@@ -248,6 +235,41 @@ export function Canvassing() {
       setArcgisMapTile(getArcgisMapServerTileConfig());
     });
   }, []);
+
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) {
+      setLeads([]);
+      setStates({});
+      setEnrichment({});
+      return;
+    }
+    setLeads(loadCanvassLeads());
+    setStates(loadCanvassStates());
+    setEnrichment(loadCanvassEnrichment());
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setAutoOpenEstimate(true);
+      setRequireOwnerInfoBeforeOpen(true);
+      return;
+    }
+    try {
+      const k1 = getScopedStorageKey(AUTO_OPEN_ESTIMATE_BASE);
+      if (k1) {
+        const raw = window.localStorage.getItem(k1);
+        setAutoOpenEstimate(raw == null ? true : raw === "1");
+      }
+      const k2 = getScopedStorageKey(REQUIRE_OWNER_INFO_BASE);
+      if (k2) {
+        const raw = window.localStorage.getItem(k2);
+        setRequireOwnerInfoBeforeOpen(raw == null ? true : raw === "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user?.id]);
 
   const hasRequiredOwnerInfo = useCallback((payload: PropertyImportPayload | null): boolean => {
     if (!payload) return false;
@@ -908,20 +930,24 @@ export function Canvassing() {
   };
 
   useEffect(() => {
+    if (!user?.id) return;
     try {
-      window.localStorage.setItem(AUTO_OPEN_ESTIMATE_KEY, autoOpenEstimate ? "1" : "0");
+      const k = getScopedStorageKey(AUTO_OPEN_ESTIMATE_BASE);
+      if (k) window.localStorage.setItem(k, autoOpenEstimate ? "1" : "0");
     } catch {
       // ignore
     }
-  }, [autoOpenEstimate]);
+  }, [autoOpenEstimate, user?.id]);
 
   useEffect(() => {
+    if (!user?.id) return;
     try {
-      window.localStorage.setItem(REQUIRE_OWNER_INFO_KEY, requireOwnerInfoBeforeOpen ? "1" : "0");
+      const k = getScopedStorageKey(REQUIRE_OWNER_INFO_BASE);
+      if (k) window.localStorage.setItem(k, requireOwnerInfoBeforeOpen ? "1" : "0");
     } catch {
       // ignore
     }
-  }, [requireOwnerInfoBeforeOpen]);
+  }, [requireOwnerInfoBeforeOpen, user?.id]);
 
   useEffect(() => {
     if (!toast) return;

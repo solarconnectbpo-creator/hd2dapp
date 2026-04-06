@@ -1,5 +1,6 @@
 import type { ContactRecord } from "./contactsCsv";
 import { optHttpsUrl } from "./fieldProjectTypes";
+import { getScopedStorageKey } from "./userScopedStorage";
 
 export const CONTACTS_STORAGE_KEY = "roofing-estimator-vite-contacts-v1";
 export const ORG_SETTINGS_STORAGE_KEY = "roofing-estimator-vite-org-v1";
@@ -45,7 +46,9 @@ export function defaultOrgSettings(): OrgSettings {
 
 export function loadOrgSettings(): OrgSettings {
   try {
-    const raw = window.localStorage.getItem(ORG_SETTINGS_STORAGE_KEY);
+    const key = getScopedStorageKey(ORG_SETTINGS_STORAGE_KEY);
+    if (!key) return defaultOrgSettings();
+    const raw = window.localStorage.getItem(key);
     if (!raw) return defaultOrgSettings();
     const rawObj = JSON.parse(raw) as Record<string, unknown>;
     delete rawObj.arcgisFeatureLayerUrl;
@@ -85,7 +88,9 @@ export function saveOrgSettingsSafe(org: OrgSettings): { ok: true } | { ok: fals
           "Company profile JSON is too large for browser storage. Use a smaller logo file (try under 300KB) or remove the logo.",
       };
     }
-    window.localStorage.setItem(ORG_SETTINGS_STORAGE_KEY, json);
+    const key = getScopedStorageKey(ORG_SETTINGS_STORAGE_KEY);
+    if (!key) return { ok: false, message: "Sign in to save company settings." };
+    window.localStorage.setItem(key, json);
     return { ok: true };
   } catch (e) {
     if (e instanceof DOMException && (e.name === "QuotaExceededError" || e.code === 22)) {
@@ -101,7 +106,9 @@ export function saveOrgSettingsSafe(org: OrgSettings): { ok: true } | { ok: fals
 
 export function loadContactsFromStorage(): ContactRecord[] {
   try {
-    const raw = window.localStorage.getItem(CONTACTS_STORAGE_KEY);
+    const key = getScopedStorageKey(CONTACTS_STORAGE_KEY);
+    if (!key) return [];
+    const raw = window.localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -124,7 +131,9 @@ export function saveContactsToStorageSafe(
     if (json.length > 4_200_000) {
       return { ok: false, message: "Contact list is too large for browser storage. Export a subset or clear old leads." };
     }
-    window.localStorage.setItem(CONTACTS_STORAGE_KEY, json);
+    const key = getScopedStorageKey(CONTACTS_STORAGE_KEY);
+    if (!key) return { ok: false, message: "Sign in to save contacts." };
+    window.localStorage.setItem(key, json);
     return { ok: true };
   } catch (e) {
     if (e instanceof DOMException && (e.name === "QuotaExceededError" || e.code === 22)) {

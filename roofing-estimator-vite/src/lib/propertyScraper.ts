@@ -4,9 +4,19 @@
  * on a seed list (addresses or LLC names), then upload the enriched CSV here — no RentCast.
  */
 
+import { getScopedStorageKey } from "./userScopedStorage";
+
 export const PENDING_PROPERTY_IMPORT_KEY = "roofing-pending-property-import-v1";
 /** Mirrors pending import JSON so a remount (e.g. React Strict Mode) can still consume it after localStorage was cleared. */
 export const PENDING_PROPERTY_IMPORT_SESSION_KEY = "roofing-pending-property-import-session-v1";
+
+export function getPendingPropertyImportLocalKey(): string | null {
+  return getScopedStorageKey(PENDING_PROPERTY_IMPORT_KEY);
+}
+
+export function getPendingPropertyImportSessionKey(): string | null {
+  return getScopedStorageKey(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+}
 
 /** `rentcast` kept only for decoding older saved payloads / JSON. */
 export type PropertyImportSource =
@@ -407,6 +417,9 @@ export function stashPendingPropertyImport(
   options?: PendingPropertyImportOptions,
   buildingFootprint?: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null,
 ): void {
+  const localKey = getPendingPropertyImportLocalKey();
+  const sessionKey = getPendingPropertyImportSessionKey();
+  if (!localKey || !sessionKey) return;
   try {
     const envelope: PendingPropertyImportEnvelope = {
       payload,
@@ -414,9 +427,9 @@ export function stashPendingPropertyImport(
       ...(buildingFootprint != null ? { buildingFootprint } : {}),
     };
     const json = JSON.stringify(envelope);
-    window.localStorage.setItem(PENDING_PROPERTY_IMPORT_KEY, json);
+    window.localStorage.setItem(localKey, json);
     try {
-      window.sessionStorage.setItem(PENDING_PROPERTY_IMPORT_SESSION_KEY, json);
+      window.sessionStorage.setItem(sessionKey, json);
     } catch {
       /* private mode */
     }

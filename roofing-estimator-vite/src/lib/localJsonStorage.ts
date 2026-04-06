@@ -1,3 +1,5 @@
+import { getScopedStorageKey } from "./userScopedStorage";
+
 const DEFAULT_MAX_ITEMS = 50;
 
 export const SOCIAL_DRAFTS_STORAGE_KEY = "hd2d-social-drafts-v1";
@@ -21,7 +23,9 @@ export type AdCreativeDraftStored = {
 export function loadMetaLastCampaignId(): string {
   if (typeof window === "undefined") return "";
   try {
-    return window.localStorage.getItem(META_LAST_CAMPAIGN_ID_KEY) || "";
+    const k = getScopedStorageKey(META_LAST_CAMPAIGN_ID_KEY);
+    if (!k) return "";
+    return window.localStorage.getItem(k) || "";
   } catch {
     return "";
   }
@@ -30,9 +34,11 @@ export function loadMetaLastCampaignId(): string {
 export function saveMetaLastCampaignId(id: string): void {
   if (typeof window === "undefined") return;
   try {
+    const k = getScopedStorageKey(META_LAST_CAMPAIGN_ID_KEY);
+    if (!k) return;
     const t = id.trim();
-    if (t) window.localStorage.setItem(META_LAST_CAMPAIGN_ID_KEY, t);
-    else window.localStorage.removeItem(META_LAST_CAMPAIGN_ID_KEY);
+    if (t) window.localStorage.setItem(k, t);
+    else window.localStorage.removeItem(k);
   } catch {
     /* ignore */
   }
@@ -41,7 +47,9 @@ export function saveMetaLastCampaignId(id: string): void {
 export function loadJsonArray<T>(key: string, fallback: T[]): T[] {
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const resolved = getScopedStorageKey(key);
+    if (!resolved) return fallback;
+    const raw = window.localStorage.getItem(resolved);
     if (!raw?.trim()) return fallback;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return fallback;
@@ -53,9 +61,11 @@ export function loadJsonArray<T>(key: string, fallback: T[]): T[] {
 
 export function saveJsonArray<T>(key: string, items: T[], maxItems = DEFAULT_MAX_ITEMS): { ok: true } | { ok: false; error: string } {
   if (typeof window === "undefined") return { ok: false, error: "Storage not available." };
+  const resolved = getScopedStorageKey(key);
+  if (!resolved) return { ok: false, error: "Sign in to save drafts." };
   const capped = items.slice(0, maxItems);
   try {
-    window.localStorage.setItem(key, JSON.stringify(capped));
+    window.localStorage.setItem(resolved, JSON.stringify(capped));
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not save.";

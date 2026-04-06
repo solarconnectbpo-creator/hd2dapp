@@ -10,6 +10,7 @@ import {
   type AuthSession,
   type AuthUser,
 } from "../lib/authClient";
+import { setActiveStorageUserId } from "../lib/userScopedStorage";
 
 type AuthContextValue = {
   loading: boolean;
@@ -105,6 +106,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     if (token) await logoutRemote(token);
   }, [session?.token]);
+
+  const sessionUserId = session?.user?.id ?? null;
+  if (typeof window !== "undefined") {
+    setActiveStorageUserId(sessionUserId);
+  }
 
   const value = useMemo<AuthContextValue>(
     () => ({

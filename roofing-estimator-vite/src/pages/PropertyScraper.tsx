@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { useAuth } from "../context/AuthContext";
 import { VirtualizedPropertyLeadTable } from "../components/VirtualizedPropertyLeadTable";
 import { parsePropertyContactsCsvAsync } from "../lib/propertyContactsCsv";
 import {
@@ -31,12 +32,12 @@ import {
   enrichPropertyRecordWithPlaces,
   enrichPropertyRecordsWithPlaces,
   extractCityFromPropertyAddress,
-  PROPERTY_SCRAPER_GOOGLE_PLACES_KEY_STORAGE,
+  getGooglePlacesKeyStorageKey,
 } from "../lib/propertyPhoneEnrichment";
 import {
   enrichPropertyRecordWithPdl,
   enrichPropertyRecordsWithPdl,
-  PROPERTY_SCRAPER_PDL_KEY_STORAGE,
+  getPdlKeyStorageKey,
 } from "../lib/propertyPdlEnrichment";
 import {
   buildPropertyCampaignCsv,
@@ -79,6 +80,9 @@ const FPS_MANUAL_SOURCE = "FastPeopleSearch";
 const MAX_PROPERTY_CSV_BYTES = 180 * 1024 * 1024;
 
 export function PropertyScraper() {
+  const { user } = useAuth();
+  const isAdmin = user?.user_type === "admin";
+  const showVendorEnrichment = isAdmin && import.meta.env.VITE_PROPERTY_SCRAPER_OFFLINE !== "true";
   const propertyScraperOffline = import.meta.env.VITE_PROPERTY_SCRAPER_OFFLINE === "true";
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,25 +121,29 @@ export function PropertyScraper() {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(PROPERTY_SCRAPER_GOOGLE_PLACES_KEY_STORAGE);
+      const k = getGooglePlacesKeyStorageKey();
+      const saved = k ? window.localStorage.getItem(k) : null;
       const fromEnv = import.meta.env.VITE_GOOGLE_PLACES_API_KEY?.trim();
       if (saved) setPlacesKey(saved);
       else if (fromEnv) setPlacesKey(fromEnv);
+      else setPlacesKey("");
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(PROPERTY_SCRAPER_PDL_KEY_STORAGE);
+      const k = getPdlKeyStorageKey();
+      const saved = k ? window.localStorage.getItem(k) : null;
       const fromEnv = import.meta.env.VITE_PDL_API_KEY?.trim();
       if (saved) setPdlKey(saved);
       else if (fromEnv) setPdlKey(fromEnv);
+      else setPdlKey("");
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (selectedRowIndex != null) {
@@ -150,7 +158,12 @@ export function PropertyScraper() {
 
   const persistPlacesKey = useCallback(() => {
     try {
-      window.localStorage.setItem(PROPERTY_SCRAPER_GOOGLE_PLACES_KEY_STORAGE, placesKey.trim());
+      const k = getGooglePlacesKeyStorageKey();
+      if (!k) {
+        setMessage({ kind: "err", text: "Sign in to save your Places key." });
+        return;
+      }
+      window.localStorage.setItem(k, placesKey.trim());
       setMessage({ kind: "ok", text: "Google Places API key saved in this browser." });
     } catch {
       setMessage({ kind: "err", text: "Could not save Places key." });
@@ -159,7 +172,12 @@ export function PropertyScraper() {
 
   const persistPdlKey = useCallback(() => {
     try {
-      window.localStorage.setItem(PROPERTY_SCRAPER_PDL_KEY_STORAGE, pdlKey.trim());
+      const k = getPdlKeyStorageKey();
+      if (!k) {
+        setMessage({ kind: "err", text: "Sign in to save your PDL key." });
+        return;
+      }
+      window.localStorage.setItem(k, pdlKey.trim());
       setMessage({ kind: "ok", text: "People Data Labs API key saved in this browser." });
     } catch {
       setMessage({ kind: "err", text: "Could not save PDL key." });
@@ -664,18 +682,20 @@ export function PropertyScraper() {
           <code className="text-xs bg-gray-100 px-1 rounded">/parallel-setup</code>,{" "}
           <code className="text-xs bg-gray-100 px-1 rounded">/parallel-enrich</code>) and <strong>re-upload</strong> the
           enriched file.
-          {!propertyScraperOffline ? (
+          {isAdmin && !propertyScraperOffline ? (
             <>
               {" "}
               Optional in-browser <strong>DealMachine</strong>, <strong>Google Places</strong>, and{" "}
               <strong>People Data Labs</strong> can fill some gaps when you add keys (localhost dev proxy).
             </>
-          ) : (
+          ) : propertyScraperOffline ? (
             <>
               {" "}
               <strong>DealMachine / Places / PDL</strong> panels are off (
               <code className="text-xs bg-gray-100 px-1 rounded">VITE_PROPERTY_SCRAPER_OFFLINE=true</code>).
             </>
+          ) : (
+            <> Administrator accounts can enable optional API-assisted enrichment after CSV import.</>
           )}{" "}
           <strong>FastPeopleSearch</strong> (
           <a
@@ -725,17 +745,21 @@ export function PropertyScraper() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-black space-y-2">
-            <p className="font-medium">Optional bulk web enrichment (Cursor + Parallel)</p>
-            <p className="text-neutral-800">
-              After you <strong>Export outreach CSV</strong>, you can run Parallel bulk enrichment from the editor (e.g.{" "}
-              <code className="text-xs bg-white px-1 rounded border border-gray-200">/parallel-setup</code> then{" "}
-              <code className="text-xs bg-white px-1 rounded border border-gray-200">/parallel-enrich</code> with the
-              fields you want). Comply with Parallel&apos;s terms and each website&apos;s rules.
-            </p>
+            {isAdmin ? (
+              <>
+                <p className="font-medium">Optional bulk web enrichment (Cursor + Parallel)</p>
+                <p className="text-neutral-800">
+                  After you <strong>Export outreach CSV</strong>, you can run Parallel bulk enrichment from the editor (e.g.{" "}
+                  <code className="text-xs bg-white px-1 rounded border border-gray-200">/parallel-setup</code> then{" "}
+                  <code className="text-xs bg-white px-1 rounded border border-gray-200">/parallel-enrich</code> with the
+                  fields you want). Comply with Parallel&apos;s terms and each website&apos;s rules.
+                </p>
+              </>
+            ) : null}
           </CardContent>
         </Card>
 
-        {!propertyScraperOffline ? (
+        {showVendorEnrichment ? (
           <>
           <Card className="text-black border-blue-200 bg-blue-50/40">
             <CardHeader>
@@ -943,15 +967,20 @@ export function PropertyScraper() {
                 Headers: Address, Owner, Phone, Email, State, etc. No API call. You can import very large lists (e.g.{" "}
                 <strong>100,000</strong> commercial / PM rows): parsing yields to the UI, the table is{" "}
                 <strong>virtualized</strong> (only visible rows render), and the full file must stay under ~180MB. For
-                free manual research, download the template (assessor + SOS columns) and re-upload when filled.{" "}
-                <strong>St. Louis City</strong> and <strong>Kansas City MO</strong> open parcels:{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">npm run data:mo-parcels</code> →{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">data/mo-stl-kc-open-data-import.csv</code>. Up to{" "}
-                <strong>50,000</strong> LLC / large-building / multifamily-style rows (still{" "}
-                <strong>no phones in source</strong>):{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">npm run data:mo-commercial-50k</code> →{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">data/mo-commercial-pm-candidates-50k.csv</code>{" "}
-                (empty phone / contact / email columns for you to fill from a licensed list).
+                free manual research, download the template (assessor + SOS columns) and re-upload when filled.
+                {isAdmin ? (
+                  <>
+                    {" "}
+                    <strong>St. Louis City</strong> and <strong>Kansas City MO</strong> open parcels:{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">npm run data:mo-parcels</code> →{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">data/mo-stl-kc-open-data-import.csv</code>. Up to{" "}
+                    <strong>50,000</strong> LLC / large-building / multifamily-style rows (still{" "}
+                    <strong>no phones in source</strong>):{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">npm run data:mo-commercial-50k</code> →{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">data/mo-commercial-pm-candidates-50k.csv</code>{" "}
+                    (empty phone / contact / email columns for you to fill from a licensed list).
+                  </>
+                ) : null}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-3 text-black">
@@ -998,6 +1027,7 @@ export function PropertyScraper() {
           </Card>
         </div>
 
+        {isAdmin ? (
         <Card className="text-black border-violet-200 bg-violet-50/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-black">
@@ -1036,6 +1066,7 @@ export function PropertyScraper() {
             </p>
           </CardContent>
         </Card>
+        ) : null}
 
         {commResults.length > 0 || preview ? (
           <div className="flex flex-wrap gap-2 items-center">
@@ -1054,7 +1085,7 @@ export function PropertyScraper() {
         {commResults.length > 0 ? (
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2 items-center">
-              {!propertyScraperOffline ? (
+              {showVendorEnrichment ? (
                 <>
                   <span className="text-sm font-medium text-black">Data enhancement (loaded rows)</span>
                   <Button
@@ -1093,10 +1124,15 @@ export function PropertyScraper() {
                   </Button>
                   <span className="text-xs text-neutral-600">Skips rows that already have digits in Phone(s).</span>
                 </>
-              ) : (
+              ) : propertyScraperOffline ? (
                 <span className="text-xs text-neutral-700">
                   CSV-only mode: add <code className="text-xs bg-gray-100 px-1 rounded">phone</code> / contact columns in
                   your spreadsheet, then re-import — or use manual FPS / clipboard merge below.
+                </span>
+              ) : (
+                <span className="text-xs text-neutral-700">
+                  API-assisted row enrichment is limited to administrator accounts. Add phone and contact columns in your CSV,
+                  or use manual FastPeopleSearch below.
                 </span>
               )}
             </div>
@@ -1296,7 +1332,7 @@ export function PropertyScraper() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
-                {!propertyScraperOffline ? (
+                {showVendorEnrichment ? (
                   <>
                     <Button
                       type="button"

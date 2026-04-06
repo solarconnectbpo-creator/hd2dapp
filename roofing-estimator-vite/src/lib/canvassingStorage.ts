@@ -1,5 +1,6 @@
 import type { ContactRecord } from "./contactsCsv";
 import type { PropertyImportPayload } from "./propertyScraper";
+import { getScopedStorageKey } from "./userScopedStorage";
 
 export type CanvassVisitStatus = "new" | "visited" | "skip" | "interested";
 
@@ -18,9 +19,9 @@ export type CanvassLeadEnrichment = {
   updatedAt: string;
 };
 
-const LEADS_KEY = "roofing-estimator-vite-canvassing-leads-v1";
-const STATES_KEY = "roofing-estimator-vite-canvassing-states-v1";
-const ENRICHMENT_KEY = "roofing-estimator-vite-canvassing-enrichment-v1";
+const LEADS_BASE = "roofing-estimator-vite-canvassing-leads-v1";
+const STATES_BASE = "roofing-estimator-vite-canvassing-states-v1";
+const ENRICHMENT_BASE = "roofing-estimator-vite-canvassing-enrichment-v1";
 
 const MAX_PARCEL_STRING_CHARS = 520;
 
@@ -48,7 +49,9 @@ export function trimParcelForStorage(parcel: Record<string, unknown> | null): Re
 export function loadCanvassLeads(): ContactRecord[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(LEADS_KEY);
+    const k = getScopedStorageKey(LEADS_BASE);
+    if (!k) return [];
+    const raw = window.localStorage.getItem(k);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -61,7 +64,9 @@ export function loadCanvassLeads(): ContactRecord[] {
 export function saveCanvassLeads(leads: ContactRecord[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(LEADS_KEY, JSON.stringify(leads));
+    const k = getScopedStorageKey(LEADS_BASE);
+    if (!k) return;
+    window.localStorage.setItem(k, JSON.stringify(leads));
   } catch {
     /* quota */
   }
@@ -70,7 +75,9 @@ export function saveCanvassLeads(leads: ContactRecord[]): void {
 export function loadCanvassStates(): Record<string, CanvassLeadState> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(STATES_KEY);
+    const k = getScopedStorageKey(STATES_BASE);
+    if (!k) return {};
+    const raw = window.localStorage.getItem(k);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return {};
@@ -83,7 +90,9 @@ export function loadCanvassStates(): Record<string, CanvassLeadState> {
 export function saveCanvassStates(states: Record<string, CanvassLeadState>): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STATES_KEY, JSON.stringify(states));
+    const k = getScopedStorageKey(STATES_BASE);
+    if (!k) return;
+    window.localStorage.setItem(k, JSON.stringify(states));
   } catch {
     /* quota */
   }
@@ -92,7 +101,9 @@ export function saveCanvassStates(states: Record<string, CanvassLeadState>): voi
 export function loadCanvassEnrichment(): Record<string, CanvassLeadEnrichment> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(ENRICHMENT_KEY);
+    const k = getScopedStorageKey(ENRICHMENT_BASE);
+    if (!k) return {};
+    const raw = window.localStorage.getItem(k);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return {};
@@ -105,7 +116,9 @@ export function loadCanvassEnrichment(): Record<string, CanvassLeadEnrichment> {
 export function saveCanvassEnrichment(data: Record<string, CanvassLeadEnrichment>): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(ENRICHMENT_KEY, JSON.stringify(data));
+    const k = getScopedStorageKey(ENRICHMENT_BASE);
+    if (!k) return;
+    window.localStorage.setItem(k, JSON.stringify(data));
   } catch {
     /* quota */
   }
@@ -114,7 +127,8 @@ export function saveCanvassEnrichment(data: Record<string, CanvassLeadEnrichment
 export function clearCanvassEnrichment(): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(ENRICHMENT_KEY);
+    const k = getScopedStorageKey(ENRICHMENT_BASE);
+    if (k) window.localStorage.removeItem(k);
   } catch {
     /* ignore */
   }

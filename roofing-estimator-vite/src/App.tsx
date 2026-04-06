@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { useAuth } from "./context/AuthContext";
 import { useRoofing } from "./context/RoofingContext";
 import { useMeasurementChatBridge } from "./context/MeasurementChatBridge";
 import { mergeFormPatch, mergeProposalPatch } from "./lib/mergeEstimatorPatches";
@@ -19,9 +20,9 @@ import {
 } from "./lib/orgSettings";
 import {
   normalizePropertyImportPayloadContacts,
+  parsePendingPropertyImport,
   PENDING_PROPERTY_IMPORT_KEY,
   PENDING_PROPERTY_IMPORT_SESSION_KEY,
-  parsePendingPropertyImport,
   type PropertyImportPayload,
 } from "./lib/propertyScraper";
 import {
@@ -64,6 +65,7 @@ import {
 import { buildFootprintDxfFromPolygons, type FootprintFeature } from "./lib/roofDxfExport";
 import { compareDrawnVsHeuristic, type TakeoffComparisonRow } from "./lib/roofTakeoffComparison";
 import { parseCarrierScope, type CarrierParsed } from "./lib/carrierScopeParse";
+import { getScopedStorageKey } from "./lib/userScopedStorage";
 import { Map3D, type Map3DHandle } from "./components/Map3D";
 import {
   computeCarrierBenchmark,
@@ -3097,6 +3099,8 @@ function buildProposalHtml(
 }
 
 function App() {
+  const { user } = useAuth();
+  const storageUserId = user?.id ?? null;
   const [searchParams, setSearchParams] = useSearchParams();
   /** Captured once for /measurement/new?auto=1 instant estimate (avoid stale searchParams in one-shot import effect). */
   const measurementAutoFromQueryRef = useRef(searchParams.get("auto") === "1");
@@ -3116,7 +3120,7 @@ function App() {
     buildMeasurementSectionFromForm(defaultFormState(), "Section 1"),
   ]);
   const [proposal, setProposal] = useState<ProposalState>(defaultProposalState("residential"));
-  const [contacts, setContacts] = useState<ContactRecord[]>(() => loadContactsFromStorage());
+  const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [selectedContactId, setSelectedContactId] = useState("");
   const [contactSearch, setContactSearch] = useState("");
   const [contactsGeocodeBusy, setContactsGeocodeBusy] = useState(false);
@@ -3202,7 +3206,13 @@ function App() {
   }, [measurementSections]);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!storageUserId) {
+      setSavedJobs([]);
+      return;
+    }
+    const k = getScopedStorageKey(STORAGE_KEY);
+    if (!k) return;
+    const raw = window.localStorage.getItem(k);
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as SavedJob[];
@@ -3210,10 +3220,17 @@ function App() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [storageUserId]);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(PROPERTY_DB_KEY);
+    if (!storageUserId) {
+      setPropertyDb([]);
+      setActiveProperty(null);
+      return;
+    }
+    const k = getScopedStorageKey(PROPERTY_DB_KEY);
+    if (!k) return;
+    const raw = window.localStorage.getItem(k);
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as PropertyOwnerRecord[];
@@ -3228,7 +3245,16 @@ function App() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [storageUserId]);
+
+  useEffect(() => {
+    if (!storageUserId) {
+      setContacts([]);
+      setSelectedContactId("");
+      return;
+    }
+    setContacts(loadContactsFromStorage());
+  }, [storageUserId]);
 
   useEffect(() => {
     const r = saveContactsToStorageSafe(contacts);
@@ -3238,6 +3264,7 @@ function App() {
   }, [contacts]);
 
   useEffect(() => {
+    if (!storageUserId) return;
     const org = loadOrgSettings();
     setProposal((curr) => ({
       ...curr,
@@ -3250,7 +3277,7 @@ function App() {
       logoDataUrl: org.logoDataUrl || curr.logoDataUrl,
       profile: org.defaultTemplateProfile,
     }));
-  }, []);
+  }, [storageUserId]);
 
   useEffect(() => {
     fetchSavedReports();
@@ -3345,7 +3372,8 @@ function App() {
 
   const persistJobs = (jobs: SavedJob[]) => {
     setSavedJobs(jobs);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
+    const k = getScopedStorageKey(STORAGE_KEY);
+    if (k) window.localStorage.setItem(k, JSON.stringify(jobs));
   };
 
   const result = useMemo(() => {
@@ -4299,7 +4327,8 @@ function App() {
 
   const persistPropertyDb = (records: PropertyOwnerRecord[]) => {
     setPropertyDb(records);
-    window.localStorage.setItem(PROPERTY_DB_KEY, JSON.stringify(records));
+    const k = getScopedStorageKey(PROPERTY_DB_KEY);
+    if (k) window.localStorage.setItem(k, JSON.stringify(records));
   };
 
   const findNearbyProperty = (lat: number, lng: number, thresholdFt = 150): PropertyOwnerRecord | null => {
@@ -4733,7 +4762,7 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- deep link; one-shot query handling
   useEffect(() => {
     const contactId = searchParams.get("contactId");
-    if (!contactId) return;
+    if (!contactId || !storageUserId) return;
     const auto = searchParams.get("auto") === "1";
     setSearchParams({}, { replace: true });
     const list = loadContactsFromStorage();
@@ -4759,31 +4788,33 @@ function App() {
   }, [searchParams]);
 
   // One-shot import from Property records / Canvassing (localStorage + sessionStorage handoff).
-  // Must run once per mount: do not depend on `form` (re-runs would miss the stash after first removal).
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally mount-only; uses defaultFormState() as base
+  // Runs when the signed-in user id is known so keys match `stashPendingPropertyImport`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- uses defaultFormState() as base; not tied to form
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !storageUserId) return;
+    const localKey = getScopedStorageKey(PENDING_PROPERTY_IMPORT_KEY);
+    const sessionKey = getScopedStorageKey(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+    if (!localKey || !sessionKey) return;
     try {
       const raw =
-        window.localStorage.getItem(PENDING_PROPERTY_IMPORT_KEY) ??
-        window.sessionStorage.getItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        window.localStorage.getItem(localKey) ?? window.sessionStorage.getItem(sessionKey);
       if (!raw) return;
 
       const parsed = parsePendingPropertyImport(raw);
       if (!parsed) {
-        window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
-        window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        window.localStorage.removeItem(localKey);
+        window.sessionStorage.removeItem(sessionKey);
         return;
       }
       const payload = normalizePropertyImportPayloadContacts(parsed.payload as PropertyImportPayload);
       if (!payload?.address) {
-        window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
-        window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        window.localStorage.removeItem(localKey);
+        window.sessionStorage.removeItem(sessionKey);
         return;
       }
 
-      window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
-      window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+      window.localStorage.removeItem(localKey);
+      window.sessionStorage.removeItem(sessionKey);
 
       const shouldAutoEstimate = Boolean(parsed.options?.autoEstimate || measurementAutoFromQueryRef.current);
 
@@ -4877,13 +4908,15 @@ function App() {
     } catch (e) {
       console.error("[measurement] pending property import failed", e);
       try {
-        window.localStorage.removeItem(PENDING_PROPERTY_IMPORT_KEY);
-        window.sessionStorage.removeItem(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        const lk = getScopedStorageKey(PENDING_PROPERTY_IMPORT_KEY);
+        const sk = getScopedStorageKey(PENDING_PROPERTY_IMPORT_SESSION_KEY);
+        if (lk) window.localStorage.removeItem(lk);
+        if (sk) window.sessionStorage.removeItem(sk);
       } catch {
         /* ignore */
       }
     }
-  }, []);
+  }, [storageUserId]);
 
   const applyDrawnAreaToEstimate = () => {
     if (mapboxAreaSqFt <= 0 && drawnRoofLines.length === 0) {

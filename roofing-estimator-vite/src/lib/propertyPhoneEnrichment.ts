@@ -6,8 +6,13 @@
 
 import { isLikelyPropertyManagerOrCommercialOwner, type PropertyImportPayload } from "./propertyScraper";
 import { isViteDevProxyOrigin } from "./viteApiProxy";
+import { getScopedStorageKey } from "./userScopedStorage";
 
 export const PROPERTY_SCRAPER_GOOGLE_PLACES_KEY_STORAGE = "roofing-estimator-vite-google-places-key";
+
+export function getGooglePlacesKeyStorageKey(): string | null {
+  return getScopedStorageKey(PROPERTY_SCRAPER_GOOGLE_PLACES_KEY_STORAGE);
+}
 
 function placesBaseUrl(): string {
   return isViteDevProxyOrigin() ? "/google-places-api" : "https://places.googleapis.com";

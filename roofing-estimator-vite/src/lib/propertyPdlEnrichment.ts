@@ -10,8 +10,13 @@ import {
 } from "./propertyScraper";
 import { extractCityFromPropertyAddress } from "./propertyPhoneEnrichment";
 import { isViteDevProxyOrigin } from "./viteApiProxy";
+import { getScopedStorageKey } from "./userScopedStorage";
 
 export const PROPERTY_SCRAPER_PDL_KEY_STORAGE = "roofing-estimator-vite-pdl-api-key";
+
+export function getPdlKeyStorageKey(): string | null {
+  return getScopedStorageKey(PROPERTY_SCRAPER_PDL_KEY_STORAGE);
+}
 
 function pdlBaseUrl(): string {
   return isViteDevProxyOrigin() ? "/pdl-api" : "https://api.peopledatalabs.com";

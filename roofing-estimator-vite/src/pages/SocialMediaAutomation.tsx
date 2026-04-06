@@ -35,6 +35,7 @@ import {
   type MetaScheduledRow,
 } from "../lib/metaMarketingClient";
 import { isHd2dApiConfigured } from "../lib/hd2dApiBase";
+import { getScopedStorageKey } from "../lib/userScopedStorage";
 
 const cardChrome = "border-white/[0.07] ring-1 ring-white/[0.04]";
 const fieldClass =
@@ -70,6 +71,7 @@ export function SocialMediaAutomation() {
   const { session, user } = useAuth();
   const token = session?.token ?? "";
   const canMeta = user?.user_type === "company" || user?.user_type === "admin";
+  const isAdmin = user?.user_type === "admin";
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -98,6 +100,11 @@ export function SocialMediaAutomation() {
   const oauthRedirectDisplay =
     (metaOAuthRedirectUri && metaOAuthRedirectUri.trim()) || spaOAuthCallbackUrl || null;
   const oauthUriFromWorkerOnly = Boolean(metaOAuthRedirectUri?.trim());
+
+  const adCreativeDraftsStorageResolved = useMemo(
+    () => getScopedStorageKey(AD_CREATIVE_DRAFTS_STORAGE_KEY),
+    [user?.id],
+  );
 
   const refreshCreativePacks = useCallback(() => {
     setCreativePacks(loadJsonArray<AdCreativeDraftStored>(AD_CREATIVE_DRAFTS_STORAGE_KEY, []));
@@ -146,7 +153,7 @@ export function SocialMediaAutomation() {
   useEffect(() => {
     refreshCreativePacks();
     const onStorage = (ev: StorageEvent) => {
-      if (ev.key === AD_CREATIVE_DRAFTS_STORAGE_KEY || ev.key === null) refreshCreativePacks();
+      if (ev.key === adCreativeDraftsStorageResolved || ev.key === null) refreshCreativePacks();
     };
     const onFocus = () => refreshCreativePacks();
     window.addEventListener("storage", onStorage);
@@ -155,7 +162,7 @@ export function SocialMediaAutomation() {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", onFocus);
     };
-  }, [refreshCreativePacks]);
+  }, [refreshCreativePacks, adCreativeDraftsStorageResolved]);
 
   const persist = useCallback((next: SocialDraft[]) => {
     const r = saveJsonArray(SOCIAL_DRAFTS_STORAGE_KEY, next);
@@ -164,7 +171,7 @@ export function SocialMediaAutomation() {
 
   useEffect(() => {
     setDrafts(loadJsonArray<SocialDraft>(SOCIAL_DRAFTS_STORAGE_KEY, []));
-  }, []);
+  }, [user?.id]);
 
   const saveDraft = () => {
     const body = draftText.trim();
@@ -213,17 +220,27 @@ export function SocialMediaAutomation() {
               <CardTitle className="text-black">Meta (Facebook) — schedule Page posts</CardTitle>
             </div>
             <CardDescription className="text-[#8b9199]">
-              Uses your Facebook Page (not personal profile). In Meta Developer Console → Facebook Login → Valid OAuth Redirect
-              URIs, add the exact URL below. It must match this app&apos;s origin +{" "}
-              <code className="font-mono text-[0.85em]">/api/meta/oauth/callback</code> and the Worker&apos;s{" "}
-              <code className="font-mono text-[0.85em]">APP_PUBLIC_ORIGIN</code> (no trailing slash).
+              {isAdmin ? (
+                <>
+                  Uses your Facebook Page (not personal profile). In Meta Developer Console → Facebook Login → Valid OAuth
+                  Redirect URIs, add the exact URL below. It must match this app&apos;s origin +{" "}
+                  <code className="font-mono text-[0.85em]">/api/meta/oauth/callback</code> and the Worker&apos;s{" "}
+                  <code className="font-mono text-[0.85em]">APP_PUBLIC_ORIGIN</code> (no trailing slash).
+                </>
+              ) : (
+                <>
+                  Uses your Facebook Page (not your personal profile). Add the redirect URL below to your Meta app&apos;s{" "}
+                  <strong>Valid OAuth Redirect URIs</strong> (exact match). Ask your administrator if you are unsure which
+                  URL to use.
+                </>
+              )}
             </CardDescription>
             {oauthRedirectDisplay ? (
               <div className="mt-2 space-y-2">
                 <p className="break-all rounded-md bg-white/[0.06] px-2 py-1.5 font-mono text-xs text-[#e7e9ea]">
                   {oauthRedirectDisplay}
                 </p>
-                {!oauthUriFromWorkerOnly && spaOAuthCallbackUrl ? (
+                {isAdmin && !oauthUriFromWorkerOnly && spaOAuthCallbackUrl ? (
                   <p className="text-xs text-amber-200/90" role="status">
                     Worker did not return a redirect URI yet — showing this site&apos;s callback URL. Set{" "}
                     <code className="rounded bg-white/[0.08] px-1 font-mono">APP_PUBLIC_ORIGIN</code> on the Worker to the same
@@ -235,12 +252,24 @@ export function SocialMediaAutomation() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             {!isHd2dApiConfigured() ? (
-              <p className="text-amber-200/90">Configure the HD2D Worker (VITE_INTEL_API_BASE) to enable Meta.</p>
+              <p className="text-amber-200/90">
+                {isAdmin ? (
+                  <>Configure the HD2D Worker (VITE_INTEL_API_BASE) to enable Meta.</>
+                ) : (
+                  <>Meta scheduling is not available until the app API is configured. Contact your administrator.</>
+                )}
+              </p>
             ) : !metaConfigured ? (
               <p className="text-[#8b9199]">
-                Set <code className="rounded bg-white/[0.06] px-1 font-mono text-xs">META_APP_ID</code>,{" "}
-                <code className="rounded bg-white/[0.06] px-1 font-mono text-xs">META_APP_SECRET</code>, and{" "}
-                <code className="rounded bg-white/[0.06] px-1 font-mono text-xs">APP_PUBLIC_ORIGIN</code> on the Worker.
+                {isAdmin ? (
+                  <>
+                    Set <code className="rounded bg-white/[0.06] px-1 font-mono text-xs">META_APP_ID</code>,{" "}
+                    <code className="rounded bg-white/[0.06] px-1 font-mono text-xs">META_APP_SECRET</code>, and{" "}
+                    <code className="rounded bg-white/[0.06] px-1 font-mono text-xs">APP_PUBLIC_ORIGIN</code> on the Worker.
+                  </>
+                ) : (
+                  <>Meta is not fully configured yet. Ask your administrator to finish the Facebook app and server setup.</>
+                )}
               </p>
             ) : !metaConnected ? (
               <div className="flex flex-wrap gap-2">

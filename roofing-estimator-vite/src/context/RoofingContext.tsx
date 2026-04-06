@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAuth } from "./AuthContext";
+import { getScopedStorageKey } from "../lib/userScopedStorage";
 import {
   type DamagePhoto,
   type DamagePhotoAiSummary,
@@ -130,7 +132,7 @@ interface RoofingContextType {
 
 const RoofingContext = createContext<RoofingContextType | undefined>(undefined);
 
-const LS_KEY = "roofing-pro-context-v1";
+const LS_KEY_BASE = "roofing-pro-context-v1";
 
 const ROOF_FORMS = new Set<RoofFormKind>(["gable", "hip", "flat", "mansard", "complex"]);
 
@@ -194,13 +196,23 @@ function newPhotoId(): string {
 }
 
 export function RoofingProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const storageUserId = user?.id ?? null;
+
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [fieldProjects, setFieldProjects] = useState<FieldProject[]>([]);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(LS_KEY);
+    setMeasurements([]);
+    setEstimates([]);
+    setContracts([]);
+    setFieldProjects([]);
+    if (typeof window === "undefined" || !storageUserId) return;
+    const key = getScopedStorageKey(LS_KEY_BASE);
+    if (!key) return;
+    const raw = window.localStorage.getItem(key);
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as {
@@ -234,14 +246,17 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore invalid storage
     }
-  }, []);
+  }, [storageUserId]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !storageUserId) return;
+    const key = getScopedStorageKey(LS_KEY_BASE);
+    if (!key) return;
     window.localStorage.setItem(
-      LS_KEY,
+      key,
       JSON.stringify({ measurements, estimates, contracts, fieldProjects }),
     );
-  }, [measurements, estimates, contracts, fieldProjects]);
+  }, [measurements, estimates, contracts, fieldProjects, storageUserId]);
 
   const api = useMemo<RoofingContextType>(
     () => ({
