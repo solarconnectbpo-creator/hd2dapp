@@ -1,10 +1,36 @@
 /**
- * Vercel Edge: proxy same-origin `/api/*` to the HD2D Worker. Required when Cloudflare Zero Trust
- * protects `*.workers.dev` — set HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET (service token).
+ * Vercel Edge: proxy same-origin `/api/*` to the HD2D Worker.
+ *
+ * - **Default:** `*.workers.dev` — if Cloudflare Access protects it, set HD2D_ACCESS_CLIENT_ID / SECRET
+ *   (Service Auth policy) or use HD2D_WORKER_UPSTREAM below.
+ * - **Bypass Access:** set `HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com` (Worker route on
+ *   your zone — see backend/wrangler.toml). No Access app should cover that hostname; middleware skips
+ *   service-token headers for non-`workers.dev` hosts.
+ *
  * @see https://developers.cloudflare.com/cloudflare-one/identity/service-tokens/
- * @see https://developers.cloudflare.com/cloudflare-one/access-controls/policies/#service-auth
  */
-const UPSTREAM = "https://hd2d-backend.solarconnectbpo.workers.dev";
+const DEFAULT_UPSTREAM = "https://hd2d-backend.solarconnectbpo.workers.dev";
+
+function upstreamBase(): string {
+  const raw = process.env["HD2D_WORKER_UPSTREAM"]?.trim();
+  const base = (raw || DEFAULT_UPSTREAM).replace(/\/$/, "");
+  try {
+    const u = new URL(base);
+    if (u.protocol !== "https:") return DEFAULT_UPSTREAM;
+    return base;
+  } catch {
+    return DEFAULT_UPSTREAM;
+  }
+}
+
+/** Access service tokens only apply to the default workers.dev host in our setup. */
+function needsCfAccessServiceAuth(base: string): boolean {
+  try {
+    return new URL(base).hostname.endsWith(".workers.dev");
+  } catch {
+    return true;
+  }
+}
 
 const HOP_BY_HOP = new Set([
   "host",
@@ -25,7 +51,8 @@ export const config = {
 
 export default async function middleware(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  const target = new URL(url.pathname + url.search, UPSTREAM);
+  const base = upstreamBase();
+  const target = new URL(url.pathname + url.search, `${base}/`);
   const headers = new Headers(request.headers);
   for (const name of HOP_BY_HOP) {
     headers.delete(name);
@@ -33,19 +60,21 @@ export default async function middleware(request: Request): Promise<Response> {
   // Bracket keys so the Vercel Edge bundler does not replace these with `undefined` at build time.
   const id = process.env["HD2D_ACCESS_CLIENT_ID"]?.trim();
   const secret = process.env["HD2D_ACCESS_CLIENT_SECRET"]?.trim();
-  if (!id || !secret) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error:
-          "Vercel Edge middleware did not receive HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET. Confirm they exist for Production and redeploy.",
-        debug: { hasClientId: Boolean(id), hasClientSecret: Boolean(secret) },
-      }),
-      { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
-    );
+  if (needsCfAccessServiceAuth(base)) {
+    if (!id || !secret) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "Vercel Edge middleware did not receive HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET. Confirm they exist for Production and redeploy.",
+          debug: { hasClientId: Boolean(id), hasClientSecret: Boolean(secret) },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+    headers.set("CF-Access-Client-Id", id);
+    headers.set("CF-Access-Client-Secret", secret);
   }
-  headers.set("CF-Access-Client-Id", id);
-  headers.set("CF-Access-Client-Secret", secret);
 
   const method = request.method;
   let body: ArrayBuffer | undefined;
