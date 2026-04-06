@@ -36,6 +36,9 @@ const CallCenterRoute = lazyRoute(() => import("./pages/CallCenter").then((m) =>
 const LeadMarketplaceRoute = lazyRoute(() =>
   import("./pages/LeadMarketplace").then((m) => ({ default: m.LeadMarketplace })),
 );
+const AccountPendingRoute = lazyRoute(() =>
+  import("./pages/AccountPending").then((m) => ({ default: m.AccountPending })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -81,6 +84,7 @@ export const router = createBrowserRouter([
           { path: "courses", Component: CoursesRoute },
           { path: "call-center", Component: CallCenterRoute },
           { path: "leads", Component: LeadMarketplaceRoute },
+          { path: "account/pending", Component: AccountPendingRoute },
           { path: "admin/courses", Component: AdminCoursesRoute },
           { path: "admin/users", Component: AdminUsersRoute },
           { path: "*", Component: NotFound },

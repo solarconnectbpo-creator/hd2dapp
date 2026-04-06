@@ -5,6 +5,7 @@ import {
   adminCreateUser,
   adminDeleteUser,
   adminListUsers,
+  adminSetUserApproval,
   adminUpdateUser,
   type AdminUserRow,
 } from "../lib/authClient";
@@ -101,7 +102,8 @@ export function AdminUsers() {
       <div>
         <h1 className="text-2xl font-semibold text-[#e7e9ea]">User accounts</h1>
         <p className="text-sm text-[#71767b] mt-1">
-          Create logins, assign roles, and remove accounts. Passwords are stored hashed on the Worker (D1).
+          Create logins, assign roles, approve company/rep access, and remove accounts. Passwords are stored hashed on the Worker
+          (D1).
         </p>
       </div>
 
@@ -187,8 +189,10 @@ export function AdminUsers() {
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Role</th>
+                  <th className="px-4 py-3 font-medium">Approval</th>
+                  <th className="px-4 py-3 font-medium">Billing</th>
                   <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3 font-medium w-48">Actions</th>
+                  <th className="px-4 py-3 font-medium w-56">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2f3336] text-[#e7e9ea]">
@@ -237,6 +241,19 @@ function UserRow({
   const [name, setName] = useState(row.name);
   const [role, setRole] = useState(row.user_type);
   const [newPassword, setNewPassword] = useState("");
+
+  const setApproval = async (st: "approved" | "rejected") => {
+    onError("");
+    onBusy(true);
+    try {
+      await adminSetUserApproval(token, row.id, st);
+      await onRefresh();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Approval update failed.");
+    } finally {
+      onBusy(false);
+    }
+  };
 
   const save = async () => {
     onError("");
@@ -294,6 +311,8 @@ function UserRow({
           <span className="capitalize">{row.user_type.replace("_", " ")}</span>
         )}
       </td>
+      <td className="px-4 py-3 align-top text-xs capitalize text-[#9aa0a6]">{row.approval_status}</td>
+      <td className="px-4 py-3 align-top text-xs capitalize text-[#9aa0a6]">{row.billing_status}</td>
       <td className="px-4 py-3 align-top text-[#71767b] text-xs">{formatTs(row.updated_at)}</td>
       <td className="px-4 py-3 align-top space-y-2">
         {editing ? (
@@ -331,6 +350,27 @@ function UserRow({
           </>
         ) : (
           <div className="flex flex-wrap gap-2">
+            {row.user_type !== "admin" ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-btn text-xs py-1 px-2"
+                  disabled={busy}
+                  onClick={() => void setApproval("approved")}
+                  title="Allow platform access (still requires active billing for company/rep)"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn text-xs py-1 px-2 border-rose-500/40 text-rose-300"
+                  disabled={busy}
+                  onClick={() => void setApproval("rejected")}
+                >
+                  Reject
+                </button>
+              </>
+            ) : null}
             <button type="button" className="secondary-btn text-xs py-1 px-2" onClick={() => setEditing(true)} disabled={busy}>
               Edit
             </button>

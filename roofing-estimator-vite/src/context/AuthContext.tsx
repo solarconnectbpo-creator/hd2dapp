@@ -7,6 +7,7 @@ import {
   loginWithPassword,
   logoutRemote,
   registerAccount,
+  type AuthAccess,
   type AuthSession,
   type AuthUser,
   type RegisterAccountPayload,
@@ -17,6 +18,12 @@ type AuthContextValue = {
   loading: boolean;
   session: AuthSession | null;
   user: AuthUser | null;
+  /** Latest access evaluation from the Worker (approval + billing). */
+  access: AuthAccess | null;
+  /** False for company/rep until approved and billing active (admins always true). */
+  accessGranted: boolean;
+  /** Re-fetch GET /api/auth/me and update the stored session (e.g. after Stripe returns). */
+  refreshSession: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (payload: RegisterAccountPayload) => Promise<AuthUser>;
   logout: () => Promise<void>;
@@ -73,9 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const user = await fetchCurrentUser(existing.token);
+        const { user, access } = await fetchCurrentUser(existing.token);
         if (!mounted) return;
-        setSession({ ...existing, user });
+        setSession({ ...existing, user, access });
       } catch {
         clearSession();
         if (mounted) setSession(null);
@@ -101,6 +108,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return next.user;
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const existing = getStoredSession();
+    if (!existing?.token) return;
+    try {
+      const { user, access } = await fetchCurrentUser(existing.token);
+      setSession({ ...existing, user, access });
+    } catch {
+      clearSession();
+      setSession(null);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     const token = session?.token || "";
     clearSession();
@@ -113,17 +132,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveStorageUserId(sessionUserId);
   }
 
+  const access = session?.access ?? null;
+  const accessGranted =
+    session?.user?.user_type === "admin" || session?.access?.accessGranted === true;
+
   const value = useMemo<AuthContextValue>(
     () => ({
       loading,
       session,
       user: session?.user ?? null,
+      access,
+      accessGranted,
+      refreshSession,
       login,
       register,
       logout,
       isAuthenticated: Boolean(session?.token),
     }),
-    [loading, session, login, register, logout],
+    [loading, session, access, accessGranted, refreshSession, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 
 export function AuthGate() {
-  const { loading, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated, accessGranted, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -24,5 +24,15 @@ export function AuthGate() {
     const from = `${location.pathname}${location.search || ""}`;
     return <Navigate to={to} replace state={{ from }} />;
   }
+
+  const needsOrgGate = user?.user_type === "company" || user?.user_type === "sales_rep";
+  const onPendingPath = location.pathname.startsWith("/account/pending");
+  if (needsOrgGate && !accessGranted && !onPendingPath) {
+    return <Navigate to="/account/pending" replace />;
+  }
+  if (needsOrgGate && accessGranted && onPendingPath) {
+    return <Navigate to="/" replace />;
+  }
+
   return <Outlet />;
 }

@@ -12,10 +12,19 @@ export type AuthUser = {
   user_type: "admin" | "company" | "sales_rep";
 };
 
+/** Mirrors Worker `evaluateAccess` payload on login / register / GET /api/auth/me. */
+export type AuthAccess = {
+  accessGranted: boolean;
+  approval_status: string;
+  billing_status: string;
+  reasons: string[];
+};
+
 export type AuthSession = {
   token: string;
   user: AuthUser;
   expiresAt: number;
+  access?: AuthAccess;
 };
 
 type LoginResponse = {
@@ -23,6 +32,7 @@ type LoginResponse = {
   token?: string;
   user?: AuthUser;
   expiresAt?: number;
+  access?: AuthAccess;
   error?: string;
   /** Server hint (e.g. D1 error) — safe to show in UI for debugging sign-up / login. */
   detail?: string;
@@ -71,27 +81,30 @@ export type AuthCapabilities = {
   ok: boolean;
   /** False when Worker has AUTH_SIGNUP_ENABLED=false */
   authSignup: boolean;
+  /** True when Worker can start membership Stripe Checkout. */
+  membershipCheckout: boolean;
 };
 
 /** GET /api/health — use on sign-up page to show when self-service registration is off. */
 export async function fetchAuthCapabilities(): Promise<AuthCapabilities> {
   const apiBase = getAuthApiBase();
-  if (!apiBase) return { ok: false, authSignup: false };
+  if (!apiBase) return { ok: false, authSignup: false, membershipCheckout: false };
   try {
     const res = await authFetch(`${apiBase}/api/health`, {
       headers: { Accept: "application/json" },
     });
     const data = await readJsonResponseBody<{
       ok?: boolean;
-      capabilities?: { authSignup?: boolean };
+      capabilities?: { authSignup?: boolean; membershipCheckout?: boolean };
     }>(res);
     if (!res.ok || data.ok !== true) {
-      return { ok: false, authSignup: true };
+      return { ok: false, authSignup: true, membershipCheckout: false };
     }
     const signup = data.capabilities?.authSignup !== false;
-    return { ok: true, authSignup: signup };
+    const membershipCheckout = data.capabilities?.membershipCheckout === true;
+    return { ok: true, authSignup: signup, membershipCheckout };
   } catch {
-    return { ok: false, authSignup: true };
+    return { ok: false, authSignup: true, membershipCheckout: false };
   }
 }
 
@@ -140,19 +153,24 @@ export async function loginWithPassword(email: string, password: string): Promis
     token: data.token,
     user: data.user,
     expiresAt: data.expiresAt,
+    access: data.access,
   };
   storeSession(session);
   return session;
 }
 
-export async function fetchCurrentUser(token: string): Promise<AuthUser> {
+export async function fetchCurrentUser(token: string): Promise<{ user: AuthUser; access?: AuthAccess }> {
   const apiBase = getAuthApiBase();
   if (!apiBase) throw new Error("Backend API base is not configured.");
   const res = await authFetch(`${apiBase}/api/auth/me`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
   });
   const text = await res.text();
-  const data = parseFetchedJson<{ success?: boolean; user?: AuthUser; error?: string }>(text, res, "/api/auth/me");
+  const data = parseFetchedJson<{ success?: boolean; user?: AuthUser; access?: AuthAccess; error?: string }>(
+    text,
+    res,
+    "/api/auth/me",
+  );
   if (!res.ok || data.success !== true || !data.user) {
     throw new Error(
       safeUserFacingApiMessage(data.error || `Session validation failed (${res.status}).`, res.status, {
@@ -160,7 +178,7 @@ export async function fetchCurrentUser(token: string): Promise<AuthUser> {
       }),
     );
   }
-  return data.user;
+  return { user: data.user, access: data.access };
 }
 
 export async function logoutRemote(token: string): Promise<void> {
@@ -222,9 +240,31 @@ export async function registerAccount(payload: RegisterAccountPayload): Promise<
     token: data.token,
     user: data.user,
     expiresAt: data.expiresAt,
+    access: data.access,
   };
   storeSession(session);
   return session;
+}
+
+export async function startMembershipCheckout(token: string): Promise<string> {
+  const apiBase = getAuthApiBase();
+  if (!apiBase) throw new Error("Backend API base is not configured.");
+  const res = await authFetch(`${apiBase}/api/billing/membership-checkout-session`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const data = await readJsonResponseBody<{ success?: boolean; url?: string; error?: string }>(res);
+  if (!res.ok || data.success !== true || !data.url) {
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Could not start checkout (${res.status}).`, res.status, {
+        skipStatusHints: true,
+      }),
+    );
+  }
+  return data.url;
 }
 
 export type AdminUserRow = {
@@ -232,6 +272,8 @@ export type AdminUserRow = {
   email: string;
   name: string;
   user_type: AuthUser["user_type"];
+  approval_status: string;
+  billing_status: string;
   created_at: number;
   updated_at: number;
 };
@@ -287,6 +329,32 @@ export async function adminDeleteUser(token: string, userId: string): Promise<vo
   if (!res.ok || data.success !== true) {
     throw new Error(
       safeUserFacingApiMessage(data.error || `Delete failed (${res.status}).`, res.status, { skipStatusHints: true }),
+    );
+  }
+}
+
+export async function adminSetUserApproval(
+  token: string,
+  userId: string,
+  approval_status: "pending" | "approved" | "rejected",
+): Promise<void> {
+  const apiBase = getAuthApiBase();
+  if (!apiBase) throw new Error("Backend API base is not configured.");
+  const res = await authFetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/approval`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ approval_status }),
+  });
+  const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
+  if (!res.ok || data.success !== true) {
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Approval update failed (${res.status}).`, res.status, {
+        skipStatusHints: true,
+      }),
     );
   }
 }
