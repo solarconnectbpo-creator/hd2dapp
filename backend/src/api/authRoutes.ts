@@ -166,7 +166,20 @@ export async function handleAuthRequest(
         envRow = null;
       }
       const access = evaluateAccess(env, matched.user.user_type, envRow);
-      const { token, expiresAt } = await issueToken(env, matched.user);
+      let token: string;
+      let expiresAt: number;
+      try {
+        const issued = await issueToken(env, matched.user);
+        token = issued.token;
+        expiresAt = issued.expiresAt;
+      } catch (e) {
+        console.error("login issueToken (env user):", e);
+        const detail = e instanceof Error ? e.message : String(e);
+        return new Response(
+          JSON.stringify({ success: false, error: "Could not create session.", detail }),
+          { status: 500, headers: j },
+        );
+      }
       return new Response(JSON.stringify({ success: true, token, user: matched.user, expiresAt, access }), {
         status: 200,
         headers: j,
@@ -207,7 +220,20 @@ export async function handleAuthRequest(
       }
       const user = rowToAuthUser(dbUser);
       const access = evaluateAccess(env, user.user_type, dbUser);
-      const { token, expiresAt } = await issueToken(env, user);
+      let token: string;
+      let expiresAt: number;
+      try {
+        const issued = await issueToken(env, user);
+        token = issued.token;
+        expiresAt = issued.expiresAt;
+      } catch (e) {
+        console.error("login issueToken (db user):", e);
+        const detail = e instanceof Error ? e.message : String(e);
+        return new Response(
+          JSON.stringify({ success: false, error: "Could not create session.", detail }),
+          { status: 500, headers: j },
+        );
+      }
       return new Response(JSON.stringify({ success: true, token, user, expiresAt, access }), { status: 200, headers: j });
     }
     return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
@@ -389,7 +415,7 @@ export async function handleAuthRequest(
       homeState: isCompany ? undefined : homeState,
     });
     if (ctx) {
-      ctx.waitUntil(notify);
+      ctx.waitUntil(notify.catch((e) => console.error("[signup-notify]", e)));
     } else {
       void notify.catch((e) => console.error("[signup-notify]", e));
     }
