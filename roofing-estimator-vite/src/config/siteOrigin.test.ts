@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HD2D_PUBLIC_API_ORIGIN, apiOriginForHostname, isHd2dZoneHostname } from "./siteOrigin";
+import { HD2D_PRODUCTION_WWW_ORIGIN, apiOriginForHostname, isHd2dZoneHostname } from "./siteOrigin";
 
 describe("isHd2dZoneHostname", () => {
   it("matches apex, www, and subdomains", () => {
@@ -11,9 +11,9 @@ describe("isHd2dZoneHostname", () => {
 });
 
 describe("apiOriginForHostname", () => {
-  it("maps Vercel preview to public API origin (apex /api/*, not workers.dev)", () => {
-    expect(apiOriginForHostname("hd2d-closers.vercel.app")).toBe(HD2D_PUBLIC_API_ORIGIN);
-    expect(apiOriginForHostname("foo-bar-123-solar.vercel.app")).toBe(HD2D_PUBLIC_API_ORIGIN);
+  it("maps Vercel preview to www production host (avoids apex↔www redirect loops on /api/*)", () => {
+    expect(apiOriginForHostname("hd2d-closers.vercel.app")).toBe(HD2D_PRODUCTION_WWW_ORIGIN);
+    expect(apiOriginForHostname("foo-bar-123-solar.vercel.app")).toBe(HD2D_PRODUCTION_WWW_ORIGIN);
   });
 
   it("maps Cloudflare Pages *.pages.dev to null when same-origin /api proxy is default", () => {

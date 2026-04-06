@@ -7,12 +7,6 @@
       "destination": "https://hardcoredoortodoorclosers.com/:path*",
       "permanent": true
     },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.hardcoredoortodoorclosers.com" }],
-      "destination": "https://hardcoredoortodoorclosers.com/:path*",
-      "permanent": true
-    }
   ],
   "rewrites": [
     {
