@@ -32,10 +32,19 @@ export default async function middleware(request: Request): Promise<Response> {
   // Bracket keys so the Vercel Edge bundler does not replace these with `undefined` at build time.
   const id = process.env["HD2D_ACCESS_CLIENT_ID"]?.trim();
   const secret = process.env["HD2D_ACCESS_CLIENT_SECRET"]?.trim();
-  if (id && secret) {
-    headers.set("CF-Access-Client-Id", id);
-    headers.set("CF-Access-Client-Secret", secret);
+  if (!id || !secret) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error:
+          "Vercel Edge middleware did not receive HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET. Confirm they exist for Production and redeploy.",
+        debug: { hasClientId: Boolean(id), hasClientSecret: Boolean(secret) },
+      }),
+      { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
   }
+  headers.set("CF-Access-Client-Id", id);
+  headers.set("CF-Access-Client-Secret", secret);
 
   const method = request.method;
   let body: ArrayBuffer | undefined;
@@ -63,7 +72,7 @@ export default async function middleware(request: Request): Promise<Response> {
         JSON.stringify({
           success: false,
           error:
-            "Cloudflare Access blocked the API proxy. In Vercel → Environment Variables, set HD2D_ACCESS_CLIENT_ID and HD2D_ACCESS_CLIENT_SECRET (Cloudflare Access service token for the Worker hostname).",
+            "Cloudflare Access still redirected this request (token or policy). In Zero Trust → Access → your Application for hd2d-backend…workers.dev, add a Service Auth policy that includes this service token.",
         }),
         { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
       );
