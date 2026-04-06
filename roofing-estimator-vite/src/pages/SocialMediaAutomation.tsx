@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowLeft,
@@ -88,6 +88,16 @@ export function SocialMediaAutomation() {
   const [scheduleAt, setScheduleAt] = useState("");
   const [creativePacks, setCreativePacks] = useState<AdCreativeDraftStored[]>([]);
   const [selectedPackId, setSelectedPackId] = useState("");
+
+  /** Shown when Worker omits APP_PUBLIC_ORIGIN — Meta still needs this exact URI in the app settings. */
+  const spaOAuthCallbackUrl = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin.replace(/\/$/, "")}/api/meta/oauth/callback`;
+  }, []);
+
+  const oauthRedirectDisplay =
+    (metaOAuthRedirectUri && metaOAuthRedirectUri.trim()) || spaOAuthCallbackUrl || null;
+  const oauthUriFromWorkerOnly = Boolean(metaOAuthRedirectUri?.trim());
 
   const refreshCreativePacks = useCallback(() => {
     setCreativePacks(loadJsonArray<AdCreativeDraftStored>(AD_CREATIVE_DRAFTS_STORAGE_KEY, []));
@@ -204,12 +214,23 @@ export function SocialMediaAutomation() {
             </div>
             <CardDescription className="text-[#8b9199]">
               Uses your Facebook Page (not personal profile). In Meta Developer Console → Facebook Login → Valid OAuth Redirect
-              URIs, add the exact URL below (it matches Worker <code className="font-mono">APP_PUBLIC_ORIGIN</code>).
+              URIs, add the exact URL below. It must match this app&apos;s origin +{" "}
+              <code className="font-mono text-[0.85em]">/api/meta/oauth/callback</code> and the Worker&apos;s{" "}
+              <code className="font-mono text-[0.85em]">APP_PUBLIC_ORIGIN</code> (no trailing slash).
             </CardDescription>
-            {metaOAuthRedirectUri ? (
-              <p className="mt-2 break-all rounded-md bg-white/[0.06] px-2 py-1.5 font-mono text-xs text-[#e7e9ea]">
-                {metaOAuthRedirectUri}
-              </p>
+            {oauthRedirectDisplay ? (
+              <div className="mt-2 space-y-2">
+                <p className="break-all rounded-md bg-white/[0.06] px-2 py-1.5 font-mono text-xs text-[#e7e9ea]">
+                  {oauthRedirectDisplay}
+                </p>
+                {!oauthUriFromWorkerOnly && spaOAuthCallbackUrl ? (
+                  <p className="text-xs text-amber-200/90" role="status">
+                    Worker did not return a redirect URI yet — showing this site&apos;s callback URL. Set{" "}
+                    <code className="rounded bg-white/[0.08] px-1 font-mono">APP_PUBLIC_ORIGIN</code> on the Worker to the same
+                    origin as this page (no trailing slash) so Meta OAuth matches.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
