@@ -8,20 +8,30 @@ import { FieldProjectsPanel } from "../features/fieldProjects/FieldProjectsPanel
 export function Projects() {
   const { measurements } = useRoofing();
 
+  const tabListChrome =
+    "inline-flex min-w-max h-10 rounded-xl border border-white/[0.08] bg-[#12141a] p-1 text-[#8b9199] shadow-none";
+  const tabTriggerChrome =
+    "rounded-lg px-4 py-2 text-sm font-medium text-[#8b9199] data-[state=active]:border-transparent data-[state=active]:bg-[#1d9bf0] data-[state=active]:text-white data-[state=active]:shadow-[0_0_24px_rgba(29,155,240,0.22)] data-[state=inactive]:hover:text-[#e7e9ea]";
+
   return (
     <div className="hd2d-page-shell">
-      <div className="mb-8">
-        <h1 className="mb-2 text-2xl text-black sm:text-3xl">Projects &amp; Reports</h1>
-        <p className="text-black">
+      <div className="mb-8 border-b border-white/[0.06] pb-8 sm:mb-10 sm:pb-10">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#71767b]">Pipeline</p>
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-black sm:text-3xl">Projects &amp; Reports</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-[#71767b]">
           Field jobs with list/board pipeline, deal value &amp; tags, damage photos, and saved measurements
         </p>
       </div>
 
       <Tabs defaultValue="field" className="space-y-6">
         <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-          <TabsList className="inline-flex min-w-max">
-            <TabsTrigger value="field">Field jobs</TabsTrigger>
-            <TabsTrigger value="measurements">Measurements</TabsTrigger>
+          <TabsList className={tabListChrome}>
+            <TabsTrigger value="field" className={tabTriggerChrome}>
+              Field jobs
+            </TabsTrigger>
+            <TabsTrigger value="measurements" className={tabTriggerChrome}>
+              Measurements
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -32,17 +42,25 @@ export function Projects() {
         <TabsContent value="measurements" className="space-y-6">
           <Tabs defaultValue="all" className="space-y-6">
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-              <TabsList className="inline-flex min-w-max">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="gable">Gable</TabsTrigger>
-                <TabsTrigger value="hip">Hip</TabsTrigger>
-                <TabsTrigger value="flat">Flat</TabsTrigger>
+              <TabsList className={tabListChrome}>
+                <TabsTrigger value="all" className={tabTriggerChrome}>
+                  All
+                </TabsTrigger>
+                <TabsTrigger value="gable" className={tabTriggerChrome}>
+                  Gable
+                </TabsTrigger>
+                <TabsTrigger value="hip" className={tabTriggerChrome}>
+                  Hip
+                </TabsTrigger>
+                <TabsTrigger value="flat" className={tabTriggerChrome}>
+                  Flat
+                </TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="all" className="space-y-4">
               {measurements.length === 0 ? (
-                <Card>
+                <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
                   <CardContent className="flex flex-col items-center justify-center py-16">
                     <Ruler className="mb-4 h-16 w-16 text-black" />
                     <h3 className="mb-2 text-xl text-black">No measurements yet</h3>
@@ -54,7 +72,7 @@ export function Projects() {
                   .slice()
                   .reverse()
                   .map((measurement) => (
-                    <Card key={measurement.id}>
+                    <Card key={measurement.id} className="border-white/[0.07] ring-1 ring-white/[0.04]">
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div>
@@ -112,7 +130,7 @@ export function Projects() {
                 {measurements
                   .filter((m) => m.roofForm === type)
                   .map((measurement) => (
-                    <Card key={measurement.id}>
+                    <Card key={measurement.id} className="border-white/[0.07] ring-1 ring-white/[0.04]">
                       <CardHeader>
                         <CardTitle>{measurement.projectName}</CardTitle>
                         <CardDescription>{measurement.date}</CardDescription>

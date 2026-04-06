@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import {
   Camera,
@@ -37,6 +38,17 @@ const FP_MODAL_SELECT =
 const FP_MODAL_SELECT_PIPELINE =
   "ml-0 mt-1 block w-full rounded-md border border-black/20 bg-[#f3f4f6] px-3 py-2 text-black sm:ml-2 sm:mt-0 sm:inline-block sm:w-auto";
 const FP_MODAL_INNER = "rounded-lg border border-black/10 bg-[#f1f5f9] p-3 space-y-3";
+
+/** Light “paper” blocks — avoids global `.bg-white` → `--x-surface` remap on the dark app shell. */
+const FP_PAPER = "canvass-paper rounded-2xl border border-[#e2e8f0] shadow-sm";
+const FP_TOOLBAR_TOGGLE =
+  "inline-flex rounded-xl border border-[#e2e8f0] bg-[#ffffff] p-0.5 shadow-sm";
+const FP_BTN_ACTIVE = "bg-[#0f172a] text-white shadow-sm";
+const FP_BTN_IDLE = "text-[#475569] hover:bg-[#f1f5f9]";
+const FP_PILL_ACTIVE = "border-[#1d9bf0] bg-[#1d9bf0] text-white shadow-[0_0_16px_rgba(29,155,240,0.2)]";
+const FP_PILL_IDLE = "border-[#e2e8f0] bg-[#f8fafc] text-[#334155] hover:bg-[#f1f5f9]";
+const FP_FIELD_LIGHT =
+  "mt-1 w-full max-w-md rounded-lg border border-[#e2e8f0] bg-[#ffffff] px-3 py-2 text-sm text-[#0f172a] placeholder:text-[#94a3b8]";
 
 const usdFmt = new Intl.NumberFormat(undefined, {
   style: "currency",
@@ -425,17 +437,24 @@ export function FieldProjectsPanel() {
   const selectedOpenUrl = selected ? resolveGhlOpenUrl(selected, org.ghlBaseUrl) : null;
   const selectedEmbedSrc = selected ? resolveGhlEmbedUrl(selected, org.ghlBaseUrl) : null;
 
+  const modalMount = typeof document !== "undefined" ? document.body : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
-          <p className="text-sm text-black/80">
-            Opportunities-style <strong>list</strong> or <strong>board</strong> views (local CRM). Add deal value,
-            owner, and tags; optionally link each job to your CRM. Photos and AI notes stay on device until you export.
+          <p className="max-w-2xl text-sm leading-relaxed text-[#71767b]">
+            Opportunities-style <strong className="text-[#e7e9ea]">list</strong> or{" "}
+            <strong className="text-[#e7e9ea]">board</strong> views (local CRM). Add deal value, owner, and tags;
+            optionally link each job to your CRM. Photos and AI notes stay on device until you export.
           </p>
         </div>
-        <Button type="button" className="bg-black text-white hover:bg-black/90" onClick={() => setCreateOpen(true)}>
+        <Button
+          type="button"
+          className="shrink-0 bg-[#1d9bf0] text-white shadow-[0_0_24px_rgba(29,155,240,0.28)] hover:bg-[#1a8cd8]"
+          onClick={() => setCreateOpen(true)}
+        >
           New field project
         </Button>
       </div>
@@ -450,13 +469,13 @@ export function FieldProjectsPanel() {
       ) : null}
 
       {sorted.length > 0 ? (
-        <div className="space-y-3">
+        <div className={`space-y-4 ${FP_PAPER} p-4 sm:p-5`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="inline-flex rounded-lg border border-black/15 bg-white p-0.5 shadow-sm">
+            <div className={FP_TOOLBAR_TOGGLE}>
               <button
                 type="button"
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
-                  projectsView === "list" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  projectsView === "list" ? FP_BTN_ACTIVE : FP_BTN_IDLE
                 }`}
                 onClick={() => setProjectsView("list")}
               >
@@ -465,8 +484,8 @@ export function FieldProjectsPanel() {
               </button>
               <button
                 type="button"
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
-                  projectsView === "board" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  projectsView === "board" ? FP_BTN_ACTIVE : FP_BTN_IDLE
                 }`}
                 onClick={() => setProjectsView("board")}
               >
@@ -477,10 +496,8 @@ export function FieldProjectsPanel() {
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  stageFilter === "all"
-                    ? "border-black bg-black text-white"
-                    : "border-black/15 bg-white text-black/80 hover:bg-black/5"
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  stageFilter === "all" ? FP_PILL_ACTIVE : FP_PILL_IDLE
                 }`}
                 onClick={() => setStageFilter("all")}
               >
@@ -490,10 +507,8 @@ export function FieldProjectsPanel() {
                 <button
                   key={s}
                   type="button"
-                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                    stageFilter === s
-                      ? "border-black bg-black text-white"
-                      : "border-black/15 bg-white text-black/80 hover:bg-black/5"
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    stageFilter === s ? FP_PILL_ACTIVE : FP_PILL_IDLE
                   }`}
                   onClick={() => setStageFilter(s)}
                 >
@@ -502,21 +517,21 @@ export function FieldProjectsPanel() {
               ))}
             </div>
           </div>
-          <label className="block text-sm font-medium text-black">
+          <label className="block text-sm font-medium text-[#0f172a]">
             Search
             <input
-              className="mt-1 w-full max-w-md rounded-md border border-black/20 px-3 py-2 text-black"
+              className={FP_FIELD_LIGHT}
               value={boardQuery}
               onChange={(e) => setBoardQuery(e.target.value)}
               placeholder="Name, address, owner, tags, notes…"
             />
           </label>
           {projectsView === "board" ? (
-            <p className="text-xs text-black/60">
+            <p className="text-xs text-[#64748b]">
               Drag-and-drop between columns on desktop; on phones use the pipeline dropdown inside a job.
             </p>
           ) : (
-            <p className="text-xs text-black/60">
+            <p className="text-xs text-[#64748b]">
               Click column headers to sort. Stage changes apply immediately from the dropdown.
             </p>
           )}
@@ -524,21 +539,24 @@ export function FieldProjectsPanel() {
       ) : null}
 
       {sorted.length === 0 ? (
-        <Card>
+        <Card className="border-white/[0.08] bg-[#12141a] ring-1 ring-white/[0.04]">
           <CardContent className="flex flex-col items-center justify-center py-14">
-            <Camera className="mb-3 h-14 w-14 text-black/40" />
-            <p className="text-center text-black">No field projects yet. Create one to add site photos and pipeline.</p>
+            <Camera className="mb-3 h-14 w-14 text-[#1d9bf0]/80" />
+            <p className="max-w-sm text-center text-sm leading-relaxed text-[#e7e9ea]">
+              No field projects yet. Create one to add site photos and pipeline.
+            </p>
           </CardContent>
         </Card>
       ) : projectsView === "list" ? (
-        <div className="overflow-x-auto rounded-lg border border-black/10 bg-white shadow-sm">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm text-black">
+        <div className={`${FP_PAPER} overflow-hidden`}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-left text-sm text-[#0f172a]">
             <thead>
-              <tr className="border-b border-black/10 bg-black/[0.03]">
+              <tr className="border-b border-[#e2e8f0] bg-[#f8fafc]">
                 <th className="px-3 py-2.5">
                   <button
                     type="button"
-                    className="font-semibold hover:underline"
+                    className="font-semibold text-[#0f172a] hover:underline"
                     onClick={() => toggleListSort("name")}
                   >
                     Opportunity {listSortKey === "name" ? (listSortDesc ? "↓" : "↑") : ""}
@@ -547,7 +565,7 @@ export function FieldProjectsPanel() {
                 <th className="px-3 py-2.5">
                   <button
                     type="button"
-                    className="font-semibold hover:underline"
+                    className="font-semibold text-[#0f172a] hover:underline"
                     onClick={() => toggleListSort("stage")}
                   >
                     Stage {listSortKey === "stage" ? (listSortDesc ? "↓" : "↑") : ""}
@@ -556,46 +574,46 @@ export function FieldProjectsPanel() {
                 <th className="px-3 py-2.5">
                   <button
                     type="button"
-                    className="font-semibold hover:underline"
+                    className="font-semibold text-[#0f172a] hover:underline"
                     onClick={() => toggleListSort("value")}
                   >
                     Value {listSortKey === "value" ? (listSortDesc ? "↓" : "↑") : ""}
                   </button>
                 </th>
-                <th className="px-3 py-2.5 font-semibold">Owner</th>
-                <th className="px-3 py-2.5 font-semibold">Tags</th>
-                <th className="px-3 py-2.5 font-semibold">Photos</th>
+                <th className="px-3 py-2.5 font-semibold text-[#0f172a]">Owner</th>
+                <th className="px-3 py-2.5 font-semibold text-[#0f172a]">Tags</th>
+                <th className="px-3 py-2.5 font-semibold text-[#0f172a]">Photos</th>
                 <th className="px-3 py-2.5">
                   <button
                     type="button"
-                    className="font-semibold hover:underline"
+                    className="font-semibold text-[#0f172a] hover:underline"
                     onClick={() => toggleListSort("updated")}
                   >
                     Updated {listSortKey === "updated" ? (listSortDesc ? "↓" : "↑") : ""}
                   </button>
                 </th>
-                <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
+                <th className="px-3 py-2.5 text-right font-semibold text-[#0f172a]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {listSortedProjects.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-black/60">
+                  <td colSpan={8} className="px-3 py-10 text-center text-[#64748b]">
                     No jobs match this filter.
                   </td>
                 </tr>
               ) : (
                 listSortedProjects.map((p) => (
-                  <tr key={p.id} className="border-b border-black/[0.06] hover:bg-black/[0.02]">
+                  <tr key={p.id} className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]">
                     <td className="max-w-[200px] px-3 py-2 align-top">
-                      <p className="font-medium leading-snug">{p.name}</p>
+                      <p className="font-medium leading-snug text-[#0f172a]">{p.name}</p>
                       {p.address ? (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-black/60">{p.address}</p>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-[#64748b]">{p.address}</p>
                       ) : null}
                     </td>
                     <td className="px-3 py-2 align-top">
                       <select
-                        className="max-w-[140px] rounded-md border border-black/20 bg-white px-2 py-1 text-xs text-black"
+                        className="max-w-[140px] rounded-md border border-[#e2e8f0] bg-[#ffffff] px-2 py-1 text-xs text-[#0f172a]"
                         value={p.pipelineStage}
                         onChange={(e) =>
                           setFieldProjectPipelineStage(p.id, e.target.value as FieldPipelineStage)
@@ -608,10 +626,10 @@ export function FieldProjectsPanel() {
                         ))}
                       </select>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 align-top text-black/90">
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-[#0f172a]">
                       {p.monetaryValueUsd != null ? formatUsd(p.monetaryValueUsd) : "—"}
                     </td>
-                    <td className="max-w-[120px] px-3 py-2 align-top text-xs text-black/80">
+                    <td className="max-w-[120px] px-3 py-2 align-top text-xs text-[#334155]">
                       {p.ownerLabel ?? "—"}
                     </td>
                     <td className="max-w-[160px] px-3 py-2 align-top">
@@ -620,30 +638,36 @@ export function FieldProjectsPanel() {
                           p.tags.map((t) => (
                             <span
                               key={t}
-                              className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-black/80"
+                              className="rounded bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-medium text-[#475569]"
                             >
                               {t}
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-black/40">—</span>
+                          <span className="text-xs text-[#94a3b8]">—</span>
                         )}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 align-top text-black/80">{p.photos.length}</td>
-                    <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-black/70">
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-[#0f172a]">{p.photos.length}</td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-[#64748b]">
                       {new Date(p.updatedAt).toLocaleString()}
                     </td>
                     <td className="px-3 py-2 align-top text-right">
                       <div className="flex flex-wrap justify-end gap-1">
-                        <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelectedId(p.id)}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-[#e2e8f0] bg-[#ffffff] text-xs text-[#0f172a] hover:bg-[#f8fafc]"
+                          onClick={() => setSelectedId(p.id)}
+                        >
                           Open
                         </Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs text-red-700"
+                          className="h-8 text-xs text-red-700 hover:bg-red-50"
                           onClick={() => {
                             if (window.confirm(`Delete field project “${p.name}” and all its photos?`)) {
                               deleteFieldProject(p.id);
@@ -660,8 +684,10 @@ export function FieldProjectsPanel() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       ) : (
+        <div className={`${FP_PAPER} p-4 sm:p-5`}>
         <div className="overflow-x-auto pb-2">
           <div className="flex min-h-[min(480px,70vh)] gap-3" style={{ minWidth: "min(100%, 920px)" }}>
             {FIELD_PROJECT_PIPELINE_STAGES.map((stage) => {
@@ -670,18 +696,20 @@ export function FieldProjectsPanel() {
               return (
                 <div
                   key={stage}
-                  className={`flex min-w-[200px] flex-1 flex-col rounded-lg border bg-white/80 ${
-                    isOver ? "border-black ring-2 ring-black/20" : "border-black/10"
+                  className={`flex min-w-[200px] flex-1 flex-col rounded-xl border shadow-sm ${
+                    isOver
+                      ? "border-[#1d9bf0] bg-[#f0f9ff] ring-2 ring-[#1d9bf0]/25"
+                      : "border-[#e2e8f0] bg-[#f8fafc]"
                   }`}
                   onDragOver={(e) => onColumnDragOver(e, stage)}
                   onDragLeave={() => setDragOverStage((cur) => (cur === stage ? null : cur))}
                   onDrop={(e) => onColumnDrop(e, stage)}
                 >
-                  <div className="border-b border-black/10 px-2 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-black/70">
+                  <div className="border-b border-[#e2e8f0] px-2 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">
                       {fieldProjectStageLabel(stage)}
                     </p>
-                    <p className="text-[11px] text-black/50">{column.length} job{column.length !== 1 ? "s" : ""}</p>
+                    <p className="text-[11px] text-[#94a3b8]">{column.length} job{column.length !== 1 ? "s" : ""}</p>
                   </div>
                   <div className="flex flex-1 flex-col gap-2 p-2">
                     {column.map((p) => (
@@ -713,9 +741,11 @@ export function FieldProjectsPanel() {
             })}
           </div>
         </div>
+        </div>
       )}
 
-      {createOpen ? (
+      {createOpen && modalMount
+        ? createPortal(
         <div
           className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
@@ -826,10 +856,13 @@ export function FieldProjectsPanel() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      ) : null}
+        </div>,
+            modalMount,
+          )
+        : null}
 
-      {selected ? (
+      {selected && modalMount
+        ? createPortal(
         <div
           className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-y-contain bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
@@ -1155,23 +1188,28 @@ export function FieldProjectsPanel() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      ) : null}
+        </div>,
+            modalMount,
+          )
+        : null}
 
-      {lightboxUrl ? (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
-          role="presentation"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <img
-            src={lightboxUrl}
-            alt="Full size"
-            className="max-h-full max-w-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      ) : null}
+      {lightboxUrl && modalMount
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
+              role="presentation"
+              onClick={() => setLightboxUrl(null)}
+            >
+              <img
+                src={lightboxUrl}
+                alt="Full size"
+                className="max-h-full max-w-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>,
+            modalMount,
+          )
+        : null}
     </div>
   );
 }
@@ -1196,50 +1234,65 @@ function KanbanCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`cursor-grab border-black/10 active:cursor-grabbing ${dragging ? "opacity-60" : ""}`}
+      className={`cursor-grab border-[#e2e8f0] bg-[#ffffff] shadow-sm active:cursor-grabbing ${dragging ? "opacity-60" : ""}`}
     >
       <CardHeader className="space-y-1 p-3 pb-2">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base leading-snug">{project.name}</CardTitle>
-          <Badge variant="outline" className="shrink-0 border-black/20 bg-black/5 text-[10px] text-black">
+          <CardTitle className="text-base leading-snug text-[#0f172a]">{project.name}</CardTitle>
+          <Badge
+            variant="outline"
+            className="shrink-0 border-[#e2e8f0] bg-[#f8fafc] text-[10px] text-[#475569]"
+          >
             {fieldProjectStageLabel(project.pipelineStage)}
           </Badge>
         </div>
         {project.address ? (
-          <CardDescription className="line-clamp-2 text-xs text-black/75">{project.address}</CardDescription>
+          <CardDescription className="line-clamp-2 text-xs text-[#64748b]">{project.address}</CardDescription>
         ) : null}
         {project.monetaryValueUsd != null ? (
           <p className="text-xs font-semibold text-emerald-800">{formatUsd(project.monetaryValueUsd)}</p>
         ) : null}
         {project.ownerLabel ? (
-          <p className="text-[11px] text-black/60">Owner: {project.ownerLabel}</p>
+          <p className="text-[11px] text-[#64748b]">Owner: {project.ownerLabel}</p>
         ) : null}
         {project.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1 pt-0.5">
             {project.tags.slice(0, 4).map((t) => (
               <span
                 key={t}
-                className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-black/70"
+                className="rounded bg-[#f1f5f9] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[#64748b]"
               >
                 {t}
               </span>
             ))}
             {project.tags.length > 4 ? (
-              <span className="text-[9px] text-black/50">+{project.tags.length - 4}</span>
+              <span className="text-[9px] text-[#94a3b8]">+{project.tags.length - 4}</span>
             ) : null}
           </div>
         ) : null}
-        <p className="text-[11px] text-black/50">{new Date(project.updatedAt).toLocaleDateString()}</p>
+        <p className="text-[11px] text-[#94a3b8]">{new Date(project.updatedAt).toLocaleDateString()}</p>
       </CardHeader>
       <CardContent className="flex items-center justify-between gap-2 px-3 pb-3 pt-0">
-        <span className="text-xs text-black/80">
+        <span className="text-xs text-[#475569]">
           {project.photos.length} photo{project.photos.length !== 1 ? "s" : ""}
         </span>
         <div className="flex gap-1">
-          <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={onOpen}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 border-[#e2e8f0] bg-[#ffffff] text-xs text-[#0f172a] hover:bg-[#f8fafc]"
+            onClick={onOpen}
+          >
             Open
           </Button>
-          <Button type="button" size="sm" variant="outline" className="h-8 text-xs text-red-700" onClick={onDelete}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs text-red-700 hover:bg-red-50"
+            onClick={onDelete}
+          >
             Delete
           </Button>
         </div>
