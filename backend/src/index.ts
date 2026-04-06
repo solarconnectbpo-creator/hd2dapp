@@ -26,6 +26,7 @@ import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
 import { handleEstimatorChatAi } from "./api/estimatorChatAi";
 import { handleGhlSubmitLead } from "./api/ghlSubmitLead";
 import { handleMetaMarketing, processMetaScheduledRetries, type MetaMarketingEnv } from "./api/metaMarketing";
+import { handleMarketingGenerateImage, type MarketingImageEnv } from "./api/marketingGenerateImage";
 
 interface Env {
   DB: any;
@@ -166,6 +167,11 @@ export default {
         request.method === "POST"
       ) {
         return await handleLeadsCheckoutSession(request, env as LeadsCheckoutEnv, corsHeaders);
+      } else if (
+        (path === "/api/marketing/generate-image" || path === "/api/marketing/generate-image/") &&
+        request.method === "POST"
+      ) {
+        return await handleMarketingGenerateImage(request, env as MarketingImageEnv, corsHeaders);
       } else if (path.startsWith("/api/meta")) {
         return await handleMetaMarketing(request, env as MetaMarketingEnv, path, corsHeaders);
       } else if (path.startsWith("/api/leads")) {

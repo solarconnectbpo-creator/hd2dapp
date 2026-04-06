@@ -65,6 +65,9 @@
 # APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
 # Production example: APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com
 
+# --- Marketing images (POST /api/marketing/generate-image — company/admin; rate-limited in KV) ---
+# OPENAI_API_KEY=sk-...
+
 # --- Meta (Facebook) — scheduled Page posts + optional draft ad campaigns (see src/api/metaMarketing.ts) ---
 # Create a Meta app → Facebook Login → add Valid OAuth Redirect URI: {APP_PUBLIC_ORIGIN}/api/meta/oauth/callback
 # META_APP_ID=
