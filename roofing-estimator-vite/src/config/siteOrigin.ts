@@ -5,7 +5,8 @@ export const HD2D_PRODUCTION_ORIGIN = "https://hardcoredoortodoorclosers.com";
 
 /**
  * Apex origin used for cross-origin API calls (e.g. Vercel previews → `https://…/api/*` on Pages).
- * Same-origin Pages hosts use `window.location.origin` + `/api/*` (Functions proxy to `*.workers.dev`).
+ * Vercel apex uses same host + `/api/*` (see `vercel.json` external rewrite to `*.workers.dev`).
+ * Cloudflare Pages uses `window.location.origin` + `/api/*` (Functions proxy).
  */
 export const HD2D_PUBLIC_API_ORIGIN = HD2D_PRODUCTION_ORIGIN;
 
@@ -17,7 +18,7 @@ export const HD2D_WORKER_API_ORIGIN = "https://hd2d-backend.solarconnectbpo.work
 
 /**
  * Primary site apex — subdomains on this zone.
- * Same-origin `/api/*` is served by **Pages Functions** (proxy to Worker `*.workers.dev`); see `functions/api/*`.
+ * Same-origin `/api/*`: **Vercel** → `vercel.json` rewrite to Worker; **Pages** → `functions/api/*`.
  */
 export const HD2D_SITE_ROOT = "hardcoredoortodoorclosers.com";
 
@@ -28,7 +29,7 @@ function sameOriginApiProxyEnabled(): boolean {
   if (import.meta.env.VITE_HD2D_SAME_ORIGIN_API === "false" || import.meta.env.VITE_HD2D_SAME_ORIGIN_API === "0") {
     return false;
   }
-  // Vercel static hosting has no `/api` proxy — call apex API (Pages on zone) cross-origin
+  // Vercel: `/api/*` is proxied via `vercel.json` rewrite (apex same-origin); previews use apex API origin
   if (import.meta.env.VERCEL) return false;
   // Cloudflare Pages: same-origin `/api/*` (apex, www, *.pages.dev previews)
   return true;
