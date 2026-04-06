@@ -2,6 +2,7 @@
  * Vercel Edge: proxy same-origin `/api/*` to the HD2D Worker. Required when Cloudflare Zero Trust
  * protects `*.workers.dev` — set HD2D_ACCESS_CLIENT_ID / HD2D_ACCESS_CLIENT_SECRET (service token).
  * @see https://developers.cloudflare.com/cloudflare-one/identity/service-tokens/
+ * @see https://developers.cloudflare.com/cloudflare-one/access-controls/policies/#service-auth
  */
 const UPSTREAM = "https://hd2d-backend.solarconnectbpo.workers.dev";
 
@@ -72,7 +73,8 @@ export default async function middleware(request: Request): Promise<Response> {
         JSON.stringify({
           success: false,
           error:
-            "Cloudflare Access still redirected this request (token or policy). In Zero Trust → Access → your Application for hd2d-backend…workers.dev, add a Service Auth policy that includes this service token.",
+            "Cloudflare Access rejected the service token. Fix in Zero Trust → Access → Applications → the app for hd2d-backend.solarconnectbpo.workers.dev: add a policy whose Action is Service Auth (not Allow). Under Include use selector Service Token (pick this token) or Any Access Service Token. Vercel must use the same Client ID + Secret from Access controls → Service credentials → Service Tokens.",
+          doc: "https://developers.cloudflare.com/cloudflare-one/access-controls/policies/#service-auth",
         }),
         { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
       );
