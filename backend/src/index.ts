@@ -34,6 +34,10 @@ interface Env {
   SESSION_SECRET?: string;
   /** When "false", disables POST /api/auth/register. */
   AUTH_SIGNUP_ENABLED?: string;
+  /** Set "true" locally to allow AUTH_* demo/admin login slots (off by default in production). */
+  AUTH_ENV_LOGIN_ENABLED?: string;
+  /** Set "true" to require a D1 user row for GET /api/auth/me (401 if removed). */
+  AUTH_REQUIRE_DB_USER_FOR_ME?: string;
   /** EagleView API Center OAuth (see `eagleviewApicenterProxy.ts`). */
   EAGLEVIEW_CLIENT_ID?: string;
   EAGLEVIEW_OAUTH_CLIENT_ID?: string;
@@ -99,6 +103,8 @@ type AuthEnv = Pick<
   | "DB"
   | "SESSION_SECRET"
   | "AUTH_SIGNUP_ENABLED"
+  | "AUTH_ENV_LOGIN_ENABLED"
+  | "AUTH_REQUIRE_DB_USER_FOR_ME"
   | "AUTH_ADMIN_EMAIL"
   | "AUTH_ADMIN_PASSWORD"
   | "AUTH_ADMIN_NAME"

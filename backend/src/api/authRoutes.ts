@@ -22,6 +22,16 @@ export type AuthEnv = {
   AUTH_REP_PASSWORD?: string;
   /** When "false", POST /api/auth/register is disabled. Defaults to enabled. */
   AUTH_SIGNUP_ENABLED?: string;
+  /**
+   * When "true", allow login via Worker AUTH_* email/password slots (demo/admin/company/rep).
+   * Defaults to off so production is not open to baked-in or misconfigured demo passwords.
+   */
+  AUTH_ENV_LOGIN_ENABLED?: string;
+  /**
+   * When "true", GET /api/auth/me returns 401 if the user id is not found in D1 (removed accounts).
+   * D1 query errors return 503 so clients can retry instead of forcing logout.
+   */
+  AUTH_REQUIRE_DB_USER_FOR_ME?: string;
 };
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -38,6 +48,11 @@ function staticEnvPasswordMatches(stored: string, input: string): boolean {
   return stored.length > 0 && stored.toLowerCase() === input.toLowerCase();
 }
 
+function isEnvLoginEnabled(env: AuthEnv): boolean {
+  return (env.AUTH_ENV_LOGIN_ENABLED || "").trim().toLowerCase() === "true";
+}
+
+/** Only used when AUTH_ENV_LOGIN_ENABLED=true (local/dev). Defaults match former baked-in demo accounts. */
 function staticEnvUsers(env: AuthEnv): Array<{ user: AuthUser; password: string }> {
   const adminName = (env.AUTH_ADMIN_NAME || "Admin").trim() || "Admin";
   const adminEmail = (env.AUTH_ADMIN_EMAIL || "admin@hardcoredoortodoorclosers.com").trim();
@@ -117,10 +132,12 @@ export async function handleAuthRequest(
         headers: j,
       });
     }
-    // Cloudflare AUTH_* env users first so admin/company/rep secrets win over an older D1 row (e.g. same email as sales_rep).
-    const matched = staticEnvUsers(env).find(
-      (u) => u.user.email.toLowerCase() === email && staticEnvPasswordMatches(u.password, password),
-    );
+    // Optional AUTH_* env users (dev only unless explicitly enabled in production).
+    const matched = isEnvLoginEnabled(env)
+      ? staticEnvUsers(env).find(
+          (u) => u.user.email.toLowerCase() === email && staticEnvPasswordMatches(u.password, password),
+        )
+      : undefined;
     if (matched) {
       try {
         await ensureDbUserFromEnvLogin(env.DB, matched.user, password);
@@ -275,12 +292,34 @@ export async function handleAuthRequest(
       });
     }
     let row: Awaited<ReturnType<typeof findUserById>> = null;
+    let meDbError = false;
     try {
       row = await findUserById(env.DB, payload.sub);
     } catch (e) {
       console.error("me findUserById:", e);
-      // Valid JWT but D1 failed — still return profile from token so sessions are not dropped on refresh.
+      meDbError = true;
       row = null;
+    }
+    const requireDbUser = (env.AUTH_REQUIRE_DB_USER_FOR_ME || "").trim().toLowerCase() === "true";
+    if (requireDbUser) {
+      if (meDbError) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Could not verify account. Try again shortly.",
+          }),
+          { status: 503, headers: j },
+        );
+      }
+      if (!row) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Account not found or no longer active. Sign in again.",
+          }),
+          { status: 401, headers: j },
+        );
+      }
     }
     // Role comes from the signed JWT (matches login), not D1 — avoids downgrading admin after env login when DB row is stale.
     const user: AuthUser = row

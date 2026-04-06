@@ -114,7 +114,8 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 # If remote commands fail with "Invalid format for Authorization header" / code 6003: remove or fix a bad
 # CLOUDFLARE_API_TOKEN in your shell/environment, then run `wrangler login` (or set a token with D1 + Workers permissions).
 # Optional Worker vars: AUTH_SIGNUP_ENABLED=false to disable public sign-up; SESSION_SECRET via `wrangler secret put SESSION_SECRET`.
-# Env-based admin (same as /login + admin routes): `wrangler secret put AUTH_ADMIN_EMAIL`, `AUTH_ADMIN_PASSWORD`; optional `AUTH_ADMIN_NAME` (or plain [vars]).
+# Env-based demo/admin/company/rep login (AUTH_* emails/passwords) requires AUTH_ENV_LOGIN_ENABLED=true — default is off (D1 + register only).
+# Optional: AUTH_REQUIRE_DB_USER_FOR_ME=true so removed D1 users lose sessions on /api/auth/me (503 if D1 query fails).
 
 # Build configuration
 [build]

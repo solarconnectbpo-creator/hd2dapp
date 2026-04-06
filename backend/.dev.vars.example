@@ -13,7 +13,9 @@
 # EAGLEVIEW_EMBEDDED_TOKEN_URL=https://api.eagleview.com/auth-service/v1/token
 # EAGLEVIEW_EMBEDDED_SCOPE=
 
-# Optional auth overrides for login endpoint (defaults use demo credentials):
+# Auth: D1 users (sign-up + admin-created) always work. Env-based demo slots (AUTH_*) are OFF unless you opt in:
+# AUTH_ENV_LOGIN_ENABLED=true
+# Optional overrides when AUTH_ENV_LOGIN_ENABLED=true (defaults below match former demo accounts):
 # AUTH_ADMIN_EMAIL=admin@hardcoredoortodoorclosers.com
 # AUTH_ADMIN_PASSWORD=AdminTest123!
 # AUTH_ADMIN_NAME=Admin
@@ -22,6 +24,8 @@
 # AUTH_REP_EMAIL=test.rep@hardcoredoortodoorclosers.com
 # AUTH_REP_PASSWORD=TestRep123!
 # SESSION_SECRET=change-me
+# Optional: GET /api/auth/me returns 401 if user was removed from D1 (503 if D1 errors). Can force re-auth after deletes:
+# AUTH_REQUIRE_DB_USER_FOR_ME=true
 
 # ML vision — Worker proxies /api/ai/roof-vision + /api/ai/roof-segment → ml-vision-service (see backend/ml-vision-service/README.md).
 # Same-origin app flow: Vite `/intel-proxy` → Worker → ROOF_VISION_SERVICE_URL (local default: http://127.0.0.1:18090).
