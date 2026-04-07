@@ -31,8 +31,9 @@ import { handleGhlSubmitLead } from "./api/ghlSubmitLead";
 import { handleMetaMarketing, processMetaScheduledRetries, type MetaMarketingEnv } from "./api/metaMarketing";
 import { handleMarketingGenerateImage, type MarketingImageEnv } from "./api/marketingGenerateImage";
 import { handleTelnyxWebhook, type TelnyxWebhookEnv } from "./api/telnyxWebhook";
+import { handleTwilioWebhook, type TwilioWebhookEnv } from "./api/twilioWebhook";
 import { handleSmsHttpRoutes, type SmsHttpEnv } from "./api/smsHttpRoutes";
-import { processSmsWorkflowRuns } from "./sms/smsWorkflowEngine";
+import { processSmsNoResponseSweep, processSmsWorkflowRuns } from "./sms/smsWorkflowEngine";
 
 interface Env {
   DB: any;
@@ -123,6 +124,12 @@ interface Env {
   TELNYX_WEBHOOK_QUERY_SECRET?: string;
   /** Stripe metered Price id for SMS; syncs subscription item to users.stripe_subscription_item_sms. */
   STRIPE_SMS_METERED_PRICE_ID?: string;
+  /** Twilio Account SID (optional; used when set with TWILIO_AUTH_TOKEN instead of Telnyx). */
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_FROM_NUMBER?: string;
+  /** Optional: require ?token= on POST /api/webhooks/twilio */
+  TWILIO_WEBHOOK_QUERY_SECRET?: string;
 }
 
 type AuthEnv = Pick<
@@ -198,6 +205,11 @@ export default {
         request.method === "POST"
       ) {
         return await handleTelnyxWebhook(request, env as TelnyxWebhookEnv, corsHeaders);
+      } else if (
+        (path === "/api/webhooks/twilio" || path === "/api/webhooks/twilio/") &&
+        request.method === "POST"
+      ) {
+        return await handleTwilioWebhook(request, env as TwilioWebhookEnv, corsHeaders);
       } else if (path.startsWith("/api/sms")) {
         const smsRes = await handleSmsHttpRoutes(request, env as SmsHttpEnv, path, corsHeaders);
         if (smsRes) return smsRes;
@@ -342,9 +354,27 @@ export default {
           DB: env.DB,
           TELNYX_API_KEY: env.TELNYX_API_KEY,
           TELNYX_FROM_NUMBER: env.TELNYX_FROM_NUMBER,
+          TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+          TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
+          TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
           STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
         }),
       );
+      return;
+    }
+    if (event.cron === "*/10 * * * *") {
+      ctx.waitUntil(
+        processSmsNoResponseSweep({
+          DB: env.DB,
+          TELNYX_API_KEY: env.TELNYX_API_KEY,
+          TELNYX_FROM_NUMBER: env.TELNYX_FROM_NUMBER,
+          TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+          TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
+          TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
+          STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+        }),
+      );
+      ctx.waitUntil(processMetaScheduledRetries(env as MetaMarketingEnv));
       return;
     }
     ctx.waitUntil(processMetaScheduledRetries(env as MetaMarketingEnv));

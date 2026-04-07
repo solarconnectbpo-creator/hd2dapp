@@ -12,6 +12,8 @@
     "d1:migrate:remote:access": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0006_user_access_billing.sql",
     "d1:migrate:local:sms": "npx wrangler d1 execute d2d --local --file=./migrations/0007_sms_automation.sql",
     "d1:migrate:remote:sms": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0007_sms_automation.sql",
+    "d1:migrate:local:sms_v2": "npx wrangler d1 execute d2d --local --file=./migrations/0008_sms_automation_v2.sql",
+    "d1:migrate:remote:sms_v2": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0008_sms_automation_v2.sql",
     "deploy": "node scripts/wrangler-run.mjs deploy --env=\"\"",
     "deploy:all": "npm run deploy && npm --prefix ../roofing-estimator-vite run pages:deploy",
     "build": "npx wrangler build",
