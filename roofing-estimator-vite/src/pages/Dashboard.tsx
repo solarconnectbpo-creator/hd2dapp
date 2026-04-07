@@ -198,7 +198,7 @@ export function Dashboard() {
             <Link to="/sms-automation">
               <Button className="w-full justify-start" variant="outline">
                 <MessageSquare className="w-4 h-4 mr-2" />
-                SMS automation
+                SMS follow-up
               </Button>
             </Link>
           </CardContent>

@@ -317,8 +317,10 @@ export function AutomationBuilder() {
   if (user?.user_type === "admin") {
     return (
       <div className="hd2d-page-shell max-w-lg space-y-4">
-        <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS automation</h1>
-        <p className="text-sm text-[#71767b]">Use a company admin account to manage workflows for your organization.</p>
+        <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS follow-up</h1>
+        <p className="text-sm text-[#71767b]">
+          Sign in with a company account to edit follow-up sequences for that organization.
+        </p>
       </div>
     );
   }
@@ -341,15 +343,210 @@ export function AutomationBuilder() {
 
   return (
     <div className="hd2d-page-shell max-w-3xl space-y-8">
-      <Seo title="SMS automation — HD2D Closers" description="Edit SMS follow-up workflows and AI reply suggestions." path="/sms-automation" />
+      <Seo title="SMS follow-up — HD2D Closers" description="Automated SMS follow-up sequences, Telnyx setup, and AI reply drafts." path="/sms-automation" />
       <div>
-        <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS automation</h1>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#71767b]">Messaging</p>
+        <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS follow-up</h1>
         <p className="text-sm text-[#71767b] mt-2">
-          Build text follow-ups that run on the server. You can edit workflows anytime; when your Telnyx number is ready,
-          we will send and receive SMS for your organization. Triggers also fire from lead flows in the app (e.g. after
-          estimator chat).
+          Design automated text sequences that run when a trigger fires (new lead, no response, etc.). Sending and receiving
+          uses Telnyx once your number is connected below.
         </p>
       </div>
+
+      <section
+        className="rounded-xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.06] to-transparent p-5 ring-1 ring-sky-500/20"
+        aria-labelledby="sms-followup-heading"
+      >
+        <h2 id="sms-followup-heading" className="text-lg font-semibold text-[#e7e9ea]">
+          Follow-up sequences
+        </h2>
+        <p className="mt-1 text-sm text-[#8b9199]">
+          Each sequence has a <strong className="font-medium text-[#c4d0dc]">trigger</strong> (when it starts) and{" "}
+          <strong className="font-medium text-[#c4d0dc]">steps</strong> (texts, wait times, tags, pipeline moves) that run in
+          order.
+        </p>
+
+        {loading ? (
+          <p className="mt-4 text-sm text-[#8b9199]">Loading workflows…</p>
+        ) : null}
+        {error ? (
+          <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>
+        ) : null}
+
+        <div className="mt-6 grid gap-6 md:grid-cols-[1fr_2fr]">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-[#e7e9ea]">Your sequences</h3>
+            <ul className="space-y-1">
+              {workflows.map((w) => (
+                <li key={w.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(w.id)}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                      selectedId === w.id ? "bg-[#1d9bf0]/30 text-white" : "bg-white/[0.04] text-[#e7e9ea] hover:bg-white/[0.08]"
+                    }`}
+                  >
+                    {w.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {selectedId ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#e7e9ea]">Sequence name</label>
+                <input
+                  className="mt-1 w-full rounded-lg border border-white/[0.12] bg-[#12141a] px-3 py-2 text-sm text-[#e7e9ea]"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#e7e9ea]">When to start (trigger)</label>
+                <select
+                  className="mt-1 w-full rounded-lg border border-white/[0.12] bg-[#12141a] px-3 py-2 text-sm text-[#e7e9ea]"
+                  value={trigger}
+                  onChange={(e) => setTrigger(e.target.value)}
+                >
+                  {!canonicalTriggers.includes(trigger) ? (
+                    <option value={trigger}>{trigger}</option>
+                  ) : null}
+                  {canonicalTriggers.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-[#e7e9ea]">Follow-up steps</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {(["sms", "delay", "condition", "tag", "move_pipeline"] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-xs text-[#e7e9ea] hover:bg-white/[0.1]"
+                        onClick={() => addStep(k)}
+                      >
+                        + {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <ul className="mt-3 space-y-3">
+                  {steps.map((s, i) => (
+                    <li key={s.key} className="rounded-lg border border-white/[0.08] bg-[#12141a]/80 p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-medium uppercase text-[#8b9199]">
+                          {i + 1}. {s.kind}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs text-red-300 hover:underline"
+                          onClick={() => removeStep(s.key)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {s.kind === "sms" ? (
+                        <textarea
+                          className="min-h-[72px] w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-sm text-[#e7e9ea]"
+                          value={s.text}
+                          onChange={(e) => updateStep(s.key, { text: e.target.value } as Partial<UiStep>)}
+                          spellCheck
+                        />
+                      ) : null}
+                      {s.kind === "delay" ? (
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-[#e7e9ea]">
+                          <input
+                            type="number"
+                            min={0}
+                            className="w-20 rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1"
+                            value={s.hours}
+                            onChange={(e) =>
+                              updateStep(s.key, { hours: Number(e.target.value) || 0 } as Partial<UiStep>)
+                            }
+                          />
+                          <span>h</span>
+                          <input
+                            type="number"
+                            min={0}
+                            className="w-20 rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1"
+                            value={s.minutes}
+                            onChange={(e) =>
+                              updateStep(s.key, { minutes: Number(e.target.value) || 0 } as Partial<UiStep>)
+                            }
+                          />
+                          <span>m</span>
+                        </div>
+                      ) : null}
+                      {s.kind === "condition" ? (
+                        <select
+                          className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-sm text-[#e7e9ea]"
+                          value={s.check}
+                          onChange={(e) =>
+                            updateStep(s.key, {
+                              check: e.target.value as "no_reply" | "claim_not_filed",
+                            } as Partial<UiStep>)
+                          }
+                        >
+                          <option value="no_reply">no_reply (no inbound since run started)</option>
+                          <option value="claim_not_filed">claim_not_filed</option>
+                        </select>
+                      ) : null}
+                      {s.kind === "tag" ? (
+                        <div className="space-y-1 text-sm">
+                          <input
+                            className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-[#e7e9ea]"
+                            placeholder="Add tags (comma-separated)"
+                            value={s.add}
+                            onChange={(e) => updateStep(s.key, { add: e.target.value } as Partial<UiStep>)}
+                          />
+                          <input
+                            className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-[#e7e9ea]"
+                            placeholder="Remove tags (comma-separated)"
+                            value={s.remove}
+                            onChange={(e) => updateStep(s.key, { remove: e.target.value } as Partial<UiStep>)}
+                          />
+                        </div>
+                      ) : null}
+                      {s.kind === "move_pipeline" ? (
+                        <input
+                          className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-sm text-[#e7e9ea]"
+                          value={s.stage}
+                          onChange={(e) => updateStep(s.key, { stage: e.target.value } as Partial<UiStep>)}
+                        />
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-3">
+                <h3 className="text-xs font-semibold uppercase text-sky-200/90">Follow-up preview (first SMS)</h3>
+                <p className="mt-1 text-sm text-[#e7e9ea]">{firstSmsPreview || "—"}</p>
+                <p className="mt-2 text-xs text-[#71767b]">
+                  Sample: {PREVIEW.name}, {PREVIEW.address}, {PREVIEW.company}. Placeholders:{" "}
+                  <code className="text-[#8b9199]">{"{{name}} {{phone}} {{address}} {{company}}"}</code>
+                </p>
+              </div>
+
+              <details className="rounded-lg border border-white/[0.08] bg-[#0a0c10]/50 p-4">
+                <summary className="cursor-pointer text-sm text-[#8b9199]">Advanced: JSON</summary>
+                <pre className="mt-2 max-h-40 overflow-auto font-mono text-xs text-[#e7e9ea]">{stepsJson}</pre>
+              </details>
+
+              <button type="button" className="run-btn" disabled={busy} onClick={() => void saveWorkflow()}>
+                {busy ? "Saving…" : "Save follow-up sequence"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </section>
 
       <section
         className="rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.07] to-transparent p-5 ring-1 ring-amber-500/15"
@@ -460,189 +657,11 @@ export function AutomationBuilder() {
         {copyHint ? <p className="mt-3 text-xs text-sky-200/90">{copyHint}</p> : null}
       </section>
 
-      {loading ? (
-        <p className="text-sm text-[#8b9199]">Loading workflows…</p>
-      ) : null}
-      {error ? (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>
-      ) : null}
-
-      <div className="grid gap-6 md:grid-cols-[1fr_2fr]">
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-[#e7e9ea]">Workflows</h2>
-          <ul className="space-y-1">
-            {workflows.map((w) => (
-              <li key={w.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(w.id)}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                    selectedId === w.id ? "bg-[#1d9bf0]/30 text-white" : "bg-white/[0.04] text-[#e7e9ea] hover:bg-white/[0.08]"
-                  }`}
-                >
-                  {w.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {selectedId ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[#e7e9ea]">Name</label>
-              <input
-                className="mt-1 w-full rounded-lg border border-white/[0.12] bg-[#12141a] px-3 py-2 text-sm text-[#e7e9ea]"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#e7e9ea]">Trigger</label>
-              <select
-                className="mt-1 w-full rounded-lg border border-white/[0.12] bg-[#12141a] px-3 py-2 text-sm text-[#e7e9ea]"
-                value={trigger}
-                onChange={(e) => setTrigger(e.target.value)}
-              >
-                {!canonicalTriggers.includes(trigger) ? (
-                  <option value={trigger}>{trigger}</option>
-                ) : null}
-                {canonicalTriggers.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-semibold text-[#e7e9ea]">Steps</h2>
-                <div className="flex flex-wrap gap-1">
-                  {(["sms", "delay", "condition", "tag", "move_pipeline"] as const).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-xs text-[#e7e9ea] hover:bg-white/[0.1]"
-                      onClick={() => addStep(k)}
-                    >
-                      + {k}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <ul className="mt-3 space-y-3">
-                {steps.map((s, i) => (
-                  <li key={s.key} className="rounded-lg border border-white/[0.08] bg-[#12141a]/80 p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-medium uppercase text-[#8b9199]">
-                        {i + 1}. {s.kind}
-                      </span>
-                      <button
-                        type="button"
-                        className="text-xs text-red-300 hover:underline"
-                        onClick={() => removeStep(s.key)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    {s.kind === "sms" ? (
-                      <textarea
-                        className="min-h-[72px] w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-sm text-[#e7e9ea]"
-                        value={s.text}
-                        onChange={(e) => updateStep(s.key, { text: e.target.value } as Partial<UiStep>)}
-                        spellCheck
-                      />
-                    ) : null}
-                    {s.kind === "delay" ? (
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-[#e7e9ea]">
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-20 rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1"
-                          value={s.hours}
-                          onChange={(e) =>
-                            updateStep(s.key, { hours: Number(e.target.value) || 0 } as Partial<UiStep>)
-                          }
-                        />
-                        <span>h</span>
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-20 rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1"
-                          value={s.minutes}
-                          onChange={(e) =>
-                            updateStep(s.key, { minutes: Number(e.target.value) || 0 } as Partial<UiStep>)
-                          }
-                        />
-                        <span>m</span>
-                      </div>
-                    ) : null}
-                    {s.kind === "condition" ? (
-                      <select
-                        className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-sm text-[#e7e9ea]"
-                        value={s.check}
-                        onChange={(e) =>
-                          updateStep(s.key, {
-                            check: e.target.value as "no_reply" | "claim_not_filed",
-                          } as Partial<UiStep>)
-                        }
-                      >
-                        <option value="no_reply">no_reply (no inbound since run started)</option>
-                        <option value="claim_not_filed">claim_not_filed</option>
-                      </select>
-                    ) : null}
-                    {s.kind === "tag" ? (
-                      <div className="space-y-1 text-sm">
-                        <input
-                          className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-[#e7e9ea]"
-                          placeholder="Add tags (comma-separated)"
-                          value={s.add}
-                          onChange={(e) => updateStep(s.key, { add: e.target.value } as Partial<UiStep>)}
-                        />
-                        <input
-                          className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-[#e7e9ea]"
-                          placeholder="Remove tags (comma-separated)"
-                          value={s.remove}
-                          onChange={(e) => updateStep(s.key, { remove: e.target.value } as Partial<UiStep>)}
-                        />
-                      </div>
-                    ) : null}
-                    {s.kind === "move_pipeline" ? (
-                      <input
-                        className="w-full rounded border border-white/[0.1] bg-[#0a0c10] px-2 py-1 text-sm text-[#e7e9ea]"
-                        value={s.stage}
-                        onChange={(e) => updateStep(s.key, { stage: e.target.value } as Partial<UiStep>)}
-                      />
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-3">
-              <h3 className="text-xs font-semibold uppercase text-sky-200/90">Preview (first SMS)</h3>
-              <p className="mt-1 text-sm text-[#e7e9ea]">{firstSmsPreview || "—"}</p>
-              <p className="mt-2 text-xs text-[#71767b]">
-                Sample: {PREVIEW.name}, {PREVIEW.address}, {PREVIEW.company}. Placeholders:{" "}
-                <code className="text-[#8b9199]">{"{{name}} {{phone}} {{address}} {{company}}"}</code>
-              </p>
-            </div>
-
-            <details className="rounded-lg border border-white/[0.08] bg-[#0a0c10]/50 p-4">
-              <summary className="cursor-pointer text-sm text-[#8b9199]">Advanced: JSON</summary>
-              <pre className="mt-2 max-h-40 overflow-auto font-mono text-xs text-[#e7e9ea]">{stepsJson}</pre>
-            </details>
-
-            <button type="button" className="run-btn" disabled={busy} onClick={() => void saveWorkflow()}>
-              {busy ? "Saving…" : "Save workflow"}
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="space-y-2 rounded-xl border border-white/[0.08] bg-[#12141a]/80 p-4">
-        <h2 className="text-sm font-semibold text-[#e7e9ea]">AI suggested reply</h2>
+      <section className="space-y-2 rounded-xl border border-white/[0.08] bg-[#12141a]/80 p-4" aria-labelledby="sms-ai-heading">
+        <h2 id="sms-ai-heading" className="text-sm font-semibold text-[#e7e9ea]">
+          Draft a reply (AI)
+        </h2>
+        <p className="text-xs text-[#71767b]">Optional helper for one-off replies to an inbound text—not the same as an automated follow-up sequence above.</p>
         <textarea
           className="min-h-[80px] w-full rounded-lg border border-white/[0.12] bg-[#0a0c10] px-3 py-2 text-sm text-[#e7e9ea]"
           placeholder="Paste inbound SMS…"
@@ -657,7 +676,7 @@ export function AutomationBuilder() {
             {suggestOut}
           </p>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }
