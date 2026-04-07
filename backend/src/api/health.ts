@@ -5,7 +5,7 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-05-signup-notify";
+export const WORKER_BUILD_TAG = "2026-04-05-sms-automation";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
@@ -28,6 +28,10 @@ type HealthEnv = {
   AUTH_SIGNUP_ENABLED?: string;
   STRIPE_SECRET_KEY?: string;
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
+  /** Telnyx API key — outbound SMS + workflow steps (see services/sms). */
+  TELNYX_API_KEY?: string;
+  /** Stripe metered Price id for SMS usage records (optional). */
+  STRIPE_SMS_METERED_PRICE_ID?: string;
   RESEND_API_KEY?: string;
 };
 
@@ -88,6 +92,10 @@ export function handleHealthGet(
         ),
         /** True when Resend is configured (POST /api/auth/register can email admin on new sign-up). */
         signupNotifyEmail: Boolean((env.RESEND_API_KEY || "").trim()),
+        /** True when Telnyx API key is set (POST /api/sms/send, workflow SMS steps, inbound webhook persistence). */
+        telnyxSms: Boolean((env.TELNYX_API_KEY || "").trim()),
+        /** True when metered SMS Price id is set (usage records after successful outbound SMS when subscription item exists). */
+        stripeSmsMeteredPrice: Boolean((env.STRIPE_SMS_METERED_PRICE_ID || "").trim()),
       },
     },
     200,

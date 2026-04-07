@@ -205,6 +205,24 @@ export async function updateUserBillingAndStripe(
   return true;
 }
 
+/** Metered Stripe Price id for SMS usage (optional); subscription item id stored on user when subscription includes this price. */
+export async function getStripeSmsSubscriptionItem(db: D1, userId: string): Promise<string | null> {
+  if (db == null) return null;
+  const row = await db
+    .prepare(`SELECT stripe_subscription_item_sms FROM users WHERE id = ? LIMIT 1`)
+    .bind(userId)
+    .first<{ stripe_subscription_item_sms: string | null }>();
+  return row?.stripe_subscription_item_sms?.trim() || null;
+}
+
+export async function updateUserStripeSmsSubscriptionItem(db: D1, userId: string, itemId: string | null): Promise<void> {
+  const t = now();
+  await db
+    .prepare(`UPDATE users SET stripe_subscription_item_sms = ?, updated_at = ? WHERE id = ?`)
+    .bind(itemId, t, userId)
+    .run();
+}
+
 export async function findUserIdByStripeCustomerId(db: D1, customerId: string): Promise<string | null> {
   if (db == null) return null;
   const c = customerId.trim();

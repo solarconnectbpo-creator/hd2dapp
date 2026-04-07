@@ -14,7 +14,8 @@ routes = [
 
 # Retry Meta Page posts that failed Graph API (pending rows in D1).
 [triggers]
-crons = ["*/10 * * * *"]
+# Meta retries every 10m; SMS workflow runs every minute (pending sms_workflow_runs).
+crons = ["*/10 * * * *", "* * * * *"]
 
 # `/api/*` on hardcoredoortodoorclosers.com is NOT routed here — it is served by Cloudflare Pages
 # (`functions/api/*` proxies to this Worker’s *.workers.dev URL). That avoids Worker + Pages fighting

@@ -1,9 +1,15 @@
 import type { AuthEnv } from "./authRoutes";
 import { verifyStripeWebhookSignature } from "./stripeWebhookVerify";
-import { findUserIdByStripeCustomerId, updateUserBillingAndStripe } from "../auth/userDb";
+import {
+  findUserIdByStripeCustomerId,
+  updateUserBillingAndStripe,
+  updateUserStripeSmsSubscriptionItem,
+} from "../auth/userDb";
 
 export type StripeWebhookEnv = AuthEnv & {
   STRIPE_WEBHOOK_SECRET?: string;
+  /** When set, subscription items with this Price id sync to `users.stripe_subscription_item_sms`. */
+  STRIPE_SMS_METERED_PRICE_ID?: string;
 };
 
 type StripeObj = Record<string, unknown>;
@@ -15,6 +21,23 @@ function billingFromSubscriptionStatus(status: string | undefined): "active" | "
   if (s === "canceled" || s === "incomplete_expired") return "canceled";
   if (s === "incomplete" || s === "paused") return "unpaid";
   return "unpaid";
+}
+
+function extractSmsSubscriptionItemId(sub: StripeObj, meteredPriceId: string): string | null {
+  const items = sub.items as { data?: Array<{ id?: string; price?: unknown }> } | undefined;
+  const list = items?.data;
+  if (!list || !meteredPriceId) return null;
+  for (const it of list) {
+    const p = it.price;
+    const pid =
+      typeof p === "string"
+        ? p
+        : p && typeof p === "object" && "id" in p && typeof (p as { id?: string }).id === "string"
+          ? (p as { id: string }).id
+          : "";
+    if (pid === meteredPriceId && typeof it.id === "string") return it.id;
+  }
+  return null;
 }
 
 async function resolveUserIdFromSubscription(db: unknown, sub: StripeObj): Promise<string | null> {
@@ -78,12 +101,18 @@ export async function handleStripeWebhook(
           billing_status: st,
           stripe_customer_id: customer || undefined,
         });
+        const smsPrice = (env.STRIPE_SMS_METERED_PRICE_ID || "").trim();
+        if (smsPrice) {
+          const smsItem = extractSmsSubscriptionItemId(sub, smsPrice);
+          await updateUserStripeSmsSubscriptionItem(env.DB, userId, smsItem);
+        }
       }
     } else if (type === "customer.subscription.deleted" && obj) {
       const sub = obj;
       const userId = await resolveUserIdFromSubscription(env.DB, sub);
       if (userId) {
         await updateUserBillingAndStripe(env.DB, userId, { billing_status: "canceled" });
+        await updateUserStripeSmsSubscriptionItem(env.DB, userId, null);
       }
     }
   } catch (e) {

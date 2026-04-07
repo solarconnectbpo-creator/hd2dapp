@@ -30,6 +30,9 @@ import { handleEstimatorChatAi } from "./api/estimatorChatAi";
 import { handleGhlSubmitLead } from "./api/ghlSubmitLead";
 import { handleMetaMarketing, processMetaScheduledRetries, type MetaMarketingEnv } from "./api/metaMarketing";
 import { handleMarketingGenerateImage, type MarketingImageEnv } from "./api/marketingGenerateImage";
+import { handleTelnyxWebhook, type TelnyxWebhookEnv } from "./api/telnyxWebhook";
+import { handleSmsHttpRoutes, type SmsHttpEnv } from "./api/smsHttpRoutes";
+import { processSmsWorkflowRuns } from "./sms/smsWorkflowEngine";
 
 interface Env {
   DB: any;
@@ -112,6 +115,14 @@ interface Env {
   SIGNUP_NOTIFY_TO?: string;
   /** Resend verified From header, e.g. HD2D <noreply@hardcoredoortodoorclosers.com> */
   RESEND_FROM?: string;
+  /** Telnyx API key for outbound SMS and workflow steps. */
+  TELNYX_API_KEY?: string;
+  /** Default E.164 from number when org has no row in sms_org_numbers. */
+  TELNYX_FROM_NUMBER?: string;
+  /** Optional: require ?token= on POST /api/webhooks/telnyx (same value). */
+  TELNYX_WEBHOOK_QUERY_SECRET?: string;
+  /** Stripe metered Price id for SMS; syncs subscription item to users.stripe_subscription_item_sms. */
+  STRIPE_SMS_METERED_PRICE_ID?: string;
 }
 
 type AuthEnv = Pick<
@@ -182,6 +193,14 @@ export default {
         request.method === "POST"
       ) {
         return await handleStripeWebhook(request, env as StripeWebhookEnv, corsHeaders);
+      } else if (
+        (path === "/api/webhooks/telnyx" || path === "/api/webhooks/telnyx/") &&
+        request.method === "POST"
+      ) {
+        return await handleTelnyxWebhook(request, env as TelnyxWebhookEnv, corsHeaders);
+      } else if (path.startsWith("/api/sms")) {
+        const smsRes = await handleSmsHttpRoutes(request, env as SmsHttpEnv, path, corsHeaders);
+        if (smsRes) return smsRes;
       } else if (
         (path === "/api/billing/membership-checkout-session" || path === "/api/billing/membership-checkout-session/") &&
         request.method === "POST"
@@ -316,7 +335,18 @@ export default {
     }
   },
 
-  async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<void>) => void }): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (event.cron === "* * * * *") {
+      ctx.waitUntil(
+        processSmsWorkflowRuns({
+          DB: env.DB,
+          TELNYX_API_KEY: env.TELNYX_API_KEY,
+          TELNYX_FROM_NUMBER: env.TELNYX_FROM_NUMBER,
+          STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+        }),
+      );
+      return;
+    }
     ctx.waitUntil(processMetaScheduledRetries(env as MetaMarketingEnv));
   },
 };
