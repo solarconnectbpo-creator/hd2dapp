@@ -29,7 +29,8 @@ export function SignUp() {
   const [orgPreviewCount, setOrgPreviewCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [signupAllowed, setSignupAllowed] = useState<boolean | null>(null);
+  /** loading | server allows | server disabled | health check failed */
+  const [signupGate, setSignupGate] = useState<"loading" | "allowed" | "disabled" | "unreachable">("loading");
 
   useEffect(() => {
     const t = searchParams.get("type");
@@ -40,8 +41,17 @@ export function SignUp() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const caps = await fetchAuthCapabilities();
-      if (!cancelled) setSignupAllowed(caps.ok ? caps.authSignup : null);
+      try {
+        const caps = await fetchAuthCapabilities();
+        if (cancelled) return;
+        if (!caps.ok) {
+          setSignupGate("unreachable");
+          return;
+        }
+        setSignupGate(caps.authSignup ? "allowed" : "disabled");
+      } catch {
+        if (!cancelled) setSignupGate("unreachable");
+      }
     })();
     return () => {
       cancelled = true;
@@ -184,13 +194,26 @@ export function SignUp() {
           </button>
         </div>
 
-        {signupAllowed === false ? (
+        {signupGate === "disabled" ? (
           <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
             Self-service sign up is turned off on the server. Ask an admin to create your account, or use{" "}
             <Link to="/admin/login" className="font-medium text-[#1d9bf0] underline-offset-2 hover:underline">
               admin sign in
             </Link>{" "}
             if you have an admin account.
+          </div>
+        ) : null}
+        {signupGate === "unreachable" ? (
+          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            We can’t reach the server to confirm registration settings. Check your connection, then{" "}
+            <button
+              type="button"
+              className="font-medium text-[#1d9bf0] underline-offset-2 hover:underline"
+              onClick={() => window.location.reload()}
+            >
+              refresh the page
+            </button>
+            .
           </div>
         ) : null}
 
@@ -328,9 +351,9 @@ export function SignUp() {
             <button
               type="submit"
               className="run-btn w-full min-h-[48px]"
-              disabled={busy || signupAllowed === false}
+              disabled={busy || signupGate === "disabled" || signupGate === "loading"}
             >
-              {busy ? "Creating account..." : "Create account"}
+              {busy ? "Creating account..." : signupGate === "loading" ? "Checking registration…" : "Create account"}
             </button>
             <AuthDivider label="Already have an account?" />
             <Link to="/login" state={location.state} className={AUTH_SECONDARY_BTN}>

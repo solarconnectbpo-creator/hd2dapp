@@ -121,6 +121,15 @@ export function Login() {
             invalid={error ? true : undefined}
             ariaDescribedBy={error ? "login-error" : undefined}
           />
+          <p className="text-center text-xs text-[#71767b]">
+            <a
+              href="mailto:support@hardcoredoortodoorclosers.com?subject=HD2D%20Closers%20%E2%80%94%20password%20help"
+              className="font-medium text-[#1d9bf0] underline-offset-2 hover:underline"
+            >
+              Forgot password?
+            </a>{" "}
+            — resets go through your admin or support (no self-serve reset yet).
+          </p>
           {error ? (
             <div
               id="login-error"

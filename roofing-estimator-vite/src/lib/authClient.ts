@@ -1,6 +1,7 @@
 import { HD2D_PUBLIC_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
+import { mapAuthFailureMessage } from "./authApiMessage";
 import { networkFetchFailureHint, safeUserFacingApiMessage } from "./safeApiError";
 
 const AUTH_STORAGE_KEY = "hd2d-auth-session-v1";
@@ -36,6 +37,8 @@ type LoginResponse = {
   error?: string;
   /** Server hint (e.g. D1 error) — safe to show in UI for debugging sign-up / login. */
   detail?: string;
+  /** Machine-readable code from Worker (see mapAuthFailureMessage). */
+  error_code?: string;
 };
 
 function getAuthApiBase(): string {
@@ -144,8 +147,12 @@ export async function loginWithPassword(email: string, password: string): Promis
   const text = await res.text();
   const data = parseFetchedJson<LoginResponse>(text, res, "login");
   if (!res.ok || data.success !== true || !data.token || !data.user || !data.expiresAt) {
-    const msg = [data.error || `Login failed (${res.status}).`, data.detail].filter(Boolean).join(" — ");
-    throw new Error(safeUserFacingApiMessage(msg, res.status, { skipStatusHints: true }));
+    throw new Error(
+      mapAuthFailureMessage(
+        { error: data.error, detail: data.detail, error_code: data.error_code },
+        res.status,
+      ),
+    );
   }
   const session: AuthSession = {
     token: data.token,
@@ -164,16 +171,20 @@ export async function fetchCurrentUser(token: string): Promise<{ user: AuthUser;
     headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
   });
   const text = await res.text();
-  const data = parseFetchedJson<{ success?: boolean; user?: AuthUser; access?: AuthAccess; error?: string }>(
-    text,
-    res,
-    "/api/auth/me",
-  );
+  const data = parseFetchedJson<{
+    success?: boolean;
+    user?: AuthUser;
+    access?: AuthAccess;
+    error?: string;
+    detail?: string;
+    error_code?: string;
+  }>(text, res, "/api/auth/me");
   if (!res.ok || data.success !== true || !data.user) {
     throw new Error(
-      safeUserFacingApiMessage(data.error || `Session validation failed (${res.status}).`, res.status, {
-        skipStatusHints: true,
-      }),
+      mapAuthFailureMessage(
+        { error: data.error, detail: data.detail, error_code: data.error_code },
+        res.status,
+      ),
     );
   }
   return { user: data.user, access: data.access };
@@ -231,8 +242,12 @@ export async function registerAccount(payload: RegisterAccountPayload): Promise<
   });
   const data = await readJsonResponseBody<LoginResponse>(res);
   if (!res.ok || data.success !== true || !data.token || !data.user || !data.expiresAt) {
-    const msg = [data.error || `Sign up failed (${res.status}).`, data.detail].filter(Boolean).join(" — ");
-    throw new Error(safeUserFacingApiMessage(msg, res.status, { skipStatusHints: true }));
+    throw new Error(
+      mapAuthFailureMessage(
+        { error: data.error, detail: data.detail, error_code: data.error_code },
+        res.status,
+      ),
+    );
   }
   const session: AuthSession = {
     token: data.token,

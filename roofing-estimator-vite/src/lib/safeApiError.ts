@@ -17,6 +17,7 @@ export function safeUserFacingApiMessage(
   if (!options?.skipStatusHints) {
     if (status === 401) return "Sign in again to continue.";
     if (status === 403) return "You don’t have permission for this action.";
+    if (status === 429) return "Too many attempts. Wait a few minutes and try again.";
     if (status === 503) return "This service is temporarily unavailable. Try again shortly.";
     if (status === 502 || status === 504) return "The server had a problem. Try again in a moment.";
   }
@@ -29,7 +30,9 @@ export function safeUserFacingApiMessage(
     (lower.includes("service token") && (lower.includes("vercel") || lower.includes("zero trust"))) ||
     (lower.includes("service auth") && lower.includes("zero trust"))
   ) {
-    return "Sign-in can’t reach the server yet: Cloudflare is blocking the API proxy. Your admin needs a Service Auth policy on the Worker app and matching HD2D_ACCESS_* secrets in Vercel—not a wrong password.";
+    return options?.skipStatusHints
+      ? "Sign-in can’t reach the server (API proxy blocked). Try again shortly or contact support if this continues."
+      : "Sign-in can’t reach the server yet: Cloudflare is blocking the API proxy. Your admin needs a Service Auth policy on the Worker app and matching HD2D_ACCESS_* secrets in Vercel—not a wrong password.";
   }
   /** Login/sign-up use skipStatusHints — long bodies used to hit the 200-char trim and showed a useless generic line. */
   if (options?.skipStatusHints && status === 503) {

@@ -96,7 +96,7 @@ export function AccountPending() {
         ))}
       </ul>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {showPay ? (
           <button type="button" className="run-btn" disabled={busy} onClick={() => void onPay()}>
             {busy ? "Redirecting…" : "Pay membership"}
@@ -106,6 +106,14 @@ export function AccountPending() {
           Refresh status
         </button>
       </div>
+
+      <p className="text-sm text-[#8b9199]">
+        Questions or stuck? Email{" "}
+        <a className="font-medium text-[#1d9bf0] underline-offset-2 hover:underline" href="mailto:support@hardcoredoortodoorclosers.com">
+          support@hardcoredoortodoorclosers.com
+        </a>
+        .
+      </p>
 
       <p className="text-xs text-[#71767b]">
         Approval status: <span className="text-[#e7e9ea]">{access?.approval_status ?? "—"}</span> · Billing:{" "}

@@ -86,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         clearSession();
         if (mounted) setSession(null);
+        toast.error("We couldn’t verify your saved session. Sign in again.");
       } finally {
         if (mounted) setLoading(false);
       }
