@@ -9,6 +9,7 @@ import {
   Headphones,
   MapPinned,
   Megaphone,
+  MessageSquare,
   PhoneForwarded,
   Ruler,
   Search,
@@ -192,6 +193,12 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <PhoneForwarded className="w-4 h-4 mr-2" />
                 Buy leads
+              </Button>
+            </Link>
+            <Link to="/sms-automation">
+              <Button className="w-full justify-start" variant="outline">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                SMS automation
               </Button>
             </Link>
           </CardContent>

@@ -135,6 +135,38 @@ function authHeaders(): HeadersInit {
   return h;
 }
 
+type SmsSetupStatus = {
+  success?: boolean;
+  org_id?: string;
+  inbound_numbers?: Array<{ phone_e164: string; label: string | null }>;
+  worker?: {
+    telnyx_configured?: boolean;
+    telnyx_default_from_set?: boolean;
+    twilio_configured?: boolean;
+  };
+};
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 export function AutomationBuilder() {
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
@@ -148,6 +180,8 @@ export function AutomationBuilder() {
   const [suggestIn, setSuggestIn] = useState("");
   const [suggestOut, setSuggestOut] = useState<string | null>(null);
   const [canonicalTriggers, setCanonicalTriggers] = useState<string[]>(["manual"]);
+  const [setup, setSetup] = useState<SmsSetupStatus | null>(null);
+  const [copyHint, setCopyHint] = useState<string | null>(null);
 
   const stepsJson = useMemo(() => uiStepsToJson(steps), [steps]);
 
@@ -162,20 +196,29 @@ export function AutomationBuilder() {
     setLoading(true);
     try {
       const base = getHd2dApiBase().replace(/\/$/, "");
-      const [wfRes, trRes] = await Promise.all([
+      const [wfRes, trRes, setupRes] = await Promise.all([
         fetch(`${base}/api/sms/workflows`, { headers: authHeaders() }),
         fetch(`${base}/api/sms/triggers`, { headers: authHeaders() }),
+        fetch(`${base}/api/sms/setup-status`, { headers: authHeaders() }),
       ]);
       const wfData = await readJsonResponseBody<{ success?: boolean; workflows?: WorkflowRow[]; error?: string }>(wfRes);
       if (!wfRes.ok || !wfData.success) {
         setError(wfData.error || `Failed to load (${wfRes.status})`);
         setWorkflows([]);
+        setSetup(null);
         return;
       }
       setWorkflows(wfData.workflows ?? []);
       const trData = await readJsonResponseBody<{ success?: boolean; triggers?: string[] }>(trRes);
       if (trRes.ok && trData.success && trData.triggers?.length) {
         setCanonicalTriggers(trData.triggers);
+      }
+      if (setupRes.ok) {
+        const st = await readJsonResponseBody<SmsSetupStatus>(setupRes);
+        if (st.success) setSetup(st);
+        else setSetup(null);
+      } else {
+        setSetup(null);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -280,17 +323,142 @@ export function AutomationBuilder() {
     );
   }
 
+  const apiBase = getHd2dApiBase().replace(/\/$/, "");
+  const webhookUrl = `${apiBase}/api/webhooks/telnyx`;
+  const orgId = setup?.org_id ?? "";
+  const inbound = setup?.inbound_numbers ?? [];
+  const wTelnyx = setup?.worker?.telnyx_configured;
+  const wFrom = setup?.worker?.telnyx_default_from_set;
+  const sqlExample = orgId
+    ? `INSERT INTO sms_org_numbers (phone_e164, org_id, label, created_at)\nVALUES ('+15551234567', '${orgId}', 'main', strftime('%s','now'));`
+    : "";
+
+  async function onCopy(label: string, text: string) {
+    const ok = await copyToClipboard(text);
+    setCopyHint(ok ? `Copied: ${label}` : "Copy failed — select and copy manually");
+    window.setTimeout(() => setCopyHint(null), 2500);
+  }
+
   return (
     <div className="hd2d-page-shell max-w-3xl space-y-8">
       <Seo title="SMS automation — HD2D Closers" description="Edit SMS follow-up workflows and AI reply suggestions." path="/sms-automation" />
       <div>
         <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS automation</h1>
         <p className="text-sm text-[#71767b] mt-2">
-          Workflows run on the server (Telnyx or Twilio). Map your inbound number to an org in{" "}
-          <code className="text-xs text-[#8b9199]">sms_org_numbers</code> (D1). Use{" "}
-          <code className="text-xs text-[#8b9199]">POST /api/sms/events</code> from your app to fire triggers.
+          Build text follow-ups that run on the server. You can edit workflows anytime; when your Telnyx number is ready,
+          we will send and receive SMS for your organization. Triggers also fire from lead flows in the app (e.g. after
+          estimator chat).
         </p>
       </div>
+
+      <section
+        className="rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.07] to-transparent p-5 ring-1 ring-amber-500/15"
+        aria-labelledby="sms-setup-heading"
+      >
+        <h2 id="sms-setup-heading" className="text-base font-semibold text-[#e7e9ea]">
+          Telnyx setup (add your number when ready)
+        </h2>
+        <p className="mt-1 text-sm text-[#8b9199]">
+          No phone number is required to design workflows. Finish these steps when you are ready to go live.
+        </p>
+        <ul className="mt-4 space-y-3 text-sm text-[#e7e9ea]">
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[#8b9199]">1.</span>
+            <span>Buy or port a number in Telnyx and attach it to a Messaging profile.</span>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[#8b9199]">2.</span>
+            <span>Ask your host to set Worker secrets:</span>
+            <code className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-sky-200/90">TELNYX_API_KEY</code>
+            <span className="text-[#71767b]">and</span>
+            <code className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-sky-200/90">TELNYX_FROM_NUMBER</code>
+            <span className="text-[#71767b]">(E.164).</span>
+          </li>
+          <li className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-[#8b9199]">3.</span>
+              <span>Set the Telnyx inbound webhook to:</span>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code className="block flex-1 break-all rounded-lg border border-white/10 bg-[#0a0c10] px-3 py-2 text-xs text-[#c4d0dc]">
+                {webhookUrl}
+              </code>
+              <button
+                type="button"
+                className="shrink-0 rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-2 text-xs font-semibold text-sky-100 hover:bg-sky-500/25"
+                onClick={() => void onCopy("Webhook URL", webhookUrl)}
+              >
+                Copy URL
+              </button>
+            </div>
+            <p className="text-xs text-[#71767b]">
+              If the host sets <code className="text-[#8b9199]">TELNYX_WEBHOOK_QUERY_SECRET</code>, append{" "}
+              <code className="text-[#8b9199]">?token=…</code> to that URL in Telnyx.
+            </p>
+          </li>
+          <li className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-[#8b9199]">4.</span>
+              <span>Map your inbound number to this org in the database (one-time):</span>
+            </div>
+            {orgId ? (
+              <>
+                <p className="text-xs text-[#71767b]">
+                  Your organization id (for D1 / Wrangler):{" "}
+                  <code className="text-[#c4d0dc]">{orgId}</code>{" "}
+                  <button
+                    type="button"
+                    className="text-sky-300 underline decoration-sky-500/40 hover:text-sky-200"
+                    onClick={() => void onCopy("Organization id", orgId)}
+                  >
+                    Copy
+                  </button>
+                </p>
+                {sqlExample ? (
+                  <div className="flex flex-col gap-2">
+                    <pre className="max-h-36 overflow-auto rounded-lg border border-white/10 bg-[#0a0c10] p-3 text-xs text-[#c4d0dc]">
+                      {sqlExample}
+                    </pre>
+                    <button
+                      type="button"
+                      className="self-start rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-[#e7e9ea] hover:bg-white/[0.1]"
+                      onClick={() => void onCopy("SQL example", sqlExample)}
+                    >
+                      Copy SQL
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-xs text-[#71767b]">Sign in with a company account to see your org id and SQL template.</p>
+            )}
+          </li>
+        </ul>
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.08] pt-4">
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              wTelnyx ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-white/[0.06] text-[#8b9199] ring-1 ring-white/10"
+            }`}
+          >
+            Worker Telnyx API: {wTelnyx ? "configured" : "not set"}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              wFrom ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-white/[0.06] text-[#8b9199] ring-1 ring-white/10"
+            }`}
+          >
+            Default from number: {wFrom ? "set" : "not set"}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              inbound.length > 0 ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30" : "bg-amber-500/12 text-amber-100 ring-1 ring-amber-500/25"
+            }`}
+          >
+            Inbound mapped: {inbound.length ? inbound.map((n) => n.phone_e164).join(", ") : "none yet"}
+          </span>
+        </div>
+        {copyHint ? <p className="mt-3 text-xs text-sky-200/90">{copyHint}</p> : null}
+      </section>
 
       {loading ? (
         <p className="text-sm text-[#8b9199]">Loading workflows…</p>
