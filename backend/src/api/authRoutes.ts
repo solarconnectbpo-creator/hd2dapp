@@ -128,7 +128,7 @@ export async function handleAuthRequest(
     try {
       body = (await request.json()) as { email?: string; password?: string };
     } catch {
-      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body.", error_code: "INVALID_JSON" }), {
         status: 400,
         headers: j,
       });
@@ -136,13 +136,16 @@ export async function handleAuthRequest(
     const email = (body.email || "").trim().toLowerCase();
     const password = body.password || "";
     if (!email || !password) {
-      return new Response(JSON.stringify({ success: false, error: "Email and password are required." }), {
-        status: 400,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: "Email and password are required.", error_code: "MISSING_FIELDS" }),
+        {
+          status: 400,
+          headers: j,
+        },
+      );
     }
     if (!isValidEmail(email)) {
-      return new Response(JSON.stringify({ success: false, error: "Enter a valid email address." }), {
+      return new Response(JSON.stringify({ success: false, error: "Enter a valid email address.", error_code: "INVALID_EMAIL" }), {
         status: 400,
         headers: j,
       });
@@ -197,6 +200,7 @@ export async function handleAuthRequest(
           error:
             "Could not look up user. Run `npm run d1:migrate:remote` once from the backend folder if D1 is new.",
           detail,
+          error_code: "DB_UNAVAILABLE",
         }),
         { status: 503, headers: j },
       );
@@ -207,16 +211,22 @@ export async function handleAuthRequest(
         ok = await verifyPassword(password, dbUser.salt, dbUser.password_hash);
       } catch (e) {
         console.error("login verifyPassword:", e);
-        return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
-          status: 401,
-          headers: j,
-        });
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid credentials.", error_code: "INVALID_CREDENTIALS" }),
+          {
+            status: 401,
+            headers: j,
+          },
+        );
       }
       if (!ok) {
-        return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
-          status: 401,
-          headers: j,
-        });
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid credentials.", error_code: "INVALID_CREDENTIALS" }),
+          {
+            status: 401,
+            headers: j,
+          },
+        );
       }
       const user = rowToAuthUser(dbUser);
       const access = evaluateAccess(env, user.user_type, dbUser);
@@ -236,7 +246,7 @@ export async function handleAuthRequest(
       }
       return new Response(JSON.stringify({ success: true, token, user, expiresAt, access }), { status: 200, headers: j });
     }
-    return new Response(JSON.stringify({ success: false, error: "Invalid credentials." }), {
+    return new Response(JSON.stringify({ success: false, error: "Invalid credentials.", error_code: "INVALID_CREDENTIALS" }), {
       status: 401,
       headers: j,
     });
@@ -245,10 +255,13 @@ export async function handleAuthRequest(
   if (p === "/api/auth/register" && request.method === "POST") {
     const signupOff = (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() === "false";
     if (signupOff) {
-      return new Response(JSON.stringify({ success: false, error: "Self-service sign up is disabled." }), {
-        status: 403,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: "Self-service sign up is disabled.", error_code: "SIGNUP_DISABLED" }),
+        {
+          status: 403,
+          headers: j,
+        },
+      );
     }
     let body: {
       email?: string;
@@ -263,7 +276,7 @@ export async function handleAuthRequest(
     try {
       body = (await request.json()) as typeof body;
     } catch {
-      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body.", error_code: "INVALID_JSON" }), {
         status: 400,
         headers: j,
       });
@@ -274,34 +287,54 @@ export async function handleAuthRequest(
     const accountType = (body.accountType || "rep").trim().toLowerCase();
     const isCompany = accountType === "company";
     if (!email || !password) {
-      return new Response(JSON.stringify({ success: false, error: "Email and password are required." }), {
-        status: 400,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: "Email and password are required.", error_code: "MISSING_FIELDS" }),
+        {
+          status: 400,
+          headers: j,
+        },
+      );
     }
     if (!isValidEmail(email)) {
-      return new Response(JSON.stringify({ success: false, error: "Enter a valid email address." }), {
+      return new Response(JSON.stringify({ success: false, error: "Enter a valid email address.", error_code: "INVALID_EMAIL" }), {
         status: 400,
         headers: j,
       });
     }
     if (password.length < 8) {
-      return new Response(JSON.stringify({ success: false, error: "Password must be at least 8 characters." }), {
-        status: 400,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Password must be at least 8 characters.",
+          error_code: "PASSWORD_TOO_SHORT",
+        }),
+        {
+          status: 400,
+          headers: j,
+        },
+      );
     }
     if (password.length > 256) {
-      return new Response(JSON.stringify({ success: false, error: "Password is too long." }), {
-        status: 400,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: "Password is too long.", error_code: "PASSWORD_TOO_LONG" }),
+        {
+          status: 400,
+          headers: j,
+        },
+      );
     }
     if (await findUserByEmail(env.DB, email)) {
-      return new Response(JSON.stringify({ success: false, error: "An account with this email already exists." }), {
-        status: 409,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "An account with this email already exists.",
+          error_code: "EMAIL_TAKEN",
+        }),
+        {
+          status: 409,
+          headers: j,
+        },
+      );
     }
     const displayName = nameRaw || email.split("@")[0];
     const id = crypto.randomUUID();
@@ -427,17 +460,20 @@ export async function handleAuthRequest(
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
     if (!token) {
-      return new Response(JSON.stringify({ success: false, error: "Missing bearer token." }), {
+      return new Response(JSON.stringify({ success: false, error: "Missing bearer token.", error_code: "MISSING_BEARER" }), {
         status: 401,
         headers: j,
       });
     }
     const payload = await verifyAuthToken(token, getSecret(env));
     if (!payload) {
-      return new Response(JSON.stringify({ success: false, error: "Invalid or expired session." }), {
-        status: 401,
-        headers: j,
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid or expired session.", error_code: "SESSION_EXPIRED" }),
+        {
+          status: 401,
+          headers: j,
+        },
+      );
     }
     let row: Awaited<ReturnType<typeof findUserById>> = null;
     let meDbError = false;
@@ -455,6 +491,7 @@ export async function handleAuthRequest(
           JSON.stringify({
             success: false,
             error: "Could not verify account. Try again shortly.",
+            error_code: "DB_UNAVAILABLE",
           }),
           { status: 503, headers: j },
         );
@@ -464,6 +501,7 @@ export async function handleAuthRequest(
           JSON.stringify({
             success: false,
             error: "Account not found or no longer active. Sign in again.",
+            error_code: "ACCOUNT_REMOVED",
           }),
           { status: 401, headers: j },
         );
