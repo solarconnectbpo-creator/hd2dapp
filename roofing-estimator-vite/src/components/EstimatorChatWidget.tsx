@@ -6,6 +6,7 @@ import { useMeasurementChatBridge } from "../context/MeasurementChatBridge";
 import { getHd2dApiBase, isHd2dApiConfigured } from "../lib/hd2dApiBase";
 import { buildGhlSummaryNote } from "../lib/mergeEstimatorPatches";
 import { parseJsonResponse } from "../lib/readJsonResponse";
+import { postSmsEvent } from "../lib/smsEmitEvent";
 
 type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -100,6 +101,19 @@ export function EstimatorChatWidget() {
       const data = json.data;
       if (data?.noteWarning) toast.message(data.noteWarning);
       toast.success(data?.contactId ? `Sent to GHL (contact ${data.contactId})` : "Sent to GHL.");
+      if (phone) {
+        const addressParts = [form.address?.trim(), form.stateCode?.trim()].filter(Boolean);
+        const addressLine = addressParts.length ? addressParts.join(", ") : undefined;
+        const smsRes = await postSmsEvent({
+          event: "lead.created",
+          phone,
+          name: proposal.clientName.trim() || undefined,
+          address: addressLine,
+        });
+        if (!smsRes.ok && smsRes.error && smsRes.error !== "not_signed_in") {
+          toast.message(`SMS automation: ${smsRes.error}`);
+        }
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "GHL request failed");
     } finally {

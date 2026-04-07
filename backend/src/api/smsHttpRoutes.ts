@@ -5,6 +5,7 @@ import { resolveSmsOutbound } from "../services/sms/smsProviderResolve";
 import { recordSmsUsageEvent } from "./stripeSmsUsage";
 import {
   deleteSmsWorkflow,
+  ensureSmsContactForOrg,
   getOrgOwnerUserId,
   getOutboundFromForOrg,
   getSmsWorkflow,
@@ -37,6 +38,16 @@ function json(data: unknown, status: number, cors: Record<string, string>): Resp
     status,
     headers: { ...cors, "Content-Type": "application/json" },
   });
+}
+
+function normalizePhoneE164(raw: string): string {
+  const s = (raw || "").trim();
+  if (!s) return "";
+  if (s.startsWith("+")) return s;
+  const digits = s.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : "";
 }
 
 function workflowEnv(env: SmsHttpEnv): SmsWorkflowEnv {
@@ -93,19 +104,34 @@ export async function handleSmsHttpRoutes(
   }
 
   if (base === "/api/sms/events" && request.method === "POST") {
-    let body: { event?: string; contact_id?: string };
+    let body: { event?: string; contact_id?: string; phone_e164?: string; phone?: string; name?: string; address?: string };
     try {
       body = (await request.json()) as typeof body;
     } catch {
       return json({ success: false, error: "Invalid JSON." }, 400, j);
     }
     const eventType = (body.event || "").trim();
-    const contactId = (body.contact_id || "").trim();
-    if (!eventType || !contactId) {
-      return json({ success: false, error: "event and contact_id required." }, 400, j);
+    if (!eventType) {
+      return json({ success: false, error: "event required." }, 400, j);
+    }
+    let contactId = (body.contact_id || "").trim();
+    if (!contactId) {
+      const rawPhone = (body.phone_e164 || body.phone || "").trim();
+      const phone = normalizePhoneE164(rawPhone);
+      if (!phone) {
+        return json({ success: false, error: "contact_id or phone (phone_e164) required." }, 400, j);
+      }
+      const t = Math.floor(Date.now() / 1000);
+      contactId = await ensureSmsContactForOrg(env.DB, {
+        orgId: oid,
+        phoneE164: phone,
+        name: body.name,
+        address: body.address,
+        t,
+      });
     }
     const out = await emitSmsEvent(workflowEnv(env), oid, eventType, contactId);
-    return json({ success: true, started: out.started, errors: out.errors }, 200, j);
+    return json({ success: true, started: out.started, errors: out.errors, contact_id: contactId }, 200, j);
   }
 
   if (base === "/api/sms/workflows" && request.method === "POST") {

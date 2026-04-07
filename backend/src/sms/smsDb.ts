@@ -71,6 +71,38 @@ export async function findContactByOrgPhone(
   return row ?? null;
 }
 
+/** Upsert by org + E.164; returns sms_contacts.id (for workflow events). Requires migration 0008+ for `address`. */
+export async function ensureSmsContactForOrg(
+  db: D1,
+  args: { orgId: string; phoneE164: string; name?: string; address?: string; t: number },
+): Promise<string> {
+  const phone = args.phoneE164.trim();
+  const existing = await findContactByOrgPhone(db, args.orgId, phone);
+  const nm = (args.name || "").trim();
+  const addr = (args.address || "").trim();
+  if (existing) {
+    await db
+      .prepare(
+        `UPDATE sms_contacts SET updated_at = ?,
+          name = COALESCE(NULLIF(?, ''), name),
+          address = COALESCE(NULLIF(?, ''), address)
+         WHERE id = ?`,
+      )
+      .bind(args.t, nm, addr, existing.id)
+      .run();
+    return existing.id;
+  }
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO sms_contacts (id, org_id, phone_e164, name, address, unsubscribed, last_inbound_at, provider, automations_paused, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 0, NULL, 'telnyx', 0, ?, ?)`,
+    )
+    .bind(id, args.orgId, phone, nm, addr, args.t, args.t)
+    .run();
+  return id;
+}
+
 export type SmsContactRow = {
   id: string;
   org_id: string;
