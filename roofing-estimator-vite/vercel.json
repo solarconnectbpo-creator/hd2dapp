@@ -3,14 +3,8 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.hardcoredoortodoorclosers.com" }],
-      "destination": "https://hardcoredoortodoorclosers.com/:path*",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
       "has": [{ "type": "host", "value": "hd2d-closers.vercel.app" }],
-      "destination": "https://hardcoredoortodoorclosers.com/:path*",
+      "destination": "https://www.hardcoredoortodoorclosers.com/:path*",
       "permanent": true
     }
   ],
