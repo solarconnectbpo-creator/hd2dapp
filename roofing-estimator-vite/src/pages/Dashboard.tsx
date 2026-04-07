@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 import {
+  ChevronRight,
   FileSignature,
   FileText,
   Folder,
@@ -123,6 +124,24 @@ export function Dashboard() {
         })}
       </div>
 
+      <Link
+        to="/sms-automation"
+        className="mb-8 flex items-center gap-4 rounded-xl border border-sky-500/35 bg-gradient-to-r from-sky-500/[0.12] via-sky-500/[0.06] to-transparent p-5 text-left ring-1 ring-sky-500/25 transition hover:border-sky-400/45 hover:ring-sky-400/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+      >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/30">
+          <MessageSquare className="h-6 w-6" aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-200/80">Follow-up</p>
+          <h2 className="text-lg font-semibold text-[var(--x-text)]">SMS follow-up sequences</h2>
+          <p className="mt-1 text-sm text-[var(--x-muted)]">
+            Automated texts after leads and events. Also under <span className="text-[#8b9199]">SMS follow-up</span> in the
+            left menu (second item).
+          </p>
+        </div>
+        <ChevronRight className="h-6 w-6 shrink-0 text-sky-300" aria-hidden />
+      </Link>
+
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card className="border-white/[0.07] bg-[var(--x-surface)] text-[var(--x-text)] ring-1 ring-white/[0.04]">
           <CardHeader>
@@ -134,6 +153,12 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <Ruler className="w-4 h-4 mr-2" />
                 New Roof Measurement
+              </Button>
+            </Link>
+            <Link to="/sms-automation">
+              <Button className="w-full justify-start" variant="outline">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                SMS follow-up
               </Button>
             </Link>
             <Link to="/canvassing">
@@ -193,12 +218,6 @@ export function Dashboard() {
               <Button className="w-full justify-start" variant="outline">
                 <PhoneForwarded className="w-4 h-4 mr-2" />
                 Buy leads
-              </Button>
-            </Link>
-            <Link to="/sms-automation">
-              <Button className="w-full justify-start" variant="outline">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                SMS follow-up
               </Button>
             </Link>
           </CardContent>
