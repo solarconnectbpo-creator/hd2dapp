@@ -5,7 +5,7 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-06-sms-automation-v2";
+export const WORKER_BUILD_TAG = "2026-04-08-sms-setup-status";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */

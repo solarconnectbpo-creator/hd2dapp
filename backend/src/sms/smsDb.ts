@@ -17,6 +17,18 @@ export async function resolveOrgIdByInboundTo(db: D1, toE164: string): Promise<s
   return row?.org_id ?? null;
 }
 
+export async function listSmsOrgNumbersForOrg(
+  db: D1,
+  orgId: string,
+): Promise<Array<{ phone_e164: string; label: string | null }>> {
+  if (db == null) return [];
+  const res = (await db
+    .prepare(`SELECT phone_e164, label FROM sms_org_numbers WHERE org_id = ? ORDER BY created_at ASC`)
+    .bind(orgId)
+    .all()) as { results?: Array<{ phone_e164: string; label: string | null }> };
+  return res.results ?? [];
+}
+
 export async function upsertSmsContact(
   db: D1,
   args: {

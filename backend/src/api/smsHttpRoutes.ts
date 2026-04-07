@@ -9,6 +9,7 @@ import {
   getOrgOwnerUserId,
   getOutboundFromForOrg,
   getSmsWorkflow,
+  listSmsOrgNumbersForOrg,
   listSmsWorkflows,
   upsertSmsWorkflow,
 } from "../sms/smsDb";
@@ -101,6 +102,29 @@ export async function handleSmsHttpRoutes(
     await seedDefaultSmsWorkflowsIfEmpty(env.DB, oid);
     const rows = await listSmsWorkflows(env.DB, oid);
     return json({ success: true, workflows: rows }, 200, j);
+  }
+
+  if (base === "/api/sms/setup-status" && request.method === "GET") {
+    const inbound_numbers = await listSmsOrgNumbersForOrg(env.DB, oid);
+    const telnyxKey = (env.TELNYX_API_KEY || "").trim();
+    const telnyxFrom = (env.TELNYX_FROM_NUMBER || "").trim();
+    const twSid = (env.TWILIO_ACCOUNT_SID || "").trim();
+    const twTok = (env.TWILIO_AUTH_TOKEN || "").trim();
+    const twFrom = (env.TWILIO_FROM_NUMBER || "").trim();
+    return json(
+      {
+        success: true,
+        org_id: oid,
+        inbound_numbers,
+        worker: {
+          telnyx_configured: Boolean(telnyxKey),
+          telnyx_default_from_set: Boolean(telnyxFrom),
+          twilio_configured: Boolean(twSid && twTok && twFrom),
+        },
+      },
+      200,
+      j,
+    );
   }
 
   if (base === "/api/sms/events" && request.method === "POST") {
