@@ -38,7 +38,7 @@ export function Login() {
   if (loading) {
     return (
       <AuthScreenLayout
-        tagline={<>Sign in to access canvassing, storm intel, and roofing estimates — built for reps in the field.</>}
+        tagline={<>Sign in for canvassing, estimates, and SMS follow-up — built for reps in the field.</>}
       >
         <div
           className="flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-8 text-[#e7e9ea]"
@@ -61,7 +61,13 @@ export function Login() {
     <AuthScreenLayout
       tagline={
         <>
-          Sign in to access canvassing, storm intel, and roofing estimates — built for reps in the field.
+          Sign in for canvassing, storm intel, roofing estimates, and{" "}
+          <strong className="font-semibold text-[#c4d0dc]">SMS follow-up</strong> sequences. After sign-in, use{" "}
+          <strong className="font-semibold text-[#c4d0dc]">SMS follow-up</strong> in the sidebar (☰ menu on mobile)—or open{" "}
+          <Link to="/sms-automation" className="font-semibold text-[#1d9bf0] underline-offset-2 hover:underline">
+            /sms-automation
+          </Link>{" "}
+          after you are signed in.
         </>
       }
     >

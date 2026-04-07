@@ -29,6 +29,7 @@ import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: Home },
+  { path: "/sms-automation", label: "SMS follow-up", icon: MessageSquare },
   { path: "/measurement/new", label: "New Measurement", icon: Ruler },
   { path: "/estimates", label: "Estimates", icon: FileText },
   { path: "/contracts", label: "Contracts", icon: FileSignature },
@@ -40,7 +41,6 @@ const navItems = [
   { path: "/courses", label: "Courses", icon: GraduationCap },
   { path: "/call-center", label: "Call center", icon: Headphones },
   { path: "/leads", label: "Buy leads", icon: PhoneForwarded },
-  { path: "/sms-automation", label: "SMS follow-up", icon: MessageSquare },
 ] as const;
 
 const ADMIN_USERS_PATH = "/admin/users";
