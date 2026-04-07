@@ -11,6 +11,7 @@ import {
   MapPinned,
   Megaphone,
   Menu,
+  MessageSquare,
   PhoneForwarded,
   Ruler,
   Search,
@@ -39,6 +40,7 @@ const navItems = [
   { path: "/courses", label: "Courses", icon: GraduationCap },
   { path: "/call-center", label: "Call center", icon: Headphones },
   { path: "/leads", label: "Buy leads", icon: PhoneForwarded },
+  { path: "/sms-automation", label: "SMS automation", icon: MessageSquare },
 ] as const;
 
 const ADMIN_USERS_PATH = "/admin/users";
