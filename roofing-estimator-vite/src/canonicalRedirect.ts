@@ -16,10 +16,11 @@ if (typeof window !== "undefined" && import.meta.env.PROD && import.meta.env.VER
 }
 
 /**
- * Cloudflare Pages (and any non-Vercel prod build): use apex as canonical so www and apex show the same app
- * and deep links stay consistent with HD2D_PRODUCTION_ORIGIN.
+ * www → apex in **all** production builds (including Vercel). Previously this was gated with `!VERCEL`, so
+ * visitors on `www.hardcoredoortodoorclosers.com` served by Vercel never redirected and could load an older
+ * deployment than apex / Cloudflare Pages — e.g. missing sidebar items.
  */
-if (typeof window !== "undefined" && import.meta.env.PROD && !import.meta.env.VERCEL) {
+if (typeof window !== "undefined" && import.meta.env.PROD) {
   const host = window.location.hostname.toLowerCase();
   if (host === `www.${HD2D_SITE_ROOT}`) {
     const path = window.location.pathname + window.location.search + window.location.hash;
