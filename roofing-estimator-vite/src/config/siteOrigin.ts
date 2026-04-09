@@ -76,7 +76,9 @@ export function resolveProductionApiOrigin(): string {
   if (import.meta.env.VERCEL && isHd2dZoneHostname(host)) return origin;
   if (host.endsWith(".pages.dev") && sameOriginApiProxyEnabled()) return origin;
   if (host.endsWith(".pages.dev")) return pub;
-  if (isHd2dZoneHostname(host) && sameOriginApiProxyEnabled()) return origin;
+  // Apex, www, app.*: always use the browser origin for `/api/*` so www and apex both hit the same
+  // host’s API (Cloudflare Pages / Vercel rewrites). Avoids www → apex cross-origin when env disables same-origin mode.
+  if (isHd2dZoneHostname(host)) return origin;
   return pub;
 }
 
