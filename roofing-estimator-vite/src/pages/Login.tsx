@@ -40,7 +40,7 @@ export function Login() {
     return (
       <>
         <Seo
-          title="Sign in ? Door to Door Closers"
+          title="Sign in — Door to Door Closers"
           description="Sign in to Door to Door Closers for roof measurements, canvassing, estimates, and SMS follow-up."
           path="/login"
         />
@@ -68,7 +68,7 @@ export function Login() {
   return (
     <>
       <Seo
-        title="Sign in ? Door to Door Closers"
+        title="Sign in — Door to Door Closers"
         description="Sign in to Door to Door Closers for roof measurements, canvassing, estimates, and SMS follow-up."
         path="/login"
       />
