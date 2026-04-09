@@ -11,20 +11,20 @@ export function Careers() {
     <AuthScreenLayout
       tagline={
         <>
-          HD2D Closers connects field reps with roofing teams — local territories and storm-response crews. Start a rep
+          Door to Door Closers connects field reps with roofing teams - local territories and storm-response crews. Start a rep
           profile to be matched with orgs in your state.
         </>
       }
     >
       <Seo
-        title="Careers & field reps — HD2D Closers"
-        description="Join HD2D as a field sales rep or roofing company. Reps sign up with home state and placement preference; contractors create an organization workspace."
+        title="Careers & field reps - Door to Door Closers"
+        description="Join Door to Door Closers as a field sales rep or roofing company. Reps sign up with home state and placement preference; contractors create an organization workspace."
         path="/careers"
       />
       <div className="rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-md">
         <h1 className="mb-2 text-center text-xl font-bold text-[#e7e9ea]">Work with a roofing company</h1>
         <p className="mb-6 text-center text-sm leading-relaxed text-[#71767b]">
-          Field reps: create an account, add your home state, and choose local vs storm placement — HD2D routes you toward
+          Field reps: create an account, add your home state, and choose local vs storm placement - we route you toward
           partner teams (directory + admin placement). Companies: sign up as a{" "}
           <strong className="text-[#e7e9ea]">roofing company</strong> to own your org workspace.
         </p>

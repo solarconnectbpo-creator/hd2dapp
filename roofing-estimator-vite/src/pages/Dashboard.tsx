@@ -18,6 +18,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
+import { Seo } from "../components/Seo";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import {
@@ -44,6 +45,12 @@ export function Dashboard() {
   ];
 
   const recentMeasurements = measurements.slice(-5).reverse();
+
+  const workspaceEmpty =
+    measurements.length === 0 &&
+    estimates.length === 0 &&
+    contracts.length === 0 &&
+    fieldProjects.length === 0;
 
   const onExportBackup = () => {
     const payload = buildRoofingBackupPayload(measurements, estimates, contracts, fieldProjects);
@@ -94,6 +101,11 @@ export function Dashboard() {
 
   return (
     <div className="hd2d-page-shell">
+      <Seo
+        title="Dashboard — Door to Door Closers"
+        description="Roof measurements, estimates, canvassing, SMS follow-up, and field tools for Door to Door Closers reps."
+        path="/"
+      />
       <div className="mb-8 border-b border-white/[0.06] pb-8 sm:mb-10 sm:pb-10">
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#71767b]">Overview</p>
         <h1 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--x-text)] sm:text-3xl">Dashboard</h1>
@@ -101,6 +113,37 @@ export function Dashboard() {
           Measurements, estimates, and field tools — data stays in this browser unless you export.
         </p>
       </div>
+
+      {workspaceEmpty ? (
+        <div className="mb-8 rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-500/[0.12] via-sky-500/[0.04] to-transparent p-6 ring-1 ring-sky-500/20 sm:p-8">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-200/90">Get started</p>
+          <h2 className="mb-2 text-xl font-semibold text-[var(--x-text)] sm:text-2xl">Welcome to Door to Door Closers</h2>
+          <p className="mb-6 max-w-2xl text-sm leading-relaxed text-[var(--x-muted)]">
+            Start with a roof measurement or the canvassing map. Use HD2D Copilot (sparkle button, bottom-right) for
+            estimates, damage notes, and follow-up drafts.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link to="/measurement/new">
+              <Button className="w-full sm:w-auto" size="lg">
+                <Ruler className="mr-2 h-4 w-4" />
+                New roof measurement
+              </Button>
+            </Link>
+            <Link to="/canvassing">
+              <Button variant="outline" className="w-full sm:w-auto" size="lg">
+                <MapPinned className="mr-2 h-4 w-4" />
+                Canvassing map
+              </Button>
+            </Link>
+            <Link to="/sms-automation">
+              <Button variant="outline" className="w-full sm:w-auto" size="lg">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                SMS follow-up
+              </Button>
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {

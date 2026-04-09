@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
+import { Seo } from "../components/Seo";
 import { AuthScreenLayout } from "../components/auth/AuthScreenLayout";
 import { AUTH_FIELD_CLASS } from "../components/auth/authFieldStyles";
 import { PasswordField } from "../components/auth/PasswordField";
@@ -19,17 +20,24 @@ export function AdminLogin() {
 
   if (loading) {
     return (
-      <AuthScreenLayout tagline={<>Administrator access — manage users and roles.</>}>
-        <div
-          className="flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-8 text-[#e7e9ea]"
-          role="status"
-          aria-busy="true"
-          aria-label="Checking session"
-        >
-          <div className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08] ring-2 ring-[#1d9bf0]/30" />
-          <p className="text-sm text-[#8b9199]">Checking session…</p>
-        </div>
-      </AuthScreenLayout>
+      <>
+        <Seo
+          title="Admin sign in — Door to Door Closers"
+          description="Administrator sign-in for Door to Door Closers user and role management."
+          path="/admin/login"
+        />
+        <AuthScreenLayout tagline={<>Administrator access — manage users and roles.</>}>
+          <div
+            className="flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-8 text-[#e7e9ea]"
+            role="status"
+            aria-busy="true"
+            aria-label="Checking session"
+          >
+            <div className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08] ring-2 ring-[#1d9bf0]/30" />
+            <p className="text-sm text-[#8b9199]">Checking session…</p>
+          </div>
+        </AuthScreenLayout>
+      </>
     );
   }
 
@@ -60,14 +68,20 @@ export function AdminLogin() {
   }
 
   return (
-    <AuthScreenLayout
-      tagline={
-        <>Administrator access — manage users and roles. Use the credentials configured on the HD2D Worker.</>
-      }
-    >
+    <>
+      <Seo
+        title="Admin sign in — Door to Door Closers"
+        description="Administrator sign-in for Door to Door Closers user and role management."
+        path="/admin/login"
+      />
+      <AuthScreenLayout
+        tagline={
+          <>Administrator access — manage users and roles. Use the credentials configured on the HD2D Worker.</>
+        }
+      >
       <div className="rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-md">
         <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Admin sign in</h1>
-        <p className="mb-6 text-center text-sm text-[#8b9199]">HD2D Closers team dashboard</p>
+        <p className="mb-6 text-center text-sm text-[#8b9199]">Door to Door Closers team dashboard</p>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-[#e7e9ea]">Admin email</span>
@@ -120,6 +134,7 @@ export function AdminLogin() {
           </div>
         </form>
       </div>
-    </AuthScreenLayout>
+      </AuthScreenLayout>
+    </>
   );
 }

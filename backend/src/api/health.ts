@@ -5,11 +5,13 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-08-sms-setup-status";
+export const WORKER_BUILD_TAG = "2026-04-03-hd2d-copilot-anthropic";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
   OPENAI_API_KEY?: string;
+  /** Anthropic — optional; HD2D Copilot prefers Claude when set (secret `ANTHROPIC_API_KEY`). */
+  ANTHROPIC_API_KEY?: string;
   /** When set, Worker proxies `/api/ai/roof-vision` and `/api/ai/roof-segment` to ml-vision-service. */
   ROOF_VISION_SERVICE_URL?: string;
   ROOF_VISION_SERVICE_SECRET?: string;
@@ -80,6 +82,8 @@ export function handleHealthGet(
         dealmachineServerKey: Boolean(env.DEALMACHINE_API_KEY?.trim()),
         /** True when `OPENAI_API_KEY` secret is set (marketing images, estimator chat, roof AI). */
         openaiConfigured: Boolean(env.OPENAI_API_KEY?.trim()),
+        /** True when `ANTHROPIC_API_KEY` is set (HD2D Copilot uses Claude when both AI keys exist). */
+        anthropicConfigured: Boolean(env.ANTHROPIC_API_KEY?.trim()),
         arcgisParcelLayer: Boolean(resolveArcgisParcelLayerUrl(env)),
         /** Public tile URL for optional county / reference raster on the Canvassing map (no token in URL). */
         arcgisMapServerTileUrl: tileOk ? tileRaw : null,

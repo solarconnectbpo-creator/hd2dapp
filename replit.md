@@ -1,7 +1,7 @@
-# Hardcore Door to Door Closers
+# Door to Door Closers
 
 ## Overview
-Hardcore Door to Door Closers is a mobile application for door-to-door sales professionals in the home improvement industry. It aims to streamline sales processes, enhance lead management, and foster community among sales professionals. The application integrates AI-powered features for lead analysis, deal forecasting, and event management, alongside a social networking platform and a comprehensive CRM system. The business vision is to empower sales teams with cutting-edge tools, increase efficiency, and provide a competitive edge in the market.
+Door to Door Closers is a mobile application for door-to-door sales professionals in the home improvement industry. It aims to streamline sales processes, enhance lead management, and foster community among sales professionals. The application integrates AI-powered features for lead analysis, deal forecasting, and event management, alongside a social networking platform and a comprehensive CRM system. The business vision is to empower sales teams with cutting-edge tools, increase efficiency, and provide a competitive edge in the market.
 
 ## User Preferences
 I prefer simple language and detailed explanations. I want iterative development where I am consulted before major changes. Do not make changes to the `backend/D1_migrations` folder. Do not make changes to the `services/cloudflareWorker.template.js` file.
@@ -255,3 +255,4 @@ See `PLATFORM_SETUP.md` and `README_DEPLOYMENT.md` for complete instructions.
 - **OpenAI GPT-4o-mini**: AI model used for various analytical and generative tasks
 - **OpenStreetMap Nominatim**: Used for address geocoding
 - **SimpleTalk**: AI voice call platform for inbound call handling and routing
+

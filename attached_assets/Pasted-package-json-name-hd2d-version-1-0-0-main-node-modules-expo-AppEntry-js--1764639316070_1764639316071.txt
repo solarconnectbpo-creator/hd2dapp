@@ -85,16 +85,16 @@ app.json
 {
   "expo": {
     "name": "HD2D",
-    "slug": "hardcoredoortodoorclosers",
+    "slug": "doortodoorclosers",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
-    "scheme": "hardcoredoortodoorclosers",
+    "scheme": "doortodoorclosers",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hardcoredoortodoorclosers.app"
+      "bundleIdentifier": "com.doortodoorclosers.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -103,7 +103,7 @@ app.json
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.hardcoredoortodoorclosers.app"
+      "package": "com.doortodoorclosers.app"
     },
     "web": {
       "output": "single",

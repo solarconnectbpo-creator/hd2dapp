@@ -24,11 +24,11 @@ export function AuthScreenLayout({ tagline, children }: AuthScreenLayoutProps) {
         <Link
           to="/"
           className="rounded-2xl p-2 ring-1 ring-white/10 transition hover:ring-[#1d9bf0]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1d9bf0]"
-          aria-label="HD2D Closers home"
+          aria-label="Door to Door Closers home"
         >
           <img
             src={hd2dLogoUrl}
-            alt="Hardcore D2D Closers"
+            alt="Door to Door Closers"
             className="h-auto w-full max-h-[min(42vh,300px)] max-w-[min(16rem,88vw)] object-contain object-center select-none drop-shadow-[0_8px_32px_rgba(0,0,0,0.65)]"
             width={256}
             height={320}

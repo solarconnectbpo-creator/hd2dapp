@@ -35,7 +35,7 @@ wrangler deploy
 1. Open the app and go to **Inbound** tab
 2. Tap **Webhook Configuration** card
 3. Paste your Cloudflare Worker URL:
-   - Example: `https://hd2d-inbound.hardcoredoortodoorclosers.workers.dev`
+   - Example: `https://hd2d-inbound.DoorToDoorClosers.workers.dev`
    - Or custom domain: `https://hardcoredoortodoorclosers.com/api/webhooks/inbound`
 4. Tap **Test Webhook** button to verify connection
 
@@ -112,3 +112,4 @@ dataset = "hd2d_calls"
 - Use Cloudflare Cache for frequently accessed data
 - Batch webhook calls in production
 - Monitor Worker CPU time
+

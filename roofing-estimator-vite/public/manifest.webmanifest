@@ -1,7 +1,7 @@
 {
   "id": "https://hardcoredoortodoorclosers.com/",
-  "name": "HD2D Closers — Roofing Pro",
-  "short_name": "HD2D Closers",
+  "name": "Door to Door Closers - Roofing Pro",
+  "short_name": "D2D Closers",
   "description": "Roof measurements, estimates, contracts, and field tools for roofing contractors.",
   "start_url": "https://hardcoredoortodoorclosers.com/",
   "scope": "/",
@@ -17,3 +17,4 @@
     }
   ]
 }
+

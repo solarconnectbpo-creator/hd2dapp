@@ -1,4 +1,4 @@
-name = "hd2d-backend"
+﻿name = "hd2d-backend"
 main = "src/index.ts"
 compatibility_date = "2024-12-02"
 compatibility_flags = ["nodejs_compat"]
@@ -7,8 +7,11 @@ workers_dev = true
 preview_urls = true
 
 # Public API hostname on your zone (no Access app on this host). Vercel: HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com
+#
+# Requires zone `hardcoredoortodoorclosers.com` on the **same** Cloudflare account as `wrangler login`.
+# If deploy fails with "zone does not exist on your account" (10083), comment out `routes` below and attach
+# `api.hardcoredoortodoorclosers.com` under Workers & Pages → hd2d-backend → Domains.
 routes = [
-  # custom_domain: hostname only (no path/*) — Wrangler provisions DNS + routes all paths on this host to the Worker.
   { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
 ]
 
@@ -127,3 +130,4 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 command = "npm install"
 
 # Custom domain routing (see top-level `routes` for api subdomain).
+

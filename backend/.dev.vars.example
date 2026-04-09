@@ -98,6 +98,9 @@
 
 # --- Marketing images (POST /api/marketing/generate-image — company/admin; rate-limited in KV) ---
 # OPENAI_API_KEY=sk-...
+# Optional: HD2D Copilot (POST /api/ai/estimator-chat) prefers Claude when set; otherwise uses OpenAI.
+# wrangler secret put ANTHROPIC_API_KEY
+# ANTHROPIC_API_KEY=
 
 # --- Meta (Facebook) — scheduled Page posts + optional draft ad campaigns (see src/api/metaMarketing.ts) ---
 # Create a Meta app → Facebook Login → add Valid OAuth Redirect URI: {APP_PUBLIC_ORIGIN}/api/meta/oauth/callback
@@ -115,3 +118,4 @@
 # ARCGIS_MAPSERVER_TILE_URL=https://your-host/arcgis/rest/services/YourMap/MapServer/tile/{z}/{y}/{x}
 # ARCGIS_MAPSERVER_TILE_ATTRIBUTION=County GIS
 # ARCGIS_MAPSERVER_TILE_OPACITY=0.55
+

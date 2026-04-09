@@ -15,6 +15,9 @@ export const MISSOURI_BBOX = { west: -95.78, east: -89.09, north: 40.62, south: 
 /** Illinois state bounds — parcel map fallbacks include several IL counties (not statewide parcels). */
 export const ILLINOIS_BBOX = { west: -91.52, east: -87.02, north: 42.51, south: 36.97 } as const;
 
+/** Minnesota state bounds — built-in parcel fallbacks cover metro + Dakota County; rural MN may need Worker JSON. */
+export const MINNESOTA_BBOX = { west: -97.3, east: -89.0, north: 49.5, south: 43.4 } as const;
+
 export function isInMissouriBbox(lat: number, lng: number): boolean {
   return (
     lat >= MISSOURI_BBOX.south &&
@@ -33,9 +36,18 @@ export function isInIllinoisBbox(lat: number, lng: number): boolean {
   );
 }
 
-/** True when public MO/IL parcel overlays may apply (metro counties + primary STL layer). */
+export function isInMinnesotaBbox(lat: number, lng: number): boolean {
+  return (
+    lat >= MINNESOTA_BBOX.south &&
+    lat <= MINNESOTA_BBOX.north &&
+    lng >= MINNESOTA_BBOX.west &&
+    lng <= MINNESOTA_BBOX.east
+  );
+}
+
+/** True when public MO/IL/MN parcel overlays may apply (regional county layers + primary STL layer). */
 export function isInMoIlParcelCoverageBbox(lat: number, lng: number): boolean {
-  return isInMissouriBbox(lat, lng) || isInIllinoisBbox(lat, lng);
+  return isInMissouriBbox(lat, lng) || isInIllinoisBbox(lat, lng) || isInMinnesotaBbox(lat, lng);
 }
 
 export type StlIntelLite = {

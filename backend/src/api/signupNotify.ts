@@ -1,4 +1,4 @@
-/**
+﻿/**
  * New sign-up notification via Resend (https://resend.com) — one API key, no SMTP.
  * If RESEND_API_KEY is unset, notifications are skipped (local dev).
  */
@@ -63,3 +63,4 @@ export async function sendSignupNotification(
     console.error("[signup-notify] Resend error:", res.status, errText.slice(0, 500));
   }
 }
+

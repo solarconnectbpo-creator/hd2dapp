@@ -1,4 +1,4 @@
-import type { AuthEnv } from "./authRoutes";
+﻿import type { AuthEnv } from "./authRoutes";
 import { getBearerPayload } from "./authRoutes";
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -116,3 +116,4 @@ export async function handleLeadsCheckoutSession(
 
   return new Response(JSON.stringify({ success: true, url: stripeJson.url }), { status: 200, headers: j });
 }
+

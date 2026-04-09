@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Vercel Edge: proxy same-origin `/api/*` to the HD2D Worker.
  *
  * - **Default:** `*.workers.dev` — if Cloudflare Access protects it, set HD2D_ACCESS_CLIENT_ID / SECRET
@@ -117,3 +117,4 @@ export default async function middleware(request: Request): Promise<Response> {
     });
   }
 }
+

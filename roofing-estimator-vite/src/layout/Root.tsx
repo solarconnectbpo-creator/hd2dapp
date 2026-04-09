@@ -16,6 +16,7 @@ import {
   Ruler,
   Search,
   Shield,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -192,6 +193,18 @@ export function Root() {
             <span className="sr-only">Close menu</span>
           </button>
         </div>
+        {user ? (
+          <div className="mx-4 mb-2 rounded-xl border border-sky-500/25 bg-sky-500/[0.1] px-3 py-2.5 ring-1 ring-sky-500/15">
+            <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sky-200/95">
+              <Sparkles className="h-3.5 w-3.5 shrink-0 text-sky-300" aria-hidden />
+              HD2D Copilot
+            </p>
+            <p className="text-xs leading-relaxed text-[#9aa3ad]">
+              Estimates, storm damage reports, and follow-up — tap the <span className="text-sky-300">sparkle</span> button
+              bottom-right on any page.
+            </p>
+          </div>
+        ) : null}
         <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="Main">
           <NavLinks currentPath={location.pathname} onNavigate={() => setMobileOpen(false)} />
           {user?.user_type === "admin" ? (

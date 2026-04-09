@@ -1,5 +1,7 @@
 # https://hardcoredoortodoorclosers.com
+# Sitemap lists public URLs only; gated in-app routes are not indexed here by design.
 User-agent: *
 Allow: /
 
 Sitemap: https://hardcoredoortodoorclosers.com/sitemap.xml
+

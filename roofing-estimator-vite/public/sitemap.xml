@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Public marketing and auth URLs only. Authenticated app routes (e.g. /measurement/new) are intentionally omitted. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://hardcoredoortodoorclosers.com/</loc>
@@ -21,3 +22,4 @@
     <priority>0.85</priority>
   </url>
 </urlset>
+

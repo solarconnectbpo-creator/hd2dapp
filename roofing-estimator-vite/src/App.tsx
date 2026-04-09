@@ -44,6 +44,7 @@ import {
 } from "./lib/roofGeometryFromPolygons";
 import {
   footprintToPolygonFeatures,
+  polygonFeatureHasSelfIntersection,
   polygonFeatureOuterPerimeterFt,
   polygonFeaturePlanAreaSqFt,
   type BuildingFootprintFeature,
@@ -515,6 +516,63 @@ function deriveRoofQuantities(form: FormState): { planAreaSqFt: number; surfaceS
   return {
     planAreaSqFt: explicitArea,
     surfaceSquares: (explicitArea / 100) * pitchFactor,
+  };
+}
+
+function pitchFactorForRise(rise: number): number {
+  return Math.sqrt(1 + (rise / 12) ** 2);
+}
+
+/**
+ * Surface roofing squares for one section: entered squares win; else plan SF × face pitch (or main pitch).
+ */
+function surfaceSquaresForMeasurementSection(section: MeasurementSection, defaultPitch: string): number {
+  const m = Number.parseFloat(section.measuredSquares);
+  if (Number.isFinite(m) && m > 0) return m;
+  const a = Number.parseFloat(section.areaSqFt);
+  if (!Number.isFinite(a) || a <= 0) return 0;
+  const rise = parsePitchRise(section.facePitch) ?? parsePitchRise(defaultPitch) ?? 6;
+  return (a * pitchFactorForRise(rise)) / 100;
+}
+
+/** Section totals: plan SF and perimeter sum; surface SQ = sum of per-face squares (pitch-aware when SQ omitted). */
+function aggregateMeasurementSectionTotals(
+  sections: MeasurementSection[],
+  defaultPitch: string,
+): { areaSqFt: number; perimeterFt: number; measuredSquares: number } {
+  const toNum = (value: string) => {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  let areaSqFt = 0;
+  let perimeterFt = 0;
+  let measuredSquares = 0;
+  for (const s of sections) {
+    areaSqFt += toNum(s.areaSqFt);
+    perimeterFt += toNum(s.perimeterFt);
+    measuredSquares += surfaceSquaresForMeasurementSection(s, defaultPitch);
+  }
+  return { areaSqFt, perimeterFt, measuredSquares };
+}
+
+/** When both plan area and measured squares are set, compare implied surface vs plan×pitch (null if not applicable). */
+function planVersusMeasuredSquaresMismatch(form: FormState): {
+  deltaPct: number;
+  expectedSurfaceSq: number;
+  measuredSurfaceSq: number;
+} | null {
+  const explicitArea = Number.parseFloat(form.areaSqFt);
+  const measuredSquares = Number.parseFloat(form.measuredSquares);
+  if (!Number.isFinite(explicitArea) || explicitArea <= 0) return null;
+  if (!Number.isFinite(measuredSquares) || measuredSquares <= 0) return null;
+  const pitchRise = parsePitchRise(form.roofPitch) ?? 6;
+  const expectedSurfaceSf = explicitArea * pitchFactorForRise(pitchRise);
+  const fromMeasuredSf = measuredSquares * 100;
+  const deltaPct = Math.abs(fromMeasuredSf - expectedSurfaceSf) / Math.max(1, expectedSurfaceSf);
+  return {
+    deltaPct,
+    expectedSurfaceSq: expectedSurfaceSf / 100,
+    measuredSurfaceSq: measuredSquares,
   };
 }
 
@@ -1803,8 +1861,10 @@ function buildFaceTableRows(sections: MeasurementSection[], defaultPitch: string
     const face = cls ? `${faceBase} (${cls})` : faceBase;
     const sqFt = Number.parseFloat(s.areaSqFt) || 0;
     const sqField = Number.parseFloat(s.measuredSquares);
+    const rise = parsePitchRise(s.facePitch) ?? parsePitchRise(defaultPitch) ?? 6;
+    const pf = pitchFactorForRise(rise);
     const squares =
-      Number.isFinite(sqField) && sqField > 0 ? round2(sqField) : sqFt > 0 ? round2(sqFt / 100) : 0;
+      Number.isFinite(sqField) && sqField > 0 ? round2(sqField) : sqFt > 0 ? round2((sqFt * pf) / 100) : 0;
     const slope = formatSlopeColumn(s.facePitch, defaultPitch);
     return { face, sqFt, squares, slope };
   });
@@ -1998,13 +2058,19 @@ function buildResult(form: FormState): EstimateResult | null {
   }
   if (Number.isFinite(measuredSquares) && measuredSquares > 0 && Number.isFinite(explicitArea) && explicitArea > 0) {
     const pitchRiseQ = parsePitchRise(form.roofPitch) ?? 6;
-    const pitchFactorQ = Math.sqrt(1 + (pitchRiseQ / 12) ** 2);
+    const pitchFactorQ = pitchFactorForRise(pitchRiseQ);
     const expectedSurfaceSf = explicitArea * pitchFactorQ;
     const fromMeasuredSf = measuredSquares * 100;
     const deltaPct = Math.abs(fromMeasuredSf - expectedSurfaceSf) / Math.max(1, expectedSurfaceSf);
     if (deltaPct > 0.15) {
       quality -= 12;
-      warnings.push("Measured squares (surface-based) and plan area × pitch differ by more than 15%; verify takeoff.");
+      warnings.push(
+        `Plan area × pitch vs measured squares differ by ${(deltaPct * 100).toFixed(1)}% (${(expectedSurfaceSf / 100).toFixed(2)} SQ expected from plan); verify takeoff.`,
+      );
+    } else if (deltaPct > 0.05) {
+      warnings.push(
+        `Plan area × pitch vs measured squares differ by ${(deltaPct * 100).toFixed(1)}% (${(expectedSurfaceSf / 100).toFixed(2)} SQ expected from plan).`,
+      );
     }
   }
   const criticalLengths = lengths.ridges + lengths.eaves + lengths.rakes + lengths.valleys;
@@ -2258,8 +2324,9 @@ function buildReportHtml(form: FormState, result: EstimateResult): string {
       padding: 20px 22px; margin: 0; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
     }
     @media print {
-      body { background: #fff; padding: 14px 18px; }
+      body { background: #fff; padding: 10mm 12mm; color: #000; }
       pre.report { border: none; box-shadow: none; padding: 0; }
+      h1 { page-break-after: avoid; }
     }
   </style>
 </head>
@@ -2966,7 +3033,18 @@ function buildProposalHtml(
     .scope-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px;border-radius:999px;margin:0 0 14px}
     .scope-badge.replace{background:#0f172a;color:#fff}
     .scope-badge.repair{background:#9a3412;color:#fff}
-    @media print{body{padding:16px 20px}}
+    svg.roof-diagram-print{max-width:100%;height:auto;display:block;margin:12px auto}
+    @media print{
+      body{padding:10mm 12mm;max-width:none;color:#000;background:#fff}
+      h1,h2,h3{page-break-after:avoid}
+      table, .highlight, .row{page-break-inside:avoid}
+      table.scope-xact{box-shadow:none}
+      img{max-width:100%!important;page-break-inside:avoid}
+      .highlight{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .scope-badge.replace,.scope-badge.repair{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      table thead{display:table-header-group}
+      .footer{border-top-color:#ccc}
+    }
   </style>
 </head>
 <body>
@@ -3190,20 +3268,29 @@ function App() {
     });
   }, [registerBridge]);
 
-  const measurementSectionTotals = useMemo(() => {
-    const toNum = (value: string) => {
-      const parsed = Number.parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : 0;
+  const measurementSectionTotals = useMemo(
+    () => aggregateMeasurementSectionTotals(measurementSections, form.roofPitch),
+    [measurementSections, form.roofPitch],
+  );
+
+  const quantityChainPreview = useMemo(() => {
+    const d = deriveRoofQuantities(form);
+    if (!d) return null;
+    const wastePct = clamp(Number.parseFloat(form.wastePercent) || 12, 0, 35);
+    const pitchRise = parsePitchRise(form.roofPitch) ?? 6;
+    const pf = pitchFactorForRise(pitchRise);
+    const effectiveSq = d.surfaceSquares * (1 + wastePct / 100);
+    return {
+      planSf: d.planAreaSqFt,
+      pitchRise,
+      pitchFactor: pf,
+      surfaceSq: d.surfaceSquares,
+      wastePct,
+      effectiveSq,
     };
-    return measurementSections.reduce(
-      (acc, section) => ({
-        areaSqFt: acc.areaSqFt + toNum(section.areaSqFt),
-        perimeterFt: acc.perimeterFt + toNum(section.perimeterFt),
-        measuredSquares: acc.measuredSquares + toNum(section.measuredSquares),
-      }),
-      { areaSqFt: 0, perimeterFt: 0, measuredSquares: 0 },
-    );
-  }, [measurementSections]);
+  }, [form]);
+
+  const planMeasuredMismatch = useMemo(() => planVersusMeasuredSquaresMismatch(form), [form]);
 
   useEffect(() => {
     if (!storageUserId) {
@@ -5259,6 +5346,34 @@ function App() {
             <p className="muted" style={{ gridColumn: "1 / -1", fontSize: 12, marginTop: 4 }}>
               Diagram footprint uses <strong>plan area</strong> and, when entered, <strong>perimeter</strong> to match a rectangular plan; ridge lines scale to your ridge LF. Gable eaves/rakes show <strong>ea.</strong> (each of two parallel sides). Hip/mansard eaves are split by edge length along the long vs short plan sides. Without perimeter, outline proportions fall back to your eave vs rake LF ratio.
             </p>
+            <details
+              className="muted"
+              style={{ gridColumn: "1 / -1", fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px", marginTop: 4 }}
+            >
+              <summary style={{ cursor: "pointer", fontWeight: 600, color: "inherit" }}>
+                Tips for accurate measurements (pitch, map, sections)
+              </summary>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.45 }}>
+                <li>
+                  <strong>Pitch</strong> — Use the real average or governing slope; wrong pitch skews surface area when deriving from plan SF.
+                </li>
+                <li>
+                  <strong>Map polygon</strong> — Default view is <strong>top-down</strong> for accurate tracing; use the map&apos;s view controls for oblique context. Trace the true roof footprint (eaves), not lot line; zoom in and close the ring cleanly with auto-calc on.
+                </li>
+                <li>
+                  <strong>Plan area vs measured squares</strong> — If both are filled, <strong>entered squares win</strong> for pricing; they are not forced to match plan × pitch — align them with your takeoff or leave one blank.
+                </li>
+                <li>
+                  <strong>Waste %</strong> — Adjusts effective squares for materials; match job complexity and product.
+                </li>
+                <li>
+                  <strong>Roof structure</strong> — For odd footprints, use Complex or draw manual ridge/eave lines on the map so edge LF stays realistic.
+                </li>
+                <li>
+                  <strong>Sections</strong> — Sum multiple planes here; use per-face pitch when area-only — totals use face pitch (or main pitch) to estimate SQ when squares are omitted.
+                </li>
+              </ul>
+            </details>
             <label>Plan Area (sq ft)<input type="number" min={1} value={form.areaSqFt} onChange={(e) => setForm((curr) => ({ ...curr, areaSqFt: e.target.value }))} placeholder="2500" /></label>
             <label>Perimeter (ft)<input type="number" min={1} value={form.perimeterFt} onChange={(e) => setForm((curr) => ({ ...curr, perimeterFt: e.target.value }))} placeholder="220" /></label>
             <label>Pitch (rise/12)<input value={form.roofPitch} onChange={(e) => setForm((curr) => ({ ...curr, roofPitch: e.target.value }))} placeholder="6/12" /></label>
@@ -5271,8 +5386,46 @@ function App() {
               />
             </label>
             <label>Waste %<input value={form.wastePercent} onChange={(e) => setForm((curr) => ({ ...curr, wastePercent: e.target.value }))} placeholder="12" /></label>
+            {quantityChainPreview ? (
+              <div
+                className="muted"
+                style={{
+                  gridColumn: "1 / -1",
+                  fontSize: 12,
+                  border: "1px dashed #cbd5e1",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong style={{ color: "inherit" }}>Quantity chain</strong>
+                {" — "}
+                Plan {quantityChainPreview.planSf.toLocaleString(undefined, { maximumFractionDigits: 2 })} sf → pitch{" "}
+                {quantityChainPreview.pitchRise}/12 (×{quantityChainPreview.pitchFactor.toFixed(3)}) →{" "}
+                {quantityChainPreview.surfaceSq.toFixed(2)} surface SQ → waste {quantityChainPreview.wastePct}% →{" "}
+                <strong>{quantityChainPreview.effectiveSq.toFixed(2)} effective SQ</strong> (pricing basis for material-style lines).
+              </div>
+            ) : null}
+            {planMeasuredMismatch && planMeasuredMismatch.deltaPct > 0.05 ? (
+              <div
+                role="status"
+                style={{
+                  gridColumn: "1 / -1",
+                  fontSize: 12,
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  borderLeft: `4px solid ${planMeasuredMismatch.deltaPct > 0.15 ? "#b45309" : "#ca8a04"}`,
+                  background: planMeasuredMismatch.deltaPct > 0.15 ? "#fff7ed" : "#fefce8",
+                }}
+              >
+                <strong>Plan vs measured squares:</strong> entered {planMeasuredMismatch.measuredSurfaceSq.toFixed(2)} SQ vs{" "}
+                {planMeasuredMismatch.expectedSurfaceSq.toFixed(2)} SQ implied by plan area × pitch (
+                {(planMeasuredMismatch.deltaPct * 100).toFixed(1)}% difference). Squares are used for the estimate; clear one field or
+                align values with your takeoff.
+              </div>
+            ) : null}
             <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+              <div className="measurement-section-header">
                 <strong>Separate Measurements (sections)</strong>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button type="button" className="secondary-btn" onClick={addMeasurementSection}>Add Section</button>
@@ -5280,7 +5433,8 @@ function App() {
                 </div>
               </div>
               <p className="muted" style={{ marginTop: 0, marginBottom: 8, fontSize: 12 }}>
-                Enter each roof section separately; totals are used when generating the estimate.
+                Enter each roof section separately. Section <strong>totals</strong> sum plan SF and perimeter; surface SQ is the sum of each
+                face — entered squares per section win, otherwise area × that face&apos;s pitch (or main pitch).
               </p>
               <div style={{ display: "grid", gap: 8 }}>
                 {measurementSections.map((section, idx) => (
@@ -5289,7 +5443,7 @@ function App() {
                       Face ID <strong>F{idx + 1}</strong>
                       {section.label.trim() ? ` — label: ${section.label.trim()}` : ""} (override ID with label starting with F1, F2, …)
                     </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+                    <div className="measurement-face-grid">
                       <label>Label<input value={section.label} onChange={(e) => updateMeasurementSection(section.id, "label", e.target.value)} placeholder={`Section ${idx + 1} or F1`} /></label>
                       <label>Area (sq ft)<input type="number" min={0} value={section.areaSqFt} onChange={(e) => updateMeasurementSection(section.id, "areaSqFt", e.target.value)} placeholder="1200" /></label>
                       <label>Perimeter (ft)<input type="number" min={0} value={section.perimeterFt} onChange={(e) => updateMeasurementSection(section.id, "perimeterFt", e.target.value)} placeholder="180" /></label>
@@ -5320,7 +5474,8 @@ function App() {
                 ))}
               </div>
               <p className="muted" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
-                Section totals: {measurementSectionTotals.areaSqFt.toFixed(2)} sq ft, {measurementSectionTotals.perimeterFt.toFixed(2)} ft perimeter, {measurementSectionTotals.measuredSquares.toFixed(2)} SQ.
+                Section totals: {measurementSectionTotals.areaSqFt.toFixed(2)} sq ft, {measurementSectionTotals.perimeterFt.toFixed(2)} ft perimeter,{" "}
+                {measurementSectionTotals.measuredSquares.toFixed(2)} SQ surface (pitch-weighted when squares omitted).
               </p>
             </div>
             <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
@@ -5563,7 +5718,7 @@ function App() {
                   <div key={photo.id} className="tile">
                     <span>{photo.name}</span>
                     <img src={photo.previewUrl} alt={photo.name} style={{ width: "100%", maxHeight: 120, objectFit: "cover", borderRadius: 6 }} />
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    <div className="damage-photo-tags" style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                       {DAMAGE_PHOTO_TAGS.map((tag) => (
                         <button
                           key={tag}
@@ -5617,7 +5772,7 @@ function App() {
               Draw a polygon around the roof outline — ridges, hips, valleys, eaves, rakes, and area are computed automatically based on roof type and pitch.
             </span>
           </div>
-          <div className="auto-calc-row" style={{ flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <div className="auto-calc-row hd2d-map-toolbar">
             <button
               type="button"
               className="secondary-btn"
@@ -5685,8 +5840,8 @@ function App() {
                   lng: Number.parseFloat(form.longitude) || -93.53,
                 }}
                 zoom={18}
-                pitch={60}
-                bearing={-20}
+                pitch={0}
+                bearing={0}
                 height="100%"
                 enableGps
                 enableDraw
@@ -5706,6 +5861,12 @@ function App() {
                 onPolygonDrawn={(feature) => {
                   try {
                     const poly = feature as GeoJSON.Feature<GeoJSON.Polygon>;
+                    if (polygonFeatureHasSelfIntersection(poly)) {
+                      toast.message(
+                        "Outline self-intersects (bow-tie shape). Area may be wrong — use Undo Point or Clear and retrace the eaves.",
+                        { duration: 8000 },
+                      );
+                    }
                     const areaSqFt = polygonFeaturePlanAreaSqFt(poly);
                     const perimFt = polygonFeatureOuterPerimeterFt(poly);
                     const pitchRise = parsePitchRise(form.roofPitch) ?? 6;
@@ -5795,7 +5956,7 @@ function App() {
                 }}
               />
           </div>
-              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <div className="hd2d-action-row">
                 <button type="button" className="secondary-btn" onClick={applyDrawnAreaToEstimate}>
                   Apply All Measurements To Estimate
                 </button>

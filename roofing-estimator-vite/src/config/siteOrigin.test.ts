@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { HD2D_PRODUCTION_WWW_ORIGIN, apiOriginForHostname, isHd2dZoneHostname } from "./siteOrigin";
 
 describe("isHd2dZoneHostname", () => {
@@ -11,7 +11,7 @@ describe("isHd2dZoneHostname", () => {
 });
 
 describe("apiOriginForHostname", () => {
-  it("maps Vercel preview to www production host (avoids apex↔www redirect loops on /api/*)", () => {
+  it("maps Vercel preview to www production host (avoids apex<->www redirect loops on /api/*)", () => {
     expect(apiOriginForHostname("hd2d-closers.vercel.app")).toBe(HD2D_PRODUCTION_WWW_ORIGIN);
     expect(apiOriginForHostname("foo-bar-123-solar.vercel.app")).toBe(HD2D_PRODUCTION_WWW_ORIGIN);
   });
@@ -31,3 +31,4 @@ describe("apiOriginForHostname", () => {
     expect(apiOriginForHostname("localhost")).toBeNull();
   });
 });
+

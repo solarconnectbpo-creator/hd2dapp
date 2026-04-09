@@ -1,4 +1,4 @@
-# Design Guidelines: HardcoreDoorToDoorClosers
+﻿# Design Guidelines: DoorToDoorClosers
 
 ## Authentication & User Management
 
@@ -6,7 +6,7 @@
 
 **Implementation:**
 - Use SSO for authentication (Apple Sign-In required for iOS, Google Sign-In for cross-platform)
-- Onboarding flow: Welcome screen → Auth screen → Profile setup (industry specialization, location, experience level)
+- Onboarding flow: Welcome screen â†’ Auth screen â†’ Profile setup (industry specialization, location, experience level)
 - Profile/Settings screen includes:
   - Professional avatar (generate 6 preset avatars with hardhat/professional attire aesthetic)
   - Display name, company affiliation, certifications earned

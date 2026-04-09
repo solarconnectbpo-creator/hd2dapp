@@ -4,14 +4,15 @@ import { safeUserFacingApiMessage } from "./safeApiError";
 export type AuthErrorPayload = {
   error?: string;
   detail?: string;
-  error_code?: string;
+  /** Worker usually sends strings; proxies or edge cases may send numbers. */
+  error_code?: string | number;
 };
 
 /**
  * Maps Worker auth responses to short, user-focused copy (prefers `error_code` when present).
  */
 export function mapAuthFailureMessage(payload: AuthErrorPayload, status: number): string {
-  const code = (payload.error_code || "").trim().toUpperCase();
+  const code = String(payload.error_code ?? "").trim().toUpperCase();
   switch (code) {
     case "INVALID_CREDENTIALS":
       return "That email or password doesn’t match our records. Try again, or create an account if you’re new.";

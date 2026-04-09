@@ -97,7 +97,7 @@ export function SignUp() {
       <AuthScreenLayout
         tagline={
           <>
-            Create your HD2D Closers account to sync leads, storm layers, and estimates across devices.
+            Create your Door to Door Closers account to sync leads, storm layers, and estimates across devices.
           </>
         }
       >
@@ -155,19 +155,19 @@ export function SignUp() {
     <AuthScreenLayout
       tagline={
         <>
-          Create your HD2D Closers account — roofing companies onboard billing and territory; field reps opt into placement
+          Create your Door to Door Closers account - roofing companies onboard billing and territory; field reps opt into placement
           with teams in their state or storm-response crews.
         </>
       }
     >
       <Seo
-        title="Sign up — HD2D Closers | Roofing field sales & estimates"
-        description="Create an HD2D Closers account as a roofing company or field rep. Reps choose home state and local vs storm placement; contractors get an organization workspace."
+        title="Sign up - Door to Door Closers | Roofing field sales & estimates"
+        description="Create a Door to Door Closers account as a roofing company or field rep. Reps choose home state and local vs storm placement; contractors get an organization workspace."
         path="/signup"
       />
       <div className="rounded-2xl border border-white/[0.08] bg-[#12141a]/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-md">
         <h1 className="mb-1 text-center text-xl font-bold text-[#e7e9ea]">Create account</h1>
-        <p className="mb-4 text-center text-sm text-[#8b9199]">Choose how you work with HD2D</p>
+        <p className="mb-4 text-center text-sm text-[#8b9199]">Choose how you work with us</p>
 
         <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-white/[0.08] bg-black/20 p-1">
           <button

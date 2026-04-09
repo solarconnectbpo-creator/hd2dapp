@@ -95,6 +95,7 @@ export function FallbackMap({
       zoom,
       zoomControl: true,
       attributionControl: true,
+      maxZoom: 20,
     });
 
     const satelliteLayer = L.tileLayer(SATELLITE_TILE, {

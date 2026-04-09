@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   createContext,
   useContext,
   useState,
@@ -331,3 +331,4 @@ export function useAuth() {
   }
   return context;
 }
+

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+﻿import { useEffect } from "react";
 
 const SITE = "https://hardcoredoortodoorclosers.com";
 
@@ -52,3 +52,4 @@ export function Seo({ title, description, path = "" }: SeoProps) {
 
   return null;
 }
+

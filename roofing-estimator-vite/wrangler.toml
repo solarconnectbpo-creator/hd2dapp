@@ -1,4 +1,4 @@
-# Cloudflare Pages — HD2D web app (Vite SPA)
+﻿# Cloudflare Pages — HD2D web app (Vite SPA)
 # Canonical production for https://hardcoredoortodoorclosers.com (prefer Pages over Vercel for apex DNS).
 #
 # Deploy: `npm run pages:deploy` — builds, ensures Pages project `hd2d-closers` exists, uploads `dist/` (see scripts/pages-deploy.mjs).
@@ -17,3 +17,4 @@
 
 name = "hd2d-closers"
 pages_build_output_dir = "dist"
+

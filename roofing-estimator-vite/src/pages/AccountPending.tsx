@@ -76,7 +76,7 @@ export function AccountPending() {
 
       {checkout === "success" ? (
         <p className="text-sm rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-200">
-          Payment received — refreshing your access. If you are still blocked after a minute, click Refresh below (Stripe webhooks
+          Payment received - refreshing your access. If you are still blocked after a minute, click Refresh below (Stripe webhooks
           can take a few seconds).
         </p>
       ) : null}
@@ -99,7 +99,7 @@ export function AccountPending() {
       <div className="flex flex-wrap items-center gap-3">
         {showPay ? (
           <button type="button" className="run-btn" disabled={busy} onClick={() => void onPay()}>
-            {busy ? "Redirecting…" : "Pay membership"}
+            {busy ? "Redirecting..." : "Pay membership"}
           </button>
         ) : null}
         <button type="button" className="secondary-btn" disabled={busy} onClick={() => void refreshSession()}>
@@ -116,9 +116,10 @@ export function AccountPending() {
       </p>
 
       <p className="text-xs text-[#71767b]">
-        Approval status: <span className="text-[#e7e9ea]">{access?.approval_status ?? "—"}</span> · Billing:{" "}
-        <span className="text-[#e7e9ea]">{access?.billing_status ?? "—"}</span>
+        Approval status: <span className="text-[#e7e9ea]">{access?.approval_status ?? "-"}</span> ? Billing:{" "}
+        <span className="text-[#e7e9ea]">{access?.billing_status ?? "-"}</span>
       </p>
     </div>
   );
 }
+

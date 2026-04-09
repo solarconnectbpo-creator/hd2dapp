@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Link } from "react-router";
 
 type Props = { children: ReactNode; title?: string };
 
@@ -29,13 +30,28 @@ export class ErrorBoundary extends Component<Props, State> {
             {this.props.title ?? "This section crashed"}
           </h2>
           <p className="mt-2 text-sm text-red-100/90">{this.state.message}</p>
-          <button
-            type="button"
-            className="mt-4 rounded-lg bg-[#1d9bf0] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a8cd8]"
-            onClick={() => this.setState({ hasError: false, message: "" })}
-          >
-            Try again
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="rounded-lg bg-[#1d9bf0] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a8cd8]"
+              onClick={() => this.setState({ hasError: false, message: "" })}
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-white/[0.12] bg-white/[0.06] px-4 py-2 text-sm font-medium text-[#e7e9ea] hover:bg-white/[0.1]"
+              onClick={() => window.location.reload()}
+            >
+              Reload page
+            </button>
+            <Link
+              to="/"
+              className="text-sm font-semibold text-sky-400 underline-offset-2 hover:underline"
+            >
+              Back to dashboard
+            </Link>
+          </div>
         </div>
       );
     }

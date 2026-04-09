@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Attach custom domain(s) to Cloudflare Pages project `hd2d-closers` via API.
  *
  * Auth (first match):
@@ -86,3 +86,4 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+

@@ -751,7 +751,7 @@ export function Canvassing() {
           setPanelHint("No parcel record at this pin — try the building center or a different spot.");
         } else if (!isInMoIlParcelCoverageBbox(lat, lng) && !fromGis) {
           setPanelHint(
-            "Parcel overlays use MO/IL county GIS layers where configured (built-in + optional Worker JSON). Rural gaps remain — verify the owner locally.",
+            "Parcel overlays use MO/IL/MN county GIS layers where configured (built-in + optional Worker JSON). Outside those regions or rural gaps — verify the owner locally.",
           );
         } else if (!owner) {
           setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");
@@ -1178,7 +1178,7 @@ export function Canvassing() {
             </div>
 
             {sheetOpen ? (
-            <aside className="canvass-light-sheet flex max-h-[min(44vh,420px)] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white pb-[env(safe-area-inset-bottom,0px)] text-zinc-950 shadow-md ring-1 ring-black/[0.04] lg:h-auto lg:max-h-none lg:w-[min(100%,400px)] lg:min-w-[min(100%,320px)] lg:shrink-0">
+            <aside className="canvass-light-sheet canvass-property-sheet flex max-h-[min(44vh,420px)] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-200/90 pb-[env(safe-area-inset-bottom,0px)] text-zinc-950 shadow-md ring-1 ring-black/[0.04] lg:h-auto lg:max-h-none lg:w-[min(100%,400px)] lg:min-w-[min(100%,320px)] lg:shrink-0">
               <div className="canvass-sheet-header flex shrink-0 items-center justify-between border-b border-gray-100 bg-gradient-to-r from-slate-50 via-white to-white px-4 py-2.5">
                 <span className="text-sm font-semibold uppercase tracking-wide text-zinc-950">
                   {panelBusy ? "Loading…" : "Property"}
@@ -1192,9 +1192,13 @@ export function Canvassing() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="canvass-sheet-main flex min-h-0 flex-1 flex-col">
               <div className="canvass-sheet-body min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 pb-2 pt-3 text-sm text-zinc-950">
-                {panelHint ? <p className="text-xs text-amber-900">{panelHint}</p> : null}
+                {panelHint ? (
+                  <p className="canvass-panel-hint rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+                    {panelHint}
+                  </p>
+                ) : null}
                 <p className="text-[11px] leading-snug text-zinc-950">
                   Owner and contact fields come from public parcel and map data where available, plus automated property
                   lookup when we can match a full U.S. address — not generic web search.
@@ -1442,7 +1446,7 @@ export function Canvassing() {
                 <p className="text-[11px] leading-snug text-zinc-600">
                   Creates a field job with photo documentation. Opens Projects to capture site images.
                 </p>
-                <label className="flex items-center gap-2 text-xs text-zinc-950">
+                <label className="canvass-footer-checkbox flex flex-row items-center gap-2 text-xs text-zinc-950">
                   <input
                     type="checkbox"
                     checked={autoOpenEstimate}
@@ -1450,7 +1454,7 @@ export function Canvassing() {
                   />
                   Auto-open instant estimate when I click a property
                 </label>
-                <label className="flex items-center gap-2 text-xs text-zinc-950">
+                <label className="canvass-footer-checkbox flex flex-row items-center gap-2 text-xs text-zinc-950">
                   <input
                     type="checkbox"
                     checked={requireOwnerInfoBeforeOpen}

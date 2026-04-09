@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purge all cached content for a Cloudflare zone (fixes stale HTML at edge after domain moves).
  *
  * Requires CLOUDFLARE_API_TOKEN with Zone → Cache Purge → Purge (or zone read + cache purge).
@@ -67,3 +67,4 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+

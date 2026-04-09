@@ -1,4 +1,4 @@
-import { hashPassword, verifyPassword } from "../auth/password";
+﻿import { hashPassword, verifyPassword } from "../auth/password";
 import { signAuthPayload, verifyAuthToken, type AuthUser } from "../auth/token";
 import { isValidEmail, normalizeDisplayName } from "../auth/validation";
 import {
@@ -601,3 +601,4 @@ export async function handleAuthRequest(
     );
   }
 }
+

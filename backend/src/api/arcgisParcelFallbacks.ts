@@ -1,5 +1,5 @@
 /**
- * Extra public parcel FeatureServer/MapServer layers for MO / IL where the primary layer
+ * Extra public parcel FeatureServer/MapServer layers for MO / IL / MN where the primary layer
  * (default: St. Louis County) has no coverage. Queried only when the map click or map
  * bbox intersects each region’s WGS84 box (best-effort rectangles).
  *
@@ -8,11 +8,18 @@
  */
 
 import { MO_IL_PARCEL_FALLBACK_REGIONS, type ParcelFallbackRegion } from "./moIlParcelFallbackRegions";
+import { MN_PARCEL_FALLBACK_REGIONS } from "./mnParcelFallbackRegions";
 
 export type { ParcelFallbackRegion };
 
 /** Built-in MO/IL regions; same reference as MO_IL_PARCEL_FALLBACK_REGIONS. */
 export const DEFAULT_MO_IL_PARCEL_FALLBACKS = MO_IL_PARCEL_FALLBACK_REGIONS;
+
+/** Built-in MO, IL, and MN regions before optional Worker JSON. */
+export const BUILT_IN_PARCEL_FALLBACK_REGIONS: readonly ParcelFallbackRegion[] = [
+  ...MO_IL_PARCEL_FALLBACK_REGIONS,
+  ...MN_PARCEL_FALLBACK_REGIONS,
+];
 
 const LAYER_URL_TAIL = /\/(FeatureServer|MapServer)\/\d+$/i;
 
@@ -50,7 +57,7 @@ export function parseExtraParcelFallbacksJson(raw: string | undefined): ParcelFa
 }
 
 export function allParcelFallbackRegions(env: { ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON?: string }): ParcelFallbackRegion[] {
-  return [...MO_IL_PARCEL_FALLBACK_REGIONS, ...parseExtraParcelFallbacksJson(env.ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON)];
+  return [...BUILT_IN_PARCEL_FALLBACK_REGIONS, ...parseExtraParcelFallbacksJson(env.ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON)];
 }
 
 export function pointInParcelFallbackRegion(lat: number, lng: number, r: ParcelFallbackRegion): boolean {
@@ -75,7 +82,7 @@ export function parcelFallbackUrlsForPoint(
   lng: number,
   env?: { ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON?: string },
 ): string[] {
-  const regions = env ? allParcelFallbackRegions(env) : [...MO_IL_PARCEL_FALLBACK_REGIONS];
+  const regions = env ? allParcelFallbackRegions(env) : [...BUILT_IN_PARCEL_FALLBACK_REGIONS];
   const urls: string[] = [];
   for (const region of regions) {
     if (pointInParcelFallbackRegion(lat, lng, region)) urls.push(region.layerUrl);

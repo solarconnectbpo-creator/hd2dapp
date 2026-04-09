@@ -1,17 +1,17 @@
-{
+﻿{
   "expo": {
     "name": "Hardcore D2D Closers",
-    "slug": "hardcoredoortodoorclosers",
+    "slug": "DoorToDoorClosers",
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "hardcoredoortodoorclosers",
+    "scheme": "DoorToDoorClosers",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "description": "Hardcore Door-to-Door Closers - The ultimate platform for sales reps and companies",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hardcoredoortodoorclosers.app",
+      "bundleIdentifier": "com.DoorToDoorClosers.app",
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Location centers the property map and lets you select the roof you are standing at."
@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.hardcoredoortodoorclosers.app",
+      "package": "com.DoorToDoorClosers.app",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"

@@ -7,6 +7,7 @@ import {
   forwardRef,
   type CSSProperties,
 } from "react";
+import "maplibre-gl/dist/maplibre-gl.css";
 import maplibregl, { type MapGeoJSONFeature } from "maplibre-gl";
 import { getHd2dApiBase } from "../lib/hd2dApiBase";
 import { formatWorkerFetchFailure } from "../lib/workerApiError";
@@ -736,6 +737,8 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
     const lng = center?.lng ?? -98.5795;
     const preferGoogleSat = Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim());
     const baseSatSource = preferGoogleSat ? "google-session" : "esri-sat";
+    /** Match map max zoom to raster source max so we don't over-zoom (stretched, blurry tiles). */
+    const baseImageryMaxZoom = preferGoogleSat ? 22 : 20;
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -776,15 +779,25 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
           },
         },
         layers: [
-          { id: "satellite-layer", type: "raster", source: baseSatSource, paint: {} },
-          { id: "labels-layer", type: "raster", source: "esri-labels", paint: { "raster-opacity": 0.7 } },
+          {
+            id: "satellite-layer",
+            type: "raster",
+            source: baseSatSource,
+            paint: { "raster-resampling": "linear" },
+          },
+          {
+            id: "labels-layer",
+            type: "raster",
+            source: "esri-labels",
+            paint: { "raster-opacity": 0.7, "raster-resampling": "linear" },
+          },
         ],
       },
       center: [lng, lat],
       zoom,
       pitch,
       bearing,
-      maxZoom: 22,
+      maxZoom: baseImageryMaxZoom,
       maxPitch: 85,
     });
 
@@ -1098,6 +1111,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
           source: "arcgis-server-overlay",
           paint: {
             "raster-opacity": Math.min(1, Math.max(0.05, arcgisServerTileOpacity ?? 0.55)),
+            "raster-resampling": "linear",
           },
         },
         beforeId,

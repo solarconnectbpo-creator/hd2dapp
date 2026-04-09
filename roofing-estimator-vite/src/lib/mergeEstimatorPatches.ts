@@ -80,17 +80,22 @@ export function mergeProposalPatch<T extends ProposalClientSlice>(
 }
 
 export function buildGhlSummaryNote(form: FormState, proposal: ProposalClientSlice): string {
+  const carrier = (form.carrierScopeText || "").trim();
   const lines = [
-    "Roofing estimator intake (submitted from app chat)",
+    "HD2D — Roofing estimator (Copilot / New Measurement)",
+    `Proposal title: ${proposal.proposalTitle || "—"}`,
+    `Contractor / company: ${proposal.companyName || "—"}`,
     `Address: ${form.address || "—"}`,
-    `State: ${form.stateCode || "—"}`,
+    `State: ${form.stateCode || "—"} | Lat/Lng: ${form.latitude || "—"}, ${form.longitude || "—"}`,
     `Client: ${proposal.clientName || "—"} | ${proposal.clientCompany || ""}`.trim(),
     `Email: ${proposal.clientEmail || "—"} | Phone: ${proposal.clientPhone || "—"}`,
-    `Roof: ${form.roofType} | Pitch: ${form.roofPitch} | Area sq ft: ${form.areaSqFt || "—"}`,
+    `Roof: ${form.roofType} | Structure: ${form.roofStructure} | Pitch: ${form.roofPitch}`,
+    `Plan area sq ft: ${form.areaSqFt || "—"} | Perimeter ft: ${form.perimeterFt || "—"}`,
     `Squares: ${form.measuredSquares || "—"} | Waste %: ${form.wastePercent || "—"}`,
-    `Scope: ${form.estimateScopeMode} | Damage: ${form.damageTypes.join(", ") || "—"} | Severity: ${form.severity}`,
+    `Scope mode: ${form.estimateScopeMode} | Damage: ${form.damageTypes.join(", ") || "—"} | Severity: ${form.severity}`,
     `Deductible: ${form.deductibleUsd || "—"} | Non-rec dep: ${form.nonRecDepUsd || "—"}`,
-    `Property notes: ${form.propertyRecordNotes || "—"}`,
-  ];
+    carrier ? `Carrier / scope narrative: ${carrier.slice(0, 2000)}${carrier.length > 2000 ? "…" : ""}` : "",
+    `Property / field notes: ${form.propertyRecordNotes || "—"}`,
+  ].filter(Boolean);
   return lines.join("\n");
 }

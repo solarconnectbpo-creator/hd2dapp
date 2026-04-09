@@ -149,6 +149,11 @@ export function polygonFeatureOuterPerimeterFt(feature: Feature<Polygon>): numbe
   return ringPerimeterFt(ring);
 }
 
+/** True when the outer ring self-intersects (bow-tie, etc.) — area takeoff may be invalid. */
+export function polygonFeatureHasSelfIntersection(feature: Feature<Polygon>): boolean {
+  return turf.kinks(feature as Feature<Polygon>).features.length > 0;
+}
+
 /**
  * When no building footprint exists, conservative roof plan SF from lot size (tiered ratio + cap).
  * Planning only — verify in the field before bids or permits.

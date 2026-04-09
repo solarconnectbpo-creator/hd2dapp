@@ -1,9 +1,9 @@
-/// <reference types="vite/client" />
+﻿/// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Injected in `vite.config.ts` from `process.env.VERCEL_ENV` (`production` | `preview` | …). */
+  /** Injected in `vite.config.ts` from `process.env.VERCEL_ENV` (`production` | `preview` | ...). */
   readonly VERCEL_ENV?: string;
-  /** Injected in `vite.config.ts` from `process.env.VERCEL` — truthy on Vercel so builds skip same-origin `/api`. */
+  /** Injected in `vite.config.ts` from `process.env.VERCEL` - truthy on Vercel so builds skip same-origin `/api`. */
   readonly VERCEL?: string;
   readonly VITE_GOOGLE_MAPS_API_KEY?: string;
   readonly VITE_GOOGLE_PLACES_API_KEY?: string;
@@ -20,8 +20,9 @@ interface ImportMetaEnv {
   readonly VITE_CAREERS_URL?: string;
   /** VICIdial / Gradient realtime report; `/call-center` opens this in a new tab and tries an embed. */
   readonly VITE_CALLCENTER_REALTIME_REPORT_URL?: string;
-  /** Optional JSON array: `[{ "label": "…", "url": "https://…" }]` for extra report links on `/call-center`. */
+  /** Optional JSON array: `[{ "label": "...", "url": "https://..." }]` for extra report links on `/call-center`. */
   readonly VITE_CALLCENTER_EXTRA_REPORTS_JSON?: string;
-  /** JSON array of lead packages for `/leads`: `[{ "key": "…", "title": "…", "description": "…", "stripePriceId": "price_…", "priceLabel": "…" }]`. */
+  /** JSON array of lead packages for `/leads`: `[{ "key": "...", "title": "...", ... }]`. */
   readonly VITE_LEAD_PACKAGES_JSON?: string;
 }
+

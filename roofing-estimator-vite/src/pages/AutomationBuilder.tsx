@@ -343,7 +343,7 @@ export function AutomationBuilder() {
 
   return (
     <div className="hd2d-page-shell max-w-3xl space-y-8">
-      <Seo title="SMS follow-up — HD2D Closers" description="Automated SMS follow-up sequences, Telnyx setup, and AI reply drafts." path="/sms-automation" />
+      <Seo title="SMS follow-up - Door to Door Closers" description="Automated SMS follow-up sequences, Telnyx setup, and AI reply drafts." path="/sms-automation" />
       <div>
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#71767b]">Messaging</p>
         <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS follow-up</h1>

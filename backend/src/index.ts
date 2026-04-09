@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HD2D Backend - Main Entry Point
  * Cloudflare Workers API Router
  * Handles all 50+ API endpoints for the platform
@@ -39,6 +39,8 @@ interface Env {
   DB: any;
   HD2D_CACHE: any;
   OPENAI_API_KEY?: string;
+  /** Optional — when set, POST /api/ai/estimator-chat prefers Claude over OpenAI. */
+  ANTHROPIC_API_KEY?: string;
   SESSION_SECRET?: string;
   /** When "false", disables POST /api/auth/register. */
   AUTH_SIGNUP_ENABLED?: string;
@@ -545,3 +547,4 @@ async function handleWebhooks(
     },
   );
 }
+

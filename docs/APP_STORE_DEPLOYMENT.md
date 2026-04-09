@@ -1,4 +1,4 @@
-# App Store & Play Store deployment (Expo + EAS)
+﻿# App Store & Play Store deployment (Expo + EAS)
 
 This project is **Expo SDK 54** (`app.json` / `app.config.js`). The native app is **not** the `roofing-estimator-vite` folder (that is a separate web-only tool).
 
@@ -9,12 +9,12 @@ The app syncs roof/map leads to Supabase when configured (`src/lib/supabaseClien
 ### Create project & table
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. **Settings → API**: copy **Project URL** and **anon public** key (long JWT — not `sbp_` CLI tokens).
+2. **Settings â†’ API**: copy **Project URL** and **anon public** key (long JWT â€” not `sbp_` CLI tokens).
 3. In **SQL Editor**, run the migration in `supabase/migrations/20250322120000_roof_leads.sql` (creates `roof_leads` + RLS policies for anon).
 
 ### App environment
 
-Copy `.env.example` → `.env` / `.env.local` and set:
+Copy `.env.example` â†’ `.env` / `.env.local` and set:
 
 ```text
 EXPO_PUBLIC_SUPABASE_URL=https://YOUR_REF.supabase.co
@@ -40,7 +40,7 @@ eas login
 eas build:configure
 ```
 
-Link the project: `eas project:init` (creates `projectId` in `app.json` if missing — you may need to add an `expo.extra.eas.projectId` after first init; follow CLI prompts).
+Link the project: `eas project:init` (creates `projectId` in `app.json` if missing â€” you may need to add an `expo.extra.eas.projectId` after first init; follow CLI prompts).
 
 ### Secrets for cloud builds
 
@@ -69,25 +69,25 @@ Profiles are defined in `eas.json` (`development`, `preview`, `production`). `an
 
 **iOS (App Store Connect)**
 
-1. Apple Developer Program, App Store Connect app record matching `bundleIdentifier` (`com.hardcoredoortodoorclosers.app`).
+1. Apple Developer Program, App Store Connect app record matching `bundleIdentifier` (`com.DoorToDoorClosers.app`).
 2. `eas submit --platform ios` (after a production build) or upload via Transporter.
 
 **Android (Google Play)**
 
-1. Play Console app with package `com.hardcoredoortodoorclosers.app`.
+1. Play Console app with package `com.DoorToDoorClosers.app`.
 2. **Signing**: EAS manages Android credentials by default.
 3. `eas submit --platform android` (or upload AAB manually).
 
-Fill in `eas.json` → `submit.production` with Apple / Google credentials when ready (see [EAS Submit](https://docs.expo.dev/submit/introduction/)).
+Fill in `eas.json` â†’ `submit.production` with Apple / Google credentials when ready (see [EAS Submit](https://docs.expo.dev/submit/introduction/)).
 
 ---
 
 ## 3. Store compliance checklist
 
-- **Privacy policy URL** — required in both stores; host and link in store listings.
-- **Location** — `NSLocationWhenInUseUsageDescription` (iOS) and Android location permissions are declared in `app.json`; explain in the privacy questionnaire.
-- **Data collection** — disclose Supabase sync (property leads JSON), Mapbox, and any analytics you enable.
-- **Encryption export** — US App Store: typically “uses standard HTTPS only” (no custom encryption).
+- **Privacy policy URL** â€” required in both stores; host and link in store listings.
+- **Location** â€” `NSLocationWhenInUseUsageDescription` (iOS) and Android location permissions are declared in `app.json`; explain in the privacy questionnaire.
+- **Data collection** â€” disclose Supabase sync (property leads JSON), Mapbox, and any analytics you enable.
+- **Encryption export** â€” US App Store: typically â€œuses standard HTTPS onlyâ€ (no custom encryption).
 
 ---
 

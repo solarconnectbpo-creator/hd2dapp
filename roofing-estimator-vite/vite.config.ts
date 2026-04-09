@@ -175,6 +175,7 @@ export default defineConfig(({ mode }) => {
           if (id.includes("node_modules/maplibre-gl")) return "maplibre";
           if (id.includes("node_modules/leaflet")) return "leaflet";
           if (id.includes("node_modules/react-leaflet")) return "react-leaflet";
+          if (id.includes("node_modules/@turf")) return "turf";
           if (id.includes("node_modules/react-dom")) return "react-dom";
           if (id.includes("node_modules/react/")) return "react-vendor";
         },

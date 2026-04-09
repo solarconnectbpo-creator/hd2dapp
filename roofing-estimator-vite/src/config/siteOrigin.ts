@@ -1,16 +1,16 @@
-/**
+﻿/**
  * Canonical production origin (marketing / SPA host).
  */
 export const HD2D_PRODUCTION_ORIGIN = "https://hardcoredoortodoorclosers.com";
 
 /**
  * Stable production host for API when the SPA is not on the HD2D zone (e.g. `*.vercel.app` previews).
- * Use **www** here, not bare apex: Vercel often redirects apex → www; routing `/api/*` on www avoids redirect loops with that setting.
+ * Use **www** here, not bare apex: Vercel often redirects apex -> www; routing `/api/*` on www avoids redirect loops with that setting.
  */
 export const HD2D_PRODUCTION_WWW_ORIGIN = "https://www.hardcoredoortodoorclosers.com";
 
 /**
- * Legacy “public API” origin (apex). Prefer {@link HD2D_PRODUCTION_WWW_ORIGIN} for cross-origin calls off-zone when www is canonical on Vercel.
+ * Legacy "public API" origin (apex). Prefer {@link HD2D_PRODUCTION_WWW_ORIGIN} for cross-origin calls off-zone when www is canonical on Vercel.
  */
 export const HD2D_PUBLIC_API_ORIGIN = HD2D_PRODUCTION_ORIGIN;
 
@@ -21,8 +21,8 @@ export const HD2D_PUBLIC_API_ORIGIN = HD2D_PRODUCTION_ORIGIN;
 export const HD2D_WORKER_API_ORIGIN = "https://hd2d-backend.solarconnectbpo.workers.dev";
 
 /**
- * Primary site apex — subdomains on this zone.
- * Same-origin `/api/*`: **Vercel** → `vercel.json` rewrite to Worker; **Pages** → `functions/api/*`.
+ * Primary site apex - subdomains on this zone.
+ * Same-origin `/api/*`: **Vercel** -> `vercel.json` rewrite to Worker; **Pages** -> `functions/api/*`.
  */
 export const HD2D_SITE_ROOT = "hardcoredoortodoorclosers.com";
 
@@ -79,3 +79,4 @@ export function resolveProductionApiOrigin(): string {
   if (isHd2dZoneHostname(host) && sameOriginApiProxyEnabled()) return origin;
   return pub;
 }
+

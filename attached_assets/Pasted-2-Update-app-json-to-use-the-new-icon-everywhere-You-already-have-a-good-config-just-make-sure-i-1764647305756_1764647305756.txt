@@ -5,16 +5,16 @@ You already have a good config; just make sure it points to the new file and (op
 {
   "expo": {
     "name": "HD2D",
-    "slug": "hardcoredoortodoorclosers",
+    "slug": "doortodoorclosers",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",          // <-- D2D logo
-    "scheme": "hardcoredoortodoorclosers",
+    "scheme": "doortodoorclosers",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hardcoredoortodoorclosers.app"
+      "bundleIdentifier": "com.doortodoorclosers.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +23,7 @@ You already have a good config; just make sure it points to the new file and (op
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.hardcoredoortodoorclosers.app"
+      "package": "com.doortodoorclosers.app"
     },
     "web": {
       "output": "single",
