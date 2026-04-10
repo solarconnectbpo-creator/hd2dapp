@@ -1167,51 +1167,117 @@ html body #root .canvass-light-sheet .canvass-sheet-footer .text-zinc-950 {
 }
 
 /*
- * Property owner panel: never use Tailwind `bg-white` on these nodes — it maps to --x-surface (#12141a).
- * Dedicated classes + literal colors keep the scroll area paper-white with black ink.
+ * Property owner panel — dark HD2D chrome + light text. Global `bg-white` maps to --x-surface; without this,
+ * the sheet can render dark-on-dark (slate body text) or fight utility order. White/light gray copy on #12141a.
  */
 html body #root .canvass-light-sheet.canvass-property-sheet {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
-  color: #0f172a !important;
+  background-color: #12141a !important;
+  background-image: none !important;
+  color: #e7e9ea !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-header {
+  background: linear-gradient(to right, #161a22, #12141a) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e7e9ea !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-header span,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-header button {
+  color: #e7e9ea !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-main {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
-  color: #0f172a !important;
+  background-color: #12141a !important;
+  color: #e7e9ea !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
+  background-color: #12141a !important;
   background-image: none !important;
-  color: #0f172a !important;
+  color: #e7e9ea !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body p,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body span,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body li,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body summary {
+  color: #e7e9ea !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body .text-zinc-600 {
+  color: #8b9199 !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body .text-zinc-950 {
+  color: #f8fafc !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer {
-  background-color: #ffffff !important;
-  background-image: linear-gradient(to bottom, #ffffff, rgba(248, 250, 252, 0.9)) !important;
-  color: #0f172a !important;
+  background-color: #161a22 !important;
+  background-image: linear-gradient(to bottom, #161a22, #12141a) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e7e9ea !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .from-white {
-  --tw-gradient-from: #ffffff !important;
+  --tw-gradient-from: #161a22 !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .to-slate-50\/90 {
+  --tw-gradient-to: rgba(18, 20, 26, 0.95) !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet label.canvass-footer-checkbox {
   flex-direction: row !important;
   align-items: center !important;
-  color: #0f172a !important;
+  color: #e7e9ea !important;
 }
 
-/* Lucide / inline SVG inherits currentColor; force dark ink on white paper in production. */
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-header svg,
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body svg {
-  color: #0f172a !important;
+  color: #e7e9ea !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer p {
-  color: #475569 !important;
+  color: #8b9199 !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet label {
+  color: #e7e9ea !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet p.canvass-panel-hint,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-panel-hint.text-amber-950 {
+  color: #fde68a !important;
+  background-color: rgba(120, 53, 15, 0.35) !important;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-lock-hint {
+  color: #a7f3d0 !important;
+  background-color: rgba(6, 78, 59, 0.35) !important;
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .rounded-lg.border.border-blue-100,
+html body #root .canvass-light-sheet.canvass-property-sheet .bg-blue-50\/80 {
+  background-color: rgba(30, 58, 138, 0.35) !important;
+  border-color: rgba(96, 165, 250, 0.35) !important;
+  color: #e7e9ea !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-parcel-details,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-route-block {
+  background-color: rgba(26, 29, 38, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e7e9ea !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet textarea {
+  background-color: #1a1d26 !important;
+  color: #e7e9ea !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
