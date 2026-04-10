@@ -38,7 +38,7 @@ type LoginResponse = {
   /** Server hint (e.g. D1 error) — safe to show in UI for debugging sign-up / login. */
   detail?: string;
   /** Machine-readable code from Worker (see mapAuthFailureMessage). */
-  error_code?: string;
+  error_code?: string | number;
 };
 
 function getAuthApiBase(): string {
@@ -63,6 +63,17 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   }
 }
 
+/** Prevents hung “Checking session…” when the Worker never responds (default 25s). */
+const AUTH_FETCH_TIMEOUT_MS = 25_000;
+
+function authFetchSignal(existing?: AbortSignal | null): AbortSignal | undefined {
+  if (existing) return existing;
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS);
+  }
+  return undefined;
+}
+
 /** Same-origin or cross-origin fetch to Worker; clearer errors on DNS / offline / blocked requests. */
 async function authFetch(input: string, init?: RequestInit): Promise<Response> {
   try {
@@ -70,9 +81,15 @@ async function authFetch(input: string, init?: RequestInit): Promise<Response> {
       ...init,
       mode: "cors",
       credentials: "omit",
+      signal: authFetchSignal(init?.signal),
     });
   } catch (e) {
     const base = getAuthApiBase() || "(unknown)";
+    if (e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError")) {
+      throw new Error(
+        `Request timed out after ${AUTH_FETCH_TIMEOUT_MS / 1000}s. Check your connection, then try again. API base: ${base || "(unknown)"}.`,
+      );
+    }
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(networkFetchFailureHint(base, msg));
   }
@@ -177,7 +194,7 @@ export async function fetchCurrentUser(token: string): Promise<{ user: AuthUser;
     access?: AuthAccess;
     error?: string;
     detail?: string;
-    error_code?: string;
+    error_code?: string | number;
   }>(text, res, "/api/auth/me");
   if (!res.ok || data.success !== true || !data.user) {
     throw new Error(

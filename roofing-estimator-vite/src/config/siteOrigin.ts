@@ -48,7 +48,7 @@ export function isHd2dZoneHostname(hostname: string): boolean {
  * Hosts where the SPA must use {@link HD2D_PUBLIC_API_ORIGIN} (cross-origin) instead of the page origin.
  * - **`*.pages.dev`:** same-origin `/api/*` when `sameOriginApiProxyEnabled()`; else apex.
  * - **`*.vercel.app`:** {@link HD2D_PRODUCTION_WWW_ORIGIN} (`/api/*` rewrites live on that host).
- * - **HD2D zone:** same-origin when `sameOriginApiProxyEnabled()`.
+ * - **HD2D zone:** `null` (caller uses page origin; not cross-origin).
  */
 export function apiOriginForHostname(hostname: string): string | null {
   const h = hostname.trim().toLowerCase();
@@ -61,10 +61,10 @@ export function apiOriginForHostname(hostname: string): string | null {
 
 /**
  * API base origin in production for `getHd2dApiBase()`.
- * - **Vercel + HD2D hostname (apex, www, subdomains):** `window.location.origin` + `/api/*` (rewrites on that host).
+ * - **Vercel + HD2D hostname (apex, www, subdomains):** `window.location.origin` + `/api/*` (Edge middleware proxies to Worker).
  * - **`*.vercel.app` previews:** {@link HD2D_PRODUCTION_WWW_ORIGIN}.
  * - **`*.pages.dev`:** same-origin `/api/*` when `sameOriginApiProxyEnabled()` (Pages proxy); else apex.
- * - **HD2D apex / www:** same-origin `/api/*` when `sameOriginApiProxyEnabled()`.
+ * - **HD2D zone (apex, www, `app.*`, etc.):** always `window.location.origin` so `/api/*` matches the hostname in the address bar.
  */
 export function resolveProductionApiOrigin(): string {
   const pub = HD2D_PUBLIC_API_ORIGIN.replace(/\/$/, "");
