@@ -5,7 +5,7 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-10-stripe-callcenter-webhook";
+export const WORKER_BUILD_TAG = "2026-04-11-sms-telnyx-gate-diagnostics";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
@@ -36,6 +36,8 @@ type HealthEnv = {
   CALLCENTER_STRIPE_PRICE_ID?: string;
   /** Telnyx API key — outbound SMS + workflow steps (see services/sms). */
   TELNYX_API_KEY?: string;
+  /** Default outbound E.164 when org has no row in `sms_org_numbers`. */
+  TELNYX_FROM_NUMBER?: string;
   /** Twilio Account SID — optional alternative to Telnyx when set with TWILIO_AUTH_TOKEN. */
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
@@ -114,6 +116,8 @@ export function handleHealthGet(
         signupNotifyEmail: Boolean((env.RESEND_API_KEY || "").trim()),
         /** True when Telnyx API key is set (POST /api/sms/send, workflow SMS steps, inbound webhook persistence). */
         telnyxSms: Boolean((env.TELNYX_API_KEY || "").trim()),
+        /** True when default outbound from-number is set (or org uses per-number rows in `sms_org_numbers`). */
+        telnyxDefaultFromSet: Boolean((env.TELNYX_FROM_NUMBER || "").trim()),
         /** True when Twilio Account SID + Auth Token are set (alternative outbound + /api/webhooks/twilio). */
         twilioSms: Boolean((env.TWILIO_ACCOUNT_SID || "").trim() && (env.TWILIO_AUTH_TOKEN || "").trim()),
         /** True when metered SMS Price id is set (usage records after successful outbound SMS when subscription item exists). */

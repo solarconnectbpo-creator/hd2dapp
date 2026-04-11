@@ -1,6 +1,9 @@
 import { sendSms } from "../services/sms";
 import { resolveSmsOutbound } from "../services/sms/smsProviderResolve";
 import { recordSmsUsageEvent } from "../api/stripeSmsUsage";
+import type { AccessGateEnv } from "../auth/access";
+import { evaluateAccess } from "../auth/access";
+import { findUserById } from "../auth/userDb";
 import {
   getContactById,
   getOrgOwnerUserId,
@@ -24,6 +27,27 @@ import {
 } from "./smsDb";
 
 type D1 = any;
+
+/**
+ * Outbound SMS (manual send + workflow steps) is billed to the org owner subscription.
+ * Block sends when owner is not approved or billing is not active (unless AUTH_SKIP_ACCESS_GATE).
+ */
+export async function assertOrgOwnerMaySendSms(
+  db: D1,
+  env: AccessGateEnv,
+  orgId: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const ownerId = await getOrgOwnerUserId(db, orgId);
+  if (!ownerId) {
+    return { ok: false, reason: "No organization owner; complete team setup under Company first." };
+  }
+  const row = await findUserById(db, ownerId);
+  const ev = evaluateAccess(env, "company", row);
+  if (!ev.accessGranted) {
+    return { ok: false, reason: ev.reasons.length ? ev.reasons.join(" ") : "Membership is not active for SMS." };
+  }
+  return { ok: true };
+}
 
 export type WorkflowStep =
   | { type: "sms"; text: string }
@@ -86,6 +110,36 @@ export function parseWorkflowJson(raw: string): WorkflowDoc | null {
   }
 }
 
+const MAX_WORKFLOW_STEPS = 48;
+const MAX_SINGLE_DELAY_MINUTES = 20160; // 14 days
+
+/** Stricter checks before persisting workflows (size limits, non-empty SMS bodies). */
+export function validateWorkflowJsonForPersist(
+  raw: string,
+): { ok: true; doc: WorkflowDoc; stepsJson: string } | { ok: false; error: string } {
+  const doc = parseWorkflowJson(raw);
+  if (!doc?.steps?.length) {
+    return { ok: false, error: "Invalid steps_json: need at least one SMS step." };
+  }
+  if (doc.steps.length > MAX_WORKFLOW_STEPS) {
+    return { ok: false, error: `Too many steps (max ${MAX_WORKFLOW_STEPS}).` };
+  }
+  for (const step of doc.steps) {
+    if (step.type === "delay_minutes") {
+      const m = Math.max(0, step.minutes || 0);
+      if (m > MAX_SINGLE_DELAY_MINUTES) {
+        return { ok: false, error: `A single wait exceeds ${MAX_SINGLE_DELAY_MINUTES} minutes (14 days).` };
+      }
+    }
+    if (step.type === "sms") {
+      const t = (step.text || "").trim();
+      if (!t) return { ok: false, error: "SMS steps cannot be empty." };
+      if (t.length > 1600) return { ok: false, error: "An SMS step exceeds 1600 characters." };
+    }
+  }
+  return { ok: true, doc, stepsJson: JSON.stringify(doc) };
+}
+
 function renderTemplate(
   text: string,
   contact: Pick<SmsContactRow, "name" | "phone_e164" | "address">,
@@ -127,6 +181,8 @@ export type SmsWorkflowEnv = {
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_FROM_NUMBER?: string;
   STRIPE_SECRET_KEY?: string;
+  /** When "true", skip membership billing gate for outbound SMS (local dev). */
+  AUTH_SKIP_ACCESS_GATE?: string;
 };
 
 const MAX_RUN_ITERATIONS = 40;
@@ -252,6 +308,13 @@ async function runOneDueRun(
   }
 
   if (step.type !== "sms") {
+    await updateWorkflowRun(env.DB, row.id, { status: "failed", t: nowSec });
+    return;
+  }
+
+  const gate = await assertOrgOwnerMaySendSms(env.DB, env, row.org_id);
+  if (!gate.ok) {
+    console.warn("[sms-workflow] billing gate:", gate.reason);
     await updateWorkflowRun(env.DB, row.id, { status: "failed", t: nowSec });
     return;
   }
@@ -415,8 +478,8 @@ export async function startWorkflowRunForContact(
   if (!wf || !wf.enabled) return { ok: false, error: "Workflow not found." };
   const contact = await getContactById(env.DB, contactId);
   if (!contact || contact.org_id !== orgId) return { ok: false, error: "Contact not found." };
-  const doc = parseWorkflowJson(wf.steps_json);
-  if (!doc?.steps?.length) return { ok: false, error: "Invalid workflow." };
+  const validated = validateWorkflowJsonForPersist(wf.steps_json);
+  if (!validated.ok) return { ok: false, error: validated.error };
 
   const nowSec = Math.floor(Date.now() / 1000);
   await insertWorkflowRun(env.DB, {

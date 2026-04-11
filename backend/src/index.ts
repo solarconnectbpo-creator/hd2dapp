@@ -395,6 +395,7 @@ export default {
           TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
           TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
           STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+          AUTH_SKIP_ACCESS_GATE: env.AUTH_SKIP_ACCESS_GATE,
         }),
       );
       return;
@@ -409,6 +410,7 @@ export default {
           TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
           TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
           STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+          AUTH_SKIP_ACCESS_GATE: env.AUTH_SKIP_ACCESS_GATE,
         }),
       );
       ctx.waitUntil(

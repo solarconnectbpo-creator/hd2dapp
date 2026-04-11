@@ -566,6 +566,55 @@ export async function cancelPendingRunsForContact(db: D1, contactId: string, t: 
     .run();
 }
 
+export type SmsWorkflowRunFailureRow = {
+  id: string;
+  workflow_id: string;
+  workflow_name: string;
+  contact_id: string;
+  phone_e164: string;
+  updated_at: number;
+};
+
+/** Recent failed automation runs for diagnostics (e.g. missing Telnyx, billing gate). */
+export async function listRecentWorkflowRunFailuresForOrg(
+  db: D1,
+  orgId: string,
+  limit: number,
+): Promise<SmsWorkflowRunFailureRow[]> {
+  if (db == null) return [];
+  const lim = Math.min(50, Math.max(1, limit));
+  const res = (await db
+    .prepare(
+      `SELECT r.id, r.workflow_id, w.name AS workflow_name, r.contact_id, c.phone_e164, r.updated_at
+       FROM sms_workflow_runs r
+       JOIN sms_workflows w ON w.id = r.workflow_id
+       JOIN sms_contacts c ON c.id = r.contact_id
+       WHERE w.org_id = ? AND r.status = 'failed'
+       ORDER BY r.updated_at DESC
+       LIMIT ?`,
+    )
+    .bind(orgId, lim)
+    .all()) as {
+    results?: Array<{
+      id: string;
+      workflow_id: string;
+      workflow_name: string;
+      contact_id: string;
+      phone_e164: string;
+      updated_at: number;
+    }>;
+  };
+  const rows = res.results ?? [];
+  return rows.map((r) => ({
+    id: r.id,
+    workflow_id: r.workflow_id,
+    workflow_name: r.workflow_name,
+    contact_id: r.contact_id,
+    phone_e164: r.phone_e164,
+    updated_at: r.updated_at,
+  }));
+}
+
 export async function listDueWorkflowRuns(db: D1, limit: number, nowSec: number) {
   const res = (await db
     .prepare(

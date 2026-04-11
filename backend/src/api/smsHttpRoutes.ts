@@ -14,6 +14,7 @@ import {
   insertSmsMessage,
   listSmsContactsForOrg,
   listSmsMessagesForContact,
+  listRecentWorkflowRunFailuresForOrg,
   listSmsOrgNumbersForOrg,
   listSmsWorkflows,
   updateSmsContactFields,
@@ -21,11 +22,12 @@ import {
 } from "../sms/smsDb";
 import { SMS_CANONICAL_TRIGGERS } from "../sms/smsTriggers";
 import {
+  assertOrgOwnerMaySendSms,
   emitSmsEvent,
-  parseWorkflowJson,
   resolveOrgForCompanyUser,
   seedDefaultSmsWorkflowsIfEmpty,
   startWorkflowRunForContact,
+  validateWorkflowJsonForPersist,
 } from "../sms/smsWorkflowEngine";
 import type { SmsWorkflowEnv } from "../sms/smsWorkflowEngine";
 
@@ -66,6 +68,7 @@ function workflowEnv(env: SmsHttpEnv): SmsWorkflowEnv {
     TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
     TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
     STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+    AUTH_SKIP_ACCESS_GATE: env.AUTH_SKIP_ACCESS_GATE,
   } satisfies SmsWorkflowEnv;
 }
 
@@ -112,16 +115,21 @@ export async function handleSmsHttpRoutes(
 
   if (base === "/api/sms/setup-status" && request.method === "GET") {
     const inbound_numbers = await listSmsOrgNumbersForOrg(env.DB, oid);
+    const recent_failures = await listRecentWorkflowRunFailuresForOrg(env.DB, oid, 12);
     const telnyxKey = (env.TELNYX_API_KEY || "").trim();
     const telnyxFrom = (env.TELNYX_FROM_NUMBER || "").trim();
     const twSid = (env.TWILIO_ACCOUNT_SID || "").trim();
     const twTok = (env.TWILIO_AUTH_TOKEN || "").trim();
     const twFrom = (env.TWILIO_FROM_NUMBER || "").trim();
+    const ownerGate = await assertOrgOwnerMaySendSms(env.DB, env, oid);
     return json(
       {
         success: true,
         org_id: oid,
         inbound_numbers,
+        recent_failures,
+        outbound_sms_allowed: ownerGate.ok,
+        outbound_sms_block_reason: ownerGate.ok ? undefined : ownerGate.reason,
         worker: {
           telnyx_configured: Boolean(telnyxKey),
           telnyx_default_from_set: Boolean(telnyxFrom),
@@ -172,9 +180,9 @@ export async function handleSmsHttpRoutes(
       return json({ success: false, error: "Invalid JSON." }, 400, j);
     }
     const rawSteps = (body.steps_json || '{"steps":[]}').trim();
-    const parsed = parseWorkflowJson(rawSteps);
-    if (!parsed) {
-      return json({ success: false, error: "Invalid steps_json: need at least one sms step." }, 400, j);
+    const validated = validateWorkflowJsonForPersist(rawSteps);
+    if (!validated.ok) {
+      return json({ success: false, error: validated.error }, 400, j);
     }
     const id = crypto.randomUUID();
     const t = Math.floor(Date.now() / 1000);
@@ -183,7 +191,7 @@ export async function handleSmsHttpRoutes(
       orgId: oid,
       name: (body.name || "Workflow").trim(),
       trigger: (body.trigger || "manual").trim(),
-      stepsJson: JSON.stringify(parsed),
+      stepsJson: validated.stepsJson,
       enabled: body.enabled !== false,
       t,
     });
@@ -204,16 +212,16 @@ export async function handleSmsHttpRoutes(
     if (!existing) return json({ success: false, error: "Not found." }, 404, j);
     const t = Math.floor(Date.now() / 1000);
     const rawSteps = (body.steps_json ?? existing.steps_json).trim();
-    const parsed = parseWorkflowJson(rawSteps);
-    if (!parsed) {
-      return json({ success: false, error: "Invalid steps_json: need at least one sms step." }, 400, j);
+    const validated = validateWorkflowJsonForPersist(rawSteps);
+    if (!validated.ok) {
+      return json({ success: false, error: validated.error }, 400, j);
     }
     await upsertSmsWorkflow(env.DB, {
       id,
       orgId: oid,
       name: (body.name ?? existing.name).trim(),
       trigger: (body.trigger ?? existing.trigger).trim(),
-      stepsJson: JSON.stringify(parsed),
+      stepsJson: validated.stepsJson,
       enabled: body.enabled ?? existing.enabled === 1,
       t,
     });
@@ -327,6 +335,10 @@ export async function handleSmsHttpRoutes(
       contactIdForMsg = c.id;
     } else {
       toE164 = normalizePhoneE164((body.to || "").trim());
+    }
+    const gate = await assertOrgOwnerMaySendSms(env.DB, env, oid);
+    if (!gate.ok) {
+      return json({ success: false, error: gate.reason }, 403, j);
     }
     if (!resolved || !toE164 || !text) {
       return json(
