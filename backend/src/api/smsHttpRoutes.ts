@@ -21,6 +21,7 @@ import {
   upsertSmsWorkflow,
 } from "../sms/smsDb";
 import { SMS_CANONICAL_TRIGGERS } from "../sms/smsTriggers";
+import { ValidationError, validateString } from "../utils/validation";
 import {
   assertOrgOwnerMaySendSms,
   emitSmsEvent,
@@ -313,19 +314,39 @@ export async function handleSmsHttpRoutes(
   }
 
   if (base === "/api/sms/send" && request.method === "POST") {
-    let body: { to?: string; text?: string; contact_id?: string };
+    let body: Record<string, unknown>;
     try {
-      body = (await request.json()) as typeof body;
+      body = (await request.json()) as Record<string, unknown>;
     } catch {
       return json({ success: false, error: "Invalid JSON." }, 400, j);
     }
+    let text: string;
+    try {
+      text = validateString(body.text, "text", { minLength: 1, maxLength: 1600 });
+    } catch (e) {
+      if (e instanceof ValidationError) {
+        return json({ success: false, error: `Validation: ${e.field} — ${e.message}` }, 400, j);
+      }
+      throw e;
+    }
     const orgFrom = await getOutboundFromForOrg(env.DB, oid);
     const resolved = resolveSmsOutbound(env, orgFrom);
-    const text = (body.text || "").trim();
     let toE164 = "";
     let contactIdForMsg = "";
-    if ((body.contact_id || "").trim()) {
-      const cid = (body.contact_id || "").trim();
+    const contactIdRaw =
+      typeof body.contact_id === "string" ? body.contact_id.trim() : typeof body.contactId === "string"
+        ? body.contactId.trim()
+        : "";
+    if (contactIdRaw) {
+      let cid: string;
+      try {
+        cid = validateString(contactIdRaw, "contact_id", { minLength: 1, maxLength: 128 });
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          return json({ success: false, error: `Validation: ${e.field} — ${e.message}` }, 400, j);
+        }
+        throw e;
+      }
       const c = await getSmsContactByIdForOrg(env.DB, cid, oid);
       if (!c) return json({ success: false, error: "contact_id not found for this org." }, 404, j);
       if (c.unsubscribed === 1) {
@@ -334,7 +355,11 @@ export async function handleSmsHttpRoutes(
       toE164 = c.phone_e164;
       contactIdForMsg = c.id;
     } else {
-      toE164 = normalizePhoneE164((body.to || "").trim());
+      const toRaw = typeof body.to === "string" ? body.to.trim() : "";
+      if (toRaw.length > 64) {
+        return json({ success: false, error: "Validation: to — value too long." }, 400, j);
+      }
+      toE164 = normalizePhoneE164(toRaw);
     }
     const gate = await assertOrgOwnerMaySendSms(env.DB, env, oid);
     if (!gate.ok) {

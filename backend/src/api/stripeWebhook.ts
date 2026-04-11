@@ -6,6 +6,7 @@ import {
   updateUserStripeSmsSubscriptionItem,
 } from "../auth/userDb";
 import { finalizePurchaseFromStripe } from "../marketplace/marketplaceDb";
+import { retryWithBackoffWhen } from "../utils/retry";
 
 export type StripeWebhookEnv = AuthEnv & {
   STRIPE_WEBHOOK_SECRET?: string;
@@ -79,6 +80,85 @@ function subscriptionHasMembershipPrice(sub: StripeObj, ids: Set<string>): boole
   return false;
 }
 
+function isTransientStripeWebhookError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  return /network|fetch|ECONNRESET|502|503|504|52[0-9]|53[0-9]|timeout|temporar|busy|D1|sqlite/i.test(e.message);
+}
+
+/** Stripe event handling (D1 updates). Retried only for likely-transient failures so Stripe can re-deliver on 500. */
+async function dispatchStripeWebhookEvent(
+  env: StripeWebhookEnv,
+  type: string,
+  obj: StripeObj | undefined,
+): Promise<void> {
+  if (type === "checkout.session.completed" && obj) {
+    const mode = String(obj.mode || "");
+    const clientRef = typeof obj.client_reference_id === "string" ? obj.client_reference_id.trim() : "";
+    const customer = typeof obj.customer === "string" ? obj.customer : "";
+    const meta =
+      obj.metadata && typeof obj.metadata === "object" && obj.metadata !== null && !Array.isArray(obj.metadata)
+        ? (obj.metadata as Record<string, unknown>)
+        : {};
+    const aptIdsRaw = typeof meta.hd2d_appointment_ids === "string" ? meta.hd2d_appointment_ids.trim() : "";
+    const sessionId = typeof obj.id === "string" ? obj.id : "";
+    const buyerFromMeta = typeof meta.hd2d_user_id === "string" ? meta.hd2d_user_id.trim() : "";
+    const buyerId = buyerFromMeta || clientRef;
+    if (mode === "payment" && aptIdsRaw && sessionId && buyerId) {
+      const ids = aptIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+      if (ids.length) {
+        const fin = await finalizePurchaseFromStripe(env.DB, buyerId, ids, sessionId);
+        if (!fin.ok) {
+          console.error("[stripe-webhook] marketplace finalize failed", sessionId, buyerId);
+        }
+      }
+    }
+    if (mode === "subscription" && clientRef) {
+      const kind = typeof meta.hd2d_checkout_kind === "string" ? meta.hd2d_checkout_kind.trim() : "";
+      if (kind !== "callcenter") {
+        await updateUserBillingAndStripe(env.DB, clientRef, {
+          billing_status: "active",
+          stripe_customer_id: customer || null,
+        });
+      }
+    }
+  } else if (type === "customer.subscription.updated" && obj) {
+    const sub = obj;
+    const membershipIds = membershipPriceIds(env);
+    const isMembershipSub = membershipIds.size === 0 ? true : subscriptionHasMembershipPrice(sub, membershipIds);
+    if (!isMembershipSub) {
+      // e.g. call-center-only subscription — do not overwrite platform membership billing.
+    } else {
+      const userId = await resolveUserIdFromSubscription(env.DB, sub);
+      if (userId) {
+        const st = billingFromSubscriptionStatus(typeof sub.status === "string" ? sub.status : undefined);
+        const customer = typeof sub.customer === "string" ? sub.customer : "";
+        await updateUserBillingAndStripe(env.DB, userId, {
+          billing_status: st,
+          stripe_customer_id: customer || undefined,
+        });
+        const smsPrice = (env.STRIPE_SMS_METERED_PRICE_ID || "").trim();
+        if (smsPrice) {
+          const smsItem = extractSmsSubscriptionItemId(sub, smsPrice);
+          await updateUserStripeSmsSubscriptionItem(env.DB, userId, smsItem);
+        }
+      }
+    }
+  } else if (type === "customer.subscription.deleted" && obj) {
+    const sub = obj;
+    const membershipIds = membershipPriceIds(env);
+    const isMembershipSub = membershipIds.size === 0 ? true : subscriptionHasMembershipPrice(sub, membershipIds);
+    if (!isMembershipSub) {
+      // Non-membership subscription ended — leave platform billing unchanged.
+    } else {
+      const userId = await resolveUserIdFromSubscription(env.DB, sub);
+      if (userId) {
+        await updateUserBillingAndStripe(env.DB, userId, { billing_status: "canceled" });
+        await updateUserStripeSmsSubscriptionItem(env.DB, userId, null);
+      }
+    }
+  }
+}
+
 /**
  * POST /api/webhooks/stripe — raw JSON body; verified with STRIPE_WEBHOOK_SECRET.
  */
@@ -111,74 +191,11 @@ export async function handleStripeWebhook(
   const obj = event.data?.object;
 
   try {
-    if (type === "checkout.session.completed" && obj) {
-      const mode = String(obj.mode || "");
-      const clientRef = typeof obj.client_reference_id === "string" ? obj.client_reference_id.trim() : "";
-      const customer = typeof obj.customer === "string" ? obj.customer : "";
-      const meta =
-        obj.metadata && typeof obj.metadata === "object" && obj.metadata !== null && !Array.isArray(obj.metadata)
-          ? (obj.metadata as Record<string, unknown>)
-          : {};
-      const aptIdsRaw = typeof meta.hd2d_appointment_ids === "string" ? meta.hd2d_appointment_ids.trim() : "";
-      const sessionId = typeof obj.id === "string" ? obj.id : "";
-      const buyerFromMeta = typeof meta.hd2d_user_id === "string" ? meta.hd2d_user_id.trim() : "";
-      const buyerId = buyerFromMeta || clientRef;
-      if (mode === "payment" && aptIdsRaw && sessionId && buyerId) {
-        const ids = aptIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
-        if (ids.length) {
-          const fin = await finalizePurchaseFromStripe(env.DB, buyerId, ids, sessionId);
-          if (!fin.ok) {
-            console.error("[stripe-webhook] marketplace finalize failed", sessionId, buyerId);
-          }
-        }
-      }
-      if (mode === "subscription" && clientRef) {
-        const kind = typeof meta.hd2d_checkout_kind === "string" ? meta.hd2d_checkout_kind.trim() : "";
-        if (kind !== "callcenter") {
-          await updateUserBillingAndStripe(env.DB, clientRef, {
-            billing_status: "active",
-            stripe_customer_id: customer || null,
-          });
-        }
-      }
-    } else if (type === "customer.subscription.updated" && obj) {
-      const sub = obj;
-      const membershipIds = membershipPriceIds(env);
-      const isMembershipSub =
-        membershipIds.size === 0 ? true : subscriptionHasMembershipPrice(sub, membershipIds);
-      if (!isMembershipSub) {
-        // e.g. call-center-only subscription — do not overwrite platform membership billing.
-      } else {
-        const userId = await resolveUserIdFromSubscription(env.DB, sub);
-        if (userId) {
-          const st = billingFromSubscriptionStatus(typeof sub.status === "string" ? sub.status : undefined);
-          const customer = typeof sub.customer === "string" ? sub.customer : "";
-          await updateUserBillingAndStripe(env.DB, userId, {
-            billing_status: st,
-            stripe_customer_id: customer || undefined,
-          });
-          const smsPrice = (env.STRIPE_SMS_METERED_PRICE_ID || "").trim();
-          if (smsPrice) {
-            const smsItem = extractSmsSubscriptionItemId(sub, smsPrice);
-            await updateUserStripeSmsSubscriptionItem(env.DB, userId, smsItem);
-          }
-        }
-      }
-    } else if (type === "customer.subscription.deleted" && obj) {
-      const sub = obj;
-      const membershipIds = membershipPriceIds(env);
-      const isMembershipSub =
-        membershipIds.size === 0 ? true : subscriptionHasMembershipPrice(sub, membershipIds);
-      if (!isMembershipSub) {
-        // Non-membership subscription ended — leave platform billing unchanged.
-      } else {
-        const userId = await resolveUserIdFromSubscription(env.DB, sub);
-        if (userId) {
-          await updateUserBillingAndStripe(env.DB, userId, { billing_status: "canceled" });
-          await updateUserStripeSmsSubscriptionItem(env.DB, userId, null);
-        }
-      }
-    }
+    await retryWithBackoffWhen(
+      () => dispatchStripeWebhookEvent(env, type, obj),
+      isTransientStripeWebhookError,
+      { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 8000 },
+    );
   } catch (e) {
     console.error("[stripe-webhook]", type, e);
     return new Response(JSON.stringify({ success: false, error: "Webhook handler failed." }), { status: 500, headers: j });

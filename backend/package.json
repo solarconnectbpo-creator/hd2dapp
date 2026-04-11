@@ -18,6 +18,8 @@
     "d1:migrate:remote:marketplace": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0009_marketplace_appointments.sql",
     "d1:migrate:local:org_workspace": "npx wrangler d1 execute d2d --local --file=./migrations/0010_org_workspace.sql",
     "d1:migrate:remote:org_workspace": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0010_org_workspace.sql",
+    "d1:migrate:local:perf": "npx wrangler d1 execute d2d --local --file=./migrations/0011_performance_indices.sql",
+    "d1:migrate:remote:perf": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0011_performance_indices.sql",
     "deploy": "node scripts/wrangler-run.mjs deploy --env=\"\" --keep-vars true",
     "deploy:all": "npm run deploy && npm --prefix ../roofing-estimator-vite run pages:deploy",
     "build": "npx wrangler build",
@@ -40,6 +42,7 @@
     "worker:set-roof-vision": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/set-roof-vision-worker-secrets.ps1"
   },
   "dependencies": {
+    "@sentry/cloudflare": "^9.47.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "node-fetch": "^3.3.2",

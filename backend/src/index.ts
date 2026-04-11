@@ -4,6 +4,7 @@
  * Handles all 50+ API endpoints for the platform
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import { handleRoofDamageAi } from "./api/roofDamageAi";
 import { handleRoofPitchAi } from "./api/roofPitchAi";
 import { handleRoofReportLanguageAi } from "./api/roofReportLanguageAi";
@@ -120,6 +121,10 @@ interface Env {
   CALLCENTER_STRIPE_PRICE_ID?: string;
   /** Stripe webhook signing secret (whsec_…) for POST /api/webhooks/stripe. */
   STRIPE_WEBHOOK_SECRET?: string;
+  /** Optional error monitoring (wrangler secret put SENTRY_DSN). */
+  SENTRY_DSN?: string;
+  /** Set via wrangler [vars] (e.g. production / development). */
+  ENVIRONMENT?: string;
   /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
   APP_PUBLIC_ORIGIN?: string;
   /** Meta Marketing API — Facebook Login + scheduled Page posts (see metaMarketing.ts). */
@@ -199,7 +204,7 @@ function logEagleViewEnvSummaryOnce(env: Env): void {
   }
 }
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     logEagleViewEnvSummaryOnce(env);
     const url = new URL(request.url);
@@ -370,6 +375,7 @@ export default {
       );
     } catch (error) {
       console.error("Request error:", error);
+      Sentry.captureException(error);
       return new Response(
         JSON.stringify({
           success: false,
@@ -424,6 +430,15 @@ export default {
     ctx.waitUntil(processMetaScheduledRetries(env as MetaMarketingEnv));
   },
 };
+
+export default Sentry.withSentry(
+  (env: Env) => ({
+    dsn: (env.SENTRY_DSN || "").trim() || undefined,
+    environment: (env.ENVIRONMENT || "production").trim(),
+    tracesSampleRate: 0.1,
+  }),
+  worker,
+);
 
 async function handleLeads(
   request: Request,
