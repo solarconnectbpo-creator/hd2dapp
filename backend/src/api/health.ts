@@ -2,10 +2,11 @@
  * GET /api/health — deployment checks (no secrets exposed; only whether optional keys are set).
  */
 
+import { resolvePublicAppOrigin } from "../auth/publicOrigin";
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-11-sms-telnyx-gate-diagnostics";
+export const WORKER_BUILD_TAG = "2026-04-04-password-reset-origin-fallback";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
@@ -46,6 +47,7 @@ type HealthEnv = {
   STRIPE_SMS_METERED_PRICE_ID?: string;
   RESEND_API_KEY?: string;
   APP_PUBLIC_ORIGIN?: string;
+  CORS_ALLOWED_ORIGINS?: string;
 };
 
 type CorsHeaders = Record<string, string>;
@@ -103,10 +105,8 @@ export function handleHealthGet(
           (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false",
         /** True when `GOOGLE_CLIENT_ID` is set (POST /api/auth/google). */
         googleAuth: Boolean((env.GOOGLE_CLIENT_ID || "").trim()),
-        /** True when Resend + public app origin are set (POST /api/auth/forgot-password sends email). */
-        passwordResetEmail: Boolean(
-          (env.RESEND_API_KEY || "").trim() && (env.APP_PUBLIC_ORIGIN || "").trim(),
-        ),
+        /** True when Resend is set and a public app URL exists (`APP_PUBLIC_ORIGIN` or first URL in `CORS_ALLOWED_ORIGINS`). */
+        passwordResetEmail: Boolean((env.RESEND_API_KEY || "").trim() && resolvePublicAppOrigin(env)),
         /** True when Stripe + at least one membership Price id are set (POST /api/billing/membership-checkout-session). */
         membershipCheckout: Boolean(
           (env.STRIPE_SECRET_KEY || "").trim() &&

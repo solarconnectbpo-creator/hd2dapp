@@ -2,6 +2,7 @@
 import { signAuthPayload, verifyAuthToken, type AuthUser } from "../auth/token";
 import { isValidEmail, normalizeDisplayName } from "../auth/validation";
 import { verifyGoogleIdToken } from "../auth/googleIdToken";
+import { resolvePublicAppOrigin } from "../auth/publicOrigin";
 import {
   deletePasswordResetTokenById,
   deletePasswordResetTokensForUser,
@@ -61,6 +62,8 @@ export type AuthEnv = {
   GOOGLE_CLIENT_ID?: string;
   /** Public SPA origin (no trailing slash) — used in password reset email links. */
   APP_PUBLIC_ORIGIN?: string;
+  /** Fallback for reset-link base when `APP_PUBLIC_ORIGIN` is unset (first URL in list is used). */
+  CORS_ALLOWED_ORIGINS?: string;
 };
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -301,10 +304,12 @@ export async function handleAuthRequest(
     if (!row) {
       return new Response(JSON.stringify(generic), { status: 200, headers: j });
     }
-    const origin = (env.APP_PUBLIC_ORIGIN || "").trim().replace(/\/+$/, "");
+    const origin = resolvePublicAppOrigin(env);
     const apiKey = (env.RESEND_API_KEY || "").trim();
     if (!origin || !apiKey) {
-      console.warn("[forgot-password] Missing APP_PUBLIC_ORIGIN or RESEND_API_KEY; reset email not sent.");
+      console.warn(
+        "[forgot-password] Missing RESEND_API_KEY or a public app URL (set APP_PUBLIC_ORIGIN or a URL in CORS_ALLOWED_ORIGINS); reset email not sent.",
+      );
       return new Response(JSON.stringify(generic), { status: 200, headers: j });
     }
     const plainToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, "0")).join(
