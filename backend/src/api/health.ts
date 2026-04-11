@@ -45,6 +45,7 @@ type HealthEnv = {
   /** Stripe metered Price id for SMS usage records (optional). */
   STRIPE_SMS_METERED_PRICE_ID?: string;
   RESEND_API_KEY?: string;
+  APP_PUBLIC_ORIGIN?: string;
 };
 
 type CorsHeaders = Record<string, string>;
@@ -102,6 +103,10 @@ export function handleHealthGet(
           (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false",
         /** True when `GOOGLE_CLIENT_ID` is set (POST /api/auth/google). */
         googleAuth: Boolean((env.GOOGLE_CLIENT_ID || "").trim()),
+        /** True when Resend + public app origin are set (POST /api/auth/forgot-password sends email). */
+        passwordResetEmail: Boolean(
+          (env.RESEND_API_KEY || "").trim() && (env.APP_PUBLIC_ORIGIN || "").trim(),
+        ),
         /** True when Stripe + at least one membership Price id are set (POST /api/billing/membership-checkout-session). */
         membershipCheckout: Boolean(
           (env.STRIPE_SECRET_KEY || "").trim() &&

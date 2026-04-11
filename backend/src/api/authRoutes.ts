@@ -3,12 +3,20 @@ import { signAuthPayload, verifyAuthToken, type AuthUser } from "../auth/token";
 import { isValidEmail, normalizeDisplayName } from "../auth/validation";
 import { verifyGoogleIdToken } from "../auth/googleIdToken";
 import {
+  deletePasswordResetTokenById,
+  deletePasswordResetTokensForUser,
+  findPasswordResetByTokenHash,
+  insertPasswordResetToken,
+  sha256HexOfString,
+} from "../auth/passwordResetDb";
+import {
   ensureDbUserFromEnvLogin,
   findUserByEmail,
   findUserByGoogleSub,
   findUserById,
   insertUser,
   rowToAuthUser,
+  updateUserFields,
   updateUserGoogleSub,
 } from "../auth/userDb";
 import { evaluateAccess } from "../auth/access";
@@ -51,6 +59,8 @@ export type AuthEnv = {
   RESEND_FROM?: string;
   /** Google OAuth Web client id (same as Vite `VITE_GOOGLE_CLIENT_ID`) — verifies ID token `aud`. */
   GOOGLE_CLIENT_ID?: string;
+  /** Public SPA origin (no trailing slash) — used in password reset email links. */
+  APP_PUBLIC_ORIGIN?: string;
 };
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -253,6 +263,178 @@ export async function handleAuthRequest(
     }
     return new Response(JSON.stringify({ success: false, error: "Invalid credentials.", error_code: "INVALID_CREDENTIALS" }), {
       status: 401,
+      headers: j,
+    });
+  }
+
+  if (p === "/api/auth/forgot-password" && request.method === "POST") {
+    let body: { email?: string } = {};
+    try {
+      body = (await request.json()) as { email?: string };
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body.", error_code: "INVALID_JSON" }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const email = (body.email || "").trim().toLowerCase();
+    if (!email || !isValidEmail(email)) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "If an account exists for that email, you will receive reset instructions shortly.",
+        }),
+        { status: 200, headers: j },
+      );
+    }
+    const generic = {
+      success: true as const,
+      message: "If an account exists for that email, you will receive reset instructions shortly.",
+    };
+    let row: Awaited<ReturnType<typeof findUserByEmail>> = null;
+    try {
+      row = await findUserByEmail(env.DB, email);
+    } catch (e) {
+      console.error("forgot-password findUserByEmail:", e);
+      return new Response(JSON.stringify(generic), { status: 200, headers: j });
+    }
+    if (!row) {
+      return new Response(JSON.stringify(generic), { status: 200, headers: j });
+    }
+    const origin = (env.APP_PUBLIC_ORIGIN || "").trim().replace(/\/+$/, "");
+    const apiKey = (env.RESEND_API_KEY || "").trim();
+    if (!origin || !apiKey) {
+      console.warn("[forgot-password] Missing APP_PUBLIC_ORIGIN or RESEND_API_KEY; reset email not sent.");
+      return new Response(JSON.stringify(generic), { status: 200, headers: j });
+    }
+    const plainToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, "0")).join(
+      "",
+    );
+    let tokenHash: string;
+    try {
+      tokenHash = await sha256HexOfString(plainToken);
+    } catch (e) {
+      console.error("forgot-password sha256:", e);
+      return new Response(JSON.stringify(generic), { status: 200, headers: j });
+    }
+    const t = Math.floor(Date.now() / 1000);
+    const expiresAt = t + 3600;
+    const tokenId = crypto.randomUUID();
+    try {
+      await deletePasswordResetTokensForUser(env.DB, row.id);
+      await insertPasswordResetToken(env.DB, {
+        id: tokenId,
+        userId: row.id,
+        tokenHash,
+        expiresAt,
+        createdAt: t,
+      });
+    } catch (e) {
+      console.error("forgot-password insert token:", e);
+      return new Response(JSON.stringify(generic), { status: 200, headers: j });
+    }
+    const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(plainToken)}`;
+    const sent = await sendPasswordResetEmail(env, { to: row.email, resetUrl, name: row.name });
+    if (!sent) {
+      try {
+        await deletePasswordResetTokenById(env.DB, tokenId);
+      } catch {
+        /* ignore */
+      }
+    }
+    return new Response(JSON.stringify(generic), { status: 200, headers: j });
+  }
+
+  if (p === "/api/auth/reset-password" && request.method === "POST") {
+    let body: { token?: string; password?: string } = {};
+    try {
+      body = (await request.json()) as { token?: string; password?: string };
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body.", error_code: "INVALID_JSON" }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const rawToken = (body.token || "").trim();
+    const password = body.password || "";
+    if (!rawToken || rawToken.length < 32) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid or expired reset link. Request a new reset from the sign-in page.",
+          error_code: "RESET_TOKEN_INVALID",
+        }),
+        { status: 400, headers: j },
+      );
+    }
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Password must be at least 8 characters.",
+          error_code: "PASSWORD_TOO_SHORT",
+        }),
+        { status: 400, headers: j },
+      );
+    }
+    if (password.length > 256) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Password is too long.", error_code: "PASSWORD_TOO_LONG" }),
+        { status: 400, headers: j },
+      );
+    }
+    let tokenHash: string;
+    try {
+      tokenHash = await sha256HexOfString(rawToken);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid or expired reset link.",
+          error_code: "RESET_TOKEN_INVALID",
+        }),
+        { status: 400, headers: j },
+      );
+    }
+    let pr: Awaited<ReturnType<typeof findPasswordResetByTokenHash>> = null;
+    try {
+      pr = await findPasswordResetByTokenHash(env.DB, tokenHash);
+    } catch (e) {
+      console.error("reset-password lookup:", e);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Could not verify reset link. Try again shortly.",
+          error_code: "DB_UNAVAILABLE",
+        }),
+        { status: 503, headers: j },
+      );
+    }
+    if (!pr) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid or expired reset link. Request a new reset from the sign-in page.",
+          error_code: "RESET_TOKEN_INVALID",
+        }),
+        { status: 400, headers: j },
+      );
+    }
+    const ok = await updateUserFields(env.DB, pr.user_id, { plainPassword: password });
+    if (!ok) {
+      return new Response(JSON.stringify({ success: false, error: "Could not update password.", error_code: "DB_ERROR" }), {
+        status: 500,
+        headers: j,
+      });
+    }
+    try {
+      await deletePasswordResetTokenById(env.DB, pr.id);
+      await deletePasswordResetTokensForUser(env.DB, pr.user_id);
+    } catch (e) {
+      console.error("reset-password cleanup tokens:", e);
+    }
+    return new Response(JSON.stringify({ success: true, message: "Your password has been updated. You can sign in." }), {
+      status: 200,
       headers: j,
     });
   }
@@ -829,6 +1011,8 @@ export async function handleAuthRequest(
         endpoints: {
           login: "POST /api/auth/login  body: { email, password }",
           register: "POST /api/auth/register  body: { email, password, name }",
+          forgotPassword: "POST /api/auth/forgot-password  body: { email }",
+          resetPassword: "POST /api/auth/reset-password  body: { token, password }",
           me: "GET /api/auth/me  header: Authorization: Bearer <token>",
           logout: "POST /api/auth/logout",
         },

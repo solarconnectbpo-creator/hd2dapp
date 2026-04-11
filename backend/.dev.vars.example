@@ -40,6 +40,8 @@
 # RESEND_API_KEY=re_...
 # SIGNUP_NOTIFY_TO=admin@hardcoredoortodoorclosers.com
 # RESEND_FROM=HD2D <noreply@hardcoredoortodoorclosers.com>
+# Self-serve password reset emails use the same Resend key + From. Link base (must match wrangler [vars] in prod):
+# APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
 
 # ML vision — Worker proxies /api/ai/roof-vision + /api/ai/roof-segment → ml-vision-service (see backend/ml-vision-service/README.md).
 # Same-origin app flow: Vite `/intel-proxy` → Worker → ROOF_VISION_SERVICE_URL (local default: http://127.0.0.1:18090).
