@@ -1,3 +1,7 @@
+# Optional: force 200 JSON stubs for legacy `/api/leads`-style routes on non-local Worker URLs (e.g. *.workers.dev).
+# LEGACY_PLACEHOLDER_APIS=true
+# Harden: LEGACY_PLACEHOLDER_APIS=false (also default off when Worker URL is not localhost / 127.0.0.1).
+
 # Copy to `.dev.vars` for local `wrangler dev`, or run from roofing app:
 #   cd ../roofing-estimator-vite && npm run sync:eagleview-dev
 #
@@ -75,9 +79,10 @@
 # LEADS_BULK_MIN_APPOINTMENTS=10
 # If the bulk Stripe Price is a fixed total (e.g. $1,970 one line item), not $197 × qty:
 # LEADS_BULK_FIXED_PRICE_IDS=price_ten_pack
-# Public site origin (no trailing slash) for Stripe redirect after payment:
+# Public site origin for Stripe / Meta redirects (single URL, no trailing slash).
 # APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
-# Production example: APP_PUBLIC_ORIGIN=https://www.hardcoredoortodoorclosers.com
+# Browser CORS allowlist (comma-separated `Origin` values). Leave unset for * on deployed Worker, or set apex + www. Local `wrangler dev` always uses * for CORS.
+# CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
 #
 # --- Platform membership (subscription) — gate company/rep until admin approves + Stripe subscription active ---
 # Create recurring Prices in Stripe (Products → Add product → recurring monthly). Copy each price_… id:

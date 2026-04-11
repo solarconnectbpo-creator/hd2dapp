@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # Optional shared secret (set same on Worker proxy)
     service_secret: str = ""
 
+    # Comma-separated browser origins for CORS; empty = allow all (*)
+    cors_allowed_origins: str = ""
+
     # --- Detectron2 Mask R-CNN (roof instance segmentation) ---
     # Train with repo roof-detectron; point to model_final.pth
     detectron2_weights_path: str = ""

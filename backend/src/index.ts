@@ -40,6 +40,7 @@ import { handleTelnyxWebhook, type TelnyxWebhookEnv } from "./api/telnyxWebhook"
 import { handleTwilioWebhook, type TwilioWebhookEnv } from "./api/twilioWebhook";
 import { handleSmsHttpRoutes, type SmsHttpEnv } from "./api/smsHttpRoutes";
 import { processSmsNoResponseSweep, processSmsWorkflowRuns } from "./sms/smsWorkflowEngine";
+import { buildCorsHeaders, legacyPlaceholderResponse } from "./corsAllowOrigin";
 
 interface Env {
   DB: any;
@@ -125,8 +126,12 @@ interface Env {
   SENTRY_DSN?: string;
   /** Set via wrangler [vars] (e.g. production / development). */
   ENVIRONMENT?: string;
+  /** When `false`, legacy placeholder routes (/api/leads, /api/deals, …) return 404 instead of 200 stubs. */
+  LEGACY_PLACEHOLDER_APIS?: string;
   /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
   APP_PUBLIC_ORIGIN?: string;
+  /** Comma-separated browser `Origin` values for CORS. Empty = *. Local wrangler URL always uses *. */
+  CORS_ALLOWED_ORIGINS?: string;
   /** Meta Marketing API — Facebook Login + scheduled Page posts (see metaMarketing.ts). */
   META_APP_ID?: string;
   META_APP_SECRET?: string;
@@ -210,13 +215,7 @@ const worker = {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // CORS: `*` matches Bearer-token SPA clients (no cookies). To harden, set Allow-Origin to APP_PUBLIC_ORIGIN only.
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, X-DM-Client-Key, x-company-id",
-    };
+    const corsHeaders = buildCorsHeaders(request, env);
 
     // Handle preflight
     if (request.method === "OPTIONS") {
@@ -444,164 +443,98 @@ async function handleLeads(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Leads endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Leads endpoint" });
 }
 
 async function handleDeals(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Deals endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Deals endpoint" });
 }
 
 async function handlePosts(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Posts endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Posts endpoint" });
 }
 
 async function handleComments(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Comments endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Comments endpoint" });
 }
 
 async function handleEvents(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Events endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Events endpoint" });
 }
 
 async function handleTasks(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Tasks endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Tasks endpoint" });
 }
 
 async function handleCalls(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Calls endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Calls endpoint" });
 }
 
 async function handleAgents(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Agents endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Agents endpoint" });
 }
 
 async function handleWorkflows(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: [], message: "Workflows endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Workflows endpoint" });
 }
 
 async function handleAdmin(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, data: {}, message: "Admin endpoint" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Admin endpoint", data: {} });
 }
 
 async function handleWebhooks(
   request: Request,
   env: Env,
   path: string,
-  corsHeaders: any,
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  return new Response(
-    JSON.stringify({ success: true, message: "Webhook received" }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
+  return legacyPlaceholderResponse(env, request, corsHeaders, { message: "Webhook received", data: undefined });
 }
 

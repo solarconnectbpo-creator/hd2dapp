@@ -13,9 +13,18 @@ from . import segmentation_sam as sam_mod
 
 app = FastAPI(title="HD2D Roof Vision", version="1.0.0")
 
+
+def _cors_allow_origins() -> list[str]:
+    raw = (settings.cors_allowed_origins or "").strip()
+    if not raw:
+        return ["*"]
+    parts = [p.strip().rstrip("/") for p in raw.split(",") if p.strip()]
+    return parts if parts else ["*"]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allow_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
