@@ -1,25 +1,38 @@
 /**
- * Extra public parcel FeatureServer/MapServer layers for MO / IL / MN where the primary layer
+ * Extra public parcel FeatureServer/MapServer layers where the primary layer
  * (default: St. Louis County) has no coverage. Queried only when the map click or map
  * bbox intersects each region’s WGS84 box (best-effort rectangles).
  *
- * Optional Worker var ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON: JSON array of
- * `{ "id", "layerUrl", "west", "south", "east", "north" }` appended to the built-in list.
+ * Built-ins: MO / IL / MN metros (`moIlParcelFallbackRegions`, `mnParcelFallbackRegions`) plus
+ * `usParcelFallbackRegions` (other states + DC). Optional Worker var ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON:
+ * JSON array of `{ "id", "layerUrl", "west", "south", "east", "north" }` appended to the list.
  */
 
 import { MO_IL_PARCEL_FALLBACK_REGIONS, type ParcelFallbackRegion } from "./moIlParcelFallbackRegions";
 import { MN_PARCEL_FALLBACK_REGIONS } from "./mnParcelFallbackRegions";
+import { US_PARCEL_FALLBACK_REGIONS } from "./usParcelFallbackRegions";
 
 export type { ParcelFallbackRegion };
 
 /** Built-in MO/IL regions; same reference as MO_IL_PARCEL_FALLBACK_REGIONS. */
 export const DEFAULT_MO_IL_PARCEL_FALLBACKS = MO_IL_PARCEL_FALLBACK_REGIONS;
 
-/** Built-in MO, IL, and MN regions before optional Worker JSON. */
+function assertUniqueParcelFallbackIds(regions: readonly ParcelFallbackRegion[]): void {
+  const seen = new Set<string>();
+  for (const r of regions) {
+    if (seen.has(r.id)) throw new Error(`Duplicate parcel fallback id: ${r.id}`);
+    seen.add(r.id);
+  }
+}
+
+/** Built-in MO, IL, MN, and other U.S. public parcel regions before optional Worker JSON. */
 export const BUILT_IN_PARCEL_FALLBACK_REGIONS: readonly ParcelFallbackRegion[] = [
   ...MO_IL_PARCEL_FALLBACK_REGIONS,
   ...MN_PARCEL_FALLBACK_REGIONS,
+  ...US_PARCEL_FALLBACK_REGIONS,
 ];
+
+assertUniqueParcelFallbackIds(BUILT_IN_PARCEL_FALLBACK_REGIONS);
 
 const LAYER_URL_TAIL = /\/(FeatureServer|MapServer)\/\d+$/i;
 
