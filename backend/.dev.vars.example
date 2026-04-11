@@ -27,6 +27,8 @@
 # AUTH_COMPANY_PASSWORD=TestCompany123!
 # AUTH_REP_EMAIL=test.rep@hardcoredoortodoorclosers.com
 # AUTH_REP_PASSWORD=TestRep123!
+# Google Sign-In (GIS): OAuth 2.0 Web client id from Google Cloud Console — same value as Vite `VITE_GOOGLE_CLIENT_ID`.
+# GOOGLE_CLIENT_ID=123456789-xxxx.apps.googleusercontent.com
 # SESSION_SECRET=change-me
 # Optional: GET /api/auth/me returns 401 if user was removed from D1 (503 if D1 errors). Can force re-auth after deletes:
 # AUTH_REQUIRE_DB_USER_FOR_ME=true

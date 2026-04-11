@@ -145,6 +145,8 @@ interface Env {
   RESEND_API_KEY?: string;
   /** Where to send new sign-up alerts (default admin@hardcoredoortodoorclosers.com). */
   SIGNUP_NOTIFY_TO?: string;
+  /** Google OAuth Web client id — must match SPA `VITE_GOOGLE_CLIENT_ID` for ID token verification. */
+  GOOGLE_CLIENT_ID?: string;
   /** Resend verified From header, e.g. HD2D <noreply@hardcoredoortodoorclosers.com> */
   RESEND_FROM?: string;
   /** Telnyx API key for outbound SMS and workflow steps. */

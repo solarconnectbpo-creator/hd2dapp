@@ -1,12 +1,15 @@
 ﻿import { hashPassword, verifyPassword } from "../auth/password";
 import { signAuthPayload, verifyAuthToken, type AuthUser } from "../auth/token";
 import { isValidEmail, normalizeDisplayName } from "../auth/validation";
+import { verifyGoogleIdToken } from "../auth/googleIdToken";
 import {
   ensureDbUserFromEnvLogin,
   findUserByEmail,
+  findUserByGoogleSub,
   findUserById,
   insertUser,
   rowToAuthUser,
+  updateUserGoogleSub,
 } from "../auth/userDb";
 import { evaluateAccess } from "../auth/access";
 import { isValidUsStateCode, normalizeState, type PlacementPref } from "../auth/orgDb";
@@ -46,6 +49,8 @@ export type AuthEnv = {
   SIGNUP_NOTIFY_TO?: string;
   /** Verified Resend sender, e.g. HD2D <noreply@hardcoredoortodoorclosers.com> */
   RESEND_FROM?: string;
+  /** Google OAuth Web client id (same as Vite `VITE_GOOGLE_CLIENT_ID`) — verifies ID token `aud`. */
+  GOOGLE_CLIENT_ID?: string;
 };
 
 function jsonHeaders(cors: Record<string, string>) {
@@ -250,6 +255,298 @@ export async function handleAuthRequest(
       status: 401,
       headers: j,
     });
+  }
+
+  if (p === "/api/auth/google" && request.method === "POST") {
+    const clientId = (env.GOOGLE_CLIENT_ID || "").trim();
+    if (!clientId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Google sign-in is not configured.", error_code: "GOOGLE_AUTH_DISABLED" }),
+        { status: 501, headers: j },
+      );
+    }
+    type GoogleBody = {
+      credential?: string;
+      intent?: string;
+      accountType?: string;
+      name?: string;
+      companyName?: string;
+      homeState?: string;
+      placementPref?: string;
+    };
+    let body: GoogleBody = {};
+    try {
+      body = (await request.json()) as GoogleBody;
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body.", error_code: "INVALID_JSON" }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const credential = (body.credential || "").trim();
+    if (!credential) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Google credential is required.", error_code: "MISSING_CREDENTIAL" }),
+        { status: 400, headers: j },
+      );
+    }
+    let google: NonNullable<Awaited<ReturnType<typeof verifyGoogleIdToken>>>;
+    try {
+      const v = await verifyGoogleIdToken(credential, clientId);
+      if (!v || !v.email_verified) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Google could not verify this email. Use a verified Google account.",
+            error_code: "GOOGLE_TOKEN_INVALID",
+          }),
+          { status: 401, headers: j },
+        );
+      }
+      google = v;
+    } catch (e) {
+      console.error("verifyGoogleIdToken:", e);
+      return new Response(
+        JSON.stringify({ success: false, error: "Google sign-in verification failed.", error_code: "GOOGLE_JWKS_ERROR" }),
+        { status: 503, headers: j },
+      );
+    }
+    const email = google.email;
+    const intent = (body.intent || "login").trim().toLowerCase();
+
+    async function finishGoogleSession(row: NonNullable<Awaited<ReturnType<typeof findUserByEmail>>>) {
+      const user = rowToAuthUser(row);
+      const access = evaluateAccess(env, user.user_type, row);
+      const issued = await issueToken(env, user);
+      return new Response(
+        JSON.stringify({ success: true, token: issued.token, user, expiresAt: issued.expiresAt, access }),
+        { status: 200, headers: j },
+      );
+    }
+
+    if (intent === "login") {
+      let bySub: Awaited<ReturnType<typeof findUserByGoogleSub>> = null;
+      let byEmail: Awaited<ReturnType<typeof findUserByEmail>> = null;
+      try {
+        bySub = await findUserByGoogleSub(env.DB, google.sub);
+        if (!bySub) byEmail = await findUserByEmail(env.DB, email);
+      } catch (e) {
+        console.error("google login lookup:", e);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Could not look up user. Try again shortly.",
+            error_code: "DB_UNAVAILABLE",
+          }),
+          { status: 503, headers: j },
+        );
+      }
+      if (bySub) {
+        if (bySub.email.toLowerCase() !== email) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Google account does not match this profile.",
+              error_code: "GOOGLE_EMAIL_MISMATCH",
+            }),
+            { status: 403, headers: j },
+          );
+        }
+        return await finishGoogleSession(bySub);
+      }
+      if (byEmail) {
+        const existingSub = (byEmail.google_sub || "").trim();
+        if (existingSub && existingSub !== google.sub) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error:
+                "This email is linked to a different Google account. Sign in with that Google account or use email and password.",
+              error_code: "GOOGLE_ACCOUNT_CONFLICT",
+            }),
+            { status: 403, headers: j },
+          );
+        }
+        if (!existingSub) {
+          try {
+            await updateUserGoogleSub(env.DB, byEmail.id, google.sub);
+            byEmail = (await findUserByEmail(env.DB, email)) || byEmail;
+          } catch (e) {
+            console.error("updateUserGoogleSub:", e);
+            return new Response(JSON.stringify({ success: false, error: "Could not link Google account.", error_code: "DB_ERROR" }), {
+              status: 500,
+              headers: j,
+            });
+          }
+        }
+        return await finishGoogleSession(byEmail);
+      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "No account for this Google email yet. Create an account first, then you can use Google next time.",
+          error_code: "GOOGLE_ACCOUNT_NOT_FOUND",
+        }),
+        { status: 404, headers: j },
+      );
+    }
+
+    if (intent === "register") {
+      const signupOff = (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() === "false";
+      if (signupOff) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Self-service sign up is disabled.", error_code: "SIGNUP_DISABLED" }),
+          { status: 403, headers: j },
+        );
+      }
+      let existingSubUser: Awaited<ReturnType<typeof findUserByGoogleSub>> = null;
+      let existingEmail: Awaited<ReturnType<typeof findUserByEmail>> = null;
+      try {
+        existingSubUser = await findUserByGoogleSub(env.DB, google.sub);
+        existingEmail = await findUserByEmail(env.DB, email);
+      } catch (e) {
+        console.error("google register lookup:", e);
+        return new Response(
+          JSON.stringify({ success: false, error: "Could not verify registration state.", error_code: "DB_UNAVAILABLE" }),
+          { status: 503, headers: j },
+        );
+      }
+      if (existingSubUser || existingEmail) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "An account with this email (or Google profile) already exists. Sign in instead.",
+            error_code: "EMAIL_TAKEN",
+          }),
+          { status: 409, headers: j },
+        );
+      }
+      const accountType = (body.accountType || "rep").trim().toLowerCase();
+      const isCompany = accountType === "company";
+      const nameRaw = normalizeDisplayName(body.name || google.name);
+      const displayName = nameRaw || email.split("@")[0];
+      const companyNameTrim = (body.companyName || "").trim();
+      if (isCompany && companyNameTrim.length < 2) {
+        return new Response(JSON.stringify({ success: false, error: "Company name is required (at least 2 characters)." }), {
+          status: 400,
+          headers: j,
+        });
+      }
+      let homeState = normalizeState(body.homeState || "");
+      let placementPref: PlacementPref = "either";
+      if (!isCompany) {
+        const pp = (body.placementPref || "either").trim().toLowerCase();
+        if (pp === "local" || pp === "storm" || pp === "either") placementPref = pp;
+        else {
+          return new Response(JSON.stringify({ success: false, error: "placementPref must be local, storm, or either." }), {
+            status: 400,
+            headers: j,
+          });
+        }
+        if (!isValidUsStateCode(homeState)) {
+          return new Response(JSON.stringify({ success: false, error: "Select a valid 2-letter US home state." }), {
+            status: 400,
+            headers: j,
+          });
+        }
+      }
+      const id = crypto.randomUUID();
+      const t = Math.floor(Date.now() / 1000);
+      let saltHex: string;
+      let hashHex: string;
+      try {
+        const randomPw =
+          typeof crypto.randomUUID === "function"
+            ? `${crypto.randomUUID().replace(/-/g, "")}${crypto.randomUUID().replace(/-/g, "")}`
+            : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}${Date.now()}`;
+        const h = await hashPassword(randomPw);
+        saltHex = h.saltHex;
+        hashHex = h.hashHex;
+      } catch (e) {
+        console.error("hashPassword google register:", e);
+        return new Response(JSON.stringify({ success: false, error: "Could not create account." }), { status: 500, headers: j });
+      }
+      try {
+        if (isCompany) {
+          const orgId = crypto.randomUUID();
+          await env.DB.batch([
+            env.DB
+              .prepare(
+                `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at, google_sub)
+                 VALUES (?, ?, ?, ?, ?, 'company', 'pending', 'unpaid', ?, ?, ?)`,
+              )
+              .bind(id, email, hashHex, saltHex, displayName, t, t, google.sub),
+            env.DB
+              .prepare(
+                `INSERT INTO organizations (id, name, service_states, org_kind, created_at, updated_at)
+                 VALUES (?, ?, '[]', 'local', ?, ?)`,
+              )
+              .bind(orgId, companyNameTrim, t, t),
+            env.DB
+              .prepare(`INSERT INTO org_members (org_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)`)
+              .bind(orgId, id, t),
+          ]);
+        } else {
+          await env.DB.batch([
+            env.DB
+              .prepare(
+                `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at, google_sub)
+                 VALUES (?, ?, ?, ?, ?, 'sales_rep', 'pending', 'unpaid', ?, ?, ?)`,
+              )
+              .bind(id, email, hashHex, saltHex, displayName, t, t, google.sub),
+            env.DB
+              .prepare(
+                `INSERT INTO rep_profiles (user_id, home_state, placement_pref, status, matched_org_id, created_at, updated_at)
+                 VALUES (?, ?, ?, 'pending', NULL, ?, ?)`,
+              )
+              .bind(id, homeState, placementPref, t, t),
+          ]);
+        }
+      } catch (e) {
+        console.error("google register batch:", e);
+        const detail = e instanceof Error ? e.message : String(e);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Could not create account. If this persists, ensure D1 migrations are applied (google_sub column).",
+            detail,
+          }),
+          { status: 500, headers: j },
+        );
+      }
+      const user: AuthUser = {
+        id,
+        email,
+        name: displayName,
+        user_type: isCompany ? "company" : "sales_rep",
+      };
+      let regRow: Awaited<ReturnType<typeof findUserById>> = null;
+      try {
+        regRow = await findUserById(env.DB, id);
+      } catch {
+        regRow = null;
+      }
+      const access = evaluateAccess(env, user.user_type, regRow);
+      const { token, expiresAt } = await issueToken(env, user);
+      const notify = sendSignupNotification(env, {
+        newUserEmail: email,
+        name: displayName,
+        userType: isCompany ? "company" : "sales_rep",
+        companyName: isCompany ? companyNameTrim : undefined,
+        homeState: isCompany ? undefined : homeState,
+      });
+      if (ctx) {
+        ctx.waitUntil(notify.catch((e) => console.error("[signup-notify]", e)));
+      } else {
+        void notify.catch((e) => console.error("[signup-notify]", e));
+      }
+      return new Response(JSON.stringify({ success: true, token, user, expiresAt, access }), { status: 201, headers: j });
+    }
+
+    return new Response(
+      JSON.stringify({ success: false, error: 'intent must be "login" or "register".', error_code: "INVALID_INTENT" }),
+      { status: 400, headers: j },
+    );
   }
 
   if (p === "/api/auth/register" && request.method === "POST") {

@@ -13,6 +13,8 @@ export type DbUserRow = {
   /** unpaid | active | past_due | canceled */
   billing_status: string;
   stripe_customer_id: string | null;
+  /** Google `sub` when linked (Google Sign-In). */
+  google_sub?: string | null;
   created_at: number;
   updated_at: number;
 };
@@ -28,7 +30,7 @@ export async function findUserByEmail(db: D1, email: string): Promise<DbUserRow 
   const normalized = email.trim().toLowerCase();
   const row = await db
     .prepare(
-      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, created_at, updated_at FROM users WHERE lower(email) = ? LIMIT 1`,
+      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, google_sub, created_at, updated_at FROM users WHERE lower(email) = ? LIMIT 1`,
     )
     .bind(normalized)
     .first<DbUserRow>();
@@ -39,9 +41,22 @@ export async function findUserById(db: D1, id: string): Promise<DbUserRow | null
   if (db == null) return null;
   const row = await db
     .prepare(
-      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, created_at, updated_at FROM users WHERE id = ? LIMIT 1`,
+      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, google_sub, created_at, updated_at FROM users WHERE id = ? LIMIT 1`,
     )
     .bind(id)
+    .first<DbUserRow>();
+  return row ?? null;
+}
+
+export async function findUserByGoogleSub(db: D1, googleSub: string): Promise<DbUserRow | null> {
+  if (db == null) return null;
+  const sub = googleSub.trim();
+  if (!sub) return null;
+  const row = await db
+    .prepare(
+      `SELECT id, email, password_hash, salt, name, user_type, approval_status, billing_status, stripe_customer_id, google_sub, created_at, updated_at FROM users WHERE google_sub = ? LIMIT 1`,
+    )
+    .bind(sub)
     .first<DbUserRow>();
   return row ?? null;
 }
@@ -73,6 +88,7 @@ export async function insertUser(
     billing_status: args.billing_status ?? "active",
     created_at: t,
     updated_at: t,
+    google_sub: null,
   });
 }
 
@@ -90,14 +106,16 @@ export async function insertUserHashed(
     billing_status?: string;
     created_at: number;
     updated_at: number;
+    google_sub?: string | null;
   },
 ): Promise<void> {
   const approval = args.approval_status ?? "approved";
   const billing = args.billing_status ?? "active";
+  const gsub = args.google_sub ?? null;
   await db
     .prepare(
-      `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, password_hash, salt, name, user_type, approval_status, billing_status, created_at, updated_at, google_sub)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       args.id,
@@ -110,7 +128,16 @@ export async function insertUserHashed(
       billing,
       args.created_at,
       args.updated_at,
+      gsub,
     )
+    .run();
+}
+
+export async function updateUserGoogleSub(db: D1, userId: string, googleSub: string): Promise<void> {
+  const t = now();
+  await db
+    .prepare(`UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?`)
+    .bind(googleSub.trim(), t, userId)
     .run();
 }
 

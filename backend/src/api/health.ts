@@ -28,6 +28,7 @@ type HealthEnv = {
   ARCGIS_MAPSERVER_TILE_OPACITY?: string;
   /** When "false", self-service registration is off. */
   AUTH_SIGNUP_ENABLED?: string;
+  GOOGLE_CLIENT_ID?: string;
   STRIPE_SECRET_KEY?: string;
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
   MEMBERSHIP_STRIPE_PRICE_ID_SOLO?: string;
@@ -99,6 +100,8 @@ export function handleHealthGet(
         arcgisMapServerTileOpacity: tileOk ? tileOpacity : undefined,
         authSignup:
           (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false",
+        /** True when `GOOGLE_CLIENT_ID` is set (POST /api/auth/google). */
+        googleAuth: Boolean((env.GOOGLE_CLIENT_ID || "").trim()),
         /** True when Stripe + at least one membership Price id are set (POST /api/billing/membership-checkout-session). */
         membershipCheckout: Boolean(
           (env.STRIPE_SECRET_KEY || "").trim() &&

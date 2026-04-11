@@ -20,6 +20,8 @@
     "d1:migrate:remote:org_workspace": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0010_org_workspace.sql",
     "d1:migrate:local:perf": "npx wrangler d1 execute d2d --local --file=./migrations/0011_performance_indices.sql",
     "d1:migrate:remote:perf": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0011_performance_indices.sql",
+    "d1:migrate:local:google": "npx wrangler d1 execute d2d --local --file=./migrations/0012_users_google_sub.sql",
+    "d1:migrate:remote:google": "node scripts/wrangler-run.mjs d1 execute d2d --remote --file=./migrations/0012_users_google_sub.sql",
     "deploy": "node scripts/wrangler-run.mjs deploy --env=\"\" --keep-vars true",
     "deploy:all": "npm run deploy && npm --prefix ../roofing-estimator-vite run pages:deploy",
     "build": "npx wrangler build",
