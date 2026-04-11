@@ -29,6 +29,13 @@ crons = ["*/10 * * * *", "* * * * *"]
 [vars]
 # Public SPA origin — Meta OAuth callback, Stripe return URLs (must match live site; no trailing slash). Override in `.dev.vars` for local dev (e.g. http://127.0.0.1:5173).
 APP_PUBLIC_ORIGIN = "https://hardcoredoortodoorclosers.com"
+# Lead marketplace — must match Vercel VITE_LEAD_PACKAGES_JSON (see npm run stripe:setup-leads in roofing-estimator-vite).
+LEADS_STRIPE_PRICE_IDS = "price_1TKaYpFLDUOzenNwUgcM7VFz,price_1TKac8FLDUOzenNwtgqkzl9i"
+LEADS_BULK_PRICE_IDS = "price_1TKac8FLDUOzenNwtgqkzl9i"
+LEADS_BULK_MIN_APPOINTMENTS = "10"
+LEADS_BULK_FIXED_PRICE_IDS = "price_1TKac8FLDUOzenNwtgqkzl9i"
+# Call center subscription ($3,500/mo) — POST /api/billing/callcenter-checkout-session
+CALLCENTER_STRIPE_PRICE_ID = "price_1TKaarFLDUOzenNwvNMIWglo"
 EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token"
 EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com"
 # St. Louis County MO assessor parcels (public FeatureServer — same as backend/src/api/stlIntel.ts STL_ASSESSOR_PARCEL_LAYER).
@@ -82,6 +89,9 @@ binding = "HD2D_CACHE"
 id = "c534b1528e46480eab0979236a4b63ef"
 preview_id = "d5629502b89544fd80f3e0880b352832"
 
+# `npm run deploy` uses `--keep-vars true` so Variables set in the Cloudflare dashboard are not wiped on deploy.
+# If you add LEADS_* / membership Price ids in `[vars]` below, they override dashboard values for those keys.
+#
 # Configure runtime secrets via Wrangler (target the Worker you deploy: `npm run deploy` uses top-level `--env=""`):
 # - npx wrangler secret put SESSION_SECRET --env ""
 # - npx wrangler secret put DEALMACHINE_API_KEY --env ""   (or: npm run secret:dealmachine with DEALMACHINE_API_KEY in env)
@@ -90,8 +100,12 @@ preview_id = "d5629502b89544fd80f3e0880b352832"
 #
 # Lead marketplace — POST /api/leads/checkout-session (Stripe Checkout):
 # - wrangler secret put STRIPE_SECRET_KEY --env ""
-# Non-secrets (top [vars] or env-specific vars): LEADS_STRIPE_PRICE_IDS=price_abc,price_def
+# Non-secrets: LEADS_STRIPE_PRICE_IDS=price_single,price_bulk (all Stripe Price ids you use)
+#   LEADS_BULK_PRICE_IDS=price_bulk  (subset that require min appointments per checkout; see LEADS_BULK_MIN_APPOINTMENTS)
+#   LEADS_BULK_FIXED_PRICE_IDS=price_ten_pack_fixed  (optional: bulk Price is one line at fixed total, e.g. $1,970 — Stripe qty 1)
+#   LEADS_BULK_MIN_APPOINTMENTS=10
 #   APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com  (no trailing slash; must match SPA URL)
+# D1 migration 0009_marketplace_appointments.sql — run: npm run d1:migrate:remote
 #
 # EagleView API Center (TrueDesign) — /api/eagleview/apicenter/* on this Worker:
 # - wrangler secret put EAGLEVIEW_CLIENT_SECRET

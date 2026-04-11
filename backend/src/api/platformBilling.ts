@@ -7,10 +7,36 @@ function jsonHeaders(cors: Record<string, string>) {
 
 export type PlatformBillingEnv = AuthEnv & {
   STRIPE_SECRET_KEY?: string;
-  /** Single Stripe Price id for platform membership (subscription). */
+  /** Legacy: one Price for all membership checkout when SOLO/COMPANY are unset. */
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
+  /** Monthly membership for field reps (`sales_rep`) — e.g. $97/mo. */
+  MEMBERSHIP_STRIPE_PRICE_ID_SOLO?: string;
+  /** Monthly membership for contractors (`company`) — e.g. $197/mo. */
+  MEMBERSHIP_STRIPE_PRICE_ID_COMPANY?: string;
   APP_PUBLIC_ORIGIN?: string;
 };
+
+/** Pick Stripe Price id from env; reps use SOLO, companies use COMPANY, with legacy fallback. */
+export function resolveMembershipStripePriceId(
+  env: PlatformBillingEnv,
+  userType: string,
+): string | null {
+  const legacy = (env.MEMBERSHIP_STRIPE_PRICE_ID || "").trim();
+  const solo = (env.MEMBERSHIP_STRIPE_PRICE_ID_SOLO || "").trim();
+  const company = (env.MEMBERSHIP_STRIPE_PRICE_ID_COMPANY || "").trim();
+
+  if (userType === "sales_rep") {
+    if (solo) return solo;
+    if (legacy) return legacy;
+    return null;
+  }
+  if (userType === "company") {
+    if (company) return company;
+    if (legacy) return legacy;
+    return null;
+  }
+  return null;
+}
 
 /**
  * POST /api/billing/membership-checkout-session
@@ -45,12 +71,19 @@ export async function handleMembershipCheckoutSession(
     });
   }
 
-  const priceId = (env.MEMBERSHIP_STRIPE_PRICE_ID || "").trim();
+  const priceId = resolveMembershipStripePriceId(env, payload.user_type);
   if (!priceId) {
-    return new Response(JSON.stringify({ success: false, error: "Membership pricing is not configured." }), {
-      status: 503,
-      headers: j,
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error:
+          "Membership pricing is not configured for your account type. Set MEMBERSHIP_STRIPE_PRICE_ID_SOLO and MEMBERSHIP_STRIPE_PRICE_ID_COMPANY (or MEMBERSHIP_STRIPE_PRICE_ID) on the Worker.",
+      }),
+      {
+        status: 503,
+        headers: j,
+      },
+    );
   }
 
   const origin = (env.APP_PUBLIC_ORIGIN || "").trim().replace(/\/+$/, "");
@@ -71,7 +104,9 @@ export async function handleMembershipCheckoutSession(
   params.set("line_items[0][price]", priceId);
   params.set("line_items[0][quantity]", "1");
   params.set("client_reference_id", payload.sub);
+  params.set("metadata[hd2d_checkout_kind]", "membership");
   params.set("subscription_data[metadata][user_id]", payload.sub);
+  params.set("subscription_data[metadata][hd2d_checkout_kind]", "membership");
   if (payload.email) {
     params.set("customer_email", payload.email);
   }

@@ -5,7 +5,7 @@
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-04-03-hd2d-copilot-anthropic";
+export const WORKER_BUILD_TAG = "2026-04-10-stripe-callcenter-webhook";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */
@@ -30,6 +30,10 @@ type HealthEnv = {
   AUTH_SIGNUP_ENABLED?: string;
   STRIPE_SECRET_KEY?: string;
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
+  MEMBERSHIP_STRIPE_PRICE_ID_SOLO?: string;
+  MEMBERSHIP_STRIPE_PRICE_ID_COMPANY?: string;
+  /** Call center subscription checkout — see callCenterCheckout.ts. */
+  CALLCENTER_STRIPE_PRICE_ID?: string;
   /** Telnyx API key — outbound SMS + workflow steps (see services/sms). */
   TELNYX_API_KEY?: string;
   /** Twilio Account SID — optional alternative to Telnyx when set with TWILIO_AUTH_TOKEN. */
@@ -93,9 +97,18 @@ export function handleHealthGet(
         arcgisMapServerTileOpacity: tileOk ? tileOpacity : undefined,
         authSignup:
           (env.AUTH_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false",
-        /** True when Stripe + membership Price id are set (POST /api/billing/membership-checkout-session). */
+        /** True when Stripe + at least one membership Price id are set (POST /api/billing/membership-checkout-session). */
         membershipCheckout: Boolean(
-          (env.STRIPE_SECRET_KEY || "").trim() && (env.MEMBERSHIP_STRIPE_PRICE_ID || "").trim(),
+          (env.STRIPE_SECRET_KEY || "").trim() &&
+            Boolean(
+              (env.MEMBERSHIP_STRIPE_PRICE_ID || "").trim() ||
+                (env.MEMBERSHIP_STRIPE_PRICE_ID_SOLO || "").trim() ||
+                (env.MEMBERSHIP_STRIPE_PRICE_ID_COMPANY || "").trim(),
+            ),
+        ),
+        /** True when Stripe + CALLCENTER_STRIPE_PRICE_ID are set (POST /api/billing/callcenter-checkout-session). */
+        callcenterCheckout: Boolean(
+          (env.STRIPE_SECRET_KEY || "").trim() && Boolean((env.CALLCENTER_STRIPE_PRICE_ID || "").trim()),
         ),
         /** True when Resend is configured (POST /api/auth/register can email admin on new sign-up). */
         signupNotifyEmail: Boolean((env.RESEND_API_KEY || "").trim()),

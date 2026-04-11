@@ -124,6 +124,78 @@ export async function listOrganizationsForDirectory(
   return out;
 }
 
+export type OrganizationAdminListItem = {
+  id: string;
+  name: string;
+  org_kind: OrgKind;
+  service_states: string[];
+  created_at: number;
+  member_count: number;
+};
+
+/** All organizations with member counts (admin UI). */
+export async function listOrganizationsForAdmin(db: D1): Promise<OrganizationAdminListItem[]> {
+  const res = await db
+    .prepare(
+      `SELECT o.id, o.name, o.service_states, o.org_kind, o.created_at,
+              (SELECT COUNT(*) FROM org_members m WHERE m.org_id = o.id) AS member_count
+       FROM organizations o
+       ORDER BY o.name ASC`,
+    )
+    .all();
+  const rows = (res.results || []) as Array<{
+    id: string;
+    name: string;
+    service_states: string;
+    org_kind: OrgKind;
+    created_at: number;
+    member_count: number;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    org_kind: r.org_kind,
+    service_states: parseStatesJson(r.service_states),
+    created_at: r.created_at,
+    member_count: Number(r.member_count) || 0,
+  }));
+}
+
+export type OrgMemberDetailRow = {
+  user_id: string;
+  email: string;
+  name: string;
+  user_type: string;
+  org_role: string;
+};
+
+export async function listOrgMembersDetail(db: D1, orgId: string): Promise<OrgMemberDetailRow[]> {
+  const res = await db
+    .prepare(
+      `SELECT om.user_id AS user_id, om.role AS org_role, u.email AS email, u.name AS name, u.user_type AS user_type
+       FROM org_members om
+       JOIN users u ON u.id = om.user_id
+       WHERE om.org_id = ?
+       ORDER BY lower(u.email)`,
+    )
+    .bind(orgId)
+    .all();
+  const rows = (res.results || []) as Array<{
+    user_id: string;
+    org_role: string;
+    email: string;
+    name: string;
+    user_type: string;
+  }>;
+  return rows.map((r) => ({
+    user_id: r.user_id,
+    email: r.email,
+    name: r.name,
+    user_type: r.user_type,
+    org_role: r.org_role,
+  }));
+}
+
 export async function assignRepToOrg(
   db: D1,
   args: { userId: string; orgId: string },

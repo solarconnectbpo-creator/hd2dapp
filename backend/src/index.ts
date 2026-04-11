@@ -21,8 +21,13 @@ import { handleAuthRequest, type AuthEnv as AuthEnvBearer } from "./api/authRout
 import { handleAdminRepPlacementRequest, handleOrgDirectoryRequest } from "./api/orgDirectoryRoutes";
 import { handleOsmBuildingAtPointGet } from "./api/osmBuildingFootprint";
 import { handleAdminUserRoutes } from "./api/adminUserRoutes";
+import { handleAdminOrgRoutes } from "./api/adminOrgRoutes";
 import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/coursesCatalogRoutes";
 import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCheckout";
+import { handleMarketplaceRoutes } from "./api/marketplaceRoutes";
+import { handleOrgWorkspaceRoutes } from "./api/orgWorkspaceRoutes";
+import { releaseExpiredReservations } from "./marketplace/marketplaceDb";
+import { handleCallCenterCheckoutSession, type CallCenterCheckoutEnv } from "./api/callCenterCheckout";
 import { handleMembershipCheckoutSession, type PlatformBillingEnv } from "./api/platformBilling";
 import { handleStripeWebhook, type StripeWebhookEnv } from "./api/stripeWebhook";
 import { handleArcgisRequest, type ArcgisEnv } from "./api/arcgisProxy";
@@ -97,8 +102,22 @@ interface Env {
   STRIPE_SECRET_KEY?: string;
   /** Comma-separated Price ids allowed for lead checkout (e.g. price_abc,price_def). */
   LEADS_STRIPE_PRICE_IDS?: string;
-  /** Stripe Price id for platform membership subscription (POST /api/billing/membership-checkout-session). */
+  /** Comma-separated Price ids for bulk appointment checkout (min LEADS_BULK_MIN_APPOINTMENTS). */
+  LEADS_BULK_PRICE_IDS?: string;
+  /** Bulk Price ids that are a fixed total (Stripe qty 1); see leadsCheckout.ts. */
+  LEADS_BULK_FIXED_PRICE_IDS?: string;
+  LEADS_BULK_MIN_APPOINTMENTS?: string;
+  /**
+   * Legacy: single Stripe Price for membership when SOLO/COMPANY are unset.
+   * Prefer MEMBERSHIP_STRIPE_PRICE_ID_SOLO (reps) and MEMBERSHIP_STRIPE_PRICE_ID_COMPANY (contractors).
+   */
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
+  /** Monthly membership — `sales_rep` accounts (e.g. $97/mo). */
+  MEMBERSHIP_STRIPE_PRICE_ID_SOLO?: string;
+  /** Monthly membership — `company` accounts (e.g. $197/mo). */
+  MEMBERSHIP_STRIPE_PRICE_ID_COMPANY?: string;
+  /** Call center subscription Price id (e.g. $3,500/mo) — POST /api/billing/callcenter-checkout-session. */
+  CALLCENTER_STRIPE_PRICE_ID?: string;
   /** Stripe webhook signing secret (whsec_…) for POST /api/webhooks/stripe. */
   STRIPE_WEBHOOK_SECRET?: string;
   /** Public SPA origin for Stripe success/cancel URLs (no trailing slash). */
@@ -132,6 +151,9 @@ interface Env {
   TWILIO_FROM_NUMBER?: string;
   /** Optional: require ?token= on POST /api/webhooks/twilio */
   TWILIO_WEBHOOK_QUERY_SECRET?: string;
+  /** Optional R2 bucket for org agreement files larger than ~1.5MB (see orgWorkspaceRoutes). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ORG_FILES?: any;
 }
 
 type AuthEnv = Pick<
@@ -216,6 +238,11 @@ export default {
         const smsRes = await handleSmsHttpRoutes(request, env as SmsHttpEnv, path, corsHeaders);
         if (smsRes) return smsRes;
       } else if (
+        (path === "/api/billing/callcenter-checkout-session" || path === "/api/billing/callcenter-checkout-session/") &&
+        request.method === "POST"
+      ) {
+        return await handleCallCenterCheckoutSession(request, env as CallCenterCheckoutEnv, corsHeaders);
+      } else if (
         (path === "/api/billing/membership-checkout-session" || path === "/api/billing/membership-checkout-session/") &&
         request.method === "POST"
       ) {
@@ -234,6 +261,12 @@ export default {
         request.method === "POST"
       ) {
         return await handleLeadsCheckoutSession(request, env as LeadsCheckoutEnv, corsHeaders);
+      } else if (path.startsWith("/api/leads/marketplace")) {
+        const mr = await handleMarketplaceRoutes(request, env as AuthEnv, path, corsHeaders);
+        if (mr) return mr;
+      } else if (path.startsWith("/api/org")) {
+        const or = await handleOrgWorkspaceRoutes(request, env, path, corsHeaders);
+        if (or) return or;
       } else if (
         (path === "/api/marketing/generate-image" || path === "/api/marketing/generate-image/") &&
         request.method === "POST"
@@ -261,6 +294,8 @@ export default {
         return await handleWorkflows(request, env, path, corsHeaders);
       } else if (path.startsWith("/api/arcgis/")) {
         return await handleArcgisRequest(request, env as ArcgisEnv, path, corsHeaders);
+      } else if (path.startsWith("/api/admin/organizations")) {
+        return await handleAdminOrgRoutes(request, env as AuthEnv, path, corsHeaders);
       } else if (path.startsWith("/api/admin/users")) {
         return await handleAdminUserRoutes(request, env as AuthEnv, path, corsHeaders);
       } else if (path.startsWith("/api/admin/courses")) {
@@ -374,6 +409,11 @@ export default {
           TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
           TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
           STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+        }),
+      );
+      ctx.waitUntil(
+        releaseExpiredReservations(env.DB).then((n) => {
+          if (n > 0) console.log(`[marketplace] released ${n} expired reservation(s)`);
         }),
       );
       ctx.waitUntil(processMetaScheduledRetries(env as MetaMarketingEnv));

@@ -67,15 +67,26 @@
 
 # --- Lead marketplace (Stripe Checkout via POST /api/leads/checkout-session) ---
 # STRIPE_SECRET_KEY=sk_test_...
+# Or: STRIPE_RESTRICTED_KEY=rk_live_…  (restricted key must allow read access to Prices — npm run stripe:setup-leads)
 # Comma-separated Price IDs that match VITE_LEAD_PACKAGES_JSON stripePriceId values:
-# LEADS_STRIPE_PRICE_IDS=price_abc,price_def
+# LEADS_STRIPE_PRICE_IDS=price_single_appt,price_ten_pack
+# Optional: bulk tier Price IDs (min appointments per checkout — default 5, use 10 for a 10-pack):
+# LEADS_BULK_PRICE_IDS=price_ten_pack
+# LEADS_BULK_MIN_APPOINTMENTS=10
+# If the bulk Stripe Price is a fixed total (e.g. $1,970 one line item), not $197 × qty:
+# LEADS_BULK_FIXED_PRICE_IDS=price_ten_pack
 # Public site origin (no trailing slash) for Stripe redirect after payment:
 # APP_PUBLIC_ORIGIN=http://127.0.0.1:5173
-# Production example: APP_PUBLIC_ORIGIN=https://hardcoredoortodoorclosers.com
+# Production example: APP_PUBLIC_ORIGIN=https://www.hardcoredoortodoorclosers.com
 #
 # --- Platform membership (subscription) — gate company/rep until admin approves + Stripe subscription active ---
-# Create a recurring Price in Stripe Dashboard → Products → copy price_… id:
+# Create recurring Prices in Stripe (Products → Add product → recurring monthly). Copy each price_… id:
+# MEMBERSHIP_STRIPE_PRICE_ID_SOLO=price_...      # field reps (sales_rep), e.g. $97/mo
+# MEMBERSHIP_STRIPE_PRICE_ID_COMPANY=price_...   # contractors (company), e.g. $197/mo
+# Optional legacy fallback if only one membership tier exists:
 # MEMBERSHIP_STRIPE_PRICE_ID=price_...
+# Optional: call center subscription (POST /api/billing/callcenter-checkout-session; /call-center UI)
+# CALLCENTER_STRIPE_PRICE_ID=price_...
 # Webhook endpoint: POST https://<your-worker>/api/webhooks/stripe — events: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted
 # STRIPE_WEBHOOK_SECRET=whsec_...
 #

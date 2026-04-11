@@ -153,6 +153,129 @@ export async function getContactById(db: D1, id: string): Promise<SmsContactRow 
   return row ?? null;
 }
 
+export async function getSmsContactByIdForOrg(db: D1, id: string, orgId: string): Promise<SmsContactRow | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, org_id, phone_e164, name, unsubscribed, automations_paused,
+              COALESCE(address, '') AS address,
+              COALESCE(pipeline_stage, '') AS pipeline_stage,
+              COALESCE(claim_filed, 0) AS claim_filed,
+              COALESCE(tags_json, '[]') AS tags_json,
+              last_inbound_at
+       FROM sms_contacts WHERE id = ? AND org_id = ? LIMIT 1`,
+    )
+    .bind(id, orgId)
+    .first<SmsContactRow>();
+  return row ?? null;
+}
+
+export type SmsContactListRow = SmsContactRow & {
+  created_at: number;
+  updated_at: number;
+  last_message_at: number | null;
+  last_message_preview: string | null;
+};
+
+export async function listSmsContactsForOrg(
+  db: D1,
+  orgId: string,
+  limit = 200,
+  offset = 0,
+): Promise<SmsContactListRow[]> {
+  if (db == null) return [];
+  const lim = Math.min(Math.max(1, limit), 500);
+  const off = Math.max(0, offset);
+  const res = (await db
+    .prepare(
+      `SELECT c.id, c.org_id, c.phone_e164, c.name, c.unsubscribed, c.automations_paused,
+              COALESCE(c.address, '') AS address,
+              COALESCE(c.pipeline_stage, '') AS pipeline_stage,
+              COALESCE(c.claim_filed, 0) AS claim_filed,
+              COALESCE(c.tags_json, '[]') AS tags_json,
+              c.last_inbound_at,
+              c.created_at,
+              c.updated_at,
+              (SELECT MAX(created_at) FROM sms_messages WHERE contact_id = c.id) AS last_message_at,
+              (SELECT body FROM sms_messages WHERE contact_id = c.id ORDER BY created_at DESC LIMIT 1) AS last_message_preview
+       FROM sms_contacts c
+       WHERE c.org_id = ?
+       ORDER BY COALESCE((SELECT MAX(created_at) FROM sms_messages WHERE contact_id = c.id), c.updated_at) DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .bind(orgId, lim, off)
+    .all()) as { results?: SmsContactListRow[] };
+  return res.results ?? [];
+}
+
+export type SmsMessageRow = {
+  id: string;
+  contact_id: string;
+  direction: string;
+  body: string;
+  external_id: string | null;
+  created_at: number;
+};
+
+export async function listSmsMessagesForContact(
+  db: D1,
+  orgId: string,
+  contactId: string,
+  limit = 500,
+): Promise<SmsMessageRow[]> {
+  if (db == null) return [];
+  const lim = Math.min(Math.max(1, limit), 1000);
+  const res = (await db
+    .prepare(
+      `SELECT m.id, m.contact_id, m.direction, m.body, m.external_id, m.created_at
+       FROM sms_messages m
+       INNER JOIN sms_contacts c ON c.id = m.contact_id AND c.org_id = ?
+       WHERE m.contact_id = ?
+       ORDER BY m.created_at ASC
+       LIMIT ?`,
+    )
+    .bind(orgId, contactId, lim)
+    .all()) as { results?: SmsMessageRow[] };
+  return res.results ?? [];
+}
+
+export async function updateSmsContactFields(
+  db: D1,
+  contactId: string,
+  orgId: string,
+  patch: { name?: string; automations_paused?: boolean; unsubscribed?: boolean },
+  t: number,
+): Promise<boolean> {
+  const exists = await db
+    .prepare(`SELECT id FROM sms_contacts WHERE id = ? AND org_id = ? LIMIT 1`)
+    .bind(contactId, orgId)
+    .first<{ id: string }>();
+  if (!exists) return false;
+  const parts: string[] = ["updated_at = ?"];
+  const binds: unknown[] = [t];
+  if (patch.name !== undefined) {
+    parts.push("name = ?");
+    binds.push(patch.name.trim());
+  }
+  if (patch.automations_paused !== undefined) {
+    parts.push("automations_paused = ?");
+    binds.push(patch.automations_paused ? 1 : 0);
+  }
+  if (patch.unsubscribed !== undefined) {
+    parts.push("unsubscribed = ?");
+    binds.push(patch.unsubscribed ? 1 : 0);
+  }
+  binds.push(contactId, orgId);
+  await db
+    .prepare(`UPDATE sms_contacts SET ${parts.join(", ")} WHERE id = ? AND org_id = ?`)
+    .bind(...binds)
+    .run();
+  return true;
+}
+
+export async function bumpSmsContactActivity(db: D1, contactId: string, t: number): Promise<void> {
+  await db.prepare(`UPDATE sms_contacts SET updated_at = ? WHERE id = ?`).bind(t, contactId).run();
+}
+
 function parseTagsJson(raw: string): string[] {
   try {
     const a = JSON.parse(raw || "[]") as unknown;

@@ -4,13 +4,19 @@ import { sendSms } from "../services/sms";
 import { resolveSmsOutbound } from "../services/sms/smsProviderResolve";
 import { recordSmsUsageEvent } from "./stripeSmsUsage";
 import {
+  bumpSmsContactActivity,
   deleteSmsWorkflow,
   ensureSmsContactForOrg,
   getOrgOwnerUserId,
   getOutboundFromForOrg,
+  getSmsContactByIdForOrg,
   getSmsWorkflow,
+  insertSmsMessage,
+  listSmsContactsForOrg,
+  listSmsMessagesForContact,
   listSmsOrgNumbersForOrg,
   listSmsWorkflows,
+  updateSmsContactFields,
   upsertSmsWorkflow,
 } from "../sms/smsDb";
 import { SMS_CANONICAL_TRIGGERS } from "../sms/smsTriggers";
@@ -238,8 +244,68 @@ export async function handleSmsHttpRoutes(
     return json({ success: true }, 200, j);
   }
 
+  const contactMessagesMatch = base.match(/^\/api\/sms\/contacts\/([^/]+)\/messages$/);
+  if (contactMessagesMatch && request.method === "GET") {
+    const contactId = decodeURIComponent(contactMessagesMatch[1]);
+    const url = new URL(request.url);
+    const limitRaw = parseInt(url.searchParams.get("limit") || "500", 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(1000, Math.max(1, limitRaw)) : 500;
+    const messages = await listSmsMessagesForContact(env.DB, oid, contactId, limit);
+    return json({ success: true, messages }, 200, j);
+  }
+
+  const contactOneMatch = base.match(/^\/api\/sms\/contacts\/([^/]+)$/);
+  if (contactOneMatch && request.method === "PATCH") {
+    const contactId = decodeURIComponent(contactOneMatch[1]);
+    let body: { name?: string; automations_paused?: boolean; unsubscribed?: boolean };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return json({ success: false, error: "Invalid JSON." }, 400, j);
+    }
+    const t = Math.floor(Date.now() / 1000);
+    const ok = await updateSmsContactFields(env.DB, contactId, oid, body, t);
+    if (!ok) return json({ success: false, error: "Contact not found." }, 404, j);
+    const row = await getSmsContactByIdForOrg(env.DB, contactId, oid);
+    return json({ success: true, contact: row }, 200, j);
+  }
+
+  if (base === "/api/sms/contacts" && request.method === "GET") {
+    const url = new URL(request.url);
+    const limitRaw = parseInt(url.searchParams.get("limit") || "200", 10);
+    const offsetRaw = parseInt(url.searchParams.get("offset") || "0", 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(500, Math.max(1, limitRaw)) : 200;
+    const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
+    const contacts = await listSmsContactsForOrg(env.DB, oid, limit, offset);
+    return json({ success: true, contacts }, 200, j);
+  }
+
+  if (base === "/api/sms/contacts" && request.method === "POST") {
+    let body: { phone_e164?: string; phone?: string; name?: string; address?: string };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return json({ success: false, error: "Invalid JSON." }, 400, j);
+    }
+    const raw = (body.phone_e164 || body.phone || "").trim();
+    const phoneE164 = normalizePhoneE164(raw);
+    if (!phoneE164) {
+      return json({ success: false, error: "phone_e164 or phone (10+ digits) required." }, 400, j);
+    }
+    const t = Math.floor(Date.now() / 1000);
+    const id = await ensureSmsContactForOrg(env.DB, {
+      orgId: oid,
+      phoneE164,
+      name: body.name,
+      address: body.address,
+      t,
+    });
+    const contact = await getSmsContactByIdForOrg(env.DB, id, oid);
+    return json({ success: true, contact }, 201, j);
+  }
+
   if (base === "/api/sms/send" && request.method === "POST") {
-    let body: { to?: string; text?: string };
+    let body: { to?: string; text?: string; contact_id?: string };
     try {
       body = (await request.json()) as typeof body;
     } catch {
@@ -247,10 +313,31 @@ export async function handleSmsHttpRoutes(
     }
     const orgFrom = await getOutboundFromForOrg(env.DB, oid);
     const resolved = resolveSmsOutbound(env, orgFrom);
-    const to = (body.to || "").trim();
     const text = (body.text || "").trim();
-    if (!resolved || !to || !text) {
-      return json({ success: false, error: "Configure Telnyx or Twilio and provide to + text." }, 400, j);
+    let toE164 = "";
+    let contactIdForMsg = "";
+    if ((body.contact_id || "").trim()) {
+      const cid = (body.contact_id || "").trim();
+      const c = await getSmsContactByIdForOrg(env.DB, cid, oid);
+      if (!c) return json({ success: false, error: "contact_id not found for this org." }, 404, j);
+      if (c.unsubscribed === 1) {
+        return json({ success: false, error: "Contact unsubscribed (STOP)." }, 400, j);
+      }
+      toE164 = c.phone_e164;
+      contactIdForMsg = c.id;
+    } else {
+      toE164 = normalizePhoneE164((body.to || "").trim());
+    }
+    if (!resolved || !toE164 || !text) {
+      return json(
+        {
+          success: false,
+          error:
+            "Configure Telnyx (API key + from number / org mapped number) and provide text plus to (E.164) or contact_id.",
+        },
+        400,
+        j,
+      );
     }
     const result =
       resolved.provider === "telnyx"
@@ -258,7 +345,7 @@ export async function handleSmsHttpRoutes(
             provider: "telnyx",
             apiKey: resolved.apiKey,
             from: resolved.from,
-            to,
+            to: toE164,
             text,
             appendCompliance: true,
           })
@@ -267,15 +354,28 @@ export async function handleSmsHttpRoutes(
             accountSid: resolved.accountSid,
             authToken: resolved.authToken,
             from: resolved.from,
-            to,
+            to: toE164,
             text,
             appendCompliance: true,
           });
+    const t = Math.floor(Date.now() / 1000);
+    if (!contactIdForMsg) {
+      contactIdForMsg = await ensureSmsContactForOrg(env.DB, { orgId: oid, phoneE164: toE164, t });
+    }
+    await insertSmsMessage(env.DB, {
+      id: crypto.randomUUID(),
+      contactId: contactIdForMsg,
+      direction: "outbound",
+      body: text,
+      externalId: result.externalId,
+      t,
+    });
+    await bumpSmsContactActivity(env.DB, contactIdForMsg, t);
     const ownerId = await getOrgOwnerUserId(env.DB, oid);
     if (ownerId) {
       await recordSmsUsageEvent({ STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY, DB: env.DB }, ownerId);
     }
-    return json({ success: true, externalId: result.externalId }, 200, j);
+    return json({ success: true, externalId: result.externalId, contact_id: contactIdForMsg }, 200, j);
   }
 
   return json({ success: false, error: "Not found." }, 404, j);
