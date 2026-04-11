@@ -3,6 +3,8 @@
  * FormState / ProposalState patches. Patches are whitelisted server-side; client merges with the same rules.
  */
 
+import { retryWithBackoffWhen } from "../utils/retry";
+
 interface Env {
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
@@ -10,6 +12,12 @@ interface Env {
 
 const ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022";
 const OPENAI_MODEL = "gpt-4o-mini";
+
+/** Recent turns sent to the model (both providers). */
+const CHAT_HISTORY_TURNS = 28;
+const SNAP_FORM_MAX = 12_000;
+const SNAP_PROPOSAL_MAX = 6000;
+const MAX_CONVERSATION_SUMMARY_CHARS = 2000;
 
 const FORM_PATCH_KEYS = new Set<string>([
   "address",
@@ -149,21 +157,146 @@ function normalizeMode(raw: unknown): CopilotMode {
   return "general";
 }
 
+function strField(form: Record<string, unknown>, key: string): string {
+  const v = form[key];
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function numField(form: Record<string, unknown>, key: string): number | undefined {
+  const v = form[key];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim()) {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+/** Compact JSON: only whitelisted form keys (for when full snapshot exceeds budget). */
+function buildCompactFormSnapshot(form: Record<string, unknown>): string {
+  const compact: Record<string, unknown> = {};
+  for (const k of FORM_PATCH_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(form, k)) compact[k] = form[k];
+  }
+  return JSON.stringify(compact);
+}
+
+function buildFormSnapshotForPrompt(form: unknown): string {
+  if (!form || typeof form !== "object" || Array.isArray(form)) return "{}";
+  const f = form as Record<string, unknown>;
+  const full = JSON.stringify(f);
+  if (full.length <= SNAP_FORM_MAX) return full;
+  const compact = buildCompactFormSnapshot(f);
+  if (compact.length <= SNAP_FORM_MAX) return compact;
+  return compact.slice(0, SNAP_FORM_MAX);
+}
+
+function buildProposalSnapshotForPrompt(prop: unknown): string {
+  if (!prop || typeof prop !== "object" || Array.isArray(prop)) return "{}";
+  const p = prop as Record<string, unknown>;
+  const full = JSON.stringify(p);
+  if (full.length <= SNAP_PROPOSAL_MAX) return full;
+  const compact: Record<string, unknown> = {};
+  for (const k of PROPOSAL_PATCH_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(p, k)) compact[k] = p[k];
+  }
+  const s = JSON.stringify(compact);
+  return s.length <= SNAP_PROPOSAL_MAX ? s : s.slice(0, SNAP_PROPOSAL_MAX);
+}
+
+function buildConversationSummary(messages: ChatMessage[], maxMessages = 6): string {
+  if (messages.length <= 2) return "";
+  const recent = messages.slice(-maxMessages);
+  const lines = recent.map((m) => {
+    const prefix = m.role === "user" ? "User:" : "Copilot:";
+    const text = m.content.slice(0, 280);
+    const ell = m.content.length > 280 ? "…" : "";
+    return `${prefix} ${text}${ell}`;
+  });
+  let out = lines.join("\n");
+  if (out.length > MAX_CONVERSATION_SUMMARY_CHARS) {
+    out = `${out.slice(0, MAX_CONVERSATION_SUMMARY_CHARS)}…`;
+  }
+  return out;
+}
+
+function buildEstimateChecklist(form: Record<string, unknown>): string {
+  const lines: string[] = [];
+  lines.push(strField(form, "address") ? "✅ Address" : "❌ Address (not set)");
+  lines.push(strField(form, "roofType") ? "✅ Roof type" : "❌ Roof type (not set)");
+  lines.push(strField(form, "roofStructure") ? "✅ Roof structure" : "❌ Roof structure (not set)");
+  lines.push(strField(form, "roofPitch") ? "✅ Roof pitch" : "❌ Roof pitch (not set)");
+  const area = numField(form, "areaSqFt");
+  const sq = numField(form, "measuredSquares");
+  lines.push(area || sq ? "✅ Area or squares" : "❌ Area or squares (not set)");
+  lines.push(
+    numField(form, "wastePercent") !== undefined ? "✅ Waste %" : "⚠️ Waste % (helpful but optional)",
+  );
+  const lineals =
+    numField(form, "ridgesFt") ||
+    numField(form, "eavesFt") ||
+    numField(form, "rakesFt") ||
+    numField(form, "valleysFt") ||
+    numField(form, "hipsFt");
+  lines.push(lineals ? "✅ Some lineal feet set" : "⚠️ Lineal feet (helpful for takeoff)");
+  return lines.join("\n");
+}
+
+function wantsEstimateChecklist(mode: CopilotMode, lastUserContent: string): boolean {
+  if (mode !== "estimate") return false;
+  return /\b(checklist|help\s+me\s+start|walk\s+me\s+through|get\s+started|what\s+do\s+i\s+need|where\s+do\s+i\s+start)\b/i.test(
+    lastUserContent,
+  );
+}
+
+function generateProposalTitle(
+  formSnap: Record<string, unknown>,
+  formPatch: Record<string, unknown>,
+  proposalPatch: Record<string, unknown>,
+): string {
+  const merged: Record<string, unknown> = { ...formSnap, ...formPatch, ...proposalPatch };
+  const addr = strField(merged, "address").slice(0, 44);
+  const roofType = strField(merged, "roofType");
+  const dt = merged.damageTypes;
+  const tags = Array.isArray(dt) ? dt.map((x) => String(x).trim()).filter(Boolean) : [];
+
+  let job = "Roof inspection & estimate";
+  if (tags.length > 0) job = "Storm damage inspection & estimate";
+  else if (/replace/i.test(roofType)) job = "Roof replacement estimate";
+  else if (/repair/i.test(roofType)) job = "Roof repair estimate";
+
+  const tail = addr ? ` — ${addr}` : "";
+  let title = `${job}${tail}`.trim();
+  if (title.length > 500) title = `${title.slice(0, 497)}…`;
+  return title;
+}
+
 function modeHint(mode: CopilotMode): string {
   switch (mode) {
     case "estimate":
-      return `Focus: **Estimate & takeoff** — Help reps build complete estimates. Walk through: address/location, roof type/structure, pitch, plan area or squares, waste %, measured squares, lineal feet (ridges, eaves, rakes, valleys, hips, flashing), severity/damage tags if relevant, carrier scope narrative, and add-on fields when they mention gutters, dry-in, engineering, etc. Guide use of the in-app map (footprint, lines, auto-trace). When the user gives concrete numbers or facts, include them in **formPatch**. Offer a short **estimate checklist** in assistantMessage when helpful.`;
+      return `Focus: **Estimate & takeoff** — Help reps build complete estimates. Walk through: address/location, roof type/structure, pitch, plan area or squares, waste %, measured squares, lineal feet (ridges, eaves, rakes, valleys, hips, flashing), severity/damage tags if relevant, carrier scope narrative, and add-on fields when they mention gutters, dry-in, engineering, etc. Guide use of the in-app map (footprint, lines, auto-trace). When the user gives concrete numbers or facts, include them in **formPatch**. When they ask for a checklist or how to start, include a clear **Checklist** section in assistantMessage (you may use the precomputed lines from the system message).`;
     case "damage":
       return `Focus: **Storm damage & inspection reports** — Draft professional, neutral field documentation. When they want a report, structure **assistantMessage** with clear sections, e.g.: (1) Property / date / weather context (2) Summary (3) Observations by elevation/area (4) Interior signs if any (5) Photo/documentation checklist (6) Limitations / access (7) Suggested next steps. Use **propertyRecordNotes** or **carrierScopeText** in formPatch for long narrative when appropriate. Set **severity** (1–5) and **damageTypes** when the user describes damage. Never guarantee insurance outcomes or claim value.`;
     case "followup":
-      return `Focus: **Follow-up & pipeline** — Draft SMS/email snippets, call scripts, and next-step checklists. You cannot send messages yourself; remind them to use **Send to GHL** and SMS automation in the app. Suggest **proposalPatch** (clientName, clientEmail, clientPhone, etc.) when they share contact info.`;
+      return `Focus: **Follow-up & pipeline** — Draft SMS/email snippets, call scripts, and next-step checklists. You cannot send messages yourself; remind them to use **Send to GHL** and SMS automation in the app. Suggest **proposalPatch** (clientName, clientEmail, clientPhone, etc.) when they share contact info.
+
+**SMS / outreach templates:** When the user asks for a template, example text, or SMS wording, offer **two** short variants. Use placeholders like {{name}} or {{address}} **only** for fields that already appear in the form or proposal snapshot; otherwise use neutral wording ("the homeowner", "your company") without fake merge fields. Cover stages when relevant: first contact, post-estimate follow-up, objection (price/warranty/timeline), post-proposal nudge.`;
     default:
       return `Focus: **General HD2D Copilot** — You are a primary feature of the app: answer roofing, estimating, storm restoration, canvassing, and sales follow-up questions thoroughly. For off-topic questions, answer briefly if harmless, then steer back to how you can help on the roof or the job. Prefer actionable, field-ready advice.`;
   }
 }
 
-function buildSystemPrompt(mode: CopilotMode, snapForm: string, snapProposal: string): string {
+function buildSystemPrompt(
+  mode: CopilotMode,
+  snapForm: string,
+  snapProposal: string,
+  conversationSummary: string,
+): string {
   const hint = modeHint(mode);
+  const contextBlock = conversationSummary
+    ? `\n\n**Recent conversation context (truncated; do not repeat questions already answered here):**\n${conversationSummary}`
+    : "";
+
   return `You are **HD2D Copilot**, the flagship AI assistant inside **Door to Door Closers** — expert at roofing field work, estimating, storm documentation, and sales follow-up. Be thorough, practical, and safety-conscious.
 
 ${hint}
@@ -179,6 +312,7 @@ ${hint}
 - Ask one or two focused questions when critical info is missing; do not stall on optional details.
 - **Never** guarantee insurance coverage, claim approval, or legal outcomes. No medical advice. Do not claim to be a licensed engineer, adjuster, or attorney.
 - **Never** invent exact measurements, dates, or storm events — only put values in **formPatch** when the user or snapshot provides them (or clearly stated numbers in chat).
+- **Be consistent:** If the user or summary already gave a measurement or field value, do not ask again — use it.
 - damageTypes must be only: Hail, Wind, Missing Shingles, Leaks, Flashing, Structural.
 - severity is 1–5 (integer).
 - roofStructure: auto | gable | hip | flat | mansard | complex.
@@ -193,8 +327,45 @@ ${hint}
 - "formPatch" (object, optional — only whitelisted measurement form keys)
 - "proposalPatch" (object, optional — clientName, clientCompany, clientEmail, clientPhone, companyName, proposalTitle)
 
-Current form JSON (partial, may be truncated): ${snapForm}
-Current proposal / client JSON (partial): ${snapProposal}`;
+Current form JSON (partial, may be truncated or compact): ${snapForm}
+Current proposal / client JSON (partial): ${snapProposal}${contextBlock}`;
+}
+
+function httpStatusFromError(e: unknown): number | undefined {
+  if (e && typeof e === "object" && "status" in e && typeof (e as { status?: unknown }).status === "number") {
+    return (e as { status: number }).status;
+  }
+  return undefined;
+}
+
+function isTransientLlmError(e: unknown): boolean {
+  const st = httpStatusFromError(e);
+  if (st === undefined) return true;
+  if (st === 429) return true;
+  return st >= 500 && st <= 599;
+}
+
+function errWithStatus(message: string, status: number): Error {
+  const err = new Error(message);
+  (err as Error & { status?: number }).status = status;
+  return err;
+}
+
+function validateCopilotOutput(parsed: Record<string, unknown>): { ok: true } | { ok: false; reason: string } {
+  const am = parsed.assistantMessage;
+  if (typeof am !== "string" || !am.trim()) {
+    return { ok: false, reason: "Model response missing non-empty assistantMessage" };
+  }
+  if (parsed.formPatch !== undefined && (typeof parsed.formPatch !== "object" || parsed.formPatch === null || Array.isArray(parsed.formPatch))) {
+    return { ok: false, reason: "formPatch must be an object when present" };
+  }
+  if (
+    parsed.proposalPatch !== undefined &&
+    (typeof parsed.proposalPatch !== "object" || parsed.proposalPatch === null || Array.isArray(parsed.proposalPatch))
+  ) {
+    return { ok: false, reason: "proposalPatch must be an object when present" };
+  }
+  return { ok: true };
 }
 
 async function completeWithOpenAI(
@@ -204,7 +375,7 @@ async function completeWithOpenAI(
 ): Promise<{ text: string; model: string }> {
   const openaiMessages = [
     { role: "system" as const, content: system },
-    ...messages.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+    ...messages.slice(-CHAT_HISTORY_TURNS).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -224,7 +395,7 @@ async function completeWithOpenAI(
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 400)}`);
+    throw errWithStatus(`OpenAI ${res.status}: ${errText.slice(0, 400)}`, res.status);
   }
 
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
@@ -237,7 +408,7 @@ async function completeWithAnthropic(
   system: string,
   messages: ChatMessage[],
 ): Promise<{ text: string; model: string }> {
-  const anthropicMessages = messages.slice(-16).map((m) => ({
+  const anthropicMessages = messages.slice(-CHAT_HISTORY_TURNS).map((m) => ({
     role: m.role as "user" | "assistant",
     content: m.content,
   }));
@@ -260,7 +431,7 @@ async function completeWithAnthropic(
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 400)}`);
+    throw errWithStatus(`Anthropic ${res.status}: ${errText.slice(0, 400)}`, res.status);
   }
 
   const json = (await res.json()) as {
@@ -269,6 +440,8 @@ async function completeWithAnthropic(
   const text = json.content?.map((b) => (b.type === "text" ? b.text ?? "" : "")).join("") ?? "";
   return { text, model: ANTHROPIC_MODEL };
 }
+
+const RETRY_OPTS = { maxRetries: 2, baseDelayMs: 600, maxDelayMs: 8000, backoffMultiplier: 2 };
 
 export async function handleEstimatorChatAi(
   request: Request,
@@ -327,29 +500,61 @@ export async function handleEstimatorChatAi(
     );
   }
 
-  const snapForm =
-    body.formSnapshot && typeof body.formSnapshot === "object"
-      ? JSON.stringify(body.formSnapshot).slice(0, 8000)
-      : "{}";
-  const snapProposal =
-    body.proposalSnapshot && typeof body.proposalSnapshot === "object"
-      ? JSON.stringify(body.proposalSnapshot).slice(0, 4000)
-      : "{}";
+  const formSnapObj =
+    body.formSnapshot && typeof body.formSnapshot === "object" && !Array.isArray(body.formSnapshot)
+      ? (body.formSnapshot as Record<string, unknown>)
+      : {};
+  const snapForm = buildFormSnapshotForPrompt(body.formSnapshot);
+  const snapProposal = buildProposalSnapshotForPrompt(body.proposalSnapshot);
 
-  const system = buildSystemPrompt(mode, snapForm, snapProposal);
+  const conversationSummary = buildConversationSummary(messages);
+  let system = buildSystemPrompt(mode, snapForm, snapProposal, conversationSummary);
 
-  const preferAnthropic = hasAnthropic;
-  let text: string;
-  let modelUsed: string;
+  const lastUser = messages[messages.length - 1]?.content ?? "";
+  if (wantsEstimateChecklist(mode, lastUser)) {
+    const checklist = buildEstimateChecklist(formSnapObj);
+    system += `\n\n**Precomputed estimate checklist — include a "Checklist" section in assistantMessage using these lines (you may rephrase slightly):**\n${checklist}`;
+  }
+
+  let text = "";
+  let modelUsed = "";
+  let providerUsed: "anthropic" | "openai" = "openai";
+
   try {
-    if (preferAnthropic) {
-      const r = await completeWithAnthropic(env, system, messages);
-      text = r.text;
-      modelUsed = r.model;
+    if (hasAnthropic) {
+      try {
+        const r = await retryWithBackoffWhen(
+          () => completeWithAnthropic(env, system, messages),
+          isTransientLlmError,
+          RETRY_OPTS,
+        );
+        text = r.text;
+        modelUsed = r.model;
+        providerUsed = "anthropic";
+      } catch (e1) {
+        if (hasOpenAi) {
+          console.warn("[estimator-chat] anthropic failed, falling back to openai:", e1);
+          const r = await retryWithBackoffWhen(
+            () => completeWithOpenAI(env, system, messages),
+            isTransientLlmError,
+            RETRY_OPTS,
+          );
+          text = r.text;
+          modelUsed = r.model;
+          providerUsed = "openai";
+        } else {
+          throw e1;
+        }
+      }
     } else {
-      const r = await completeWithOpenAI(env, system, messages);
+      const r = await retryWithBackoffWhen(
+        () => completeWithOpenAI(env, system, messages),
+        isTransientLlmError,
+        RETRY_OPTS,
+      );
       text = r.text;
       modelUsed = r.model;
+      providerUsed = "openai";
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Model request failed";
@@ -360,18 +565,28 @@ export async function handleEstimatorChatAi(
   }
 
   const parsed = parseJson(text);
-  const assistantMessage =
-    typeof parsed.assistantMessage === "string" ? parsed.assistantMessage.trim().slice(0, 12_000) : "";
-
-  if (!assistantMessage) {
-    return new Response(JSON.stringify({ success: false, error: "Model returned empty assistantMessage" }), {
-      status: 200,
+  const validated = validateCopilotOutput(parsed);
+  if (!validated.ok) {
+    return new Response(JSON.stringify({ success: false, error: validated.reason }), {
+      status: 502,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
+  const assistantMessage =
+    typeof parsed.assistantMessage === "string" ? parsed.assistantMessage.trim().slice(0, 12_000) : "";
+
   const formPatch = sanitizeFormPatch(parsed.formPatch);
-  const proposalPatch = sanitizeProposalPatch(parsed.proposalPatch);
+  let proposalPatch = sanitizeProposalPatch(parsed.proposalPatch);
+
+  const proposalTitleFromModel =
+    typeof proposalPatch.proposalTitle === "string" && proposalPatch.proposalTitle.trim().length > 0;
+  const patchKeysNoTitle = Object.keys(proposalPatch).filter((k) => k !== "proposalTitle");
+  const hasMeaningfulPatch = Object.keys(formPatch).length > 0 || patchKeysNoTitle.length > 0;
+  if (!proposalTitleFromModel && hasMeaningfulPatch) {
+    const auto = generateProposalTitle(formSnapObj, formPatch, proposalPatch);
+    if (auto) proposalPatch = { ...proposalPatch, proposalTitle: auto };
+  }
 
   return new Response(
     JSON.stringify({
@@ -382,7 +597,7 @@ export async function handleEstimatorChatAi(
         proposalPatch,
         model: modelUsed,
         mode,
-        provider: preferAnthropic ? "anthropic" : "openai",
+        provider: providerUsed,
       },
     }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

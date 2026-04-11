@@ -96,6 +96,39 @@ function optString(raw: unknown, max: number): string {
   return raw.trim().slice(0, max);
 }
 
+const ROOF_STRUCTURE_GUESSES = ["auto", "gable", "hip", "flat", "mansard", "complex"] as const;
+
+type MeasurementConfidence = "high" | "medium" | "low";
+
+function normalizeRoofStructureGuess(raw: unknown): string | null {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if ((ROOF_STRUCTURE_GUESSES as readonly string[]).includes(s)) return s;
+  return null;
+}
+
+function normalizePitchGuess(raw: unknown): string | null {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return null;
+  return s.slice(0, 32);
+}
+
+function normalizePlanAreaSqFtGuess(raw: unknown): number | null {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(String(raw).replace(/,/g, ""))
+        : NaN;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(Math.round(n), 500_000);
+}
+
+function normalizeMeasurementConfidence(raw: unknown): MeasurementConfidence | null {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (s === "high" || s === "medium" || s === "low") return s;
+  return null;
+}
+
 export async function handleRoofDamageAi(
   request: Request,
   env: Env,
@@ -196,11 +229,16 @@ Return ONLY valid JSON (no markdown) with exactly these keys:
 - recommendedAction: string — exactly one of: [${actionList}]
 - notes: string — 2–4 sentences: what you observe, caveats (distance, angle, lighting), and that a physical inspection is required. Empty string if roof not visible.
 - summary: string — one sentence headline for the report.
+- roofStructureGuess: string or null — ONLY if reasonably inferable from the image: one of: auto, gable, hip, flat, mansard, complex. Otherwise null or omit.
+- pitchGuess: string or null — rough pitch hint if visible (e.g. "6/12"); never invent precision. Otherwise null or omit.
+- planAreaSqFtGuess: number or null — rough plan footprint area in sq ft ONLY if scale/context allows a defensible order-of-magnitude guess; otherwise null or omit. Never invent precision.
+- confidence: string — exactly one of: high, medium, low — for the OPTIONAL measurement guesses only (roofStructureGuess, pitchGuess, planAreaSqFtGuess). Use "low" when the photo does not support measurement hints; omit measurement guess keys or set them null when confidence is low.
 
 Rules:
 - Be conservative: if unsure, lower severity and prefer "Further Inspection" or "Insurance Claim Help" as appropriate.
 - Do not claim engineering or legal conclusions; this is a visual assist only.
 - Satellite-only views: acknowledge limited certainty.
+- For measurement hints: omit or null whenever not reasonably inferable; never fabricate exact squares or pitch.
 ${context ? `\nContext: ${context}` : ""}`,
     },
   ];
@@ -268,6 +306,11 @@ ${context ? `\nContext: ${context}` : ""}`,
   const notes = optString(parsed.notes, 1200);
   const summary = optString(parsed.summary, 400);
 
+  const roofStructureGuess = normalizeRoofStructureGuess(parsed.roofStructureGuess);
+  const pitchGuess = normalizePitchGuess(parsed.pitchGuess);
+  const planAreaSqFtGuess = normalizePlanAreaSqFtGuess(parsed.planAreaSqFtGuess);
+  const confidence = normalizeMeasurementConfidence(parsed.confidence);
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -277,6 +320,10 @@ ${context ? `\nContext: ${context}` : ""}`,
         recommendedAction,
         notes,
         summary: summary || "AI draft — verify on site.",
+        roofStructureGuess,
+        pitchGuess,
+        planAreaSqFtGuess,
+        confidence,
         model: "gpt-4o-mini",
       },
     }),
