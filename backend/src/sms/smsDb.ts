@@ -17,6 +17,24 @@ export async function resolveOrgIdByInboundTo(db: D1, toE164: string): Promise<s
   return row?.org_id ?? null;
 }
 
+function normalizeE164ForOrgLookup(raw: string): string {
+  const s = (raw || "").trim();
+  if (!s) return "";
+  if (s.startsWith("+")) return s;
+  const digits = s.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : s;
+}
+
+/** Resolve org from the Telnyx “to” number (same as `sms_org_numbers.phone_e164`). */
+export async function getSmsOrgFromTelnyxToNumber(db: D1, phoneE164: string): Promise<string | null> {
+  if (db == null) return null;
+  const norm = normalizeE164ForOrgLookup(phoneE164);
+  if (!norm) return null;
+  return resolveOrgIdByInboundTo(db, norm);
+}
+
 export async function listSmsOrgNumbersForOrg(
   db: D1,
   orgId: string,
