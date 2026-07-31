@@ -4,6 +4,7 @@ import { useRoofing } from "../context/RoofingContext";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { CoxEstimateGenerator } from "../components/cox/CoxEstimateGenerator";
 
 export function Estimates() {
   const { estimates, contracts } = useRoofing();
@@ -28,6 +29,8 @@ export function Estimates() {
           </Button>
         </Link>
       </div>
+
+      <CoxEstimateGenerator />
 
       {estimates.length === 0 ? (
         <Card className="border-white/[0.07] ring-1 ring-white/[0.04]">
