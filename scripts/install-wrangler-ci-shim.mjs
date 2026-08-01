@@ -1,11 +1,7 @@
 /**
- * Cloudflare Workers Builds auth can deploy Workers, but not Pages (token scope).
- * Production SPA is therefore bundled as Worker static assets and routed on apex/www.
- *
- * Intercepts:
- *   - `wrangler deploy` / `wrangler versions upload`
- * Pre: build roofing-estimator-vite → dist (assets directory)
- * Post (versions upload only): `wrangler deploy --keep-vars true`
+ * Workers Builds can deploy Workers (+ assets) but not Pages.
+ * Build SPA into assets, deploy Worker, then orange-cloud apex/www DNS
+ * so Worker routes serve /measurement/new instead of stale Vercel HTML.
  */
 import { chmodSync, copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -22,7 +18,7 @@ if (!existsSync(realJs)) {
 }
 
 const current = readFileSync(realJs, "utf8");
-if (current.includes("WRANGLER_CI_SHIM_V3")) {
+if (current.includes("WRANGLER_CI_SHIM_V4")) {
   process.exit(0);
 }
 
@@ -31,7 +27,7 @@ if (!existsSync(backupJs) || !current.includes("WRANGLER_CI_SHIM")) {
 }
 
 const shim = `#!/usr/bin/env node
-/* WRANGLER_CI_SHIM_V3 */
+/* WRANGLER_CI_SHIM_V4 */
 const { spawnSync } = require("node:child_process");
 const { existsSync, mkdirSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
@@ -53,14 +49,18 @@ const distDir = join(viteDir, "dist");
 function ensureSpaBuilt() {
   if (process.env.WRANGLER_CI_SKIP_SPA === "1") return 0;
   if (!existsSync(join(viteDir, "package.json"))) {
-    console.warn("[wrangler-ci-shim] SPA package missing; writing placeholder dist");
     mkdirSync(distDir, { recursive: true });
-    writeFileSync(join(distDir, "index.html"), "<!doctype html><title>HD2D</title><p>SPA build missing</p>");
+    writeFileSync(join(distDir, "index.html"), "<!doctype html><title>HD2D</title>");
     return 0;
   }
   console.log("[wrangler-ci-shim] building SPA for Worker static assets…");
   if (run(npm, ["ci", "--no-audit", "--no-fund"], { cwd: viteDir }) !== 0) return 1;
   if (run(npm, ["run", "build"], { cwd: viteDir }) !== 0) return 1;
+  // Workers Assets rejects SPA /* redirects — strip if any slipped into dist.
+  const redirects = join(distDir, "_redirects");
+  if (existsSync(redirects)) {
+    writeFileSync(redirects, "# managed by Worker assets SPA fallback\\n");
+  }
   return 0;
 }
 
@@ -73,9 +73,17 @@ const status = run(process.execPath, [real, ...args], {});
 if (status !== 0) process.exit(status);
 
 if (isVersionsUpload && process.env.WRANGLER_CI_SKIP_DEPLOY !== "1") {
-  console.log("[wrangler-ci-shim] versions upload ok — deploying Worker (+ SPA assets) to production…");
+  console.log("[wrangler-ci-shim] versions upload ok — deploying Worker (+ SPA assets)…");
   const dep = run(process.execPath, [real, "deploy", "--keep-vars", "true"], {});
-  process.exit(dep);
+  if (dep !== 0) process.exit(dep);
+}
+
+if ((isDeploy || isVersionsUpload) && process.env.WRANGLER_CI_SKIP_DNS !== "1") {
+  const dns = join(repoRoot, "scripts", "cf-proxy-apex-for-worker.mjs");
+  if (existsSync(dns)) {
+    console.log("[wrangler-ci-shim] orange-clouding apex/www for Worker routes…");
+    run(process.execPath, [dns], { cwd: repoRoot });
+  }
 }
 process.exit(0);
 `;
@@ -86,4 +94,4 @@ try {
 } catch {
   /* ignore */
 }
-console.log("[wrangler-ci-shim] installed v3 (build SPA → worker deploy with assets)");
+console.log("[wrangler-ci-shim] installed v4 (SPA assets + proxy DNS)");

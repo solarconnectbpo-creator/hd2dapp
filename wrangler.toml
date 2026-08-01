@@ -8,12 +8,12 @@ compatibility_flags = ["nodejs_compat", "nodejs_als"]
 workers_dev = true
 preview_urls = true
 
-# API + apex/www custom domains so the Vite SPA (Worker assets) replaces stale Vercel HTML.
-# custom_domain attaches/updates DNS on the Cloudflare zone (orange-cloud).
+# api uses a Worker custom domain. apex/www keep existing DNS (often Vercel) but are
+# intercepted via Worker routes once those records are orange-cloud proxied.
 routes = [
   { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
-  { pattern = "hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
-  { pattern = "www.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
+  { pattern = "hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "www.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
 ]
 
 [triggers]
