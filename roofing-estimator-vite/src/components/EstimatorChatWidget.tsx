@@ -278,9 +278,6 @@ export function EstimatorChatWidget() {
           severity,
           propertyRecordNotes,
         };
-        if (summary) {
-          formPatch.carrierScopeText = `Photo review: ${summary}`.slice(0, 8000);
-        }
         lastPatchesRef.current = { formPatch, proposalPatch: {} };
         setLastProviderLine(typeof d.model === "string" ? `${d.model} · roof-damage` : "roof-damage (OpenAI)");
         setMessages((prev) => [...prev, { role: "assistant", content: narrative }]);

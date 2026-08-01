@@ -1,7 +1,4 @@
-import { getDefaultCarrierBenchmarkProfileId } from "../../lib/carrierBenchmarkPricing";
 import type { FormState } from "./measurementFormTypes";
-
-const DEFAULT_CARRIER_BENCHMARK_PROFILE_ID = getDefaultCarrierBenchmarkProfileId();
 
 /** Blank intake — address search and measurements start empty. */
 export function defaultFormState(): FormState {
@@ -30,12 +27,6 @@ export function defaultFormState(): FormState {
     severity: 2,
     damageTypes: [],
     estimateScopeMode: "replace",
-    carrierScopeText: "",
-    carrierBenchmarkProfileId: DEFAULT_CARRIER_BENCHMARK_PROFILE_ID,
-    carrierBenchmarkRegionFactor: "1.00",
-    carrierBenchmarkComplexityFactor: "1.00",
-    deductibleUsd: "0",
-    nonRecDepUsd: "0",
     propertyRecordNotes: "",
     estimateAddonModBitDetailed: "",
     estimateAddonDryInSq: "",
@@ -79,12 +70,6 @@ export function hillsdaleFormTemplate(): FormState {
     severity: 3,
     damageTypes: ["Wind", "Leaks"],
     estimateScopeMode: "replace",
-    carrierScopeText: "",
-    carrierBenchmarkProfileId: DEFAULT_CARRIER_BENCHMARK_PROFILE_ID,
-    carrierBenchmarkRegionFactor: "1.00",
-    carrierBenchmarkComplexityFactor: "1.00",
-    deductibleUsd: "2500",
-    nonRecDepUsd: "500",
     propertyRecordNotes: "",
     estimateAddonModBitDetailed: "",
     estimateAddonDryInSq: "",

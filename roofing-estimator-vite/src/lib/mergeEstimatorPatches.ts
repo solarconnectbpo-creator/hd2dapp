@@ -80,7 +80,6 @@ export function mergeProposalPatch<T extends ProposalClientSlice>(
 }
 
 export function buildGhlSummaryNote(form: FormState, proposal: ProposalClientSlice): string {
-  const carrier = (form.carrierScopeText || "").trim();
   const lines = [
     "HD2D — Roofing estimator (Copilot / New Measurement)",
     `Proposal title: ${proposal.proposalTitle || "—"}`,
@@ -93,8 +92,6 @@ export function buildGhlSummaryNote(form: FormState, proposal: ProposalClientSli
     `Plan area sq ft: ${form.areaSqFt || "—"} | Perimeter ft: ${form.perimeterFt || "—"}`,
     `Squares: ${form.measuredSquares || "—"} | Waste %: ${form.wastePercent || "—"}`,
     `Scope mode: ${form.estimateScopeMode} | Damage: ${form.damageTypes.join(", ") || "—"} | Severity: ${form.severity}`,
-    `Deductible: ${form.deductibleUsd || "—"} | Non-rec dep: ${form.nonRecDepUsd || "—"}`,
-    carrier ? `Carrier / scope narrative: ${carrier.slice(0, 2000)}${carrier.length > 2000 ? "…" : ""}` : "",
     `Property / field notes: ${form.propertyRecordNotes || "—"}`,
   ].filter(Boolean);
   return lines.join("\n");

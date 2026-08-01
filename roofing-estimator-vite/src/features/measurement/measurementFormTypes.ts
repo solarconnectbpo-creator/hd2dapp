@@ -19,7 +19,7 @@ export const DAMAGE_TYPES: DamageType[] = [
  */
 export type EstimateScopeMode = "replace" | "repair" | "auto";
 
-/** Main intake + carrier fields for the measurement / estimate screen. */
+/** Main intake fields for the measurement / estimate screen. */
 export interface FormState {
   address: string;
   stateCode: string;
@@ -45,12 +45,6 @@ export interface FormState {
   severity: number;
   damageTypes: DamageType[];
   estimateScopeMode: EstimateScopeMode;
-  carrierScopeText: string;
-  carrierBenchmarkProfileId: string;
-  carrierBenchmarkRegionFactor: string;
-  carrierBenchmarkComplexityFactor: string;
-  deductibleUsd: string;
-  nonRecDepUsd: string;
   /** Year built, lot size, etc. from property record import (Property records page). */
   propertyRecordNotes: string;
 

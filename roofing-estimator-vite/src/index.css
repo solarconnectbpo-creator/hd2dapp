@@ -257,12 +257,17 @@ html {
   gap: 10px;
 }
 
+.form-grid > * {
+  min-width: 0;
+}
+
 label {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
   color: var(--x-text);
+  min-width: 0;
 }
 
 .auth-page label {
@@ -285,12 +290,19 @@ button {
   padding: 9px 10px;
 }
 
-textarea {
-  border-radius: 14px;
+label > input,
+label > select,
+label > textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 textarea {
+  border-radius: 14px;
   resize: vertical;
+  min-height: 0;
+  overflow: auto;
 }
 
 .damage-wrap {
