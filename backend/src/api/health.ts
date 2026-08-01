@@ -6,7 +6,7 @@ import { resolvePublicAppOrigin } from "../auth/publicOrigin";
 import { resolveArcgisParcelLayerUrl } from "./arcgisParcelEnv";
 
 /** Bumped when deploying auth/D1 fixes — curl GET /api/health to confirm the live Worker matches the repo. */
-export const WORKER_BUILD_TAG = "2026-08-01-nationwide-owners-workspace-sync";
+export const WORKER_BUILD_TAG = "2026-08-01-admin-patch-cors-billing";
 
 type HealthEnv = {
   /** OpenAI — chat, marketing images, roof helpers (Wrangler secret `OPENAI_API_KEY`). */

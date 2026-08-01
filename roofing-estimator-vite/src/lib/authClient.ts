@@ -367,6 +367,7 @@ export async function adminSetUserApproval(
   token: string,
   userId: string,
   approval_status: "pending" | "approved" | "rejected",
+  opts?: { activateBilling?: boolean },
 ): Promise<void> {
   const apiBase = getAuthApiBase();
   if (!apiBase) throw new Error("Backend API base is not configured.");
@@ -377,12 +378,41 @@ export async function adminSetUserApproval(
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ approval_status }),
+    body: JSON.stringify({
+      approval_status,
+      ...(opts?.activateBilling === undefined ? {} : { activate_billing: opts.activateBilling }),
+    }),
   });
   const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
   if (!res.ok || data.success !== true) {
     throw new Error(
       safeUserFacingApiMessage(data.error || `Approval update failed (${res.status}).`, res.status, {
+        skipStatusHints: true,
+      }),
+    );
+  }
+}
+
+export async function adminSetUserBilling(
+  token: string,
+  userId: string,
+  billing_status: "unpaid" | "active" | "past_due" | "canceled",
+): Promise<void> {
+  const apiBase = getAuthApiBase();
+  if (!apiBase) throw new Error("Backend API base is not configured.");
+  const res = await authFetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/billing`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ billing_status }),
+  });
+  const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
+  if (!res.ok || data.success !== true) {
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Billing update failed (${res.status}).`, res.status, {
         skipStatusHints: true,
       }),
     );
