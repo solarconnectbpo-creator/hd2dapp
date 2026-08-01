@@ -43,12 +43,6 @@ const FORM_PATCH_KEYS = new Set<string>([
   "othersFt",
   "severity",
   "damageTypes",
-  "carrierScopeText",
-  "carrierBenchmarkProfileId",
-  "carrierBenchmarkRegionFactor",
-  "carrierBenchmarkComplexityFactor",
-  "deductibleUsd",
-  "nonRecDepUsd",
   "propertyRecordNotes",
   "estimateAddonModBitDetailed",
   "estimateAddonDryInSq",
@@ -274,9 +268,9 @@ function generateProposalTitle(
 function modeHint(mode: CopilotMode): string {
   switch (mode) {
     case "estimate":
-      return `Focus: **Estimate & takeoff** — Help reps build complete estimates. Walk through: address/location, roof type/structure, pitch, plan area or squares, waste %, measured squares, lineal feet (ridges, eaves, rakes, valleys, hips, flashing), severity/damage tags if relevant, carrier scope narrative, and add-on fields when they mention gutters, dry-in, engineering, etc. Guide use of the in-app map (footprint, lines, auto-trace). When the user gives concrete numbers or facts, include them in **formPatch**. When they ask for a checklist or how to start, include a clear **Checklist** section in assistantMessage (you may use the precomputed lines from the system message).`;
+      return `Focus: **Estimate & takeoff** — Help reps build complete estimates. Walk through: address/location, roof type/structure, pitch, plan area or squares, waste %, measured squares, lineal feet (ridges, eaves, rakes, valleys, hips, flashing), severity/damage tags if relevant, field notes, and add-on fields when they mention gutters, dry-in, engineering, etc. Guide use of the in-app map (footprint, lines, auto-trace). When the user gives concrete numbers or facts, include them in **formPatch**. When they ask for a checklist or how to start, include a clear **Checklist** section in assistantMessage (you may use the precomputed lines from the system message).`;
     case "damage":
-      return `Focus: **Storm damage & inspection reports** — Draft professional, neutral field documentation. When they want a report, structure **assistantMessage** with clear sections, e.g.: (1) Property / date / weather context (2) Summary (3) Observations by elevation/area (4) Interior signs if any (5) Photo/documentation checklist (6) Limitations / access (7) Suggested next steps. Use **propertyRecordNotes** or **carrierScopeText** in formPatch for long narrative when appropriate. Set **severity** (1–5) and **damageTypes** when the user describes damage. Never guarantee insurance outcomes or claim value.`;
+      return `Focus: **Storm damage & inspection reports** — Draft professional, neutral field documentation. When they want a report, structure **assistantMessage** with clear sections, e.g.: (1) Property / date / weather context (2) Summary (3) Observations by elevation/area (4) Interior signs if any (5) Photo/documentation checklist (6) Limitations / access (7) Suggested next steps. Use **propertyRecordNotes** in formPatch for long narrative when appropriate. Set **severity** (1–5) and **damageTypes** when the user describes damage. Never guarantee insurance outcomes or claim value.`;
     case "followup":
       return `Focus: **Follow-up & pipeline** — Draft SMS/email snippets, call scripts, and next-step checklists. You cannot send messages yourself; remind them to use **Send to GHL** and SMS automation in the app. Suggest **proposalPatch** (clientName, clientEmail, clientPhone, etc.) when they share contact info.
 
@@ -302,8 +296,8 @@ function buildSystemPrompt(
 ${hint}
 
 **What you excel at (use the full thread context):**
-- **Estimates:** Build and review takeoffs — squares, pitch, waste, lineals, add-ons, carrier scope language.
-- **Storm damage reports:** Neutral, inspection-style narratives; photo checklists; severity and damage tags; notes suitable for **propertyRecordNotes** or **carrierScopeText** when long text is needed.
+- **Estimates:** Build and review takeoffs — squares, pitch, waste, lineals, add-ons, and field notes.
+- **Storm damage reports:** Neutral, inspection-style narratives; photo checklists; severity and damage tags; notes suitable for **propertyRecordNotes** when long text is needed.
 - **General Q&A:** Materials, methods, ladder safety reminders, how to explain findings to homeowners, objection handling (without guaranteeing outcomes).
 - **Follow-up:** CRM-ready snippets; GHL handoff is via the app (**Send to GHL**).
 
@@ -320,7 +314,7 @@ ${hint}
 **Proposals & CRM (when relevant):**
 - **proposalTitle** should read like a client-facing document title (specific address or job name, scope hint, e.g. "Full roof replacement — 123 Oak St — inspection & estimate").
 - In **followup** mode, when contact info appears, fill **proposalPatch** with polished names/emails/phones the rep can send as-is.
-- Use **carrierScopeText** for insurer-style scope summaries when the user asks for "scope language" or Xactimate-style narrative; keep **propertyRecordNotes** for field observations.
+- Use **propertyRecordNotes** for field observations and longer narrative notes.
 
 **Output format (required):** Respond with **only** a single JSON object (no markdown outside JSON), with keys:
 - "assistantMessage" (string; markdown **inside the string** is allowed; prefer up to ~6000 chars for long storm reports or estimate breakdowns when needed)

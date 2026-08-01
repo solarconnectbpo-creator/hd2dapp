@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci --prefix roofing-estimator-vite --no-audit --no-fund",
+  "buildCommand": "npm run build --prefix roofing-estimator-vite",
+  "outputDirectory": "roofing-estimator-vite/dist",
+  "rewrites": [
+    {
+      "source": "/api",
+      "destination": "https://api.hardcoredoortodoorclosers.com/api"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.hardcoredoortodoorclosers.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

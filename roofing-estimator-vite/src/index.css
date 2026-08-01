@@ -257,12 +257,17 @@ html {
   gap: 10px;
 }
 
+.form-grid > * {
+  min-width: 0;
+}
+
 label {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
   color: var(--x-text);
+  min-width: 0;
 }
 
 .auth-page label {
@@ -285,12 +290,19 @@ button {
   padding: 9px 10px;
 }
 
-textarea {
-  border-radius: 14px;
+label > input,
+label > select,
+label > textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 textarea {
+  border-radius: 14px;
   resize: vertical;
+  min-height: 0;
+  overflow: auto;
 }
 
 .damage-wrap {
@@ -1060,7 +1072,17 @@ html body #root .canvass-light-sheet button.bg-zinc-900 svg {
   color: #fafafa !important;
 }
 
-html body #root .canvass-paper {
+/* Map hint pill + toast chips: beat global `button { background:#101214; color:--x-text }` (blue-gray on black). */
+html body #root .canvass-paper,
+html body #root button.canvass-paper {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
+}
+
+html body #root button.canvass-paper.text-zinc-950,
+html body #root .canvass-paper.text-zinc-950 {
   color: #0f172a !important;
 }
 
@@ -1079,6 +1101,19 @@ html body #root .canvass-paper {
   .bg-gray-50,
   .bg-gray-100 {
     background-color: var(--x-surface) !important;
+  }
+
+  /* Same layer as .bg-white remap — higher specificity keeps canvass paper white. */
+  .canvass-paper.bg-white,
+  button.canvass-paper.bg-white,
+  .canvass-light-sheet.bg-white {
+    background-color: #ffffff !important;
+  }
+
+  button.canvass-paper,
+  button.canvass-paper.text-zinc-950 {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
   }
 
   [data-slot="card"] {
@@ -1241,7 +1276,32 @@ html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body 
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer p {
-  color: #8b9199 !important;
+  color: #aeb4bd !important;
+}
+
+/* Outline / zinc utility buttons inherit dark-ink classes that vanish on the dark footer. */
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button {
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button svg {
+  color: #f8fafc !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button.bg-zinc-900 {
+  background-color: #1d9bf0 !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button.bg-zinc-900:hover {
+  background-color: #1a8cd8 !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer .text-zinc-950,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer .text-zinc-600 {
+  color: #e7e9ea !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet label {
@@ -1279,5 +1339,167 @@ html body #root .canvass-light-sheet.canvass-property-sheet textarea {
   background-color: #1a1d26 !important;
   color: #e7e9ea !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/*
+ * Light ink panels (storm damage sheet, report cards, light modals).
+ * Global utilities remap `.bg-white` → `--x-surface` and `.text-black*` / `h3` / `label`
+ * → chrome colors, which reads as blue/gray type on a black box. Force paper + ink.
+ */
+html body #root .hd2d-light-ink {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+html body #root .hd2d-light-ink .bg-white,
+html body #root .hd2d-light-ink .bg-white\/70,
+html body #root .hd2d-light-ink .bg-white\/80,
+html body #root .hd2d-light-ink .bg-white\/90,
+html body #root .hd2d-light-ink .bg-slate-50,
+html body #root .hd2d-light-ink .bg-gray-50 {
+  background-color: #ffffff !important;
+}
+
+html body #root .hd2d-light-ink h1,
+html body #root .hd2d-light-ink h2,
+html body #root .hd2d-light-ink h3 {
+  color: #0f172a !important;
+}
+
+html body #root .hd2d-light-ink p,
+html body #root .hd2d-light-ink span,
+html body #root .hd2d-light-ink li,
+html body #root .hd2d-light-ink summary {
+  color: #0f172a;
+}
+
+html body #root .hd2d-light-ink label {
+  color: #475569 !important;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+html body #root .hd2d-light-ink .text-black,
+html body #root .hd2d-light-ink .text-black\/80,
+html body #root .hd2d-light-ink .text-black\/70,
+html body #root .hd2d-light-ink .text-black\/60,
+html body #root .hd2d-light-ink .text-black\/50,
+html body #root .hd2d-light-ink .text-slate-600,
+html body #root .hd2d-light-ink .text-zinc-950 {
+  color: #0f172a !important;
+}
+
+html body #root .hd2d-light-ink .text-zinc-600,
+html body #root .hd2d-light-ink .text-muted-foreground {
+  color: #475569 !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-report-panel {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-report-body,
+html body #root .hd2d-light-ink pre {
+  color: #334155 !important;
+  background: transparent !important;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-ink-muted {
+  color: #64748b !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-ink-accent {
+  color: #0f766e !important;
+}
+
+/* Default chrome `button` is dark + --x-text (reads blue-gray). Light panels need ink. */
+html body #root .hd2d-light-ink button {
+  color: #0f172a;
+}
+
+html body #root .hd2d-light-ink button.hd2d-btn-on-dark,
+html body #root .hd2d-light-ink button.hd2d-btn-primary {
+  color: #ffffff !important;
+  background-color: #0f172a !important;
+  border-color: transparent !important;
+}
+
+html body #root .hd2d-light-ink button.hd2d-btn-accent {
+  color: #ffffff !important;
+  background-color: #0f766e !important;
+  border-color: transparent !important;
+}
+
+html body #root .hd2d-light-ink button.hd2d-btn-secondary {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+html body #root .hd2d-light-ink input[type="checkbox"] {
+  background-color: #ffffff !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  border-radius: 0.25rem;
+}
+
+/* Same report ink fixes inside existing canvass light modals (Projects). */
+html body #root .canvass-light-sheet .hd2d-report-panel {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html body #root .canvass-light-sheet .hd2d-report-body,
+html body #root .canvass-light-sheet pre.hd2d-report-body {
+  color: #334155 !important;
+  background: transparent !important;
+}
+
+html body #root .canvass-light-sheet .text-black\/80,
+html body #root .canvass-light-sheet .text-black\/70,
+html body #root .canvass-light-sheet .text-black\/60,
+html body #root .canvass-light-sheet .text-black\/50 {
+  color: #334155 !important;
+}
+
+html body #root .canvass-light-sheet h3 {
+  color: #0f172a !important;
+}
+
+/* Final canvass map-chip guard (after all remaps): white paper + slate ink, never chrome blue-gray. */
+html body #root [data-canvass-route] button.canvass-paper,
+html body #root [data-canvass-route] .canvass-paper {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
+}
+
+/*
+ * Map hint chip — dedicated class (no bg-white / text-zinc-950) so dark-chrome remaps cannot
+ * paint a black pill with blue-gray button text. Inline styles + these !important rules.
+ */
+html body #root [data-canvass-route] .canvass-map-chip,
+html body #root [data-canvass-route] button.canvass-map-chip {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #0f172a !important;
+  border: 1px solid #d1d5db !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+html body #root [data-canvass-route] button.canvass-map-chip:hover,
+html body #root [data-canvass-route] button.canvass-map-chip:focus-visible {
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
 

@@ -1,3 +1,5 @@
+import type { AuthEnv } from "./authRoutes";
+import { getBearerPayload } from "./authRoutes";
 /**
  * POST /api/ghl/submit-lead — create GoHighLevel contact + optional note (summary).
  * Requires wrangler secrets: GHL_PRIVATE_INTEGRATION_TOKEN, GHL_LOCATION_ID
@@ -5,10 +7,10 @@
  * @see https://marketplace.gohighlevel.com/docs
  */
 
-interface Env {
+type Env = AuthEnv & {
   GHL_PRIVATE_INTEGRATION_TOKEN?: string;
   GHL_LOCATION_ID?: string;
-}
+};
 
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
@@ -46,6 +48,15 @@ export async function handleGhlSubmitLead(
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
       status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Writes into the org's CRM — require a signed-in caller.
+  const authPayload = await getBearerPayload(request, env);
+  if (!authPayload) {
+    return new Response(JSON.stringify({ success: false, error: "Sign in required." }), {
+      status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

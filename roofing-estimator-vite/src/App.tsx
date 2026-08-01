@@ -65,24 +65,26 @@ import {
 } from "./lib/roofComplianceReferences";
 import { buildFootprintDxfFromPolygons, type FootprintFeature } from "./lib/roofDxfExport";
 import { compareDrawnVsHeuristic, type TakeoffComparisonRow } from "./lib/roofTakeoffComparison";
-import { parseCarrierScope, type CarrierParsed } from "./lib/carrierScopeParse";
 import { getScopedStorageKey } from "./lib/userScopedStorage";
 import { Map3D, type Map3DHandle } from "./components/Map3D";
-import {
-  computeCarrierBenchmark,
-  getCarrierBenchmarkProfiles,
-  getCarrierBenchmarkSourceLabel,
-} from "./lib/carrierBenchmarkPricing";
 import {
   DAMAGE_TYPES,
   type DamageType,
   type EstimateScopeMode,
   type FormState,
 } from "./features/measurement/measurementFormTypes";
-import { defaultFormState, hillsdaleFormTemplate } from "./features/measurement/measurementFormDefaults";
+import { defaultFormState } from "./features/measurement/measurementFormDefaults";
+import {
+  accessSurchargeLabel,
+  accessSurchargePerSquare,
+} from "./features/measurement/accessSurcharge";
+import {
+  normalizeProposalState,
+  type ProposalProfile,
+  type ProposalState,
+} from "./features/measurement/proposalTypes";
 import pricingCatalog from "./data/ai-cheatsheet-pricing.json";
 
-type DeltaDirection = "under-scoped" | "over-scoped" | "aligned";
 type RoofLineType = "ridge" | "hip" | "valley" | "eave" | "rake" | "wall-flashing" | "step-flashing";
 
 const DAMAGE_PHOTO_TAGS = [
@@ -162,9 +164,6 @@ const STATE_MULTIPLIER: Record<string, number> = {
   AK: 1.34, CA: 1.28, CO: 1.09, CT: 1.12, DC: 1.2, FL: 1.03, HI: 1.36, MA: 1.16,
   MD: 1.1, NJ: 1.16, NY: 1.2, OR: 1.07, WA: 1.12, TX: 0.96, MO: 0.94, MN: 1.05,
 };
-const CARRIER_BENCHMARK_SOURCE_LABEL = getCarrierBenchmarkSourceLabel();
-const CARRIER_BENCHMARK_PROFILES = getCarrierBenchmarkProfiles();
-
 interface MeasurementSection {
   id: string;
   label: string;
@@ -224,30 +223,6 @@ interface EstimateResult {
   regional: number;
   quality: number;
   warnings: string[];
-  carrier: CarrierParsed;
-  carrierBenchmark: {
-    sourceLabel: string;
-    profileId: string;
-    profileName: string;
-    regionFactor: number;
-    complexityFactor: number;
-    blendedMultiplier: number;
-    baseRcv: number;
-    adjustedRcv: number;
-    adjustedDelta: number;
-    adjustedDeltaDirection: DeltaDirection;
-    requiredLineCategories: string[];
-    optionalLineCategories: string[];
-  };
-  delta: number;
-  deltaDirection: DeltaDirection;
-  settlement: {
-    deductible: number;
-    recoverableDep: number;
-    initialPayment: number;
-    finalProjected: number;
-    outOfPocket: number;
-  };
   /** Drawn/entered LF vs heuristic model from plan geometry (QC). */
   takeoffComparison?: TakeoffComparisonRow[];
 }
@@ -257,17 +232,10 @@ interface SavedJob {
   name: string;
   createdAtIso: string;
   form: FormState;
-}
-
-interface SavedApiReport {
-  id: number;
-  total_area_sqft: number;
-  roof_sections: number;
-  created_at: string;
-  address?: string;
-  state?: string;
-  pitch?: string;
-  features?: Array<Record<string, unknown>>;
+  proposal?: ProposalState;
+  /** When set, Save/Print updates this contract instead of creating a new one. */
+  contractId?: string;
+  estimateId?: string;
 }
 
 interface PropertyOwnerRecord {
@@ -312,34 +280,6 @@ interface TaggedDamagePhoto {
   name: string;
   previewUrl: string;
   tags: string[];
-}
-
-type ProposalProfile = "residential" | "commercial";
-
-interface ProposalState {
-  profile: ProposalProfile;
-  companyName: string;
-  companyAddress: string;
-  companyWebsite: string;
-  logoDataUrl: string;
-  preparedBy: string;
-  clientName: string;
-  clientCompany: string;
-  clientEmail: string;
-  clientPhone: string;
-  contactEmail: string;
-  contactPhone: string;
-  proposalTitle: string;
-  inclusions: string;
-  exclusions: string;
-  paymentSchedule: string;
-  warranty: string;
-  alternates: string;
-  financingNotes: string;
-  /** Auto-filled from carrier comparison + settlement when you run Generate Estimate. */
-  insuranceSupplementNotes: string;
-  /** Auto-filled payout summary (initial ACV, projected final, OOP) when you run Generate Estimate. */
-  estimatedInsurancePayout: string;
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -400,12 +340,6 @@ function parseLengthFeet(value?: string): number {
   }
   const n = Number.parseFloat(text.replace(/[^\d.]/g, ""));
   return Number.isFinite(n) ? n : 0;
-}
-
-function parseBenchmarkFactor(input: string, fallback: number): number {
-  const n = Number.parseFloat(input);
-  if (!Number.isFinite(n)) return fallback;
-  return clamp(n, 0.75, 1.4);
 }
 
 /** Line lengths for diagrams — same source as `buildResult` (parsed from form), not re-parsed from formatted DRW strings. */
@@ -719,8 +653,6 @@ type PricingCatalogLine = {
   tax: number;
 };
 
-const STEEP_SURCHARGE: Record<string, number> = { "4-6": 18.50, "7-9": 32.00, "10+": 55.00 };
-const HEIGHT_SURCHARGE: Record<string, number> = { "2story": 8.10, "3story": 15.50, "4story": 24.00 };
 const GENERAL_CONDITIONS: MaterialLineItem[] = [
   { code: "GEN-DMP", description: "Dumpster load (~40 yds)", unit: "EA", replace: 913, qtyFn: "dumpster" },
   { code: "GEN-SAF", description: "Safety: fall protection setup", unit: "EA", replace: 385, qtyFn: "fixed1" },
@@ -1712,8 +1644,22 @@ function buildScopeLines(
 
   appendEstimateAddonScopeLines(lines, form, profile, scope, effectiveSquares, regional, lengths);
 
-  void STEEP_SURCHARGE;
-  void HEIGHT_SURCHARGE;
+  // Steep-slope and multi-story access cost real labor; price it as its own visible line
+  // rather than burying it in the per-square rate.
+  const accessPitchRise = parsePitchRise(form.roofPitch);
+  const accessStories = Number.parseFloat(form.stories) || null;
+  const accessPerSq = accessSurchargePerSquare(accessPitchRise, accessStories);
+  const accessLabel = accessSurchargeLabel(accessPitchRise, accessStories);
+  if (accessPerSq > 0 && effectiveSquares > 0 && accessLabel) {
+    lines.push({
+      code: "ACC-STEEP",
+      description: `Steep / height access (${accessLabel})`,
+      quantity: round2(effectiveSquares),
+      unit: "SQ",
+      unitCost: round2(accessPerSq * regional),
+      total: 0,
+    });
+  }
 
   const materialSubtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
   if (materialSubtotal > 0) {
@@ -1746,85 +1692,6 @@ function buildScopeLines(
     .filter((line) => line.quantity > 0);
 }
 
-function buildInsuranceSupplementNotes(form: FormState, result: EstimateResult): string {
-  const c = result.carrier;
-  const b = result.carrierBenchmark;
-  const linesOut: string[] = [];
-  linesOut.push(
-    `Carrier scope: ${c.parsedLineCount} priced line item(s) parsed. Valuation basis: ${c.valuationBasis}. Parser confidence: ${c.parserConfidence}.`,
-  );
-  if (c.rcv != null || c.acv != null) {
-    linesOut.push(
-      `Carrier document RCV / ACV: ${c.rcv != null ? money(c.rcv) : "—"} / ${c.acv != null ? money(c.acv) : "—"}${c.dep != null ? ` (depreciation ${money(c.dep)})` : ""}.`,
-    );
-  }
-  if (c.supplementLabeledTotal != null) {
-    linesOut.push(`Labeled supplement total in scope text: ${money(c.supplementLabeledTotal)}.`);
-  } else if (c.supplementAmounts.length > 0) {
-    linesOut.push(`Supplement figures found in scope: ${c.supplementAmounts.map((n) => money(n)).join(", ")}.`);
-  }
-  if (
-    c.parsedLineCount > 0 &&
-    c.lineExtensionSum > 0 &&
-    (c.valuationBasis === "RCV" || c.valuationBasis === "ACV")
-  ) {
-    const labelAmt = c.valuationBasis === "RCV" ? c.rcv : c.acv;
-    if (
-      labelAmt != null &&
-      Math.abs(labelAmt - c.lineExtensionSum) > Math.max(500, labelAmt * 0.02)
-    ) {
-      linesOut.push(
-        `Summed line-item extensions (${money(c.lineExtensionSum)}) differ from labeled ${c.valuationBasis} (${money(labelAmt)}) — taxes, O&P, fees, or non-line totals may explain the gap.`,
-      );
-    }
-  }
-  const deltaNote =
-    result.deltaDirection === "under-scoped"
-      ? "Estimator RCV is higher than the carrier total — review for potential supplement / line-item gaps."
-      : result.deltaDirection === "over-scoped"
-        ? "Estimator RCV is lower than the carrier total — verify takeoff and scope assumptions."
-        : "Estimator and carrier totals are in the same ballpark.";
-  linesOut.push(
-    `${deltaNote} Delta: ${money(result.delta)} (estimator ${money(result.replacementCostValue)} vs carrier basis ${money(c.total)}).`,
-  );
-  linesOut.push(
-    `${b.sourceLabel}: ${b.profileName} profile applied (multiplier ×${b.blendedMultiplier.toFixed(3)} from base × region × complexity). Adjusted benchmark ${money(b.adjustedRcv)} vs carrier ${money(c.total)} (delta ${money(b.adjustedDelta)}; ${b.adjustedDeltaDirection}).`,
-  );
-  if (b.requiredLineCategories.length > 0) {
-    linesOut.push(`Required benchmark scope checks: ${b.requiredLineCategories.join("; ")}.`);
-  }
-  if (b.optionalLineCategories.length > 0) {
-    linesOut.push(`Optional benchmark scope checks: ${b.optionalLineCategories.join("; ")}.`);
-  }
-  if (c.likelyMissingItems.length > 0) {
-    linesOut.push(`Common scope gaps to verify in the field: ${c.likelyMissingItems.join("; ")}.`);
-  }
-  linesOut.push(
-    `Deductible in form: ${money(result.settlement.deductible)}. Non-recoverable depreciation (form): ${money(Math.max(0, Math.round(Number.parseFloat(form.nonRecDepUsd) || 0)))}.`,
-  );
-  if (c.deductibleFromCarrier != null) {
-    linesOut.push(`Carrier document also references deductible ≈ ${money(c.deductibleFromCarrier)} — confirm against the policy.`);
-  }
-  return linesOut.join("\n");
-}
-
-function buildEstimatedInsurancePayoutSummary(result: EstimateResult): string {
-  const s = result.settlement;
-  const c = result.carrier;
-  const parts = [
-    `Initial ACV payment (after deductible in app): ${money(s.initialPayment)}.`,
-    `Recoverable depreciation (modeled): ${money(s.recoverableDep)}.`,
-    `Projected final insurance payment (initial + recoverable dep): ${money(s.finalProjected)}.`,
-    `Estimated homeowner out-of-pocket vs full contractor RCV: ${money(s.outOfPocket)}.`,
-  ];
-  if (c.netClaimFromCarrier != null) {
-    parts.push(`Reference: carrier/statement payment figure ≈ ${money(c.netClaimFromCarrier)} (compare to lines above).`);
-  }
-  if (c.acv != null) {
-    parts.push(`Carrier ACV on file: ${money(c.acv)}.`);
-  }
-  return parts.join("\n");
-}
 
 function buildMeasurementSectionFromForm(form: FormState, label = "Section 1"): MeasurementSection {
   return {
@@ -1891,20 +1758,21 @@ function buildRoofFaceTableHtml(
 }
 
 function defaultProposalState(profile: ProposalProfile = "residential"): ProposalState {
+  // Company identity stays empty here — filled from Contacts & settings (org profile) per account.
   if (profile === "commercial") {
     return {
       profile,
-      companyName: "Repair King",
+      companyName: "",
       companyAddress: "",
       companyWebsite: "",
       logoDataUrl: "",
-      preparedBy: "Estimator",
+      preparedBy: "",
       clientName: "",
       clientCompany: "",
       clientEmail: "",
       clientPhone: "",
-      contactEmail: "estimating@repairking.com",
-      contactPhone: "(000) 000-0000",
+      contactEmail: "",
+      contactPhone: "",
       proposalTitle: "Commercial Full Roof Replacement Proposal",
       inclusions:
         "Mobilization, safety setup, full tear-off and disposal as specified, new roof system installation to manufacturer specs, perimeter and penetration flashing, accessory metals, and jobsite cleanup.",
@@ -1918,23 +1786,21 @@ function defaultProposalState(profile: ProposalProfile = "residential"): Proposa
         "Alternate A: fully adhered system. Alternate B: mechanically attached system. Alternate C: coating restoration option.",
       financingNotes:
         "Commercial financing options available subject to underwriting and approved credit terms.",
-      insuranceSupplementNotes: "",
-      estimatedInsurancePayout: "",
     };
   }
   return {
     profile,
-    companyName: "Repair King",
+    companyName: "",
     companyAddress: "",
     companyWebsite: "",
     logoDataUrl: "",
-    preparedBy: "Estimator",
+    preparedBy: "",
     clientName: "",
     clientCompany: "",
     clientEmail: "",
     clientPhone: "",
-    contactEmail: "estimating@repairking.com",
-    contactPhone: "(000) 000-0000",
+    contactEmail: "",
+    contactPhone: "",
       proposalTitle: "Residential Full Roof Replacement Proposal",
       inclusions:
         "Complete tear-off and disposal of existing roofing, underlayment and ice/water shield at code-typical areas, new asphalt or specified roof system, starter and ridge components, flashing at walls and penetrations, ventilation balance as specified, and thorough cleanup.",
@@ -1948,8 +1814,6 @@ function defaultProposalState(profile: ProposalProfile = "residential"): Proposa
       "Alternate A: upgraded impact-resistant shingle. Alternate B: premium vent package. Alternate C: gutter replacement add-on.",
     financingNotes:
       "Monthly payment options available for qualified homeowners through partner lenders.",
-    insuranceSupplementNotes: "",
-    estimatedInsurancePayout: "",
   };
 }
 
@@ -2119,31 +1983,6 @@ function buildResult(form: FormState): EstimateResult | null {
   }
   quality = clamp(quality, 35, 100);
 
-  const carrier = parseCarrierScope(form.carrierScopeText);
-  const benchmarkComputation = computeCarrierBenchmark({
-    profileId: form.carrierBenchmarkProfileId,
-    baseRcv: replacementCostValue,
-    regionFactor: parseBenchmarkFactor(form.carrierBenchmarkRegionFactor, 1),
-    complexityFactor: parseBenchmarkFactor(form.carrierBenchmarkComplexityFactor, 1),
-  });
-  const adjustedDelta = benchmarkComputation.adjustedRcv - carrier.total;
-  const adjustedDeltaDirection: DeltaDirection =
-    adjustedDelta > 1500 ? "under-scoped" : adjustedDelta < -1500 ? "over-scoped" : "aligned";
-  const dep = Math.max(0, carrier.dep != null ? carrier.dep : carrier.rcv != null && carrier.acv != null ? carrier.rcv - carrier.acv : 0);
-  const deductible = Math.max(0, Math.round(Number.parseFloat(form.deductibleUsd) || 0));
-  const nonRec = Math.max(0, Math.min(Math.round(Number.parseFloat(form.nonRecDepUsd) || 0), Math.round(dep)));
-  const recoverableDep = Math.max(0, Math.round(dep) - nonRec);
-  const acvForPayment =
-    carrier.acv != null
-      ? carrier.acv
-      : carrier.total > 0
-        ? Math.max(0, carrier.total - Math.round(dep))
-        : actualCashValue;
-  const initialPayment = Math.max(0, Math.round(acvForPayment) - deductible);
-  const finalProjected = initialPayment + recoverableDep;
-  const outOfPocket = Math.max(0, finalCost - finalProjected);
-  const delta = finalCost - carrier.total;
-  const deltaDirection: DeltaDirection = delta > 1500 ? "under-scoped" : delta < -1500 ? "over-scoped" : "aligned";
   const confidence =
     form.damageTypes.length >= 2 && form.severity >= 4
       ? "high"
@@ -2171,24 +2010,6 @@ function buildResult(form: FormState): EstimateResult | null {
     regional,
     quality,
     warnings,
-    carrier,
-    carrierBenchmark: {
-      sourceLabel: benchmarkComputation.sourceLabel,
-      profileId: benchmarkComputation.profile.id,
-      profileName: benchmarkComputation.profile.name,
-      regionFactor: benchmarkComputation.regionFactor,
-      complexityFactor: benchmarkComputation.complexityFactor,
-      blendedMultiplier: benchmarkComputation.blendedMultiplier,
-      baseRcv: benchmarkComputation.baseRcv,
-      adjustedRcv: benchmarkComputation.adjustedRcv,
-      adjustedDelta,
-      adjustedDeltaDirection,
-      requiredLineCategories: benchmarkComputation.profile.requiredLineCategories,
-      optionalLineCategories: benchmarkComputation.profile.optionalLineCategories,
-    },
-    delta,
-    deltaDirection,
-    settlement: { deductible, recoverableDep, initialPayment, finalProjected, outOfPocket },
     takeoffComparison,
   };
 }
@@ -2266,7 +2087,6 @@ function buildReportText(form: FormState, result: EstimateResult): string {
     `  Effective squares ........ ${result.effectiveSquares} SQ (incl. ${result.wastePct}% waste)`,
     `  Regional Multiplier ...... ×${result.regional.toFixed(2)} (${form.stateCode})`,
     `  RCV (after +50% adjustment) ${money(result.replacementCostValue)}`,
-    `  Carrier benchmark ........ ${money(result.carrierBenchmark.adjustedRcv)} (${result.carrierBenchmark.profileName}, ×${result.carrierBenchmark.blendedMultiplier.toFixed(3)})`,
     `  Less Depreciation ........ (${money(result.depreciation)})`,
     `  ACV ...................... ${money(result.actualCashValue)}`,
     `  Confidence ............... ${result.confidence}`,
@@ -2283,15 +2103,8 @@ function buildReportText(form: FormState, result: EstimateResult): string {
     `  │  FINAL COST: ${money(result.finalCost).padEnd(27)}│`,
     `  └─────────────────────────────────────────┘`,
     "",
-    "▸ SETTLEMENT PROJECTION",
-    `  Deductible ............... ${money(result.settlement.deductible)}`,
-    `  Recoverable Dep. ......... ${money(result.settlement.recoverableDep)}`,
-    `  Initial ACV Payment ...... ${money(result.settlement.initialPayment)}`,
-    `  Projected Final Payment .. ${money(result.settlement.finalProjected)}`,
-    `  Est. Out-of-Pocket ....... ${money(result.settlement.outOfPocket)}`,
-    "",
     "▸ SCOPE VERIFICATION",
-    "  Cross-check assemblies and quantities against manufacturer specs, carrier scope, and field conditions.",
+    "  Cross-check assemblies and quantities against manufacturer specs and field conditions.",
     "",
     sep,
   ].join("\n");
@@ -2427,16 +2240,6 @@ function buildProposalText(form: FormState, result: EstimateResult, proposal: Pr
     `  ┌─────────────────────────────────────────┐`,
     `  │  PROPOSAL TOTAL: ${money(result.finalCost).padEnd(23)}│`,
     `  └─────────────────────────────────────────┘`,
-    "",
-    "▸ INSURANCE SUPPLEMENT (AUTO-FILLED — EDIT AS NEEDED)",
-    ...(proposal.insuranceSupplementNotes.trim()
-      ? proposal.insuranceSupplementNotes.split("\n").map((ln) => `  ${ln}`)
-      : ["  (Run Generate Estimate after pasting carrier scope to fill this block.)"]),
-    "",
-    "▸ ESTIMATED INSURANCE PAYOUT (AUTO-FILLED — EDIT AS NEEDED)",
-    ...(proposal.estimatedInsurancePayout.trim()
-      ? proposal.estimatedInsurancePayout.split("\n").map((ln) => `  ${ln}`)
-      : ["  (Run Generate Estimate to populate from settlement model.)"]),
     "",
     "▸ INCLUSIONS",
     `  ${proposal.inclusions}`,
@@ -3141,18 +2944,6 @@ function buildProposalHtml(
 
   <div class="highlight">PROPOSAL TOTAL: ${money(result.finalCost)}</div>
 
-  <h2>Insurance supplement &amp; carrier comparison</h2>
-  <p class="subtitle" style="white-space:pre-wrap;font-size:12px;color:#000000;line-height:1.55">${esc(
-    proposal.insuranceSupplementNotes.trim() ||
-      "Run Generate Estimate after pasting carrier line items (RCV/ACV/Depreciation, supplement totals) to auto-fill this section.",
-  )}</p>
-
-  <h2>Estimated insurance payout</h2>
-  <p class="subtitle" style="white-space:pre-wrap;font-size:12px;color:#000000;line-height:1.55">${esc(
-    proposal.estimatedInsurancePayout.trim() ||
-      "Run Generate Estimate to populate initial ACV payment, projected final payment, and out-of-pocket from the settlement model.",
-  )}</p>
-
   <div class="terms">
     <h2>Inclusions</h2><p style="white-space:pre-wrap">${esc(proposal.inclusions)}</p>
     <h2>Exclusions</h2><p style="white-space:pre-wrap">${esc(proposal.exclusions)}</p>
@@ -3177,7 +2968,8 @@ function buildProposalHtml(
 }
 
 function App() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const authToken = session?.token ?? "";
   const storageUserId = user?.id ?? null;
   const [searchParams, setSearchParams] = useSearchParams();
   /** Captured once for /measurement/new?auto=1 instant estimate (avoid stale searchParams in one-shot import effect). */
@@ -3215,14 +3007,13 @@ function App() {
   const [aiMeasureBusy, setAiMeasureBusy] = useState(false);
   const [aiMeasureNote, setAiMeasureNote] = useState("");
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
-  const [savedReports, setSavedReports] = useState<SavedApiReport[]>([]);
-  const [reportsBusy, setReportsBusy] = useState(false);
-  const [reportsStatus, setReportsStatus] = useState("");
   const [geoStatus, setGeoStatus] = useState("");
   const [geoBusy, setGeoBusy] = useState(false);
   const [propertyEnrichBusy, setPropertyEnrichBusy] = useState(false);
   const [runId, setRunId] = useState(0);
   const [lastEstimateId, setLastEstimateId] = useState<string>("");
+  /** When set, Print Proposal updates this contract instead of appending a new one. */
+  const [editingContractId, setEditingContractId] = useState<string>("");
   const [pricingPreset, setPricingPreset] = useState<PricingPreset>("standard");
   const [propertyDb, setPropertyDb] = useState<PropertyOwnerRecord[]>([]);
   const [activeProperty, setActiveProperty] = useState<PropertyOwnerRecord | null>(null);
@@ -3237,7 +3028,15 @@ function App() {
   const [nwsAlertBannerDismissed, setNwsAlertBannerDismissed] = useState(false);
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"all" | "residential" | "commercial" | "other">("all");
   const [damagePhotos, setDamagePhotos] = useState<TaggedDamagePhoto[]>([]);
-  const { addContract, addEstimate, addMeasurement } = useRoofing();
+  const {
+    contracts,
+    addContract,
+    addEstimate,
+    addMeasurement,
+    updateContract,
+    updateEstimate,
+    getContractById,
+  } = useRoofing();
   const { registerBridge } = useMeasurementChatBridge();
   const formBridgeRef = useRef(form);
   const proposalBridgeRef = useRef(proposal);
@@ -3365,11 +3164,6 @@ function App() {
       profile: org.defaultTemplateProfile,
     }));
   }, [storageUserId]);
-
-  useEffect(() => {
-    fetchSavedReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const lat = Number.parseFloat(form.latitude);
@@ -3571,7 +3365,6 @@ function App() {
   const instantPreparedForm = useMemo(() => prepareFormFromMapMeasurements(form), [form, mapboxFeatures, drawnRoofLines, autoCalcEnabled, mapboxAreaSqFt]);
   const instantReadiness = useMemo(() => scoreEstimateReadiness(instantPreparedForm), [instantPreparedForm, scoreEstimateReadiness]);
   const instantPreview = useMemo(() => buildResult(instantPreparedForm), [instantPreparedForm]);
-  const carrierScopeLive = useMemo(() => parseCarrierScope(form.carrierScopeText), [form.carrierScopeText]);
 
   const roofDiagramPreviewHtml = useMemo(() => {
     if (!result) return "";
@@ -3810,7 +3603,7 @@ function App() {
   ): Promise<PropertyOwnerRecord> => {
     if (!criteria || !isDealMachineLikelyConfigured()) return base;
     if (propertyOwnerRecordHasRequiredContact(base)) return base;
-    const dm = await fetchDealMachinePropertyByAddress(criteria);
+    const dm = await fetchDealMachinePropertyByAddress(criteria, authToken);
     if (!dm.ok) {
       setGeoStatus((curr) => (curr ? `${curr} | Property lookup: ${dm.message}` : `Property lookup: ${dm.message}`));
       return base;
@@ -4555,17 +4348,45 @@ function App() {
     setRunId((id) => id + 1);
   };
 
+  const mergeFormState = (partial: Partial<FormState> | FormState | undefined): FormState => {
+    const base = defaultFormState();
+    if (!partial) return base;
+    const merged = { ...base };
+    for (const key of Object.keys(base) as (keyof FormState)[]) {
+      const value = partial[key];
+      if (value !== undefined) {
+        (merged as Record<string, unknown>)[key] = value;
+      }
+    }
+    return merged;
+  };
+
   const saveJob = () => {
-    const name = window.prompt("Name this saved job:", form.address || "Roof estimate");
+    const name = window.prompt("Name this saved job:", form.address || proposal.proposalTitle || "Roof estimate");
     if (!name?.trim()) return;
-    const job: SavedJob = { id: `job_${Date.now()}`, name: name.trim(), createdAtIso: new Date().toISOString(), form };
+    const job: SavedJob = {
+      id: `job_${Date.now()}`,
+      name: name.trim(),
+      createdAtIso: new Date().toISOString(),
+      form,
+      proposal: { ...proposal },
+      contractId: editingContractId || undefined,
+      estimateId: lastEstimateId || undefined,
+    };
     persistJobs([job, ...savedJobs].slice(0, 30));
+    toast.success("Job saved — reopen it anytime to keep editing.");
   };
 
   const loadJob = (id: string) => {
     const job = savedJobs.find((x) => x.id === id);
     if (!job) return;
-    setForm({ ...defaultFormState(), ...job.form });
+    setForm(mergeFormState(job.form));
+    if (job.proposal) {
+      setProposal(normalizeProposalState(job.proposal, defaultProposalState(job.proposal.profile)));
+    }
+    setEditingContractId(job.contractId ?? "");
+    if (job.estimateId) setLastEstimateId(job.estimateId);
+    toast.message(job.proposal ? "Loaded job (form + proposal)." : "Loaded job form.");
   };
 
   const deleteJob = (id: string) => {
@@ -4620,11 +4441,13 @@ function App() {
       return;
     }
     if (lastEstimateId) {
-      const id = `contract_${Date.now()}`;
-      addContract({
-        id,
+      const snapshot = {
+        form: { ...form },
+        proposal: { ...proposal },
+      };
+      const payload = {
         estimateId: lastEstimateId,
-        projectName: form.address || "Roof Project",
+        projectName: form.address || proposal.proposalTitle || "Roof Project",
         clientName: proposal.clientName || "Client",
         clientAddress: form.address || "",
         clientPhone: proposal.clientPhone || "",
@@ -4637,8 +4460,35 @@ function App() {
           .join("\n\n"),
         totalAmount: result.finalCost,
         depositAmount: Math.round(result.finalCost * 0.35),
-        status: "draft",
-      });
+        builderSnapshot: snapshot,
+      };
+      if (editingContractId && getContractById(editingContractId)) {
+        const existing = getContractById(editingContractId);
+        updateContract(editingContractId, {
+          ...payload,
+          status: existing?.status ?? "draft",
+          startDate: existing?.startDate ?? "",
+          completionDate: existing?.completionDate ?? "",
+        });
+        updateEstimate(lastEstimateId, {
+          projectName: payload.projectName,
+          total: result.finalCost,
+          subtotal: result.lineItemTotal,
+          tax: result.materialSalesTax,
+          rcvBeforeMarkup: result.rcvSubtotalBeforeMarkup,
+          estimateMarkup: result.estimateMarkupAmount,
+        });
+        toast.success("Proposal updated — reopen anytime from Contracts & Proposals.");
+      } else {
+        const id = `contract_${Date.now()}`;
+        addContract({
+          id,
+          ...payload,
+          status: "draft",
+        });
+        setEditingContractId(id);
+        toast.success("Proposal saved — reopen anytime from Contracts & Proposals.");
+      }
     }
     const drawnPolyPrint = mapboxFeatures.find(
       (f: { geometry?: { type?: string } }) => f?.geometry?.type === "Polygon",
@@ -4807,8 +4657,11 @@ function App() {
         .filter((l) => isLaborScopeLine(l.code))
         .map((l) => ({
           description: `${l.code} ${l.description}`,
-          hours: 1,
-          hourlyRate: l.total,
+          // Roofing labor is priced per SQ/LF/EA, so carry the real quantity and rate
+          // instead of collapsing to "1 hr × total", which misreports the breakdown.
+          hours: l.quantity,
+          hourlyRate: l.unitCost,
+          unit: l.unit,
           totalCost: l.total,
         }));
 
@@ -4826,15 +4679,6 @@ function App() {
         total: computed.finalCost,
       });
 
-      setProposal((curr) => ({
-        ...curr,
-        insuranceSupplementNotes:
-          `Estimate readiness: ${readiness.score}/100` +
-          (readiness.reasons.length ? ` (${readiness.reasons.join("; ")})` : "") +
-          "\n\n" +
-          buildInsuranceSupplementNotes(preparedWithSectionTotals, computed),
-        estimatedInsurancePayout: buildEstimatedInsurancePayoutSummary(computed),
-      }));
     }
 
     setRunId((id) => id + 1);
@@ -4851,7 +4695,12 @@ function App() {
     const contactId = searchParams.get("contactId");
     if (!contactId || !storageUserId) return;
     const auto = searchParams.get("auto") === "1";
-    setSearchParams({}, { replace: true });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("contactId");
+      next.delete("auto");
+      return next;
+    }, { replace: true });
     const list = loadContactsFromStorage();
     const c = list.find((x) => x.id === contactId);
     if (!c) return;
@@ -4872,7 +4721,54 @@ function App() {
       const clng = c.lng;
       queueMicrotask(() => flyMapTo(clat, clng));
     }
-  }, [searchParams]);
+  }, [searchParams, storageUserId]);
+
+  // Reopen a saved proposal/contract into Proposal Builder for editing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deep link; waits until contracts hydrate
+  useEffect(() => {
+    const contractId = searchParams.get("contractId");
+    if (!contractId || !storageUserId) return;
+    const contract = contracts.find((c) => c.id === contractId);
+    if (!contract) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("contractId");
+      return next;
+    }, { replace: true });
+    setEditingContractId(contract.id);
+    if (contract.estimateId) setLastEstimateId(contract.estimateId);
+    if (contract.builderSnapshot) {
+      setForm(mergeFormState(contract.builderSnapshot.form));
+      setProposal(
+        normalizeProposalState(
+          contract.builderSnapshot.proposal,
+          defaultProposalState(
+            contract.builderSnapshot.proposal?.profile === "commercial" ? "commercial" : "residential",
+          ),
+        ),
+      );
+      queueMicrotask(() => {
+        const prepared = prepareFormFromMapMeasurements(mergeFormState(contract.builderSnapshot!.form));
+        setForm(prepared);
+        runEstimatePipeline(prepared, { forceLowReadiness: true });
+      });
+      toast.message("Proposal loaded for editing.");
+      return;
+    }
+    // Legacy contracts without a full builder snapshot — restore client fields at least.
+    setProposal((curr) => ({
+      ...curr,
+      clientName: contract.clientName || curr.clientName,
+      clientEmail: contract.clientEmail || curr.clientEmail,
+      clientPhone: contract.clientPhone || curr.clientPhone,
+      proposalTitle: contract.projectName || curr.proposalTitle,
+      inclusions: contract.terms || curr.inclusions,
+    }));
+    if (contract.clientAddress) {
+      setForm((curr) => ({ ...curr, address: contract.clientAddress }));
+    }
+    toast.message("Proposal client details loaded. Re-run estimate to refresh pricing.");
+  }, [searchParams, storageUserId, contracts]);
 
   // One-shot import from Property records / Canvassing (localStorage + sessionStorage handoff).
   // Runs when the signed-in user id is known so keys match `stashPendingPropertyImport`.
@@ -5042,63 +4938,6 @@ function App() {
     for (const line of drawnRoofLines) sums[line.type] += line.lengthFt;
     return sums;
   }, [drawnRoofLines]);
-  const saveMapboxReport = async () => {
-    if (!mapboxFeatures.length || mapboxAreaSqFt <= 0) {
-      toast.error("Draw roof polygons before saving.");
-      return;
-    }
-    try {
-      const res = await fetch("http://localhost:5000/api/report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          features: mapboxFeatures,
-          area: mapboxAreaSqFt,
-          address: form.address,
-          state: form.stateCode,
-          pitch: form.roofPitch,
-        }),
-      });
-      if (!res.ok) throw new Error("Report save failed");
-      toast.success("Map report saved.");
-      await fetchSavedReports();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Report save failed");
-    }
-  };
-
-  const fetchSavedReports = async () => {
-    setReportsBusy(true);
-    setReportsStatus("Loading saved reports...");
-    try {
-      const res = await fetch("http://localhost:5000/api/reports");
-      if (!res.ok) throw new Error("Unable to load reports");
-      const data = await parseJsonResponse<SavedApiReport[]>(res, "Saved reports");
-      setSavedReports(Array.isArray(data) ? data : []);
-      setReportsStatus(`Loaded ${Array.isArray(data) ? data.length : 0} report(s).`);
-    } catch (error) {
-      setReportsStatus(
-        error instanceof Error ? `Report load failed: ${error.message}` : "Report load failed.",
-      );
-    } finally {
-      setReportsBusy(false);
-    }
-  };
-
-  const loadSavedReportToForm = (report: SavedApiReport) => {
-    const area = Number(report.total_area_sqft || 0);
-    setForm((curr) => ({
-      ...curr,
-      areaSqFt: area > 0 ? area.toFixed(2) : curr.areaSqFt,
-      measuredSquares: area > 0 ? (area / 100).toFixed(2) : curr.measuredSquares,
-      address: report.address || curr.address,
-      stateCode: (report.state || curr.stateCode).toUpperCase().slice(0, 2),
-      roofPitch: report.pitch || curr.roofPitch,
-    }));
-    setMapboxFeatures(report.features ?? []);
-    setMapboxAreaSqFt(area > 0 ? area : 0);
-    setRunId((id) => id + 1);
-  };
 
   const applyProposalProfile = (profile: ProposalProfile) => {
     setProposal((curr) => {
@@ -6196,9 +6035,6 @@ function App() {
             <button className="secondary-btn" onClick={applyDrawnAreaToEstimate}>
               Apply All Measurements To Estimate
             </button>
-            <button className="secondary-btn" onClick={saveMapboxReport}>
-              Save Draw Report (API)
-            </button>
             {drawnRoofLines.length > 0 ? (
               <button className="secondary-btn danger" onClick={clearAllRoofLines}>
                 Clear All Lines
@@ -6254,39 +6090,6 @@ function App() {
             </>
           ) : null}
 
-          <h3>Saved Draw Reports</h3>
-          <div className="actions-row">
-            <button
-              className="secondary-btn"
-              onClick={fetchSavedReports}
-              disabled={reportsBusy}
-            >
-              {reportsBusy ? "Refreshing..." : "Refresh Reports"}
-            </button>
-            {reportsStatus ? <span className="muted">{reportsStatus}</span> : null}
-          </div>
-          {savedReports.length > 0 ? (
-            <div className="tiles">
-              {savedReports.slice(0, 24).map((report) => (
-                <div key={report.id} className="tile">
-                  <span>{new Date(report.created_at).toLocaleString()}</span>
-                  <strong>{report.address || "Unknown property"}</strong>
-                  <span>
-                    {Number(report.total_area_sqft || 0).toFixed(2)} sq ft | Sections:{" "}
-                    {report.roof_sections}
-                  </span>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => loadSavedReportToForm(report)}
-                  >
-                    Load Into Estimate
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">No saved draw reports yet.</p>
-          )}
 
           <h3>Contacts</h3>
           <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
@@ -6433,188 +6236,11 @@ function App() {
             </p>
           )}
         </section>
-        <section className="panel" id="section-estimate-inputs">
-          <h2>Carrier scope &amp; settlement</h2>
+        <section className="panel full" id="section-estimate-inputs">
+          <h2>Generate estimate</h2>
           <p className="muted" style={{ marginTop: -6, marginBottom: 10, fontSize: 12 }}>
-            <strong>Carrier text:</strong> paste line items, RCV/ACV, deductible, or net claim from the adjuster scope or statement — the app parses totals for comparison to your estimate (does not replace your takeoff squares above).{" "}
-            <strong>Settlement:</strong> use deductible and non-recoverable depreciation fields below; figures flow into notes and payout summary when you generate the estimate.
+            Review takeoff readiness, then generate pricing from your measurements above.
           </p>
-          <p className="muted" style={{ marginTop: -4, marginBottom: 10, fontSize: 12 }}>
-            Pricing source: <strong>{CARRIER_BENCHMARK_SOURCE_LABEL}</strong>
-          </p>
-          <label>
-            Carrier line items (Xactimate-style text)
-            <textarea
-              rows={10}
-              value={form.carrierScopeText}
-              onChange={(e) => setForm((curr) => ({ ...curr, carrierScopeText: e.target.value }))}
-              placeholder={
-                "RFG LAM Laminated comp shingle 27.10 SQ 286.65 7768.22\nRFG TEAR LAM Tear off laminated 24.20 SQ 93.00 2250.60\nRFG DRPE Drip edge 187.80 LF 3.10 582.18\nRCV: 45000  ACV: 38000  Depreciation: 7000\nDeductible: 2500  Net Claim: 35500"
-              }
-            />
-          </label>
-          {form.carrierScopeText.trim() ? (
-            <div
-              className="carrier-scope-live"
-              style={{
-                marginTop: 10,
-                marginBottom: 12,
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid rgba(148, 163, 184, 0.45)",
-                background: "linear-gradient(145deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.9) 100%)",
-                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-              }}
-            >
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", color: "#0f172a" }}>
-                  Live scope read
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                    background:
-                      carrierScopeLive.parserConfidence === "high"
-                        ? "rgba(34, 197, 94, 0.18)"
-                        : carrierScopeLive.parserConfidence === "medium"
-                          ? "rgba(245, 158, 11, 0.2)"
-                          : "rgba(148, 163, 184, 0.25)",
-                    color: "#0f172a",
-                  }}
-                >
-                  {carrierScopeLive.parserConfidence} confidence
-                </span>
-                <span className="muted" style={{ fontSize: 11 }}>
-                  {carrierScopeLive.parsedLineCount} priced line(s) · basis{" "}
-                  <strong>{carrierScopeLive.valuationBasis}</strong>
-                  {carrierScopeLive.lineMathMismatchCount > 0
-                    ? ` · ${carrierScopeLive.lineMathMismatchCount} qty×price check(s) off`
-                    : ""}
-                </span>
-              </div>
-              <div className="tile-grid" style={{ marginBottom: carrierScopeLive.lineCodes.length ? 8 : 0 }}>
-                <div className="tile">
-                  <span>Carrier total (basis)</span>
-                  <strong>{carrierScopeLive.total > 0 ? money(carrierScopeLive.total) : "—"}</strong>
-                </div>
-                <div className="tile">
-                  <span>Summed extensions</span>
-                  <strong>
-                    {carrierScopeLive.lineExtensionSum > 0 ? money(carrierScopeLive.lineExtensionSum) : "—"}
-                  </strong>
-                </div>
-                <div className="tile">
-                  <span>RCV / ACV</span>
-                  <strong style={{ fontSize: 13 }}>
-                    {carrierScopeLive.rcv != null ? money(carrierScopeLive.rcv) : "—"} /{" "}
-                    {carrierScopeLive.acv != null ? money(carrierScopeLive.acv) : "—"}
-                  </strong>
-                </div>
-                <div className="tile">
-                  <span>Ded / net (from text)</span>
-                  <strong style={{ fontSize: 12 }}>
-                    {carrierScopeLive.deductibleFromCarrier != null
-                      ? money(carrierScopeLive.deductibleFromCarrier)
-                      : "—"}{" "}
-                    /{" "}
-                    {carrierScopeLive.netClaimFromCarrier != null
-                      ? money(carrierScopeLive.netClaimFromCarrier)
-                      : "—"}
-                  </strong>
-                </div>
-              </div>
-              {carrierScopeLive.valuationBasis !== "line-total" &&
-              carrierScopeLive.lineExtensionSum > 0 &&
-              carrierScopeLive.total > 0 &&
-              Math.abs(carrierScopeLive.total - carrierScopeLive.lineExtensionSum) >
-                Math.max(400, carrierScopeLive.total * 0.02) ? (
-                <p className="muted" style={{ fontSize: 11, margin: "0 0 8px", lineHeight: 1.45 }}>
-                  Labeled {carrierScopeLive.valuationBasis} and summed lines differ by{" "}
-                  <strong>{money(Math.abs(carrierScopeLive.total - carrierScopeLive.lineExtensionSum))}</strong> — normal
-                  if taxes, O&amp;P, or summary rows are outside the paste.
-                </p>
-              ) : null}
-              {carrierScopeLive.supplementAmounts.length > 0 ? (
-                <p className="muted" style={{ fontSize: 11, margin: "0 0 8px" }}>
-                  Supplements detected:{" "}
-                  {carrierScopeLive.supplementAmounts.map((n) => money(n)).join(", ")}
-                </p>
-              ) : null}
-              {carrierScopeLive.lineCodes.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                  <span className="muted" style={{ fontSize: 10, marginRight: 4 }}>
-                    Codes
-                  </span>
-                  {carrierScopeLive.lineCodes.slice(0, 10).map((code) => (
-                    <code
-                      key={code}
-                      style={{
-                        fontSize: 10,
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                        background: "rgba(255,255,255,0.85)",
-                        border: "1px solid rgba(203, 213, 225, 0.9)",
-                        color: "#334155",
-                      }}
-                    >
-                      {code}
-                    </code>
-                  ))}
-                  {carrierScopeLive.lineCodes.length > 10 ? (
-                    <span className="muted" style={{ fontSize: 10 }}>
-                      +{carrierScopeLive.lineCodes.length - 10}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="form-grid">
-            <label>
-              Carrier benchmark profile
-              <select
-                value={form.carrierBenchmarkProfileId}
-                onChange={(e) => setForm((curr) => ({ ...curr, carrierBenchmarkProfileId: e.target.value }))}
-              >
-                {CARRIER_BENCHMARK_PROFILES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Benchmark region factor
-              <input
-                type="number"
-                min={0.75}
-                max={1.4}
-                step={0.01}
-                value={form.carrierBenchmarkRegionFactor}
-                onChange={(e) =>
-                  setForm((curr) => ({ ...curr, carrierBenchmarkRegionFactor: e.target.value }))
-                }
-              />
-            </label>
-            <label>
-              Benchmark complexity factor
-              <input
-                type="number"
-                min={0.75}
-                max={1.4}
-                step={0.01}
-                value={form.carrierBenchmarkComplexityFactor}
-                onChange={(e) =>
-                  setForm((curr) => ({ ...curr, carrierBenchmarkComplexityFactor: e.target.value }))
-                }
-              />
-            </label>
-            <label>Deductible ($)<input type="number" min={0} value={form.deductibleUsd} onChange={(e) => setForm((curr) => ({ ...curr, deductibleUsd: e.target.value }))} /></label>
-            <label>Non-recoverable Depreciation ($)<input type="number" min={0} value={form.nonRecDepUsd} onChange={(e) => setForm((curr) => ({ ...curr, nonRecDepUsd: e.target.value }))} /></label>
-          </div>
           <div className="tile-grid" style={{ marginBottom: 10 }}>
             <div className="tile">
               <span>Instant readiness</span>
@@ -6635,8 +6261,7 @@ function App() {
             </p>
           ) : null}
           <div className="actions-row">
-            <button className="run-btn" onClick={runEstimateAndRecord}>Generate Estimate & Comparison</button>
-            <button className="secondary-btn" onClick={() => setForm(hillsdaleFormTemplate())}>Load Hillsdale Template</button>
+            <button className="run-btn" onClick={runEstimateAndRecord}>Generate Estimate</button>
             <button className="secondary-btn" onClick={saveJob}>Save Job</button>
             <button className="secondary-btn" onClick={exportTxt}>Export TXT</button>
             <button className="secondary-btn" onClick={printReport}>Print / PDF</button>
@@ -6663,12 +6288,27 @@ function App() {
             )}
           </div>
         </section>
-        <section className="panel" id="section-proposals">
+        <section className="panel full" id="section-proposals">
           <h2>Proposal Builder</h2>
           <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-            Upload contacts CSV, company logo, and default templates on{" "}
-            <Link to="/contacts">Contacts &amp; settings</Link> (saved in this browser).
+            Set your company name, logo, and contact defaults on{" "}
+            <Link to="/contacts">Contacts &amp; settings</Link> — they apply to every proposal for this account.
+            Reopen saved proposals from <Link to="/contracts">Contracts &amp; Proposals</Link>.
           </p>
+          {editingContractId ? (
+            <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+              Editing saved proposal <code style={{ fontSize: 11 }}>{editingContractId}</code>
+              {" · "}
+              <button
+                type="button"
+                className="secondary-btn"
+                style={{ padding: "2px 8px", fontSize: 11 }}
+                onClick={() => setEditingContractId("")}
+              >
+                Detach (save as new next print)
+              </button>
+            </p>
+          ) : null}
           <div className="form-grid">
             <label>
               Profile
@@ -6683,6 +6323,7 @@ function App() {
             <label>
               Company Name
               <input
+                placeholder="Your company name"
                 value={proposal.companyName}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, companyName: e.target.value }))
@@ -6692,6 +6333,7 @@ function App() {
             <label>
               Prepared By
               <input
+                placeholder="Estimator name"
                 value={proposal.preparedBy}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, preparedBy: e.target.value }))
@@ -6701,6 +6343,7 @@ function App() {
             <label>
               Contact Email
               <input
+                placeholder="you@yourcompany.com"
                 value={proposal.contactEmail}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, contactEmail: e.target.value }))
@@ -6710,6 +6353,7 @@ function App() {
             <label>
               Contact Phone
               <input
+                placeholder="(555) 555-5555"
                 value={proposal.contactPhone}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, contactPhone: e.target.value }))
@@ -6855,32 +6499,6 @@ function App() {
               }
             />
           </label>
-          <p className="muted" style={{ fontSize: 12, margin: "-4px 0 8px" }}>
-            <strong>Insurance:</strong> Paste RCV, ACV, depreciation, supplement totals, deductible, and net claim in{" "}
-            <strong>Carrier Line Items</strong> above, then run <strong>Generate Estimate &amp; Comparison</strong> — the
-            two fields below refresh from the comparison and settlement math (you can edit after).
-          </p>
-          <label>
-            Insurance supplement (auto-filled)
-            <textarea
-              rows={6}
-              value={proposal.insuranceSupplementNotes}
-              onChange={(e) =>
-                setProposal((curr) => ({ ...curr, insuranceSupplementNotes: e.target.value }))
-              }
-            />
-          </label>
-          <label>
-            Estimated insurance payout (auto-filled)
-            <textarea
-              rows={5}
-              value={proposal.estimatedInsurancePayout}
-              onChange={(e) =>
-                setProposal((curr) => ({ ...curr, estimatedInsurancePayout: e.target.value }))
-              }
-            />
-          </label>
-
           <div className="actions-row">
             <button className="secondary-btn" onClick={exportProposalTxt}>
               Export Proposal TXT
@@ -7077,62 +6695,18 @@ function App() {
                 </table>
               </div>
 
-              {/* Carrier Comparison */}
-              <h3>Carrier Comparison</h3>
-              <div className="result-table-wrap">
-                <table className="result-table summary">
-                  <tbody>
-                    <tr><td>Valuation Basis</td><td className="r">{result.carrier.valuationBasis}</td></tr>
-                    <tr><td>Carrier Total</td><td className="r">{money(result.carrier.total)}</td></tr>
-                    <tr><td>Base Benchmark (our final cost)</td><td className="r">{money(result.finalCost)}</td></tr>
-                    <tr><td>Base Delta vs carrier</td><td className="r">{money(result.delta)} ({result.deltaDirection})</td></tr>
-                    <tr><td>Adjusted Benchmark Profile</td><td className="r">{result.carrierBenchmark.profileName}</td></tr>
-                    <tr><td>Adjusted Benchmark RCV</td><td className="r">{money(result.carrierBenchmark.adjustedRcv)}</td></tr>
-                    <tr><td>Adjusted Delta vs carrier</td><td className="r">{money(result.carrierBenchmark.adjustedDelta)} ({result.carrierBenchmark.adjustedDeltaDirection})</td></tr>
-                    <tr><td>Adjustment multipliers</td><td className="r">×{result.carrierBenchmark.blendedMultiplier.toFixed(3)} (region {result.carrierBenchmark.regionFactor.toFixed(2)} × complexity {result.carrierBenchmark.complexityFactor.toFixed(2)})</td></tr>
-                    <tr><td>Parser Confidence</td><td className="r">{result.carrier.parserConfidence}</td></tr>
-                    <tr><td>Line Math Mismatches</td><td className="r">{result.carrier.lineMathMismatchCount}</td></tr>
-                    <tr><td>RCV / ACV / Dep (Carrier)</td><td className="r">{result.carrier.rcv != null ? money(result.carrier.rcv) : "N/A"} / {result.carrier.acv != null ? money(result.carrier.acv) : "N/A"} / {result.carrier.dep != null ? money(result.carrier.dep) : "N/A"}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Settlement Projection */}
-              <h3>Settlement Projection</h3>
-              <div className="result-table-wrap">
-                <table className="result-table summary">
-                  <tbody>
-                    <tr><td>Deductible</td><td className="r">{money(result.settlement.deductible)}</td></tr>
-                    <tr><td>Recoverable Depreciation</td><td className="r">{money(result.settlement.recoverableDep)}</td></tr>
-                    <tr><td>Initial ACV Payment</td><td className="r">{money(result.settlement.initialPayment)}</td></tr>
-                    <tr><td>Projected Final Payment</td><td className="r">{money(result.settlement.finalProjected)}</td></tr>
-                    <tr className="grand-total-row"><td>Estimated Out-of-Pocket</td><td className="r">{money(result.settlement.outOfPocket)}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
               {/* Warnings */}
-              {(result.warnings.length > 0 ||
-                result.carrier.likelyMissingItems.length > 0 ||
-                result.carrierBenchmark.requiredLineCategories.length > 0 ||
-                result.carrierBenchmark.optionalLineCategories.length > 0) ? (
+              {result.warnings.length > 0 ? (
                 <>
-                  <h3>Warnings &amp; Missing Scope</h3>
+                  <h3>Warnings</h3>
                   <ul className="warning-list">
                     {result.warnings.map((w) => <li key={`w-${w}`}>{w}</li>)}
-                    {result.carrier.likelyMissingItems.map((m) => <li key={`m-${m}`}>{m}</li>)}
-                    {result.carrierBenchmark.requiredLineCategories.map((m) => (
-                      <li key={`req-${m}`}>Benchmark required check: {m}</li>
-                    ))}
-                    {result.carrierBenchmark.optionalLineCategories.map((m) => (
-                      <li key={`opt-${m}`}>Benchmark optional check: {m}</li>
-                    ))}
                   </ul>
                 </>
               ) : (
                 <>
-                  <h3>Warnings &amp; Missing Scope</h3>
-                  <p className="muted" style={{ fontSize: 13 }}>No warnings or missing-scope flags.</p>
+                  <h3>Warnings</h3>
+                  <p className="muted" style={{ fontSize: 13 }}>No warnings.</p>
                 </>
               )}
             </>

@@ -1,0 +1,235 @@
+import type { AuthEnv } from "./authRoutes";
+import { getBearerPayload } from "./authRoutes";
+import {
+  findOrgForUser,
+  isWorkspaceKind,
+  listWorkspaceRecords,
+  MAX_RECORDS_PER_PUSH,
+  softDeleteWorkspaceRecord,
+  upsertWorkspaceRecords,
+  WORKSPACE_KINDS,
+  type UpsertInput,
+  type WorkspaceKind,
+} from "../workspace/workspaceDb";
+
+function jsonHeaders(cors: Record<string, string>) {
+  return { ...cors, "Content-Type": "application/json" };
+}
+
+export type WorkspaceFilesEnv = AuthEnv & {
+  /** R2 bucket for photo blobs; absent means uploads are unavailable (503). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  WORKSPACE_FILES?: any;
+};
+
+/** Compressed field photos are well under this; the cap just stops abuse. */
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+const ALLOWED_FILE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** Keys are namespaced per user so one account cannot read another's blobs. */
+function fileKey(userId: string, fileId: string): string {
+  return `workspace/${userId}/${fileId}`;
+}
+
+/** Reject anything that could escape the user's key prefix. */
+function isSafeFileId(id: string): boolean {
+  return /^[A-Za-z0-9._-]{1,120}$/.test(id);
+}
+
+function json(body: unknown, status: number, headers: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+function parseKinds(raw: string | null): WorkspaceKind[] {
+  if (!raw || !raw.trim()) return [...WORKSPACE_KINDS];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(isWorkspaceKind);
+}
+
+/** Only owners/admins may read across the whole organization. */
+function canReadOrg(role: string | undefined): boolean {
+  return role === "owner" || role === "admin";
+}
+
+/**
+ * Routes under `/api/workspace` — durable sync for measurements, estimates, contracts,
+ * field projects, and canvassing data.
+ *
+ * - `GET  /api/workspace/records?kinds=…&since=…&scope=user|org`
+ * - `POST /api/workspace/records`            body `{ records: [{ id, kind, data, updatedAt, deleted }] }`
+ * - `DELETE /api/workspace/records/:kind/:id`
+ *
+ * Returns `null` when the path is not handled here so index.ts can fall through.
+ */
+export async function handleWorkspaceRoutes(
+  request: Request,
+  env: WorkspaceFilesEnv,
+  path: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response | null> {
+  const j = jsonHeaders(corsHeaders);
+  const base = "/api/workspace";
+  const p = path.replace(/\/+$/, "") || "/";
+  if (p !== base && !p.startsWith(`${base}/`)) return null;
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: j });
+  }
+
+  const payload = await getBearerPayload(request, env);
+  if (!payload) {
+    return json({ success: false, error: "Sign in required." }, 401, j);
+  }
+
+  const segments = p.slice(base.length).replace(/^\//, "").split("/").filter(Boolean);
+
+  try {
+    const membership = await findOrgForUser(env.DB, payload.sub);
+
+    // GET /api/workspace/records
+    if (segments.length === 1 && segments[0] === "records" && request.method === "GET") {
+      const url = new URL(request.url);
+      const kinds = parseKinds(url.searchParams.get("kinds"));
+      if (kinds.length === 0) {
+        return json({ success: false, error: "No valid kinds requested." }, 400, j);
+      }
+
+      const wantsOrg = url.searchParams.get("scope") === "org";
+      const useOrgScope = wantsOrg && !!membership && canReadOrg(membership.role);
+      if (wantsOrg && !useOrgScope) {
+        return json({ success: false, error: "Team scope requires an org owner or admin role." }, 403, j);
+      }
+
+      const records = await listWorkspaceRecords(env.DB, {
+        userId: payload.sub,
+        kinds,
+        since: Number(url.searchParams.get("since")) || 0,
+        scope: useOrgScope ? "org" : "user",
+        orgId: membership?.orgId ?? null,
+        limit: Number(url.searchParams.get("limit")) || 1000,
+      });
+
+      const watermark = records.reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), 0);
+      return json({ success: true, records, watermark, scope: useOrgScope ? "org" : "user" }, 200, j);
+    }
+
+    // POST /api/workspace/records
+    if (segments.length === 1 && segments[0] === "records" && request.method === "POST") {
+      let body: { records?: unknown } = {};
+      try {
+        body = (await request.json()) as typeof body;
+      } catch {
+        return json({ success: false, error: "Invalid JSON body." }, 400, j);
+      }
+
+      if (!Array.isArray(body.records)) {
+        return json({ success: false, error: "records must be an array." }, 400, j);
+      }
+      if (body.records.length > MAX_RECORDS_PER_PUSH) {
+        return json(
+          { success: false, error: `Too many records in one push (max ${MAX_RECORDS_PER_PUSH}).` },
+          413,
+          j,
+        );
+      }
+
+      const result = await upsertWorkspaceRecords(
+        env.DB,
+        payload.sub,
+        membership?.orgId ?? null,
+        body.records as UpsertInput[],
+      );
+      return json({ success: true, ...result }, 200, j);
+    }
+
+    // PUT /api/workspace/files/:fileId — store a photo blob (raw body).
+    if (segments.length === 2 && segments[0] === "files" && request.method === "PUT") {
+      const fileId = segments[1];
+      if (!isSafeFileId(fileId)) {
+        return json({ success: false, error: "Invalid file id." }, 400, j);
+      }
+      if (!env.WORKSPACE_FILES) {
+        return json(
+          { success: false, error: "File storage is not configured on this server." },
+          503,
+          j,
+        );
+      }
+
+      const contentType = (request.headers.get("content-type") || "").split(";")[0]?.trim() || "";
+      if (!ALLOWED_FILE_TYPES.has(contentType)) {
+        return json({ success: false, error: "Only JPEG, PNG, or WebP images are accepted." }, 415, j);
+      }
+
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      if (bytes.byteLength === 0) {
+        return json({ success: false, error: "Empty file." }, 400, j);
+      }
+      if (bytes.byteLength > MAX_FILE_BYTES) {
+        return json({ success: false, error: "File is too large." }, 413, j);
+      }
+
+      await env.WORKSPACE_FILES.put(fileKey(payload.sub, fileId), bytes, {
+        httpMetadata: { contentType },
+      });
+      return json({ success: true, fileId }, 200, j);
+    }
+
+    // GET /api/workspace/files/:fileId — stream a stored photo back.
+    if (segments.length === 2 && segments[0] === "files" && request.method === "GET") {
+      const fileId = segments[1];
+      if (!isSafeFileId(fileId)) {
+        return json({ success: false, error: "Invalid file id." }, 400, j);
+      }
+      if (!env.WORKSPACE_FILES) {
+        return json({ success: false, error: "File storage is not configured." }, 503, j);
+      }
+      const obj = await env.WORKSPACE_FILES.get(fileKey(payload.sub, fileId));
+      if (!obj) {
+        return json({ success: false, error: "File not found." }, 404, j);
+      }
+      return new Response(obj.body, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": obj.httpMetadata?.contentType || "application/octet-stream",
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+
+    // DELETE /api/workspace/files/:fileId
+    if (segments.length === 2 && segments[0] === "files" && request.method === "DELETE") {
+      const fileId = segments[1];
+      if (!isSafeFileId(fileId)) {
+        return json({ success: false, error: "Invalid file id." }, 400, j);
+      }
+      if (env.WORKSPACE_FILES) {
+        await env.WORKSPACE_FILES.delete(fileKey(payload.sub, fileId));
+      }
+      return json({ success: true }, 200, j);
+    }
+
+    // DELETE /api/workspace/records/:kind/:id
+    if (segments.length === 3 && segments[0] === "records" && request.method === "DELETE") {
+      const kind = segments[1];
+      const id = decodeURIComponent(segments[2] || "");
+      if (!isWorkspaceKind(kind)) {
+        return json({ success: false, error: "Unknown record kind." }, 400, j);
+      }
+      if (!id) {
+        return json({ success: false, error: "Record id is required." }, 400, j);
+      }
+      const ok = await softDeleteWorkspaceRecord(env.DB, payload.sub, kind, id);
+      return json({ success: true, deleted: ok }, 200, j);
+    }
+
+    return json({ success: false, error: "Not found." }, 404, j);
+  } catch (e) {
+    console.error("[workspace] route error:", e);
+    return json({ success: false, error: "Workspace sync is unavailable." }, 500, j);
+  }
+}

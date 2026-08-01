@@ -28,7 +28,8 @@ export function buildCorsHeaders(
   env: { CORS_ALLOWED_ORIGINS?: string },
 ): Record<string, string> {
   const base: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    // PATCH is required for admin approve/edit (`/api/admin/users/:id/approval`).
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-DM-Client-Key, x-company-id",
   };
 

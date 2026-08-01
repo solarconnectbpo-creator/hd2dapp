@@ -1,3 +1,5 @@
+import type { AuthEnv } from "./authRoutes";
+import { getBearerPayload } from "./authRoutes";
 /**
  * POST /api/dealmachine/property — forwards to DealMachine Public API (CORS-safe for SPA).
  *
@@ -11,7 +13,7 @@
 
 type CorsHeaders = Record<string, string>;
 
-type DealMachineEnv = {
+type DealMachineEnv = AuthEnv & {
   DEALMACHINE_API_KEY?: string;
   DEALMACHINE_API_BASE?: string;
   DEALMACHINE_PROPERTY_PATH?: string;
@@ -52,6 +54,12 @@ export async function handleDealMachinePropertyPost(
 ): Promise<Response> {
   if (request.method !== "POST") {
     return json({ success: false, error: "Method not allowed" }, 405, corsHeaders);
+  }
+
+  // Each lookup bills against the org's DealMachine quota — require a signed-in caller.
+  const payload = await getBearerPayload(request, env);
+  if (!payload) {
+    return json({ success: false, error: "Sign in required." }, 401, corsHeaders);
   }
 
   const apiKey = env.DEALMACHINE_API_KEY?.trim();

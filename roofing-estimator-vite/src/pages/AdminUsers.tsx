@@ -6,7 +6,9 @@ import {
   adminDeleteUser,
   adminListUsers,
   adminSetUserApproval,
+  adminSetUserBilling,
   adminUpdateUser,
+  fetchAuthCapabilities,
   type AdminUserRow,
 } from "../lib/authClient";
 
@@ -33,6 +35,7 @@ export function AdminUsers() {
   const [newPassword, setNewPassword] = useState("");
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<AdminUserRow["user_type"]>("sales_rep");
+  const [membershipCheckout, setMembershipCheckout] = useState<boolean | null>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -51,6 +54,21 @@ export function AdminUsers() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      try {
+        const caps = await fetchAuthCapabilities();
+        if (mounted) setMembershipCheckout(caps.membershipCheckout);
+      } catch {
+        if (mounted) setMembershipCheckout(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (user?.user_type !== "admin") {
     return <Navigate to="/" replace />;
@@ -103,9 +121,18 @@ export function AdminUsers() {
         <h1 className="text-2xl font-semibold text-[#e7e9ea]">User accounts</h1>
         <p className="text-sm text-[#71767b] mt-1">
           Create logins, assign roles, approve company/rep access, and remove accounts. Passwords are stored hashed on the Worker
-          (D1).
+          (D1). Approving a user also unlocks billing so they can sign in.
         </p>
       </div>
+
+      {membershipCheckout === false ? (
+        <p className="text-sm rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-100">
+          Stripe membership checkout is offline (membership Price IDs not set on the Worker). Lead packages and call-center
+          checkout still use Stripe when configured. Use Approve to unlock access manually, or set{" "}
+          <code className="rounded bg-black/30 px-1 font-mono text-xs">MEMBERSHIP_STRIPE_PRICE_ID_SOLO</code> /{" "}
+          <code className="rounded bg-black/30 px-1 font-mono text-xs">MEMBERSHIP_STRIPE_PRICE_ID_COMPANY</code> on the Worker.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="text-sm text-[#f4212e] rounded-lg border border-[#f4212e]/40 bg-[#f4212e]/10 px-4 py-2">{error}</p>
@@ -246,10 +273,23 @@ function UserRow({
     onError("");
     onBusy(true);
     try {
-      await adminSetUserApproval(token, row.id, st);
+      await adminSetUserApproval(token, row.id, st, { activateBilling: st === "approved" });
       await onRefresh();
     } catch (e) {
       onError(e instanceof Error ? e.message : "Approval update failed.");
+    } finally {
+      onBusy(false);
+    }
+  };
+
+  const setBilling = async (st: "active" | "unpaid") => {
+    onError("");
+    onBusy(true);
+    try {
+      await adminSetUserBilling(token, row.id, st);
+      await onRefresh();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Billing update failed.");
     } finally {
       onBusy(false);
     }
@@ -355,9 +395,9 @@ function UserRow({
                 <button
                   type="button"
                   className="secondary-btn text-xs py-1 px-2"
-                  disabled={busy}
+                  disabled={busy || (row.approval_status === "approved" && row.billing_status === "active")}
                   onClick={() => void setApproval("approved")}
-                  title="Allow platform access (still requires active billing for company/rep)"
+                  title="Approve and unlock access (sets billing active)"
                 >
                   Approve
                 </button>
@@ -369,6 +409,27 @@ function UserRow({
                 >
                   Reject
                 </button>
+                {row.billing_status !== "active" ? (
+                  <button
+                    type="button"
+                    className="secondary-btn text-xs py-1 px-2"
+                    disabled={busy}
+                    onClick={() => void setBilling("active")}
+                    title="Set billing_status=active without changing approval"
+                  >
+                    Unlock billing
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary-btn text-xs py-1 px-2"
+                    disabled={busy}
+                    onClick={() => void setBilling("unpaid")}
+                    title="Revoke membership access until they pay again"
+                  >
+                    Mark unpaid
+                  </button>
+                )}
               </>
             ) : null}
             <button type="button" className="secondary-btn text-xs py-1 px-2" onClick={() => setEditing(true)} disabled={busy}>

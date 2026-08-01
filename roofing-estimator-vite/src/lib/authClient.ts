@@ -1,4 +1,4 @@
-import { HD2D_PUBLIC_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
+import { HD2D_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
 import { mapAuthFailureMessage } from "./authApiMessage";
@@ -50,7 +50,7 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new Error(
-      `Empty response (${res.status} ${res.statusText || ""}). Point VITE_INTEL_API_BASE at ${HD2D_PUBLIC_API_ORIGIN} (not ${HD2D_WORKER_API_ORIGIN}) if /api/* returns HTML.`,
+      `Empty response (${res.status} ${res.statusText || ""}). Point VITE_INTEL_API_BASE at ${HD2D_API_ORIGIN} (not ${HD2D_WORKER_API_ORIGIN}) if /api/* returns HTML.`,
     );
   }
   try {
@@ -58,7 +58,7 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   } catch {
     const hint = trimmed.startsWith("<") ? " (received HTML, not JSON)" : "";
     throw new Error(
-      `Invalid JSON from ${label} (${res.status})${hint}. Check VITE_INTEL_API_BASE=${HD2D_PUBLIC_API_ORIGIN}.`,
+      `Invalid JSON from ${label} (${res.status})${hint}. Check VITE_INTEL_API_BASE=${HD2D_API_ORIGIN}.`,
     );
   }
 }
@@ -367,6 +367,7 @@ export async function adminSetUserApproval(
   token: string,
   userId: string,
   approval_status: "pending" | "approved" | "rejected",
+  opts?: { activateBilling?: boolean },
 ): Promise<void> {
   const apiBase = getAuthApiBase();
   if (!apiBase) throw new Error("Backend API base is not configured.");
@@ -377,12 +378,41 @@ export async function adminSetUserApproval(
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ approval_status }),
+    body: JSON.stringify({
+      approval_status,
+      ...(opts?.activateBilling === undefined ? {} : { activate_billing: opts.activateBilling }),
+    }),
   });
   const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
   if (!res.ok || data.success !== true) {
     throw new Error(
       safeUserFacingApiMessage(data.error || `Approval update failed (${res.status}).`, res.status, {
+        skipStatusHints: true,
+      }),
+    );
+  }
+}
+
+export async function adminSetUserBilling(
+  token: string,
+  userId: string,
+  billing_status: "unpaid" | "active" | "past_due" | "canceled",
+): Promise<void> {
+  const apiBase = getAuthApiBase();
+  if (!apiBase) throw new Error("Backend API base is not configured.");
+  const res = await authFetch(`${apiBase}/api/admin/users/${encodeURIComponent(userId)}/billing`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ billing_status }),
+  });
+  const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
+  if (!res.ok || data.success !== true) {
+    throw new Error(
+      safeUserFacingApiMessage(data.error || `Billing update failed (${res.status}).`, res.status, {
         skipStatusHints: true,
       }),
     );

@@ -6,6 +6,19 @@ compatibility_flags = ["nodejs_compat", "nodejs_als"]
 workers_dev = true
 preview_urls = true
 
+# Binary blobs too large for D1 rows: field-job damage photos (see src/api/workspaceRoutes.ts).
+#
+# Left commented because `wrangler deploy` FAILS when a bound bucket does not exist, which
+# would block every backend release. The Worker treats WORKSPACE_FILES as optional: without
+# it, photo upload returns 503 and images stay on the device that captured them.
+#
+# To turn photo sync on, create the bucket once and then uncomment the three lines below:
+#   npx wrangler r2 bucket create hd2d-workspace-files
+#
+# [[r2_buckets]]
+# binding = "WORKSPACE_FILES"
+# bucket_name = "hd2d-workspace-files"
+
 # Public API hostname on your zone (no Access app on this host). Vercel: HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com
 #
 # Requires zone `hardcoredoortodoorclosers.com` on the **same** Cloudflare account as `wrangler login`.
@@ -13,7 +26,16 @@ preview_urls = true
 # `api.hardcoredoortodoorclosers.com` under Workers & Pages → hd2d-backend → Domains.
 routes = [
   { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
+  { pattern = "hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "www.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
 ]
+
+# Built by CI (or locally: npm run build in roofing-estimator-vite) before deploy.
+[assets]
+directory = "../roofing-estimator-vite/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 # Retry Meta Page posts that failed Graph API (pending rows in D1).
 [triggers]

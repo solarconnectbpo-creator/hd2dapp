@@ -4,8 +4,10 @@
  * bbox intersects each region’s WGS84 box (best-effort rectangles).
  *
  * Built-ins: MO / IL / MN metros (`moIlParcelFallbackRegions`, `mnParcelFallbackRegions`) plus
- * `usParcelFallbackRegions` (other states + DC). Optional Worker var ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON:
- * JSON array of `{ "id", "layerUrl", "west", "south", "east", "north" }` appended to the list.
+ * `usParcelFallbackRegions` (live public layers: FL statewide, NC, AR, NYC, LA, King Co, DC).
+ * Nationwide owner names still rely on DealMachine address search when GIS has no owner field.
+ * Optional Worker var ARCGIS_EXTRA_PARCEL_FALLBACKS_JSON: JSON array of
+ * `{ "id", "layerUrl", "west", "south", "east", "north" }` appended to the list.
  */
 
 import { MO_IL_PARCEL_FALLBACK_REGIONS, type ParcelFallbackRegion } from "./moIlParcelFallbackRegions";

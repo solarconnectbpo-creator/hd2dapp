@@ -1,13 +1,14 @@
 import { Link } from "react-router";
-import { DollarSign, FileSignature, Plus } from "lucide-react";
+import { DollarSign, FileSignature, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { CoxEstimateGenerator } from "../components/cox/CoxEstimateGenerator";
+import { WorkspaceSyncBadge } from "../components/WorkspaceSyncBadge";
 
 export function Estimates() {
-  const { estimates, contracts } = useRoofing();
+  const { estimates, contracts, deleteEstimate } = useRoofing();
   const money = (value: number) => `$${value.toLocaleString()}`;
 
   return (
@@ -21,6 +22,7 @@ export function Estimates() {
               Open contracts &amp; proposals
             </Link>
           </p>
+          <WorkspaceSyncBadge className="mt-2" />
         </div>
         <Link to="/measurement/new" className="shrink-0">
           <Button className="w-full sm:w-auto">
@@ -61,12 +63,31 @@ export function Estimates() {
                     <CardTitle className="text-lg">{estimate.projectName}</CardTitle>
                     <CardDescription className="mt-1 text-[var(--x-muted)]">{estimate.date}</CardDescription>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 border-emerald-500/35 bg-emerald-950/50 text-emerald-300"
-                  >
-                    Estimate
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-500/35 bg-emerald-950/50 text-emerald-300"
+                    >
+                      Estimate
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete estimate for ${estimate.projectName}`}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete the estimate for ${estimate.projectName}? Any linked proposal is removed too.`,
+                          )
+                        ) {
+                          deleteEstimate(estimate.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -127,7 +148,8 @@ export function Estimates() {
                               <div key={`${line.description}-${index}`} className="text-sm">
                                 <div>{line.description}</div>
                                 <div className="text-xs text-[var(--x-muted)]">
-                                  {line.hours} hr × {money(line.hourlyRate)} = {money(line.totalCost)}
+                                  {line.hours} {line.unit ?? "hr"} × {money(line.hourlyRate)} ={" "}
+                                  {money(line.totalCost)}
                                 </div>
                               </div>
                             ))}
@@ -139,13 +161,21 @@ export function Estimates() {
                   {(() => {
                     const proposal = contracts.find((ct) => ct.estimateId === estimate.id);
                     return proposal ? (
-                      <div className="border-t border-white/[0.08] pt-3 text-sm">
-                        <span className="text-[var(--x-muted)]">Proposal: </span>
-                        <Link
-                          className="font-medium text-[var(--x-accent)] hover:underline"
-                          to="/contracts"
-                        >
-                          {proposal.status} · {proposal.clientName || "Client TBD"}
+                      <div className="space-y-2 border-t border-white/[0.08] pt-3 text-sm">
+                        <div>
+                          <span className="text-[var(--x-muted)]">Proposal: </span>
+                          <Link
+                            className="font-medium text-[var(--x-accent)] hover:underline"
+                            to="/contracts"
+                          >
+                            {proposal.status} · {proposal.clientName || "Client TBD"}
+                          </Link>
+                        </div>
+                        <Link to={`/measurement/new?contractId=${encodeURIComponent(proposal.id)}`}>
+                          <Button type="button" variant="outline" size="sm" className="w-full">
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit proposal
+                          </Button>
                         </Link>
                       </div>
                     ) : (

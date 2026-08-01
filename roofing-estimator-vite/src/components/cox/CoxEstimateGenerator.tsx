@@ -77,18 +77,18 @@ export function CoxEstimateGenerator() {
           const remote = await fetchCoxEstimateFromWorker(session.token, input);
           setResult(remote);
           setSource("worker");
-          toast.success("Cox estimate calculated (server)");
+          toast.success("Estimate calculated (server)");
           return;
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Server estimate failed";
-          toast.message("Using local Cox engine", { description: msg });
+          toast.message("Using local estimate engine", { description: msg });
         }
       }
 
       const local = generateCoxEstimate(input);
       setResult(local);
       setSource("local");
-      toast.success("Cox estimate calculated");
+      toast.success("Estimate calculated");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not calculate estimate";
       toast.error(msg);
@@ -125,10 +125,9 @@ export function CoxEstimateGenerator() {
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-xl">Cox / Atlas estimate</CardTitle>
+            <CardTitle className="text-xl">Estimate</CardTitle>
             <CardDescription className="mt-1 max-w-2xl">
-              Good / Better / Best tiers from Atlas Cox pricing ($/SQ by story &amp; pitch, tear-off
-              $80/SQ/layer, 8% tax).
+              Good / Better / Best tiers ($/SQ by story &amp; pitch, tear-off $80/SQ/layer, 8% tax).
             </CardDescription>
           </div>
           {source ? (

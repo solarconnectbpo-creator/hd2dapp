@@ -97,6 +97,16 @@ const OWNER_PRIORITY_KEYS = [
   "OWNERNAME2",
   "OWNER_LINE1",
   "SITE_OWNER",
+  /** Harris CAD / large metro extracts */
+  "OWN_NM",
+  "OWN1",
+  "OWN2",
+  "OWNER_1",
+  "OWNER_2",
+  "PY_OWNER_NAME",
+  "OWNER_NM",
+  "ACCT_OWNER",
+  "LEGAL_OWNER",
 ];
 
 function getKeyCaseInsensitive(parcel: Record<string, unknown>, key: string): unknown {

@@ -1,4 +1,5 @@
 import type { OrgSettings } from "./orgSettings";
+import { getStoredSession } from "./authClient";
 import {
   fetchDealMachinePropertyByAddress,
   isDealMachineLikelyConfigured,
@@ -71,8 +72,13 @@ function mergeOwnerFields(base: PropertyImportPayload, fromApi: PropertyImportPa
   };
 }
 
+export type OwnerLookupContextExtended = OwnerLookupContext & {
+  /** Assessor / GIS situs line — often better than reverse-geocode for DealMachine. */
+  parcelSiteAddress?: string;
+};
+
 /** Exported for Canvassing: try multiple parsed address lines when the first DealMachine query misses. */
-export function buildCriteriaCandidates(ctx: OwnerLookupContext): UsAddressSearchCriteria[] {
+export function buildCriteriaCandidates(ctx: OwnerLookupContextExtended): UsAddressSearchCriteria[] {
   const candidates: UsAddressSearchCriteria[] = [];
   const seen = new Set<string>();
   const push = (c: UsAddressSearchCriteria | null) => {
@@ -83,6 +89,11 @@ export function buildCriteriaCandidates(ctx: OwnerLookupContext): UsAddressSearc
     candidates.push(c);
   };
 
+  // Prefer assessor situs when present — street-center Nominatim often misses the parcel.
+  if (ctx.parcelSiteAddress?.trim()) {
+    push(parseUsAddressLineForSearch(ctx.parcelSiteAddress.trim()));
+  }
+  push(parseUsAddressLineForSearch(ctx.payload.address));
   push(
     nominatimReverseToAddressCriteria({
       display_name: ctx.nominatimDisplayName,
@@ -96,13 +107,12 @@ export function buildCriteriaCandidates(ctx: OwnerLookupContext): UsAddressSearc
       push(parseUsAddressLineForSearch(trimmed));
     }
   }
-  push(parseUsAddressLineForSearch(ctx.payload.address));
   return candidates;
 }
 
 export async function runOwnerFallbackLookup(
   org: OrgSettings,
-  ctx: OwnerLookupContext,
+  ctx: OwnerLookupContextExtended,
 ): Promise<OwnerLookupResult> {
   if (isOwnerInfoComplete(ctx.payload)) {
     return { ok: true, payload: ctx.payload, source: "base" };
@@ -126,8 +136,9 @@ export async function runOwnerFallbackLookup(
   }
 
   let latestError = "";
+  const token = getStoredSession()?.token;
   for (const criteria of candidates) {
-    const res = await fetchDealMachinePropertyByAddress(criteria);
+    const res = await fetchDealMachinePropertyByAddress(criteria, token);
     if (!res.ok) {
       latestError = res.message;
       continue;

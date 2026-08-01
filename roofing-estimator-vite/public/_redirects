@@ -1,8 +1,2 @@
-# Root static assets (explicit before SPA fallback)
-/hd2d-brand-logo.png /hd2d-brand-logo.png 200
-/hd2d-logo.png /hd2d-logo.png 200
-/favicon.svg /favicon.svg 200
-/manifest.webmanifest /manifest.webmanifest 200
-/icons.svg /icons.svg 200
-# Cloudflare Pages — client-side routing (React Router)
-/*    /index.html   200
+# SPA fallback is handled by Worker static assets (not_found_handling = single-page-application).
+# Do not add /* → /index.html here — Workers Assets rejects it as an infinite redirect loop.

@@ -1,0 +1,5 @@
+# Cloudflare Workers Builds runs `pnpm install` at the monorepo root.
+# Include the Worker package so `@sentry/cloudflare` (and other backend deps)
+# resolve when `npx wrangler versions upload` bundles `backend/src`.
+packages:
+  - "backend"

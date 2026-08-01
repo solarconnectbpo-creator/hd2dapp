@@ -206,7 +206,7 @@ export function generateCoxEstimate(input: CoxEstimateInput): CoxEstimateResult 
   const estimate = calculateTieredEstimateWithTax(totalBasePrice, taxRate);
 
   const projectName =
-    (input.projectName?.trim() || input.parcelId?.trim() || "Cox roof estimate").slice(0, 120);
+    (input.projectName?.trim() || input.parcelId?.trim() || "Roof estimate").slice(0, 120);
 
   return {
     parcelId: input.parcelId?.trim() || null,
@@ -263,7 +263,7 @@ export function coxResultToHd2dEstimateLines(
     totalCost: number;
   }[] = [
     {
-      name: `Cox ${tierMeta.name} — ${result.roofSystem} (${result.buildingType}, ${result.pitch})`,
+      name: `${tierMeta.name} — ${result.roofSystem} (${result.buildingType}, ${result.pitch})`,
       quantity: result.squares,
       unit: "square",
       unitCost: roundMoney(result.basePricePerSquare * tierMeta.multiplier),

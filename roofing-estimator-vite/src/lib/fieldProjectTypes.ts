@@ -31,8 +31,13 @@ export interface DamagePhoto {
   id: string;
   capturedAt: string;
   caption?: string;
-  /** JPEG data URL after client compress (preferred for localStorage). */
+  /**
+   * JPEG data URL after client compress. Empty on a device that pulled the project
+   * from the server but has not fetched the blob yet — use {@link remoteKey}.
+   */
   imageDataUrl: string;
+  /** Set once the image is stored in R2; fetch via GET /api/workspace/files/:key. */
+  remoteKey?: string;
   aiSummary?: DamagePhotoAiSummary;
 }
 
@@ -41,6 +46,11 @@ export interface FieldProject {
   name: string;
   address?: string;
   notes?: string;
+  /**
+   * Auto-generated storm / damage documentation from photo AI drafts.
+   * Kept separate from `notes` so site metadata is not overwritten.
+   */
+  aiReport?: string;
   createdAt: string;
   updatedAt: string;
   pipelineStage: FieldPipelineStage;
@@ -58,7 +68,64 @@ export interface FieldProject {
   ghlEmbedUrl?: string;
 }
 
-export const MAX_FIELD_PROJECT_PHOTOS = 24;
+export const MAX_FIELD_PROJECT_AI_REPORT = 8000;
+
+/** Soft cap for storm / field documentation (bytes live in IndexedDB + R2, not localStorage). */
+export const MAX_FIELD_PROJECT_PHOTOS = 1000;
+
+/**
+ * Union-merge photos so a remote project with fewer ids cannot wipe local captures.
+ * Prefer non-empty local JPEG bytes; keep remoteKey / AI / caption from the richer side.
+ */
+export function mergeFieldProjectPhotos(incoming: FieldProject, local: FieldProject | undefined): FieldProject {
+  if (!local) return incoming;
+  const localById = new Map(local.photos.map((p) => [p.id, p]));
+  const incomingIds = new Set(incoming.photos.map((p) => p.id));
+  const merged: DamagePhoto[] = incoming.photos.map((remote) => {
+    const loc = localById.get(remote.id);
+    if (!loc) return remote;
+    return {
+      ...remote,
+      imageDataUrl: remote.imageDataUrl || loc.imageDataUrl || "",
+      remoteKey: remote.remoteKey || loc.remoteKey,
+      caption: remote.caption ?? loc.caption,
+      aiSummary: remote.aiSummary ?? loc.aiSummary,
+    };
+  });
+  for (const loc of local.photos) {
+    if (!incomingIds.has(loc.id)) merged.push(loc);
+  }
+  merged.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+  const aiReport = incoming.aiReport?.length
+    ? incoming.aiReport.length >= (local.aiReport?.length ?? 0)
+      ? incoming.aiReport
+      : local.aiReport
+    : local.aiReport;
+  return {
+    ...incoming,
+    // Prefer the newer updatedAt so concurrent local captures aren't treated as stale.
+    updatedAt:
+      Date.parse(local.updatedAt) > Date.parse(incoming.updatedAt) ? local.updatedAt : incoming.updatedAt,
+    photos: merged.slice(0, MAX_FIELD_PROJECT_PHOTOS),
+    ...(aiReport ? { aiReport } : {}),
+  };
+}
+
+/** Reconcile a sync snapshot with the latest in-memory projects (photos added mid-sync). */
+export function reconcileFieldProjectsWithLatest(
+  synced: FieldProject[],
+  latest: FieldProject[],
+): FieldProject[] {
+  const byId = new Map<string, FieldProject>();
+  for (const remote of synced) byId.set(remote.id, remote);
+  for (const local of latest) {
+    const remote = byId.get(local.id);
+    byId.set(local.id, remote ? mergeFieldProjectPhotos(remote, local) : local);
+  }
+  return [...byId.values()].sort(
+    (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.id.localeCompare(b.id),
+  );
+}
 
 function optString(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;
@@ -140,12 +207,18 @@ export function normalizeDamagePhoto(raw: Record<string, unknown>): DamagePhoto 
   if (typeof id !== "string" || typeof capturedAt !== "string" || typeof imageDataUrl !== "string") {
     return null;
   }
-  if (!imageDataUrl.startsWith("data:image/")) return null;
+  const remoteKey = optString(raw.remoteKey, 512);
+  // Sync strips JPEG bytes (`""`) and keeps captions/AI/remoteKey. Accept empty
+  // imageDataUrl so pull+merge can reattach local bytes or fetch via remoteKey.
+  const hasLocalJpeg = imageDataUrl.startsWith("data:image/");
+  const hasPlaceholder = imageDataUrl === "";
+  if (!hasLocalJpeg && !hasPlaceholder) return null;
   return {
     id,
     capturedAt,
     caption: optString(raw.caption, 500),
-    imageDataUrl,
+    imageDataUrl: hasLocalJpeg ? imageDataUrl : "",
+    ...(remoteKey ? { remoteKey } : {}),
     aiSummary: normalizeAiSummary(raw.aiSummary),
   };
 }
@@ -180,12 +253,14 @@ export function normalizeFieldProject(raw: Record<string, unknown>): FieldProjec
   const monetaryValueUsd = optNonNegativeMoney(raw.monetaryValueUsd);
   const ownerLabel = optString(raw.ownerLabel, 120);
   const tags = normalizeTagList(raw.tags);
+  const aiReport = optString(raw.aiReport, MAX_FIELD_PROJECT_AI_REPORT);
 
   return {
     id,
     name: name.slice(0, 200),
     address: optString(raw.address, 500),
     notes: optString(raw.notes, 2000),
+    ...(aiReport ? { aiReport } : {}),
     createdAt,
     updatedAt: typeof updatedAt === "string" ? updatedAt : createdAt,
     pipelineStage,

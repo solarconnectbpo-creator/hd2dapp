@@ -27,6 +27,7 @@ import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/
 import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCheckout";
 import { handleMarketplaceRoutes } from "./api/marketplaceRoutes";
 import { handleCoxEstimateRoutes } from "./api/coxEstimateRoutes";
+import { handleWorkspaceRoutes } from "./api/workspaceRoutes";
 import { handleOrgWorkspaceRoutes } from "./api/orgWorkspaceRoutes";
 import { releaseExpiredReservations } from "./marketplace/marketplaceDb";
 import { handleCallCenterCheckoutSession, type CallCenterCheckoutEnv } from "./api/callCenterCheckout";
@@ -167,6 +168,9 @@ interface Env {
   /** Optional R2 bucket for org agreement files larger than ~1.5MB (see orgWorkspaceRoutes). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ORG_FILES?: any;
+  /** R2 bucket for field-job photo blobs (see workspaceRoutes). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  WORKSPACE_FILES?: any;
 }
 
 type AuthEnv = Pick<
@@ -271,6 +275,9 @@ const worker = {
       } else if (path.startsWith("/api/leads/marketplace")) {
         const mr = await handleMarketplaceRoutes(request, env as AuthEnv, path, corsHeaders);
         if (mr) return mr;
+      } else if (path.startsWith("/api/workspace")) {
+        const ws = await handleWorkspaceRoutes(request, env as AuthEnv, path, corsHeaders);
+        if (ws) return ws;
       } else if (path.startsWith("/api/estimates")) {
         const coxRes = await handleCoxEstimateRoutes(request, env as AuthEnv, path, corsHeaders);
         if (coxRes) return coxRes;

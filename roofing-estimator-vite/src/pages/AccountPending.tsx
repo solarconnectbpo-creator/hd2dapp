@@ -96,6 +96,13 @@ export function AccountPending() {
         ))}
       </ul>
 
+      {caps && !caps.membershipCheckout && access?.billing_status !== "active" ? (
+        <p className="text-sm rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-100">
+          Online membership checkout is not configured yet. After an admin approves your account (which unlocks access),
+          click Refresh status. Contact support if you stay blocked.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         {showPay ? (
           <button type="button" className="run-btn" disabled={busy} onClick={() => void onPay()}>

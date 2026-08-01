@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router";
 import { toast as sonnerToast } from "sonner";
 import {
@@ -17,6 +18,9 @@ import {
 import { Button } from "../components/ui/button";
 import { useAuth } from "../context/AuthContext";
 import { useRoofing } from "../context/RoofingContext";
+import { StormDamageCaptureSheet } from "../features/fieldProjects/StormDamageCaptureSheet";
+import { useFieldProjectPhotoCapture } from "../features/fieldProjects/useFieldProjectPhotoCapture";
+import { MAX_FIELD_PROJECT_PHOTOS } from "../lib/fieldProjectTypes";
 import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
 import { parseLeadsFromGeoJson } from "../lib/canvassingGeoJson";
@@ -45,6 +49,8 @@ import {
   saveCanvassLeads,
   saveCanvassStates,
 } from "../lib/canvassingStorage";
+import { useWorkspaceCollectionSync } from "../lib/useWorkspaceCollectionSync";
+import { SyncStatusText } from "../components/SyncStatusText";
 import {
   emptyPropertyImportPayload,
   inferStateCodeFromAddressLine,
@@ -184,10 +190,43 @@ const STATUS_RANK: Record<CanvassVisitStatus, number> = {
   skip: 3,
 };
 
+/** One row per lead for syncing the visit-status map as individual records. */
+type CanvassVisitRow = CanvassLeadState & { id: string };
+
 export function Canvassing() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { addFieldProject } = useRoofing();
+  const { user, session } = useAuth();
+  const {
+    fieldProjects,
+    addFieldProject,
+    addFieldProjectPhoto,
+    removeFieldProjectPhoto,
+    setFieldProjectPhotoAiSummary,
+  } = useRoofing();
+  const authToken = session?.token ?? "";
+  const {
+    cameraInputRef: stormCameraInputRef,
+    galleryInputRef: stormGalleryInputRef,
+    importing: stormImporting,
+    analyzing: stormAnalyzing,
+    importError: stormImportError,
+    setImportError: setStormImportError,
+    importFiles: importStormFiles,
+    openCamera: openStormCamera,
+    openGallery: openStormGallery,
+  } = useFieldProjectPhotoCapture({
+    fieldProjects,
+    authToken,
+    addFieldProjectPhoto,
+    setFieldProjectPhotoAiSummary,
+  });
+  const [stormReportProjectId, setStormReportProjectId] = useState<string | null>(null);
+  const [stormKeepShooting, setStormKeepShooting] = useState(true);
+  const stormKeepShootingRef = useRef(true);
+  const [stormLightboxUrl, setStormLightboxUrl] = useState<string | null>(null);
+  const stormReportProject = stormReportProjectId
+    ? fieldProjects.find((p) => p.id === stormReportProjectId) ?? null
+    : null;
   const viewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 38.63, lon: -90.2 });
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => ({
     lat: viewCenterRef.current.lat,
@@ -290,6 +329,46 @@ export function Canvassing() {
   useEffect(() => {
     saveCanvassStates(states);
   }, [states]);
+
+  // Mirror route pins and door outcomes to the account so a cleared browser or a second
+  // device does not lose a day of knocking. localStorage above stays as the offline cache.
+  const leadSync = useWorkspaceCollectionSync<ContactRecord>({
+    kind: "canvass_lead",
+    items: leads,
+    getId: (l) => l.id,
+    onRemoteMerge: setLeads,
+    toItem: (d) =>
+      d && typeof d === "object" && typeof (d as ContactRecord).id === "string"
+        ? (d as ContactRecord)
+        : null,
+  });
+
+  // Visit status is a map keyed by lead id; sync it as one record per lead.
+  const visitRows = useMemo(
+    () => Object.entries(states).map(([id, s]) => ({ id, ...s })),
+    [states],
+  );
+  const visitSync = useWorkspaceCollectionSync<CanvassVisitRow>({
+    kind: "canvass_visit",
+    items: visitRows,
+    getId: (r) => r.id,
+    onRemoteMerge: (rows) => {
+      const next: Record<string, CanvassLeadState> = {};
+      for (const { id, ...rest } of rows) next[id] = rest;
+      setStates(next);
+    },
+    toItem: (d) => {
+      if (!d || typeof d !== "object") return null;
+      const row = d as CanvassVisitRow;
+      return typeof row.id === "string" && row.id ? row : null;
+    },
+  });
+
+  const canvassSyncState = leadSync.state.status === "error" ? leadSync.state : visitSync.state;
+  const syncCanvassNow = useCallback(() => {
+    leadSync.syncNow();
+    visitSync.syncNow();
+  }, [leadSync, visitSync]);
   useEffect(() => {
     saveCanvassEnrichment(enrichment);
   }, [enrichment]);
@@ -360,10 +439,20 @@ export function Canvassing() {
     }
     const shortAddr = siteAddress.split(/\r?\n/)[0].trim().slice(0, 120);
     const name = `${shortAddr} — storm damage`.slice(0, 200);
+    const lat =
+      lastPayload.latitude?.trim() ||
+      (selectedLead?.lat != null ? String(selectedLead.lat) : "") ||
+      (mapCenter.lat != null ? String(mapCenter.lat) : "");
+    const lng =
+      lastPayload.longitude?.trim() ||
+      (selectedLead?.lng != null ? String(selectedLead.lng) : "") ||
+      (mapCenter.lng != null ? String(mapCenter.lng) : "");
     const notesParts = [
       `Storm damage report — ${new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`,
       parcelIdDisplay ? `Parcel / ID: ${parcelIdDisplay}` : null,
       selectedLead ? `Route: ${selectedLead.name || selectedLead.address || "Lead"}` : null,
+      lat && lng ? `Capture pin: ${lat}, ${lng}` : null,
+      ownerDisplay ? `Owner: ${ownerDisplay}` : null,
     ].filter(Boolean);
     const p = addFieldProject({
       name,
@@ -372,16 +461,75 @@ export function Canvassing() {
       tags: ["storm", "damage-report"],
       pipelineStage: "documentation",
     });
-    sonnerToast.success("Field job created — add photos on Projects");
-    navigate(`/projects?openProject=${encodeURIComponent(p.id)}`);
+    setStormReportProjectId(p.id);
+    setStormKeepShooting(true);
+    stormKeepShootingRef.current = true;
+    setStormImportError(null);
+    sonnerToast.success("Storm damage job ready — take site photos");
+    // Open rear camera once the sheet mounts (native capture on mobile / PWA).
+    window.setTimeout(() => openStormCamera(), 180);
   }, [
     addFieldProject,
     addressLine,
     lastPayload,
-    navigate,
+    mapCenter.lat,
+    mapCenter.lng,
+    openStormCamera,
+    ownerDisplay,
     parcelIdDisplay,
     selectedLead,
+    setStormImportError,
   ]);
+
+  const stormContextHint = useMemo(() => {
+    if (!stormReportProject) return "";
+    return [stormReportProject.name, stormReportProject.address, "storm damage documentation"]
+      .filter(Boolean)
+      .join(" — ");
+  }, [stormReportProject]);
+
+  const onStormCameraFiles = useCallback(
+    (files: FileList | null) => {
+      if (!stormReportProjectId) return;
+      // Save + reopen camera immediately; AI report builds in the background.
+      void importStormFiles(stormReportProjectId, files, {
+        autoAi: Boolean(authToken),
+        awaitAi: false,
+        contextHint: stormContextHint,
+      }).then((res) => {
+        if (res.added <= 0) return;
+        sonnerToast.success(res.added === 1 ? "Photo saved" : `${res.added} photos saved`);
+        if (!stormKeepShootingRef.current) return;
+        if (res.photoCountAfter >= MAX_FIELD_PROJECT_PHOTOS) return;
+        window.setTimeout(() => {
+          if (stormKeepShootingRef.current) openStormCamera();
+        }, 250);
+      });
+    },
+    [authToken, importStormFiles, openStormCamera, stormContextHint, stormReportProjectId],
+  );
+
+  const onStormGalleryFiles = useCallback(
+    (files: FileList | null) => {
+      if (!stormReportProjectId) return;
+      void importStormFiles(stormReportProjectId, files, {
+        autoAi: Boolean(authToken),
+        awaitAi: false,
+        contextHint: stormContextHint,
+      }).then((res) => {
+        if (res.added > 0) {
+          sonnerToast.success(res.added === 1 ? "Photo saved" : `${res.added} photos saved`);
+        }
+      });
+    },
+    [authToken, importStormFiles, stormContextHint, stormReportProjectId],
+  );
+
+  useEffect(() => {
+    if (stormReportProjectId && !stormReportProject) {
+      setStormReportProjectId(null);
+    }
+  }, [stormReportProject, stormReportProjectId]);
 
   const leadsRef = useRef(leads);
   const enrichmentRef = useRef(enrichment);
@@ -447,16 +595,20 @@ export function Canvassing() {
 
         let intelParcel: Record<string, unknown> | null = null;
         let ownerSource: OwnerEnrichmentSource = "base";
-        if (isInMissouriBbox(lat, lng)) {
-          const stl = await fetchStlIntelAtPoint(lat, lng);
-          intelParcel = stl?.parcel ?? null;
-          if (intelParcel && Object.keys(intelParcel).length > 0) {
-            ownerSource = "stl";
-          }
+
+        // Kick off GIS + building lookups in parallel. Nationwide owners come from DealMachine
+        // (address search) after reverse geocode — that runs below once we have street/city/state.
+        const stlPromise = isInMissouriBbox(lat, lng) ? fetchStlIntelAtPoint(lat, lng) : Promise.resolve(null);
+        const parcelPromise = queryArcgisAtPointViaBackend("parcel", lat, lng);
+        const buildingPromise = fetchUsBuildingFootprintAtPoint(lat, lng);
+
+        const [stl, parcelOut, buildingOutEarly] = await Promise.all([stlPromise, parcelPromise, buildingPromise]);
+        if (stl?.parcel && Object.keys(stl.parcel).length > 0) {
+          intelParcel = stl.parcel;
+          ownerSource = "stl";
         }
 
         let arcgisRestAttrs: Record<string, unknown> | null = null;
-        const parcelOut = await queryArcgisAtPointViaBackend("parcel", lat, lng);
         if (parcelOut.ok) {
           arcgisRestAttrs = parcelOut.attributes;
         } else if (parcelOut.reason === "network" || parcelOut.reason === "api") {
@@ -471,7 +623,7 @@ export function Canvassing() {
         const mapHitEmpty = !arcgisFeatureProps || Object.keys(arcgisFeatureProps).length === 0;
 
         const parcel = mergeParcelAttributes(intelParcel, arcgisMerged);
-        const buildingOut = await fetchUsBuildingFootprintAtPoint(lat, lng);
+        const buildingOut = buildingOutEarly;
         let buildingNotes = "";
         const buildingFlat: Record<string, unknown> = {};
         let hadFootprintGeometry = false;
@@ -611,6 +763,7 @@ export function Canvassing() {
         base = normalizePropertyImportPayloadContacts(base);
 
         let dealMachineHit = false;
+        const authToken = session?.token;
         const primary =
           nominatimReverseToAddressCriteria({
             display_name: data.display_name,
@@ -620,36 +773,41 @@ export function Canvassing() {
           payload: base,
           nominatimDisplayName: data.display_name,
           nominatimAddress: data.address,
+          parcelSiteAddress: siteFromParcel || undefined,
           lat,
           lng,
         });
         const toTryDm =
           fromBuilder.length > 0 ? fromBuilder : primary ? [primary] : [];
         let lastDmMsg = "";
+        // Nationwide owner/contact enrichment — DealMachine covers all U.S. addresses when configured.
         for (const criteria of toTryDm) {
-          const dm = await fetchDealMachinePropertyByAddress(criteria);
-          if (dm.ok) {
-            const p = dm.payload;
-            base = {
-              ...base,
-              ownerName: p.ownerName.trim() || p.ownerPmEntityLabel?.trim() || base.ownerName,
-              ownerPhone: p.ownerPhone.trim() || p.contactPersonPhone.trim() || base.ownerPhone,
-              ownerEmail: p.ownerEmail.trim() || base.ownerEmail,
-              ownerMailingAddress: p.ownerMailingAddress.trim() || base.ownerMailingAddress,
-              areaSqFt: p.areaSqFt.trim() || base.areaSqFt,
-              yearBuilt: p.yearBuilt.trim() || base.yearBuilt,
-              lotSizeSqFt: p.lotSizeSqFt.trim() || base.lotSizeSqFt,
-              ownerEntityType: p.ownerEntityType.trim() || base.ownerEntityType,
-              contactPersonName: p.contactPersonName.trim() || base.contactPersonName,
-              contactPersonPhone: p.contactPersonPhone.trim() || base.contactPersonPhone,
-              ownerPmEntityLabel: p.ownerPmEntityLabel?.trim() || base.ownerPmEntityLabel,
-              notes: [base.notes, p.notes].filter(Boolean).join("\n\n"),
-            };
-            ownerSource = "dealmachine";
-            dealMachineHit = true;
-            break;
+          const dm = await fetchDealMachinePropertyByAddress(criteria, authToken);
+          if (!dm.ok) {
+            lastDmMsg = dm.message;
+            continue;
           }
-          lastDmMsg = dm.message;
+          const p = dm.payload;
+          const nextOwner = p.ownerName.trim() || p.ownerPmEntityLabel?.trim() || "";
+          base = {
+            ...base,
+            ownerName: nextOwner || base.ownerName,
+            ownerPhone: p.ownerPhone.trim() || p.contactPersonPhone.trim() || base.ownerPhone,
+            ownerEmail: p.ownerEmail.trim() || base.ownerEmail,
+            ownerMailingAddress: p.ownerMailingAddress.trim() || base.ownerMailingAddress,
+            areaSqFt: p.areaSqFt.trim() || base.areaSqFt,
+            yearBuilt: p.yearBuilt.trim() || base.yearBuilt,
+            lotSizeSqFt: p.lotSizeSqFt.trim() || base.lotSizeSqFt,
+            ownerEntityType: p.ownerEntityType.trim() || base.ownerEntityType,
+            contactPersonName: p.contactPersonName.trim() || base.contactPersonName,
+            contactPersonPhone: p.contactPersonPhone.trim() || base.contactPersonPhone,
+            ownerPmEntityLabel: p.ownerPmEntityLabel?.trim() || base.ownerPmEntityLabel,
+            notes: [base.notes, p.notes].filter(Boolean).join("\n\n"),
+          };
+          ownerSource = "dealmachine";
+          dealMachineHit = true;
+          // Keep trying alternate address forms until we get an owner name.
+          if (nextOwner) break;
         }
         if (!dealMachineHit && toTryDm.length && lastDmMsg) {
           setPanelHint((curr) => (curr ? `${curr} Property lookup: ${lastDmMsg}` : `Property lookup: ${lastDmMsg}`));
@@ -662,6 +820,8 @@ export function Canvassing() {
         }
 
         base = normalizePropertyImportPayloadContacts(base);
+        if (owner) setOwnerDisplay(base.ownerName.trim() || owner);
+        else if (base.ownerName.trim()) setOwnerDisplay(base.ownerName.trim());
 
         const org = loadOrgSettings();
         const ownerFallbackOff = org.ownerFallbackProvider === "none" && org.ownerFallbackLockedOff;
@@ -670,6 +830,7 @@ export function Canvassing() {
             payload: base,
             nominatimDisplayName: data.display_name,
             nominatimAddress: data.address,
+            parcelSiteAddress: siteFromParcel || undefined,
             lat,
             lng,
           });
@@ -729,32 +890,37 @@ export function Canvassing() {
 
         const fromGis = Boolean(arcgisMerged && Object.keys(arcgisMerged).length > 0);
         const intelHit = intelParcel && Object.keys(intelParcel).length > 0;
-        if (fromGis && owner && intelHit) {
+        const displayOwner = (base.ownerName || owner).trim();
+        if (dealMachineHit && displayOwner) {
+          setPanelHint(
+            fromGis || intelHit
+              ? "Nationwide owner records loaded for this address; local parcel data filled GIS fields. Confirm before quoting."
+              : "Nationwide owner records loaded for this address. Confirm before quoting.",
+          );
+        } else if (fromGis && displayOwner && intelHit) {
           setPanelHint(
             "Owner and fields use regional parcel data when available; the map layer fills gaps. Confirm before quoting.",
           );
-        } else if (fromGis && owner) {
+        } else if (fromGis && displayOwner) {
           setPanelHint(
             mapHitEmpty && arcgisRestAttrs
               ? "Owner and property details from the parcel record at this point. Verify before quoting."
               : "Owner and property details from the map layer you tapped. Verify before quoting.",
           );
-        } else if (fromGis && !owner) {
+        } else if (fromGis && !displayOwner) {
           setPanelHint(
             mapHitEmpty && arcgisRestAttrs
-              ? "Parcel attributes found — owner name is not on this layer; check assessor or parcel details."
-              : "Map layer loaded — owner name is not on this layer; check parcel details.",
+              ? "Parcel attributes found — owner name is not on this layer. Sign in so nationwide records lookup can fill the owner."
+              : "Map layer loaded — owner name is not on this layer. Sign in so nationwide records lookup can fill the owner.",
           );
-        } else if (intelHit && owner) {
+        } else if (intelHit && displayOwner) {
           setPanelHint("Regional parcel record loaded. Confirm owner and building details on the assessor before quoting.");
+        } else if (!displayOwner) {
+          setPanelHint(
+            "No owner yet for this pin — try the building center for a cleaner address, sign in for nationwide records lookup, or enter owner details manually.",
+          );
         } else if (isInMoIlParcelCoverageBbox(lat, lng) && !parcel) {
           setPanelHint("No parcel record at this pin — try the building center or a different spot.");
-        } else if (!isInMoIlParcelCoverageBbox(lat, lng) && !fromGis) {
-          setPanelHint(
-            "Parcel overlays use MO/IL/MN county GIS layers where configured (built-in + optional Worker JSON). Outside those regions or rural gaps — verify the owner locally.",
-          );
-        } else if (!owner) {
-          setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");
         }
         if (buildingOut.ok && (buildingOut.attributes || buildingOut.geometry)) {
           setPanelHint((curr) =>
@@ -777,7 +943,7 @@ export function Canvassing() {
         setPanelBusy(false);
       }
     },
-    [autoOpenEstimate, hasRequiredOwnerInfo, openPayloadInEstimator, requireOwnerInfoBeforeOpen],
+    [autoOpenEstimate, hasRequiredOwnerInfo, openPayloadInEstimator, requireOwnerInfoBeforeOpen, session?.token],
   );
 
   const flyTo = useCallback((lat: number, lng: number) => {
@@ -999,6 +1165,11 @@ export function Canvassing() {
               <span className="hidden text-xs text-zinc-700 sm:inline">
                 Tap parcel or pin — owner + lead match (120m) — property panel opens without covering map controls
               </span>
+              <SyncStatusText
+                state={canvassSyncState}
+                onRetry={syncCanvassNow}
+                className="hidden md:inline-flex"
+              />
               <div className="ml-auto flex flex-wrap items-center gap-1">
                 {leads.length > 0 ? (
                   <span className="mr-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-zinc-950" title="Emerald = owner + contact ready">
@@ -1162,14 +1333,18 @@ export function Canvassing() {
               </ul>
             </div>
             {toast ? (
-              <div className="canvass-paper pointer-events-none absolute left-1/2 top-14 z-[25] -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-zinc-950 shadow-lg sm:top-16">
+              <div
+                className="canvass-map-chip pointer-events-none absolute left-1/2 top-14 z-[25] -translate-x-1/2 rounded-full px-4 py-1.5 text-xs shadow-lg sm:top-16"
+                style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #d1d5db" }}
+              >
                 {toast}
               </div>
             ) : null}
             {!sheetOpen ? (
               <button
                 type="button"
-                className="canvass-paper pointer-events-auto absolute bottom-4 left-1/2 z-[25] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-center text-sm text-zinc-950 shadow-lg backdrop-blur-md sm:px-5"
+                className="canvass-map-chip pointer-events-auto absolute bottom-4 left-1/2 z-[25] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full px-4 py-2.5 text-center text-sm shadow-lg sm:px-5"
+                style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #d1d5db" }}
                 onClick={() => setSheetOpen(true)}
               >
                 Tap a lead pin or Use map center — then load owner &amp; parcel
@@ -1432,7 +1607,7 @@ export function Canvassing() {
                   type="button"
                   size="lg"
                   variant="outline"
-                  className="w-full gap-2 border-zinc-300 font-semibold text-zinc-950 hover:bg-zinc-100"
+                  className="canvass-storm-btn w-full gap-2 border-white/30 bg-white/5 font-semibold text-white hover:bg-white/10"
                   disabled={
                     panelBusy ||
                     !lastPayload ||
@@ -1444,7 +1619,7 @@ export function Canvassing() {
                   Storm damage report
                 </Button>
                 <p className="text-[11px] leading-snug text-zinc-600">
-                  Creates a field job with photo documentation. Opens Projects to capture site images.
+                  Opens the camera for many site photos and builds an AI storm damage report as you shoot.
                 </p>
                 <label className="canvass-footer-checkbox flex flex-row items-center gap-2 text-xs text-zinc-950">
                   <input
@@ -1467,6 +1642,76 @@ export function Canvassing() {
             </aside>
             ) : null}
           </div>
+
+      {/* Always mounted so auto-open camera after create is not racing the sheet portal. */}
+      <input
+        ref={stormCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => onStormCameraFiles(e.target.files)}
+      />
+      <input
+        ref={stormGalleryInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => onStormGalleryFiles(e.target.files)}
+      />
+
+      {stormReportProject ? (
+        <StormDamageCaptureSheet
+          project={stormReportProject}
+          open
+          onClose={() => {
+            stormKeepShootingRef.current = false;
+            setStormKeepShooting(false);
+            setStormReportProjectId(null);
+          }}
+          onOpenFullJob={() => {
+            const id = stormReportProject.id;
+            stormKeepShootingRef.current = false;
+            setStormKeepShooting(false);
+            setStormReportProjectId(null);
+            navigate(`/projects?openProject=${encodeURIComponent(id)}`);
+          }}
+          openCamera={openStormCamera}
+          openGallery={openStormGallery}
+          importing={stormImporting}
+          analyzing={stormAnalyzing}
+          importError={stormImportError}
+          onDismissError={() => setStormImportError(null)}
+          keepShooting={stormKeepShooting}
+          onKeepShootingChange={(v) => {
+            stormKeepShootingRef.current = v;
+            setStormKeepShooting(v);
+          }}
+          canUseAi={Boolean(authToken)}
+          onRemovePhoto={(photoId) => removeFieldProjectPhoto(stormReportProject.id, photoId)}
+          onOpenLightbox={setStormLightboxUrl}
+        />
+      ) : null}
+
+      {stormLightboxUrl
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setStormLightboxUrl(null)}
+            >
+              <img
+                src={stormLightboxUrl}
+                alt="Damage photo"
+                className="max-h-full max-w-full rounded-lg object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>,
+            document.getElementById("root") ?? document.body,
+          )
+        : null}
     </div>
   );
 }

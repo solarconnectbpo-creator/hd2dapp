@@ -6,9 +6,11 @@ import {
   insertUser,
   listUsersPublic,
   updateUserApprovalStatus,
+  updateUserBillingAndStripe,
   updateUserFields,
 } from "../auth/userDb";
 import type { AuthRole } from "../auth/token";
+import type { BillingStatus } from "../auth/access";
 
 function jsonHeaders(cors: Record<string, string>) {
   return { ...cors, "Content-Type": "application/json" };
@@ -116,7 +118,7 @@ export async function handleAdminUserRoutes(
         headers: j,
       });
     }
-    let body: { approval_status?: string } = {};
+    let body: { approval_status?: string; activate_billing?: boolean } = {};
     try {
       body = (await request.json()) as typeof body;
     } catch {
@@ -133,6 +135,47 @@ export async function handleAdminUserRoutes(
       );
     }
     const ok = await updateUserApprovalStatus(env.DB, userId, st);
+    if (!ok) {
+      return new Response(JSON.stringify({ success: false, error: "User not found." }), { status: 404, headers: j });
+    }
+    // Default: approving also unlocks billing so users aren't stuck when Stripe membership Prices are unset.
+    const activateBilling = body.activate_billing !== false && st === "approved";
+    if (activateBilling) {
+      await updateUserBillingAndStripe(env.DB, userId, { billing_status: "active" });
+    }
+    if (st === "rejected") {
+      await updateUserBillingAndStripe(env.DB, userId, { billing_status: "unpaid" });
+    }
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: j });
+  }
+
+  if (segments.length === 2 && segments[1] === "billing") {
+    if (request.method !== "PATCH") {
+      return new Response(JSON.stringify({ success: false, error: "Method not allowed." }), {
+        status: 405,
+        headers: j,
+      });
+    }
+    let body: { billing_status?: string } = {};
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+        status: 400,
+        headers: j,
+      });
+    }
+    const st = (body.billing_status || "").trim().toLowerCase() as BillingStatus;
+    if (st !== "unpaid" && st !== "active" && st !== "past_due" && st !== "canceled") {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "billing_status must be unpaid, active, past_due, or canceled.",
+        }),
+        { status: 400, headers: j },
+      );
+    }
+    const ok = await updateUserBillingAndStripe(env.DB, userId, { billing_status: st });
     if (!ok) {
       return new Response(JSON.stringify({ success: false, error: "User not found." }), { status: 404, headers: j });
     }

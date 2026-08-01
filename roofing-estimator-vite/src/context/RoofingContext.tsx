@@ -1,20 +1,61 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAuth } from "./AuthContext";
 import { getScopedStorageKey } from "../lib/userScopedStorage";
+import {
+  applyRemote,
+  commitPush,
+  diffLocal,
+  emptySyncMeta,
+  type PushRecord,
+  type SyncMeta,
+  type WorkspaceKind,
+} from "../lib/workspaceSyncEngine";
+import {
+  pullWorkspaceRecords,
+  pushWorkspaceRecords,
+  uploadWorkspaceFile,
+} from "../lib/workspaceSyncClient";
 import {
   type DamagePhoto,
   type DamagePhotoAiSummary,
   type FieldPipelineStage,
   type FieldProject,
+  MAX_FIELD_PROJECT_AI_REPORT,
   MAX_FIELD_PROJECT_PHOTOS,
+  mergeFieldProjectPhotos,
   normalizeFieldProject,
   normalizeTagList,
   optHttpsUrl,
   isFieldPipelineStage,
+  reconcileFieldProjectsWithLatest,
 } from "../lib/fieldProjectTypes";
+import {
+  deleteFieldPhotoBlob,
+  deleteFieldPhotoBlobs,
+  hydrateFieldProjectPhotosFromIdb,
+  putFieldPhotoBlob,
+} from "../lib/fieldPhotoBlobStore";
+import { buildStormDamageReport } from "../lib/stormDamageReport";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
+import type { FormState } from "../features/measurement/measurementFormTypes";
+import type { ProposalState } from "../features/measurement/proposalTypes";
 
 export type RoofFormKind = "gable" | "hip" | "flat" | "mansard" | "complex";
+
+/** Snapshot so a printed proposal can be reopened in Proposal Builder. */
+export interface ContractBuilderSnapshot {
+  form: FormState;
+  proposal: ProposalState;
+}
 
 export interface Measurement {
   id: string;
@@ -46,8 +87,12 @@ export interface Estimate {
   }[];
   labor: {
     description: string;
+    /** Billed quantity in {@link unit} — not necessarily hours (roofing labor is priced per SQ). */
     hours: number;
+    /** Rate per {@link unit}. */
     hourlyRate: number;
+    /** Unit for the quantity above; defaults to hours for older saved estimates. */
+    unit?: string;
     totalCost: number;
   }[];
   subtotal: number;
@@ -74,6 +119,8 @@ export interface Contract {
   totalAmount: number;
   depositAmount: number;
   status: "draft" | "sent" | "signed";
+  /** Present when created/updated from New Measurement Proposal Builder. */
+  builderSnapshot?: ContractBuilderSnapshot;
 }
 
 export type { DamagePhoto, DamagePhotoAiSummary, FieldPipelineStage, FieldProject };
@@ -86,6 +133,9 @@ interface RoofingContextType {
   addMeasurement: (measurement: Measurement) => void;
   addEstimate: (estimate: Estimate) => void;
   addContract: (contract: Contract) => void;
+  updateContract: (id: string, patch: Partial<Omit<Contract, "id">>) => void;
+  updateEstimate: (id: string, patch: Partial<Omit<Estimate, "id">>) => void;
+  getContractById: (id: string) => Contract | undefined;
   addFieldProject: (input: {
     name: string;
     address?: string;
@@ -101,7 +151,10 @@ interface RoofingContextType {
   updateFieldProject: (
     id: string,
     patch: Partial<
-      Pick<FieldProject, "name" | "address" | "notes" | "linkedMeasurementId" | "ghlUrl" | "ghlEmbedUrl">
+      Pick<
+        FieldProject,
+        "name" | "address" | "notes" | "aiReport" | "linkedMeasurementId" | "ghlUrl" | "ghlEmbedUrl"
+      >
     > & {
       monetaryValueUsd?: number | null;
       ownerLabel?: string | null;
@@ -110,7 +163,8 @@ interface RoofingContextType {
   ) => void;
   deleteFieldProject: (id: string) => void;
   setFieldProjectPipelineStage: (id: string, stage: FieldPipelineStage) => void;
-  addFieldProjectPhoto: (projectId: string, imageDataUrl: string, caption?: string) => boolean;
+  /** Returns the new photo when added, or null if the project is missing / at the photo cap. */
+  addFieldProjectPhoto: (projectId: string, imageDataUrl: string, caption?: string) => DamagePhoto | null;
   removeFieldProjectPhoto: (projectId: string, photoId: string) => void;
   updateFieldProjectPhotoCaption: (projectId: string, photoId: string, caption: string) => void;
   setFieldProjectPhotoAiSummary: (
@@ -128,7 +182,22 @@ interface RoofingContextType {
   getMeasurementById: (id: string) => Measurement | undefined;
   getEstimateById: (id: string) => Estimate | undefined;
   getFieldProjectById: (id: string) => FieldProject | undefined;
+  /** Remove an estimate (and any measurement no longer referenced by another estimate). */
+  deleteEstimate: (id: string) => void;
+  deleteContract: (id: string) => void;
+  deleteMeasurement: (id: string) => void;
+  /** Server sync state for the "saved to your account" indicator. */
+  sync: WorkspaceSyncState;
+  /** Force a pull+push cycle (e.g. a Retry button). */
+  syncNow: () => void;
 }
+
+export type WorkspaceSyncState = {
+  /** 'off' when signed out or the API is unreachable-by-config. */
+  status: "off" | "idle" | "syncing" | "error";
+  lastSyncedAt: number | null;
+  error: string | null;
+};
 
 const RoofingContext = createContext<RoofingContextType | undefined>(undefined);
 
@@ -195,9 +264,105 @@ function newPhotoId(): string {
   return `ph-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Collections mirrored to the Worker, in the order they are pulled. */
+const SYNC_KINDS: WorkspaceKind[] = ["measurement", "estimate", "contract", "field_project"];
+
+/**
+ * Photos are base64 JPEGs — many of them would exceed the server's per-record cap.
+ * Sync the project without image bytes; blobs live in IndexedDB + R2. Captions and AI
+ * summaries are small, so they still travel with the project JSON.
+ */
+function fieldProjectForSync(project: FieldProject): FieldProject {
+  return {
+    ...project,
+    photos: project.photos.map((p) => ({ ...p, imageDataUrl: "" })),
+  };
+}
+
+/** Metadata-only cache so multi-photo JPEGs do not blow localStorage quota. */
+function fieldProjectsForLocalCache(projects: FieldProject[]): FieldProject[] {
+  return projects.map((p) => ({
+    ...p,
+    photos: p.photos.map((ph) => ({ ...ph, imageDataUrl: "" })),
+  }));
+}
+
+function isStormDamageProject(p: FieldProject): boolean {
+  return p.tags.some((t) => t === "storm" || t === "damage-report");
+}
+
+function withRefreshedStormReport(project: FieldProject): FieldProject {
+  if (!isStormDamageProject(project)) return project;
+  const aiReport = buildStormDamageReport(project).slice(0, MAX_FIELD_PROJECT_AI_REPORT);
+  return { ...project, aiReport };
+}
+
+const SYNC_META_KEY_BASE = "roofing-workspace-sync-meta-v1";
+
+type SyncMetaByKind = Partial<Record<WorkspaceKind, SyncMeta>>;
+
+function loadSyncMeta(): SyncMetaByKind {
+  if (typeof window === "undefined") return {};
+  const key = getScopedStorageKey(SYNC_META_KEY_BASE);
+  if (!key) return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as SyncMetaByKind) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSyncMeta(meta: SyncMetaByKind): void {
+  if (typeof window === "undefined") return;
+  const key = getScopedStorageKey(SYNC_META_KEY_BASE);
+  if (!key) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(meta));
+  } catch {
+    // Quota exceeded — sync still works, it just re-pushes more than needed next time.
+  }
+}
+
+function metaFor(all: SyncMetaByKind, kind: WorkspaceKind): SyncMeta {
+  return all[kind] ?? emptySyncMeta();
+}
+
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) return null;
+  const [, mime, isBase64, payload] = match;
+  try {
+    if (isBase64) {
+      const bin = atob(payload);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    }
+    return new Blob([decodeURIComponent(payload)], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
+/** Upload one photo's bytes; resolves to the stored key, or null when it stays local. */
+async function uploadPhotoBlob(token: string, photo: DamagePhoto): Promise<string | null> {
+  if (!photo.imageDataUrl) return null;
+  const blob = dataUrlToBlob(photo.imageDataUrl);
+  if (!blob) return null;
+  try {
+    const stored = await uploadWorkspaceFile(token, photo.id, blob);
+    return stored ? photo.id : null;
+  } catch (e) {
+    console.warn("[roofing] photo upload failed; keeping local copy", e);
+    return null;
+  }
+}
+
 export function RoofingProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const storageUserId = user?.id ?? null;
+  const token = session?.token ?? "";
 
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
@@ -205,6 +370,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
   const [fieldProjects, setFieldProjects] = useState<FieldProject[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     setMeasurements([]);
     setEstimates([]);
     setContracts([]);
@@ -237,26 +403,297 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         const fp: FieldProject[] = [];
         for (const row of parsed.fieldProjects) {
           if (row && typeof row === "object") {
+            // Prefer raw photos that still embed data URLs (legacy cache) before normalize.
+            const rawPhotos = Array.isArray((row as { photos?: unknown }).photos)
+              ? ((row as { photos: unknown[] }).photos as Record<string, unknown>[])
+              : [];
+            const legacyBytes = new Map<string, string>();
+            for (const ph of rawPhotos) {
+              if (
+                ph &&
+                typeof ph.id === "string" &&
+                typeof ph.imageDataUrl === "string" &&
+                ph.imageDataUrl.startsWith("data:image/")
+              ) {
+                legacyBytes.set(ph.id, ph.imageDataUrl);
+                void putFieldPhotoBlob(ph.id, ph.imageDataUrl);
+              }
+            }
             const p = normalizeFieldProject(row as Record<string, unknown>);
-            if (p) fp.push(p);
+            if (p) {
+              fp.push({
+                ...p,
+                photos: p.photos.map((ph) =>
+                  ph.imageDataUrl ? ph : { ...ph, imageDataUrl: legacyBytes.get(ph.id) ?? "" },
+                ),
+              });
+            }
           }
         }
         setFieldProjects(fp);
+        void hydrateFieldProjectPhotosFromIdb(fp).then((hydrated) => {
+          if (cancelled) return;
+          setFieldProjects((prev) => {
+            // Only fill empty slots so we don't clobber photos added while hydrating.
+            const byId = new Map(hydrated.map((p) => [p.id, p]));
+            return prev.map((p) => {
+              const h = byId.get(p.id);
+              if (!h) return p;
+              return mergeFieldProjectPhotos(p, h);
+            });
+          });
+        });
       }
     } catch {
       // ignore invalid storage
     }
+    return () => {
+      cancelled = true;
+    };
   }, [storageUserId]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !storageUserId) return;
     const key = getScopedStorageKey(LS_KEY_BASE);
     if (!key) return;
-    window.localStorage.setItem(
-      key,
-      JSON.stringify({ measurements, estimates, contracts, fieldProjects }),
-    );
+    try {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({
+          measurements,
+          estimates,
+          contracts,
+          fieldProjects: fieldProjectsForLocalCache(fieldProjects),
+        }),
+      );
+    } catch (e) {
+      // Local cache is best-effort; IndexedDB + server hold the durable photo bytes.
+      console.warn("[roofing] local cache write failed (quota?)", e);
+    }
   }, [measurements, estimates, contracts, fieldProjects, storageUserId]);
+
+  // ---- Server sync -------------------------------------------------------
+  // localStorage above is a fast offline cache; D1 via /api/workspace is the source of truth.
+
+  const [sync, setSync] = useState<WorkspaceSyncState>({
+    status: "off",
+    lastSyncedAt: null,
+    error: null,
+  });
+
+  const syncMetaRef = useRef<SyncMetaByKind>({});
+  const runningRef = useRef(false);
+  const rerunRef = useRef(false);
+  const hydratedRef = useRef(false);
+  // Read collections inside the sync loop without making it a dependency.
+  const latestRef = useRef({ measurements, estimates, contracts, fieldProjects });
+  latestRef.current = { measurements, estimates, contracts, fieldProjects };
+
+  useEffect(() => {
+    hydratedRef.current = false;
+    syncMetaRef.current = storageUserId ? loadSyncMeta() : {};
+    setSync({ status: storageUserId ? "idle" : "off", lastSyncedAt: null, error: null });
+  }, [storageUserId]);
+
+  const runSync = useCallback(async () => {
+    if (!token || !storageUserId) return;
+    if (runningRef.current) {
+      rerunRef.current = true;
+      return;
+    }
+    runningRef.current = true;
+    setSync((s) => ({ ...s, status: "syncing", error: null }));
+
+    try {
+      const meta = { ...syncMetaRef.current };
+
+      // 1) Pull anything changed on other devices since our watermark.
+      const lowestWatermark = SYNC_KINDS.reduce(
+        (min, kind) => Math.min(min, metaFor(meta, kind).watermark),
+        Number.POSITIVE_INFINITY,
+      );
+      const since = Number.isFinite(lowestWatermark) ? lowestWatermark : 0;
+      const pulled = await pullWorkspaceRecords(token, SYNC_KINDS, since);
+
+      const byKind = new Map<WorkspaceKind, typeof pulled.records>();
+      for (const rec of pulled.records) {
+        const list = byKind.get(rec.kind) ?? [];
+        list.push(rec);
+        byKind.set(rec.kind, list);
+      }
+
+      const applyKind = <T,>(
+        kind: WorkspaceKind,
+        items: T[],
+        getId: (t: T) => string,
+        toItem: (d: unknown) => T | null,
+        setItems: (next: T[]) => void,
+      ) => {
+        const res = applyRemote(items, byKind.get(kind) ?? [], getId, metaFor(meta, kind), toItem);
+        meta[kind] = res.nextMeta;
+        if (res.changed) setItems(res.items);
+        return res.items;
+      };
+
+      const cur = latestRef.current;
+      const nextMeasurements = applyKind<Measurement>(
+        "measurement",
+        cur.measurements,
+        (m) => m.id,
+        (d) => (d && typeof d === "object" ? normalizeMeasurement(d as Record<string, unknown>) : null),
+        setMeasurements,
+      );
+      const nextEstimates = applyKind<Estimate>(
+        "estimate",
+        cur.estimates,
+        (e) => e.id,
+        (d) => (d && typeof d === "object" && typeof (d as Estimate).id === "string" ? (d as Estimate) : null),
+        setEstimates,
+      );
+      const nextContracts = applyKind<Contract>(
+        "contract",
+        cur.contracts,
+        (c) => c.id,
+        (d) => (d && typeof d === "object" && typeof (d as Contract).id === "string" ? (d as Contract) : null),
+        setContracts,
+      );
+      const localProjectsById = new Map(cur.fieldProjects.map((p) => [p.id, p]));
+      // Don't let applyKind write field projects yet — a mid-sync capture must be
+      // union-merged with the latest in-memory list before we replace React state.
+      const remoteMergedProjects = applyKind<FieldProject>(
+        "field_project",
+        cur.fieldProjects,
+        (p) => p.id,
+        (d) => {
+          if (!d || typeof d !== "object") return null;
+          const parsed = normalizeFieldProject(d as Record<string, unknown>);
+          return parsed ? mergeFieldProjectPhotos(parsed, localProjectsById.get(parsed.id)) : null;
+        },
+        () => {
+          /* deferred — see reconcile below */
+        },
+      );
+      const nextFieldProjects = reconcileFieldProjectsWithLatest(
+        remoteMergedProjects,
+        latestRef.current.fieldProjects,
+      );
+      setFieldProjects(nextFieldProjects);
+      latestRef.current = { ...latestRef.current, fieldProjects: nextFieldProjects };
+
+      // 2) Push local creates/edits/deletes.
+      const nowSec = Math.floor(Date.now() / 1000);
+      const outgoing: PushRecord[] = [];
+      const stageDiff = <T,>(kind: WorkspaceKind, items: T[], getId: (t: T) => string) => {
+        const d = diffLocal(kind, items, getId, metaFor(meta, kind), nowSec);
+        meta[kind] = d.nextMeta;
+        outgoing.push(...d.push);
+        return d.push;
+      };
+
+      // Re-read latest again so photos added during remote apply are included in the push.
+      const projectsForPush = reconcileFieldProjectsWithLatest(
+        nextFieldProjects,
+        latestRef.current.fieldProjects,
+      );
+      if (projectsForPush !== nextFieldProjects) {
+        setFieldProjects(projectsForPush);
+        latestRef.current = { ...latestRef.current, fieldProjects: projectsForPush };
+      }
+
+      const pushed: PushRecord[] = [
+        ...stageDiff<Measurement>("measurement", nextMeasurements, (m) => m.id),
+        ...stageDiff<Estimate>("estimate", nextEstimates, (e) => e.id),
+        ...stageDiff<Contract>("contract", nextContracts, (c) => c.id),
+        ...stageDiff<FieldProject>(
+          "field_project",
+          projectsForPush.map(fieldProjectForSync),
+          (p) => p.id,
+        ),
+      ];
+
+      if (outgoing.length > 0) {
+        const result = await pushWorkspaceRecords(token, outgoing);
+        for (const kind of SYNC_KINDS) {
+          const forKind = pushed.filter((r) => r.kind === kind);
+          if (forKind.length > 0) {
+            meta[kind] = commitPush(metaFor(meta, kind), forKind, result.watermark);
+          }
+        }
+        if (result.rejected.length > 0) {
+          console.warn("[roofing] server rejected records", result.rejected);
+        }
+      }
+
+      for (const kind of SYNC_KINDS) {
+        const m = metaFor(meta, kind);
+        meta[kind] = { ...m, watermark: Math.max(m.watermark, pulled.watermark) };
+      }
+
+      syncMetaRef.current = meta;
+      saveSyncMeta(meta);
+      hydratedRef.current = true;
+      setSync({ status: "idle", lastSyncedAt: Date.now(), error: null });
+
+      // Retry R2 upload for photos that still only exist locally (bytes may be in IndexedDB).
+      const pendingUploads: Array<{ projectId: string; photo: DamagePhoto }> = [];
+      for (const project of latestRef.current.fieldProjects) {
+        for (const photo of project.photos) {
+          if (!photo.remoteKey) pendingUploads.push({ projectId: project.id, photo });
+        }
+      }
+      for (const { projectId, photo } of pendingUploads.slice(0, 12)) {
+        void (async () => {
+          let bytes = photo.imageDataUrl;
+          if (!bytes?.startsWith("data:image/")) {
+            const { getFieldPhotoBlob } = await import("../lib/fieldPhotoBlobStore");
+            bytes = (await getFieldPhotoBlob(photo.id)) ?? "";
+          }
+          if (!bytes.startsWith("data:image/")) return;
+          const remoteKey = await uploadPhotoBlob(token, { ...photo, imageDataUrl: bytes });
+          if (!remoteKey) return;
+          setFieldProjects((prev) =>
+            prev.map((p) =>
+              p.id === projectId
+                ? {
+                    ...p,
+                    photos: p.photos.map((ph) =>
+                      ph.id === photo.id ? { ...ph, remoteKey } : ph,
+                    ),
+                  }
+                : p,
+            ),
+          );
+        })();
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Sync failed.";
+      // Offline or a 5xx is expected sometimes — local cache still holds the work.
+      setSync((s) => ({ status: "error", lastSyncedAt: s.lastSyncedAt, error: message }));
+    } finally {
+      runningRef.current = false;
+      if (rerunRef.current) {
+        rerunRef.current = false;
+        void runSync();
+      }
+    }
+  }, [token, storageUserId]);
+
+  // Initial hydrate on sign-in.
+  useEffect(() => {
+    if (!token || !storageUserId) return;
+    void runSync();
+  }, [token, storageUserId, runSync]);
+
+  // Debounced push after local edits settle.
+  useEffect(() => {
+    if (!token || !storageUserId || !hydratedRef.current) return;
+    const t = window.setTimeout(() => void runSync(), 1500);
+    return () => window.clearTimeout(t);
+  }, [measurements, estimates, contracts, fieldProjects, token, storageUserId, runSync]);
+
+  const syncNow = useCallback(() => {
+    void runSync();
+  }, [runSync]);
 
   const api = useMemo<RoofingContextType>(
     () => ({
@@ -268,6 +705,15 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setMeasurements((prev) => [...prev, measurement]),
       addEstimate: (estimate: Estimate) => setEstimates((prev) => [...prev, estimate]),
       addContract: (contract: Contract) => setContracts((prev) => [...prev, contract]),
+      updateContract: (id, patch) =>
+        setContracts((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, ...patch, id: c.id } : c)),
+        ),
+      updateEstimate: (id, patch) =>
+        setEstimates((prev) =>
+          prev.map((e) => (e.id === id ? { ...e, ...patch, id: e.id } : e)),
+        ),
+      getContractById: (id) => contracts.find((c) => c.id === id),
       addFieldProject: (input) => {
         const now = new Date().toISOString();
         const ghlUrl = input.ghlUrl ? optHttpsUrl(input.ghlUrl.trim()) : undefined;
@@ -281,7 +727,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           const v = Math.max(0, input.monetaryValueUsd);
           monetaryValueUsd = Math.round(v * 100) / 100;
         }
-        const p: FieldProject = {
+        const p: FieldProject = withRefreshedStormReport({
           id: newFieldProjectId(),
           name: input.name.trim().slice(0, 200),
           address: input.address?.trim().slice(0, 500),
@@ -296,7 +742,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           ...(ownerLabel ? { ownerLabel } : {}),
           ...(ghlUrl ? { ghlUrl } : {}),
           ...(ghlEmbedUrl ? { ghlEmbedUrl } : {}),
-        };
+        });
         setFieldProjects((prev) => [...prev, p]);
         return p;
       },
@@ -314,6 +760,11 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
             if (patch.notes !== undefined) {
               const n = patch.notes?.trim().slice(0, 2000);
               next = { ...next, notes: n || undefined };
+            }
+            if (patch.aiReport !== undefined) {
+              const r = patch.aiReport?.trim().slice(0, MAX_FIELD_PROJECT_AI_REPORT);
+              if (r) next = { ...next, aiReport: r };
+              else delete next.aiReport;
             }
             if (patch.linkedMeasurementId !== undefined) {
               next = { ...next, linkedMeasurementId: patch.linkedMeasurementId ?? null };
@@ -355,7 +806,13 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           }),
         );
       },
-      deleteFieldProject: (id) => setFieldProjects((prev) => prev.filter((p) => p.id !== id)),
+      deleteFieldProject: (id) => {
+        const existing = fieldProjects.find((p) => p.id === id);
+        if (existing?.photos.length) {
+          void deleteFieldPhotoBlobs(existing.photos.map((ph) => ph.id));
+        }
+        setFieldProjects((prev) => prev.filter((p) => p.id !== id));
+      },
       setFieldProjectPipelineStage: (id, stage) => {
         const now = new Date().toISOString();
         setFieldProjects((prev) =>
@@ -363,7 +820,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         );
       },
       addFieldProjectPhoto: (projectId, imageDataUrl, caption) => {
-        let added = false;
+        let newPhoto: DamagePhoto | null = null;
         setFieldProjects((prev) =>
           prev.map((p) => {
             if (p.id !== projectId) return p;
@@ -375,20 +832,64 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
               caption: caption?.trim().slice(0, 500),
               imageDataUrl,
             };
-            added = true;
-            return { ...p, photos: [...p.photos, photo], updatedAt: now };
+            newPhoto = photo;
+            const next: FieldProject = { ...p, photos: [...p.photos, photo], updatedAt: now };
+            return withRefreshedStormReport(next);
           }),
         );
-        return added;
+        if (newPhoto) {
+          const uploaded: DamagePhoto = newPhoto;
+          // Durable local copy first — then drop in-memory JPEG so multi-hundred
+          // captures do not blow React state / crash the tab.
+          void putFieldPhotoBlob(uploaded.id, imageDataUrl).then(() => {
+            setFieldProjects((prev) =>
+              prev.map((p) =>
+                p.id === projectId
+                  ? {
+                      ...p,
+                      photos: p.photos.map((ph) =>
+                        ph.id === uploaded.id && ph.imageDataUrl === imageDataUrl
+                          ? { ...ph, imageDataUrl: "" }
+                          : ph,
+                      ),
+                    }
+                  : p,
+              ),
+            );
+          });
+          if (token) {
+            void uploadPhotoBlob(token, uploaded).then((remoteKey) => {
+              if (!remoteKey) return;
+              setFieldProjects((prev) =>
+                prev.map((p) =>
+                  p.id === projectId
+                    ? {
+                        ...p,
+                        photos: p.photos.map((ph) =>
+                          ph.id === uploaded.id ? { ...ph, remoteKey } : ph,
+                        ),
+                      }
+                    : p,
+                ),
+              );
+            });
+          }
+        }
+        return newPhoto;
       },
       removeFieldProjectPhoto: (projectId, photoId) => {
         const now = new Date().toISOString();
+        void deleteFieldPhotoBlob(photoId);
         setFieldProjects((prev) =>
-          prev.map((p) =>
-            p.id === projectId
-              ? { ...p, photos: p.photos.filter((x) => x.id !== photoId), updatedAt: now }
-              : p,
-          ),
+          prev.map((p) => {
+            if (p.id !== projectId) return p;
+            const next: FieldProject = {
+              ...p,
+              photos: p.photos.filter((x) => x.id !== photoId),
+              updatedAt: now,
+            };
+            return withRefreshedStormReport(next);
+          }),
         );
       },
       updateFieldProjectPhotoCaption: (projectId, photoId, caption) => {
@@ -396,13 +897,14 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setFieldProjects((prev) =>
           prev.map((p) => {
             if (p.id !== projectId) return p;
-            return {
+            const next: FieldProject = {
               ...p,
               photos: p.photos.map((ph) =>
                 ph.id === photoId ? { ...ph, caption: caption.trim().slice(0, 500) } : ph,
               ),
               updatedAt: now,
             };
+            return withRefreshedStormReport(next);
           }),
         );
       },
@@ -411,13 +913,14 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setFieldProjects((prev) =>
           prev.map((p) => {
             if (p.id !== projectId) return p;
-            return {
+            const next: FieldProject = {
               ...p,
               photos: p.photos.map((ph) =>
                 ph.id === photoId ? { ...ph, aiSummary: summary } : ph,
               ),
               updatedAt: now,
             };
+            return withRefreshedStormReport(next);
           }),
         );
       },
@@ -430,8 +933,26 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       getMeasurementById: (id: string) => measurements.find((m) => m.id === id),
       getEstimateById: (id: string) => estimates.find((e) => e.id === id),
       getFieldProjectById: (id: string) => fieldProjects.find((p) => p.id === id),
+      deleteEstimate: (id: string) => {
+        const removed = estimates.find((e) => e.id === id);
+        setEstimates((prev) => prev.filter((e) => e.id !== id));
+        setContracts((prev) => prev.filter((c) => c.estimateId !== id));
+        // Drop the measurement too when no other estimate still references it.
+        if (removed?.measurementId) {
+          const stillUsed = estimates.some(
+            (e) => e.id !== id && e.measurementId === removed.measurementId,
+          );
+          if (!stillUsed) {
+            setMeasurements((prev) => prev.filter((m) => m.id !== removed.measurementId));
+          }
+        }
+      },
+      deleteContract: (id: string) => setContracts((prev) => prev.filter((c) => c.id !== id)),
+      deleteMeasurement: (id: string) => setMeasurements((prev) => prev.filter((m) => m.id !== id)),
+      sync,
+      syncNow,
     }),
-    [contracts, estimates, fieldProjects, measurements],
+    [contracts, estimates, fieldProjects, measurements, sync, syncNow],
   );
 
   return <RoofingContext.Provider value={api}>{children}</RoofingContext.Provider>;

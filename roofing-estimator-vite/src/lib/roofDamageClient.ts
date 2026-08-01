@@ -12,13 +12,19 @@ export async function postRoofDamageDraft(params: {
   imageBase64: string;
   mimeType?: string;
   context?: string;
+  /** Bearer token — the Worker requires a signed-in caller (OpenAI billing). */
+  token?: string;
 }): Promise<{ ok: true; data: DamagePhotoAiSummary } | { ok: false; error: string }> {
   const apiBase = getHd2dApiBase().replace(/\/$/, "");
   let res: Response;
   try {
     res = await fetch(`${apiBase}/api/ai/roof-damage`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(params.token ? { Authorization: `Bearer ${params.token}` } : {}),
+      },
       body: JSON.stringify({
         imageBase64: params.imageBase64,
         mimeType: params.mimeType ?? "image/jpeg",

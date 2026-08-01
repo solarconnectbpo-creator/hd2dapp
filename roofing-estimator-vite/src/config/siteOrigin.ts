@@ -10,9 +10,16 @@ export const HD2D_PRODUCTION_ORIGIN = "https://hardcoredoortodoorclosers.com";
 export const HD2D_PRODUCTION_WWW_ORIGIN = "https://www.hardcoredoortodoorclosers.com";
 
 /**
- * Legacy "public API" origin (apex). Prefer {@link HD2D_PRODUCTION_WWW_ORIGIN} for cross-origin calls off-zone when www is canonical on Vercel.
+ * Worker custom domain (no Cloudflare Access). Prefer this over apex/www when the SPA is on Vercel
+ * and same-origin `/api` is not proxied, and over `*.workers.dev`.
  */
-export const HD2D_PUBLIC_API_ORIGIN = HD2D_PRODUCTION_ORIGIN;
+export const HD2D_API_ORIGIN = "https://api.hardcoredoortodoorclosers.com";
+
+/**
+ * Legacy "public API" origin. Prefer {@link HD2D_API_ORIGIN} for browser → Worker calls.
+ * Apex/www often serve the SPA only; `/api/*` must be rewritten to the Worker.
+ */
+export const HD2D_PUBLIC_API_ORIGIN = HD2D_API_ORIGIN;
 
 /**
  * Deployed Worker `workers.dev` URL (Wrangler default hostname). Use only for diagnostics or
@@ -73,7 +80,12 @@ export function resolveProductionApiOrigin(): string {
   const host = (window.location.hostname || "").trim().toLowerCase();
   const origin = window.location.origin.replace(/\/$/, "");
   if (host.endsWith(".vercel.app")) return wwwStable;
-  if (import.meta.env.VERCEL && isHd2dZoneHostname(host)) return origin;
+  // Vercel custom domains: prefer Worker host unless env forces same-origin proxy.
+  // Catch-all SPA rewrites used to swallow /api as HTML/405; api.* always hits the Worker.
+  if (import.meta.env.VERCEL && isHd2dZoneHostname(host)) {
+    if (sameOriginApiProxyEnabled()) return origin;
+    return HD2D_API_ORIGIN.replace(/\/$/, "");
+  }
   if (host.endsWith(".pages.dev") && sameOriginApiProxyEnabled()) return origin;
   if (host.endsWith(".pages.dev")) return pub;
   // Apex, www, app.*: always use the browser origin for `/api/*` so www and apex both hit the same

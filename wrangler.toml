@@ -1,0 +1,50 @@
+# Cloudflare Workers Builds runs from the monorepo root.
+# Canonical API config also lives in backend/wrangler.toml — keep bindings in sync.
+name = "hd2d-backend"
+main = "backend/src/index.ts"
+compatibility_date = "2024-12-02"
+compatibility_flags = ["nodejs_compat", "nodejs_als"]
+
+workers_dev = true
+preview_urls = true
+
+# api uses a Worker custom domain. apex/www keep existing DNS (often Vercel) but are
+# intercepted via Worker routes once those records are orange-cloud proxied.
+routes = [
+  { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
+  { pattern = "hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "www.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+]
+
+[triggers]
+crons = ["*/10 * * * *", "* * * * *"]
+
+# SPA from roofing-estimator-vite (built in CI before deploy). /api/* hits the Worker first.
+[assets]
+directory = "roofing-estimator-vite/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[vars]
+APP_PUBLIC_ORIGIN = "https://hardcoredoortodoorclosers.com"
+CORS_ALLOWED_ORIGINS = "https://hardcoredoortodoorclosers.com,https://www.hardcoredoortodoorclosers.com"
+LEADS_STRIPE_PRICE_IDS = "price_1TKaYpFLDUOzenNwUgcM7VFz,price_1TKac8FLDUOzenNwtgqkzl9i"
+LEADS_BULK_PRICE_IDS = "price_1TKac8FLDUOzenNwtgqkzl9i"
+LEADS_BULK_MIN_APPOINTMENTS = "10"
+LEADS_BULK_FIXED_PRICE_IDS = "price_1TKac8FLDUOzenNwtgqkzl9i"
+CALLCENTER_STRIPE_PRICE_ID = "price_1TKaarFLDUOzenNwvNMIWglo"
+EAGLEVIEW_TOKEN_URL = "https://apicenter.eagleview.com/oauth2/v1/token"
+EAGLEVIEW_API_BASE = "https://apicenter.eagleview.com"
+ARCGIS_FEATURE_LAYER_URL = "https://services6.arcgis.com/evmyRZRrsopdeog7/arcgis/rest/services/AssessorsParcels/FeatureServer/0"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "d2d"
+database_id = "2a9b7931-181f-4b19-b963-97d00e9b6d5a"
+migrations_dir = "backend/migrations"
+
+[[kv_namespaces]]
+binding = "HD2D_CACHE"
+id = "c534b1528e46480eab0979236a4b63ef"
+preview_id = "d5629502b89544fd80f3e0880b352832"

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
-import { Camera, ImagePlus, LayoutGrid, List, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, ExternalLink, ImagePlus, LayoutGrid, List, X } from "lucide-react";
 import { useRoofing } from "../../context/RoofingContext";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -14,8 +14,10 @@ import {
   type FieldPipelineStage,
   type FieldProject,
 } from "../../lib/fieldProjectTypes";
-import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
-import { postRoofDamageDraft } from "../../lib/roofDamageClient";
+import { useAuth } from "../../context/AuthContext";
+import { FieldPhotoTile } from "./FieldPhotoTile";
+import { loadOrgSettings } from "../../lib/orgSettings";
+import { useFieldProjectPhotoCapture } from "./useFieldProjectPhotoCapture";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
 
@@ -54,6 +56,16 @@ type ListSortKey = "updated" | "name" | "value" | "stage";
 
 export function FieldProjectsPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { session } = useAuth();
+  const authToken = session?.token ?? "";
+  const orgCrmBaseUrl = loadOrgSettings().ghlBaseUrl?.trim() ?? "";
+
+  /** A job's own CRM deep link, else the org-wide CRM board from Contacts settings. */
+  const crmLinkFor = useCallback(
+    (project: { ghlUrl?: string }): string | null =>
+      project.ghlUrl?.trim() || orgCrmBaseUrl || null,
+    [orgCrmBaseUrl],
+  );
 
   const {
     fieldProjects,
@@ -73,8 +85,6 @@ export function FieldProjectsPanel() {
   const [newAddress, setNewAddress] = useState("");
   const [newNotes, setNewNotes] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [boardQuery, setBoardQuery] = useState("");
   const [projectsView, setProjectsView] = useState<ProjectsViewMode>("list");
@@ -87,8 +97,22 @@ export function FieldProjectsPanel() {
   const [detailOwnerLabel, setDetailOwnerLabel] = useState("");
   const [detailTagsComma, setDetailTagsComma] = useState("");
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const {
+    cameraInputRef,
+    galleryInputRef,
+    busyPhotoId,
+    importError,
+    setImportError,
+    importFiles,
+    runAiOnPhoto,
+    openCamera,
+    openGallery,
+  } = useFieldProjectPhotoCapture({
+    fieldProjects,
+    authToken,
+    addFieldProjectPhoto,
+    setFieldProjectPhotoAiSummary,
+  });
 
   const selected = selectedId ? fieldProjects.find((p) => p.id === selectedId) : undefined;
 
@@ -259,53 +283,16 @@ export function FieldProjectsPanel() {
   };
 
   const handleFiles = useCallback(
-    async (projectId: string, files: FileList | null) => {
-      if (!files?.length) return;
-      setImportError(null);
+    (projectId: string, files: FileList | null) => {
       const proj = fieldProjects.find((p) => p.id === projectId);
-      let remaining = proj ? MAX_FIELD_PROJECT_PHOTOS - proj.photos.length : 0;
-      if (remaining <= 0) {
-        setImportError(`Each project allows at most ${MAX_FIELD_PROJECT_PHOTOS} photos (local storage limit).`);
-        return;
-      }
-      for (let i = 0; i < files.length && remaining > 0; i++) {
-        const file = files[i];
-        if (!file.type.startsWith("image/")) continue;
-        try {
-          const dataUrl = await compressImageFileToJpegDataUrl(file);
-          const ok = addFieldProjectPhoto(projectId, dataUrl);
-          if (ok) remaining -= 1;
-        } catch (e) {
-          setImportError(e instanceof Error ? e.message : "Could not process an image.");
-        }
-      }
-      if (cameraInputRef.current) cameraInputRef.current.value = "";
-      if (galleryInputRef.current) galleryInputRef.current.value = "";
-    },
-    [addFieldProjectPhoto, fieldProjects],
-  );
-
-  const runAiOnPhoto = async (projectId: string, photoId: string, imageDataUrl: string, contextHint: string) => {
-    setBusyPhotoId(photoId);
-    setImportError(null);
-    try {
-      const { base64, mimeType } = dataUrlToBase64Payload(imageDataUrl);
-      const res = await postRoofDamageDraft({
-        imageBase64: base64,
-        mimeType,
-        context: contextHint || undefined,
+      const stormish = proj?.tags.some((t) => t === "storm" || t === "damage-report");
+      void importFiles(projectId, files, {
+        autoAi: Boolean(stormish && authToken),
+        contextHint: [proj?.name, proj?.address, "storm damage documentation"].filter(Boolean).join(" — "),
       });
-      if (!res.ok) {
-        setImportError(res.error);
-        return;
-      }
-      setFieldProjectPhotoAiSummary(projectId, photoId, res.data);
-    } catch (e) {
-      setImportError(e instanceof Error ? e.message : "AI request failed");
-    } finally {
-      setBusyPhotoId(null);
-    }
-  };
+    },
+    [authToken, fieldProjects, importFiles],
+  );
 
   const onColumnDragOver = (e: DragEvent, stage: FieldPipelineStage) => {
     e.preventDefault();
@@ -332,8 +319,8 @@ export function FieldProjectsPanel() {
           <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#71767b]">
             <strong className="text-[#e7e9ea]">List</strong> or{" "}
-            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Data stays in this browser
-            until you export.
+            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Jobs and photos sync to your
+            account, so they follow you to another device.
           </p>
         </div>
         <Button
@@ -813,6 +800,16 @@ export function FieldProjectsPanel() {
                 >
                   Save deal fields
                 </Button>
+                {crmLinkFor(selected) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => window.open(crmLinkFor(selected) as string, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open in CRM
+                  </Button>
+                ) : null}
               </div>
 
               <div>
@@ -841,13 +838,22 @@ export function FieldProjectsPanel() {
                 </p>
               ) : null}
 
+              {selected.aiReport ? (
+                <div className="hd2d-report-panel rounded-lg border p-3">
+                  <p className="mb-2 text-sm font-medium text-black">AI storm damage report</p>
+                  <pre className="hd2d-report-body m-0 max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed">
+                    {selected.aiReport}
+                  </pre>
+                </div>
+              ) : null}
+
               <div>
                 <p className="mb-2 text-sm font-medium text-black">
                   Damage photos ({selected.photos.length}/{MAX_FIELD_PROJECT_PHOTOS})
                 </p>
                 <p className="mb-3 text-xs text-black/70">
-                  Photos are resized on device before save to fit browser storage. Use rear camera on site when
-                  possible.
+                  Photos are compressed on-device and saved to IndexedDB + your account. Use the rear camera on site
+                  when possible.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <input
@@ -870,7 +876,7 @@ export function FieldProjectsPanel() {
                     type="button"
                     variant="outline"
                     disabled={selected.photos.length >= MAX_FIELD_PROJECT_PHOTOS}
-                    onClick={() => cameraInputRef.current?.click()}
+                    onClick={openCamera}
                   >
                     <Camera className="mr-2 h-4 w-4" />
                     Take photo
@@ -879,7 +885,7 @@ export function FieldProjectsPanel() {
                     type="button"
                     variant="outline"
                     disabled={selected.photos.length >= MAX_FIELD_PROJECT_PHOTOS}
-                    onClick={() => galleryInputRef.current?.click()}
+                    onClick={openGallery}
                   >
                     <ImagePlus className="mr-2 h-4 w-4" />
                     Choose photos
@@ -892,71 +898,24 @@ export function FieldProjectsPanel() {
               ) : (
                 <ul className="grid gap-4 sm:grid-cols-2">
                   {selected.photos.map((ph) => (
-                    <li key={ph.id} className="overflow-hidden rounded-lg border border-black/10 bg-[#f8fafc]">
-                      <button
-                        type="button"
-                        className="block w-full focus:outline-none focus:ring-2 focus:ring-black/20"
-                        onClick={() => setLightboxUrl(ph.imageDataUrl)}
-                      >
-                        <img
-                          src={ph.imageDataUrl}
-                          alt={ph.caption || "Damage photo"}
-                          className="h-40 w-full object-cover"
-                        />
-                      </button>
-                      <div className="space-y-2 p-2">
-                        <input
-                          className="w-full rounded border border-black/15 bg-[#f3f4f6] px-2 py-1 text-sm text-black"
-                          placeholder="Caption"
-                          value={ph.caption ?? ""}
-                          onChange={(e) => updateFieldProjectPhotoCaption(selected.id, ph.id, e.target.value)}
-                        />
-                        <div className="flex flex-wrap gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            disabled={busyPhotoId === ph.id}
-                            onClick={() =>
-                              void runAiOnPhoto(
-                                selected.id,
-                                ph.id,
-                                ph.imageDataUrl,
-                                [selected.name, selected.address, ph.caption].filter(Boolean).join(" — "),
-                              )
-                            }
-                          >
-                            {busyPhotoId === ph.id ? (
-                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                            ) : (
-                              <Sparkles className="mr-1 h-3 w-3" />
-                            )}
-                            Draft damage notes (AI)
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-xs text-red-700"
-                            onClick={() => removeFieldProjectPhoto(selected.id, ph.id)}
-                          >
-                            <Trash2 className="mr-1 h-3 w-3" />
-                            Remove
-                          </Button>
-                        </div>
-                        {ph.aiSummary ? (
-                          <div className="rounded bg-black/5 p-2 text-xs text-black">
-                            <p className="font-semibold">{ph.aiSummary.summary}</p>
-                            <p className="mt-1">Types: {ph.aiSummary.damageTypes.join(", ") || "—"}</p>
-                            <p>
-                              Severity: {ph.aiSummary.severity}/5 · Action: {ph.aiSummary.recommendedAction}
-                            </p>
-                            {ph.aiSummary.notes ? <p className="mt-1 text-black/80">{ph.aiSummary.notes}</p> : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </li>
+                    <FieldPhotoTile
+                      key={ph.id}
+                      photo={ph}
+                      aiBusy={busyPhotoId === ph.id}
+                      onOpenLightbox={setLightboxUrl}
+                      onCaptionChange={(caption) =>
+                        updateFieldProjectPhotoCaption(selected.id, ph.id, caption)
+                      }
+                      onRunAi={(imageDataUrl) =>
+                        void runAiOnPhoto(
+                          selected.id,
+                          ph.id,
+                          imageDataUrl,
+                          [selected.name, selected.address, ph.caption].filter(Boolean).join(" — "),
+                        )
+                      }
+                      onRemove={() => removeFieldProjectPhoto(selected.id, ph.id)}
+                    />
                   ))}
                 </ul>
               )}
