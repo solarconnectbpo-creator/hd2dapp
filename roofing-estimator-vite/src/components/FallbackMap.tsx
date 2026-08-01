@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import "leaflet-draw";
-import "leaflet-draw/dist/leaflet.draw.css";
+import L from "../lib/leafletGlobal";
+
+/** Lazy-load Leaflet.draw only when drawing is enabled (Contacts map does not need it). */
+async function ensureLeafletDraw(): Promise<typeof L> {
+  const g = globalThis as typeof globalThis & { L?: typeof L };
+  g.L = L;
+  await import("leaflet-draw");
+  await import("leaflet-draw/dist/leaflet.draw.css");
+  return L;
+}
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -11,11 +17,14 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-const SATELLITE_TILE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const SATELLITE_ATTR = "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics";
-const STREET_TILE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-const STREET_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-const LABELS_TILE = "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png";
+/** Keep tile URLs in one object so minifiers do not collide short names with React state. */
+const MAP_TILES = {
+  satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  satelliteAttr: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics",
+  street: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  streetAttr: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  labels: "https://stamen-tiles.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png",
+} as const;
 
 export type FallbackMapPoint = {
   id: string;
@@ -81,13 +90,22 @@ export function FallbackMap({
   const onPolylineRef = useRef(onPolylineDrawn);
   const onClearedRef = useRef(onFeaturesCleared);
   const onGpsRef = useRef(onGpsUpdate);
-  useEffect(() => { onPolygonRef.current = onPolygonDrawn; }, [onPolygonDrawn]);
-  useEffect(() => { onPolylineRef.current = onPolylineDrawn; }, [onPolylineDrawn]);
-  useEffect(() => { onClearedRef.current = onFeaturesCleared; }, [onFeaturesCleared]);
-  useEffect(() => { onGpsRef.current = onGpsUpdate; }, [onGpsUpdate]);
+  useEffect(() => {
+    onPolygonRef.current = onPolygonDrawn;
+  }, [onPolygonDrawn]);
+  useEffect(() => {
+    onPolylineRef.current = onPolylineDrawn;
+  }, [onPolylineDrawn]);
+  useEffect(() => {
+    onClearedRef.current = onFeaturesCleared;
+  }, [onFeaturesCleared]);
+  useEffect(() => {
+    onGpsRef.current = onGpsUpdate;
+  }, [onGpsUpdate]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    let cancelled = false;
     const lat = center?.lat ?? 39.8283;
     const lng = center?.lng ?? -98.5795;
     const map = L.map(containerRef.current, {
@@ -98,32 +116,38 @@ export function FallbackMap({
       maxZoom: 20,
     });
 
-    const satelliteLayer = L.tileLayer(SATELLITE_TILE, {
+    const satelliteLayer = L.tileLayer(MAP_TILES.satellite, {
       maxZoom: 20,
-      attribution: SATELLITE_ATTR,
+      attribution: MAP_TILES.satelliteAttr,
     });
-    const streetLayer = L.tileLayer(STREET_TILE, {
+    const streetLayer = L.tileLayer(MAP_TILES.street, {
       maxZoom: 19,
-      attribution: STREET_ATTR,
+      attribution: MAP_TILES.streetAttr,
     });
-    const labelsLayer = L.tileLayer(LABELS_TILE, {
+    const labelsLayer = L.tileLayer(MAP_TILES.labels, {
       maxZoom: 19,
       attribution: "",
     });
 
     satelliteLayer.addTo(map);
 
-    L.control.layers(
-      { "Satellite": satelliteLayer, "Street": streetLayer },
-      { "Labels": labelsLayer },
-      { position: "topleft", collapsed: true },
-    ).addTo(map);
+    L.control
+      .layers(
+        { Satellite: satelliteLayer, Street: streetLayer },
+        { Labels: labelsLayer },
+        { position: "topleft", collapsed: true },
+      )
+      .addTo(map);
 
     const lg = L.layerGroup().addTo(map);
     markersRef.current = lg;
     mapRef.current = map;
 
-    if (enableDraw) {
+    const setupDraw = async () => {
+      if (!enableDraw || cancelled) return;
+      await ensureLeafletDraw();
+      if (cancelled || !mapRef.current) return;
+
       const drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
       drawnRef.current = drawnItems;
@@ -192,7 +216,9 @@ export function FallbackMap({
           if (!hasPolygon && onClearedRef.current) onClearedRef.current();
         }
       });
-    }
+    };
+
+    void setupDraw();
 
     if (enableGps && "geolocation" in navigator) {
       const id = navigator.geolocation.watchPosition(
@@ -247,6 +273,7 @@ export function FallbackMap({
     setReady(true);
 
     return () => {
+      cancelled = true;
       if (watchIdRef.current != null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
