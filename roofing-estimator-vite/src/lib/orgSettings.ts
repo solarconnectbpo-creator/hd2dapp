@@ -30,18 +30,28 @@ export interface OrgSettings {
 
 export function defaultOrgSettings(): OrgSettings {
   return {
-    companyName: "Repair King",
+    companyName: "",
     companyAddress: "",
     companyWebsite: "",
-    preparedBy: "Estimator",
-    contactEmail: "estimating@repairking.com",
-    contactPhone: "(000) 000-0000",
+    preparedBy: "",
+    contactEmail: "",
+    contactPhone: "",
     logoDataUrl: "",
     defaultTemplateProfile: "residential",
     ownerFallbackProvider: "dealmachine-relaxed",
     ownerFallbackApiKey: "",
     ghlBaseUrl: "",
   };
+}
+
+/** Legacy single-tenant sample branding — clear so each company uses its own profile. */
+function stripLegacySampleBranding(org: OrgSettings): OrgSettings {
+  const next = { ...org };
+  if (/^repair\s*king$/i.test(next.companyName.trim())) next.companyName = "";
+  if (/@repairking\.com$/i.test(next.contactEmail.trim())) next.contactEmail = "";
+  if (next.contactPhone.trim() === "(000) 000-0000") next.contactPhone = "";
+  if (/^estimator$/i.test(next.preparedBy.trim()) && !next.companyName) next.preparedBy = "";
+  return next;
 }
 
 export function loadOrgSettings(): OrgSettings {
@@ -59,7 +69,7 @@ export function loadOrgSettings(): OrgSettings {
     if (rawFallback === "batchdata-relaxed") {
       p.ownerFallbackProvider = "dealmachine-relaxed";
     }
-    const merged = { ...defaultOrgSettings(), ...p };
+    const merged = stripLegacySampleBranding({ ...defaultOrgSettings(), ...p });
     const lockedOff = Boolean((rawObj as { ownerFallbackLockedOff?: boolean }).ownerFallbackLockedOff);
     if (merged.ownerFallbackProvider === "none" && !lockedOff) {
       merged.ownerFallbackProvider = "dealmachine-relaxed";

@@ -1758,20 +1758,21 @@ function buildRoofFaceTableHtml(
 }
 
 function defaultProposalState(profile: ProposalProfile = "residential"): ProposalState {
+  // Company identity stays empty here — filled from Contacts & settings (org profile) per account.
   if (profile === "commercial") {
     return {
       profile,
-      companyName: "Repair King",
+      companyName: "",
       companyAddress: "",
       companyWebsite: "",
       logoDataUrl: "",
-      preparedBy: "Estimator",
+      preparedBy: "",
       clientName: "",
       clientCompany: "",
       clientEmail: "",
       clientPhone: "",
-      contactEmail: "estimating@repairking.com",
-      contactPhone: "(000) 000-0000",
+      contactEmail: "",
+      contactPhone: "",
       proposalTitle: "Commercial Full Roof Replacement Proposal",
       inclusions:
         "Mobilization, safety setup, full tear-off and disposal as specified, new roof system installation to manufacturer specs, perimeter and penetration flashing, accessory metals, and jobsite cleanup.",
@@ -1789,17 +1790,17 @@ function defaultProposalState(profile: ProposalProfile = "residential"): Proposa
   }
   return {
     profile,
-    companyName: "Repair King",
+    companyName: "",
     companyAddress: "",
     companyWebsite: "",
     logoDataUrl: "",
-    preparedBy: "Estimator",
+    preparedBy: "",
     clientName: "",
     clientCompany: "",
     clientEmail: "",
     clientPhone: "",
-    contactEmail: "estimating@repairking.com",
-    contactPhone: "(000) 000-0000",
+    contactEmail: "",
+    contactPhone: "",
       proposalTitle: "Residential Full Roof Replacement Proposal",
       inclusions:
         "Complete tear-off and disposal of existing roofing, underlayment and ice/water shield at code-typical areas, new asphalt or specified roof system, starter and ridge components, flashing at walls and penetrations, ventilation balance as specified, and thorough cleanup.",
@@ -6291,9 +6292,9 @@ function App() {
         <section className="panel full" id="section-proposals">
           <h2>Proposal Builder</h2>
           <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-            Upload contacts CSV, company logo, and default templates on{" "}
-            <Link to="/contacts">Contacts &amp; settings</Link> (saved in this browser). Reopen saved proposals from{" "}
-            <Link to="/contracts">Contracts &amp; Proposals</Link>.
+            Set your company name, logo, and contact defaults on{" "}
+            <Link to="/contacts">Contacts &amp; settings</Link> — they apply to every proposal for this account.
+            Reopen saved proposals from <Link to="/contracts">Contracts &amp; Proposals</Link>.
           </p>
           {editingContractId ? (
             <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
@@ -6323,6 +6324,7 @@ function App() {
             <label>
               Company Name
               <input
+                placeholder="Your company name"
                 value={proposal.companyName}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, companyName: e.target.value }))
@@ -6332,6 +6334,7 @@ function App() {
             <label>
               Prepared By
               <input
+                placeholder="Estimator name"
                 value={proposal.preparedBy}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, preparedBy: e.target.value }))
@@ -6341,6 +6344,7 @@ function App() {
             <label>
               Contact Email
               <input
+                placeholder="you@yourcompany.com"
                 value={proposal.contactEmail}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, contactEmail: e.target.value }))
@@ -6350,6 +6354,7 @@ function App() {
             <label>
               Contact Phone
               <input
+                placeholder="(555) 555-5555"
                 value={proposal.contactPhone}
                 onChange={(e) =>
                   setProposal((curr) => ({ ...curr, contactPhone: e.target.value }))

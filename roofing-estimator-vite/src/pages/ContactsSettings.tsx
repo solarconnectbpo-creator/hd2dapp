@@ -356,7 +356,9 @@ export function ContactsSettings() {
               <Building2 className="w-5 h-5" />
               Company &amp; branding
             </CardTitle>
-            <CardDescription>Used on printed proposals and PDF exports from the estimator.</CardDescription>
+            <CardDescription>
+              Your company branding for proposals and PDF exports. Leave blank until filled — nothing is pre-branded for a single contractor.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -364,6 +366,7 @@ export function ContactsSettings() {
                 <span className="text-[var(--x-text)] block mb-1">Company name</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Your company name"
                   value={org.companyName}
                   onChange={(e) => setOrg((o) => ({ ...o, companyName: e.target.value }))}
                 />
@@ -372,6 +375,7 @@ export function ContactsSettings() {
                 <span className="text-[var(--x-text)] block mb-1">Prepared by</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Estimator name"
                   value={org.preparedBy}
                   onChange={(e) => setOrg((o) => ({ ...o, preparedBy: e.target.value }))}
                 />
@@ -412,6 +416,7 @@ export function ContactsSettings() {
                 <span className="text-[var(--x-text)] block mb-1">Estimator email</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="you@yourcompany.com"
                   value={org.contactEmail}
                   onChange={(e) => setOrg((o) => ({ ...o, contactEmail: e.target.value }))}
                 />
@@ -420,6 +425,7 @@ export function ContactsSettings() {
                 <span className="text-[var(--x-text)] block mb-1">Estimator phone</span>
                 <input
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="(555) 555-5555"
                   value={org.contactPhone}
                   onChange={(e) => setOrg((o) => ({ ...o, contactPhone: e.target.value }))}
                 />
