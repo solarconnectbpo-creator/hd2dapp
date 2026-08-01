@@ -1,42 +1,55 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import type { DamagePhoto } from "../../lib/fieldProjectTypes";
+import { getFieldPhotoBlob } from "../../lib/fieldPhotoBlobStore";
 import { fetchWorkspaceFileObjectUrl } from "../../lib/workspaceSyncClient";
 
 /**
  * Source URL for a damage photo.
  *
- * Prefers the locally cached data URL. On a device that pulled the project from the
- * server the bytes are not in localStorage, so the stored blob is fetched once and
- * exposed as an object URL (revoked on unmount).
+ * Prefers an in-memory data URL, then IndexedDB (capture device), then R2 via the API.
  */
 export function useRemotePhotoUrl(photo: DamagePhoto): string | null {
   const { session } = useAuth();
   const token = session?.token ?? "";
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
 
-  const needsRemote = !photo.imageDataUrl && Boolean(photo.remoteKey);
+  const needsLookup = !photo.imageDataUrl;
 
   useEffect(() => {
-    if (!needsRemote || !token || !photo.remoteKey) return;
+    if (!needsLookup) {
+      setResolvedUrl(null);
+      return;
+    }
     let cancelled = false;
     let created: string | null = null;
 
-    void fetchWorkspaceFileObjectUrl(token, photo.remoteKey).then((url) => {
+    void (async () => {
+      const local = await getFieldPhotoBlob(photo.id);
+      if (cancelled) return;
+      if (local) {
+        setResolvedUrl(local);
+        return;
+      }
+      if (!token || !photo.remoteKey) {
+        setResolvedUrl(null);
+        return;
+      }
+      const url = await fetchWorkspaceFileObjectUrl(token, photo.remoteKey);
       if (!url) return;
       if (cancelled) {
         URL.revokeObjectURL(url);
         return;
       }
       created = url;
-      setObjectUrl(url);
-    });
+      setResolvedUrl(url);
+    })();
 
     return () => {
       cancelled = true;
       if (created) URL.revokeObjectURL(created);
     };
-  }, [needsRemote, token, photo.remoteKey]);
+  }, [needsLookup, token, photo.id, photo.remoteKey]);
 
-  return photo.imageDataUrl || objectUrl;
+  return photo.imageDataUrl || resolvedUrl;
 }

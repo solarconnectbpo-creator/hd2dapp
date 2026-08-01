@@ -1596,7 +1596,7 @@ export function Canvassing() {
                   type="button"
                   size="lg"
                   variant="outline"
-                  className="w-full gap-2 border-zinc-300 font-semibold text-zinc-950 hover:bg-zinc-100"
+                  className="canvass-storm-btn w-full gap-2 border-white/30 bg-white/5 font-semibold text-white hover:bg-white/10"
                   disabled={
                     panelBusy ||
                     !lastPayload ||
@@ -1608,7 +1608,7 @@ export function Canvassing() {
                   Storm damage report
                 </Button>
                 <p className="text-[11px] leading-snug text-zinc-600">
-                  Opens the camera for multiple site photos and builds an AI storm damage report as you shoot.
+                  Opens the camera for many site photos and builds an AI storm damage report as you shoot.
                 </p>
                 <label className="canvass-footer-checkbox flex flex-row items-center gap-2 text-xs text-zinc-950">
                   <input

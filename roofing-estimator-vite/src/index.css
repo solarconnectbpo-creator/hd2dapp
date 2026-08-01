@@ -1253,7 +1253,32 @@ html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-body 
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer p {
-  color: #8b9199 !important;
+  color: #aeb4bd !important;
+}
+
+/* Outline / zinc utility buttons inherit dark-ink classes that vanish on the dark footer. */
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button {
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button svg {
+  color: #f8fafc !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button.bg-zinc-900 {
+  background-color: #1d9bf0 !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer button.bg-zinc-900:hover {
+  background-color: #1a8cd8 !important;
+}
+
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer .text-zinc-950,
+html body #root .canvass-light-sheet.canvass-property-sheet .canvass-sheet-footer .text-zinc-600 {
+  color: #e7e9ea !important;
 }
 
 html body #root .canvass-light-sheet.canvass-property-sheet label {

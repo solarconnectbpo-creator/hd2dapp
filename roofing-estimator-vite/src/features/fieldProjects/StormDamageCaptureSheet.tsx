@@ -90,6 +90,8 @@ export function StormDamageCaptureSheet({
     () => [...project.photos].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt)),
     [project.photos],
   );
+  /** Keep the sheet snappy; all photos remain on the job. */
+  const visiblePhotos = photos.slice(0, 48);
   const analyzed = photos.filter((p) => p.aiSummary).length;
   const statusLine = importing
     ? "Saving photo…"
@@ -219,20 +221,28 @@ export function StormDamageCaptureSheet({
 
           {photos.length === 0 ? (
             <p className="hd2d-ink-muted hd2d-report-panel rounded-2xl border border-dashed px-4 py-10 text-center text-sm">
-              Capture elevations, slopes, and close-ups. Each photo is saved immediately and fed into the report.
+              Capture elevations, slopes, and close-ups. Each photo is saved immediately and kept on this job — take as
+              many as you need (up to {MAX_FIELD_PROJECT_PHOTOS}).
             </p>
           ) : (
-            <ul className="m-0 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-4">
-              {photos.map((ph) => (
-                <Thumb
-                  key={ph.id}
-                  photo={ph}
-                  analyzing={analyzing && !ph.aiSummary}
-                  onOpen={onOpenLightbox}
-                  onRemove={() => onRemovePhoto(ph.id)}
-                />
-              ))}
-            </ul>
+            <>
+              <ul className="m-0 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-4">
+                {visiblePhotos.map((ph) => (
+                  <Thumb
+                    key={ph.id}
+                    photo={ph}
+                    analyzing={analyzing && !ph.aiSummary}
+                    onOpen={onOpenLightbox}
+                    onRemove={() => onRemovePhoto(ph.id)}
+                  />
+                ))}
+              </ul>
+              {photos.length > visiblePhotos.length ? (
+                <p className="hd2d-ink-muted text-center text-xs">
+                  Showing latest {visiblePhotos.length} of {photos.length} saved photos
+                </p>
+              ) : null}
+            </>
           )}
 
           <section className="hd2d-report-panel rounded-2xl border p-3 shadow-sm">

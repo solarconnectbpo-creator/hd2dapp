@@ -4,6 +4,7 @@ import {
   normalizeDamagePhoto,
   normalizeFieldProject,
   optHttpsUrl,
+  reconcileFieldProjectsWithLatest,
   type FieldProject,
 } from "./fieldProjectTypes";
 
@@ -167,5 +168,43 @@ describe("mergeFieldProjectPhotos", () => {
     const merged = mergeFieldProjectPhotos(incoming, local);
     expect(merged.photos[0]?.imageDataUrl).toContain("data:image/jpeg");
     expect(merged.photos[0]?.aiSummary?.summary).toBe("s");
+  });
+});
+
+describe("reconcileFieldProjectsWithLatest", () => {
+  it("keeps photos added while a sync snapshot was in flight", () => {
+    const synced: FieldProject[] = [
+      {
+        id: "fp-1",
+        name: "Job",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:01:00.000Z",
+        pipelineStage: "documentation",
+        tags: ["storm"],
+        photos: [
+          {
+            id: "ph-1",
+            capturedAt: "2026-01-01T00:01:00.000Z",
+            imageDataUrl: "",
+          },
+        ],
+      },
+    ];
+    const latest: FieldProject[] = [
+      {
+        ...synced[0],
+        updatedAt: "2026-01-01T00:02:00.000Z",
+        photos: [
+          synced[0].photos[0],
+          {
+            id: "ph-2",
+            capturedAt: "2026-01-01T00:02:00.000Z",
+            imageDataUrl: "data:image/jpeg;base64,two",
+          },
+        ],
+      },
+    ];
+    const out = reconcileFieldProjectsWithLatest(synced, latest);
+    expect(out[0]?.photos.map((p) => p.id).sort()).toEqual(["ph-1", "ph-2"]);
   });
 });

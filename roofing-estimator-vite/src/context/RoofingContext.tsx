@@ -36,6 +36,7 @@ import {
   normalizeTagList,
   optHttpsUrl,
   isFieldPipelineStage,
+  reconcileFieldProjectsWithLatest,
 } from "../lib/fieldProjectTypes";
 import {
   deleteFieldPhotoBlob,
@@ -267,10 +268,9 @@ function newPhotoId(): string {
 const SYNC_KINDS: WorkspaceKind[] = ["measurement", "estimate", "contract", "field_project"];
 
 /**
- * Photos are base64 JPEGs — 24 of them would be several MB and exceed the server's
- * per-record cap, which would reject the whole project (losing the text sync too).
- * Sync the project without image bytes; the photos stay on the capturing device until
- * blob upload to R2 exists. Captions and AI summaries are small, so they still travel.
+ * Photos are base64 JPEGs — many of them would exceed the server's per-record cap.
+ * Sync the project without image bytes; blobs live in IndexedDB + R2. Captions and AI
+ * summaries are small, so they still travel with the project JSON.
  */
 function fieldProjectForSync(project: FieldProject): FieldProject {
   return {
@@ -558,7 +558,9 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setContracts,
       );
       const localProjectsById = new Map(cur.fieldProjects.map((p) => [p.id, p]));
-      const nextFieldProjects = applyKind<FieldProject>(
+      // Don't let applyKind write field projects yet — a mid-sync capture must be
+      // union-merged with the latest in-memory list before we replace React state.
+      const remoteMergedProjects = applyKind<FieldProject>(
         "field_project",
         cur.fieldProjects,
         (p) => p.id,
@@ -567,8 +569,16 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           const parsed = normalizeFieldProject(d as Record<string, unknown>);
           return parsed ? mergeFieldProjectPhotos(parsed, localProjectsById.get(parsed.id)) : null;
         },
-        setFieldProjects,
+        () => {
+          /* deferred — see reconcile below */
+        },
       );
+      const nextFieldProjects = reconcileFieldProjectsWithLatest(
+        remoteMergedProjects,
+        latestRef.current.fieldProjects,
+      );
+      setFieldProjects(nextFieldProjects);
+      latestRef.current = { ...latestRef.current, fieldProjects: nextFieldProjects };
 
       // 2) Push local creates/edits/deletes.
       const nowSec = Math.floor(Date.now() / 1000);
@@ -580,13 +590,23 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         return d.push;
       };
 
+      // Re-read latest again so photos added during remote apply are included in the push.
+      const projectsForPush = reconcileFieldProjectsWithLatest(
+        nextFieldProjects,
+        latestRef.current.fieldProjects,
+      );
+      if (projectsForPush !== nextFieldProjects) {
+        setFieldProjects(projectsForPush);
+        latestRef.current = { ...latestRef.current, fieldProjects: projectsForPush };
+      }
+
       const pushed: PushRecord[] = [
         ...stageDiff<Measurement>("measurement", nextMeasurements, (m) => m.id),
         ...stageDiff<Estimate>("estimate", nextEstimates, (e) => e.id),
         ...stageDiff<Contract>("contract", nextContracts, (c) => c.id),
         ...stageDiff<FieldProject>(
           "field_project",
-          nextFieldProjects.map(fieldProjectForSync),
+          projectsForPush.map(fieldProjectForSync),
           (p) => p.id,
         ),
       ];
@@ -614,17 +634,22 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       hydratedRef.current = true;
       setSync({ status: "idle", lastSyncedAt: Date.now(), error: null });
 
-      // Retry R2 upload for photos that still only exist locally.
+      // Retry R2 upload for photos that still only exist locally (bytes may be in IndexedDB).
       const pendingUploads: Array<{ projectId: string; photo: DamagePhoto }> = [];
       for (const project of latestRef.current.fieldProjects) {
         for (const photo of project.photos) {
-          if (photo.imageDataUrl?.startsWith("data:image/") && !photo.remoteKey) {
-            pendingUploads.push({ projectId: project.id, photo });
-          }
+          if (!photo.remoteKey) pendingUploads.push({ projectId: project.id, photo });
         }
       }
-      for (const { projectId, photo } of pendingUploads.slice(0, 8)) {
-        void uploadPhotoBlob(token, photo).then((remoteKey) => {
+      for (const { projectId, photo } of pendingUploads.slice(0, 12)) {
+        void (async () => {
+          let bytes = photo.imageDataUrl;
+          if (!bytes?.startsWith("data:image/")) {
+            const { getFieldPhotoBlob } = await import("../lib/fieldPhotoBlobStore");
+            bytes = (await getFieldPhotoBlob(photo.id)) ?? "";
+          }
+          if (!bytes.startsWith("data:image/")) return;
+          const remoteKey = await uploadPhotoBlob(token, { ...photo, imageDataUrl: bytes });
           if (!remoteKey) return;
           setFieldProjects((prev) =>
             prev.map((p) =>
@@ -638,7 +663,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
                 : p,
             ),
           );
-        });
+        })();
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Sync failed.";
@@ -813,27 +838,42 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           }),
         );
         if (newPhoto) {
-          void putFieldPhotoBlob(newPhoto.id, imageDataUrl);
-        }
-        // Push the image to R2 so it is not stranded on this device. Best effort:
-        // when storage is unconfigured or offline the local IndexedDB copy still works.
-        if (newPhoto && token) {
           const uploaded: DamagePhoto = newPhoto;
-          void uploadPhotoBlob(token, uploaded).then((remoteKey) => {
-            if (!remoteKey) return;
+          // Durable local copy first — then drop in-memory JPEG so multi-hundred
+          // captures do not blow React state / crash the tab.
+          void putFieldPhotoBlob(uploaded.id, imageDataUrl).then(() => {
             setFieldProjects((prev) =>
               prev.map((p) =>
                 p.id === projectId
                   ? {
                       ...p,
                       photos: p.photos.map((ph) =>
-                        ph.id === uploaded.id ? { ...ph, remoteKey } : ph,
+                        ph.id === uploaded.id && ph.imageDataUrl === imageDataUrl
+                          ? { ...ph, imageDataUrl: "" }
+                          : ph,
                       ),
                     }
                   : p,
               ),
             );
           });
+          if (token) {
+            void uploadPhotoBlob(token, uploaded).then((remoteKey) => {
+              if (!remoteKey) return;
+              setFieldProjects((prev) =>
+                prev.map((p) =>
+                  p.id === projectId
+                    ? {
+                        ...p,
+                        photos: p.photos.map((ph) =>
+                          ph.id === uploaded.id ? { ...ph, remoteKey } : ph,
+                        ),
+                      }
+                    : p,
+                ),
+              );
+            });
+          }
         }
         return newPhoto;
       },

@@ -70,6 +70,9 @@ export interface FieldProject {
 
 export const MAX_FIELD_PROJECT_AI_REPORT = 8000;
 
+/** Soft cap for storm / field documentation (bytes live in IndexedDB + R2, not localStorage). */
+export const MAX_FIELD_PROJECT_PHOTOS = 1000;
+
 /**
  * Union-merge photos so a remote project with fewer ids cannot wipe local captures.
  * Prefer non-empty local JPEG bytes; keep remoteKey / AI / caption from the richer side.
@@ -93,15 +96,36 @@ export function mergeFieldProjectPhotos(incoming: FieldProject, local: FieldProj
     if (!incomingIds.has(loc.id)) merged.push(loc);
   }
   merged.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
-  const aiReport = incoming.aiReport || local.aiReport;
+  const aiReport = incoming.aiReport?.length
+    ? incoming.aiReport.length >= (local.aiReport?.length ?? 0)
+      ? incoming.aiReport
+      : local.aiReport
+    : local.aiReport;
   return {
     ...incoming,
+    // Prefer the newer updatedAt so concurrent local captures aren't treated as stale.
+    updatedAt:
+      Date.parse(local.updatedAt) > Date.parse(incoming.updatedAt) ? local.updatedAt : incoming.updatedAt,
     photos: merged.slice(0, MAX_FIELD_PROJECT_PHOTOS),
     ...(aiReport ? { aiReport } : {}),
   };
 }
 
-export const MAX_FIELD_PROJECT_PHOTOS = 24;
+/** Reconcile a sync snapshot with the latest in-memory projects (photos added mid-sync). */
+export function reconcileFieldProjectsWithLatest(
+  synced: FieldProject[],
+  latest: FieldProject[],
+): FieldProject[] {
+  const byId = new Map<string, FieldProject>();
+  for (const remote of synced) byId.set(remote.id, remote);
+  for (const local of latest) {
+    const remote = byId.get(local.id);
+    byId.set(local.id, remote ? mergeFieldProjectPhotos(remote, local) : local);
+  }
+  return [...byId.values()].sort(
+    (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.id.localeCompare(b.id),
+  );
+}
 
 function optString(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
 import {
   MAX_FIELD_PROJECT_PHOTOS,
@@ -6,6 +6,7 @@ import {
   type DamagePhotoAiSummary,
   type FieldProject,
 } from "../../lib/fieldProjectTypes";
+import { getFieldPhotoBlob } from "../../lib/fieldPhotoBlobStore";
 import { postRoofDamageDraft } from "../../lib/roofDamageClient";
 
 export type ImportFilesResult = {
@@ -37,6 +38,10 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
   const { fieldProjects, authToken, addFieldProjectPhoto, setFieldProjectPhotoAiSummary } = deps;
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const fieldProjectsRef = useRef(fieldProjects);
+  useEffect(() => {
+    fieldProjectsRef.current = fieldProjects;
+  }, [fieldProjects]);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -51,7 +56,11 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
 
   const runAiOnPhoto = useCallback(
     async (projectId: string, photoId: string, imageDataUrl: string, contextHint: string) => {
-      if (!imageDataUrl.startsWith("data:image/")) {
+      let bytes = imageDataUrl;
+      if (!bytes.startsWith("data:image/")) {
+        bytes = (await getFieldPhotoBlob(photoId)) ?? "";
+      }
+      if (!bytes.startsWith("data:image/")) {
         setImportError("AI draft needs the original photo on this device.");
         return false;
       }
@@ -60,7 +69,7 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
       setBusyPhotoId(photoId);
       setImportError(null);
       try {
-        const { base64, mimeType } = dataUrlToBase64Payload(imageDataUrl);
+        const { base64, mimeType } = dataUrlToBase64Payload(bytes);
         const res = await postRoofDamageDraft({
           imageBase64: base64,
           mimeType,
@@ -98,7 +107,7 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
       },
     ): Promise<ImportFilesResult> => {
       if (!files?.length) {
-        const proj0 = fieldProjects.find((p) => p.id === projectId);
+        const proj0 = fieldProjectsRef.current.find((p) => p.id === projectId);
         return {
           added: 0,
           photoIds: [],
@@ -109,7 +118,7 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
       }
       setImportError(null);
       setImporting(true);
-      const proj = fieldProjects.find((p) => p.id === projectId);
+      const proj = fieldProjectsRef.current.find((p) => p.id === projectId);
       const startingCount = proj?.photos.length ?? 0;
       let remaining = proj ? MAX_FIELD_PROJECT_PHOTOS - startingCount : 0;
       if (remaining <= 0) {
@@ -163,7 +172,7 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
         photoCountAfter: startingCount + added,
       };
     },
-    [addFieldProjectPhoto, authToken, fieldProjects, resetFileInputs, runAiOnPhoto],
+    [addFieldProjectPhoto, authToken, resetFileInputs, runAiOnPhoto],
   );
 
   const openCamera = useCallback(() => {
