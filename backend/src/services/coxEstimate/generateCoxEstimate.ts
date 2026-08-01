@@ -3,6 +3,7 @@
  * Keep in sync with roofing-estimator-vite/src/lib/cox/generateCoxEstimate.ts
  */
 
+import { normalizePitchToColon } from "./normalizePitch";
 import {
   calculateTieredEstimateWithTax,
   COX_DEFAULT_TAX_RATE,
@@ -44,21 +45,13 @@ export type CoxEstimateResult = {
   generatedAt: string;
 };
 
-const PITCH_RE = /^\d+:\d+$/;
-
 function assertRoofArea(roofArea: number): void {
   if (!Number.isFinite(roofArea) || roofArea <= 0) throw new Error("Roof area must be greater than 0");
   if (roofArea > 50_000) throw new Error("Roof area cannot exceed 50,000 sq ft");
 }
 
-function assertPitch(pitch: string): void {
-  if (!PITCH_RE.test(pitch)) throw new Error("Pitch must be in format 'rise:run'");
-  const [riseRaw, runRaw] = pitch.split(":");
-  const rise = Number(riseRaw);
-  const run = Number(runRaw);
-  if (!(rise >= 0 && rise <= 12 && run > 0 && run <= 12)) {
-    throw new Error("Pitch must be between 0:12 and 12:12");
-  }
+function assertPitch(pitch: string): string {
+  return normalizePitchToColon(pitch).colon;
 }
 
 function assertTearOffLayers(layers: number): void {
@@ -72,8 +65,8 @@ export function resolveBasePricePerSquare(
   roofSystem: CoxRoofSystem,
   pitch: string,
 ): number {
-  assertPitch(pitch);
-  const [riseRaw, runRaw] = pitch.split(":");
+  const normalized = assertPitch(pitch);
+  const [riseRaw, runRaw] = normalized.split(":");
   const rise = Number(riseRaw);
   const run = Number(runRaw);
   const pitchRatio = rise / run;
@@ -98,7 +91,6 @@ export function resolveBasePricePerSquare(
 
 export function generateCoxEstimate(input: CoxEstimateInput): CoxEstimateResult {
   assertRoofArea(input.roofArea);
-  assertPitch(input.pitch);
   assertTearOffLayers(input.tearOffLayers);
 
   const buildingTypes: CoxBuildingType[] = ["oneStory", "twoStory", "threeStory"];
@@ -107,21 +99,22 @@ export function generateCoxEstimate(input: CoxEstimateInput): CoxEstimateResult 
   if (!roofSystems.includes(input.roofSystem)) throw new Error("Invalid roof system");
 
   const taxRate = input.taxRate ?? COX_DEFAULT_TAX_RATE;
+  const pitch = assertPitch(input.pitch);
   const squares = roundMoney(input.roofArea / 100);
-  const basePricePerSquare = resolveBasePricePerSquare(input.buildingType, input.roofSystem, input.pitch);
+  const basePricePerSquare = resolveBasePricePerSquare(input.buildingType, input.roofSystem, pitch);
   const materialCost = roundMoney(squares * basePricePerSquare);
   const tearOffCost = roundMoney(squares * 80 * input.tearOffLayers);
   const totalBasePrice = roundMoney(materialCost + tearOffCost);
   const estimate = calculateTieredEstimateWithTax(totalBasePrice, taxRate);
   const projectName =
-    (input.projectName?.trim() || input.parcelId?.trim() || "Cox roof estimate").slice(0, 120);
+    (input.projectName?.trim() || input.parcelId?.trim() || "Roof estimate").slice(0, 120);
 
   return {
     parcelId: input.parcelId?.trim() || null,
     projectName,
     roofArea: input.roofArea,
     squares,
-    pitch: input.pitch,
+    pitch,
     buildingType: input.buildingType,
     roofSystem: input.roofSystem,
     tearOffLayers: input.tearOffLayers,

@@ -113,8 +113,13 @@ export function Estimates() {
                     </>
                   ) : null}
                   <div className="border-t border-white/[0.08] pt-3">
-                    <p className="text-sm text-[var(--x-muted)]">Total (RCV)</p>
+                    <p className="text-sm text-[var(--x-muted)]">
+                      {estimate.rcvBeforeMarkup != null ? "Total (RCV)" : "Package total"}
+                    </p>
                     <p className="text-2xl font-semibold tabular-nums">{money(estimate.total)}</p>
+                    {estimate.measurementId ? (
+                      <p className="mt-1 text-xs text-[var(--x-muted)]">Linked to measurement</p>
+                    ) : null}
                   </div>
                   <details className="border-t border-white/[0.08] pt-3">
                     <summary className="cursor-pointer text-sm text-[var(--x-accent)] hover:underline">

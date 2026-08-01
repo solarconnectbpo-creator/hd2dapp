@@ -32,3 +32,21 @@ export {
   type CoxEstimateResult,
   type CoxRoofSystem,
 } from "./generateCoxEstimate";
+
+export {
+  normalizePitchToColon,
+  parsePitchParts,
+  pitchRiseToColon,
+  type NormalizedPitch,
+} from "./normalizePitch";
+
+export {
+  inferTearOffLayers,
+  mapRoofMaterialToCoxSystem,
+  mapStoriesToBuildingType,
+  measurementToCoxPrefill,
+  surfaceAreaFromMeasurement,
+  type CoxMeasurementPrefill,
+} from "./measurementPrefill";
+
+export { buildCoxEstimateReportHtml, openCoxEstimateReport } from "./estimateReport";

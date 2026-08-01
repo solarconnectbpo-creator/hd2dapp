@@ -106,17 +106,26 @@ export function Projects() {
                             </p>
                           </div>
                           <div>
-                            <p className="mb-1 text-sm text-[var(--x-text)]">Adjusted Area</p>
-                            <p className="text-lg text-[var(--x-text)]">{measurement.adjustedArea.toFixed(0)} sq ft</p>
-                            <p className="text-sm text-[var(--x-text)]">+{measurement.wastePercentage}% waste factor</p>
+                            <p className="mb-1 text-sm text-[var(--x-text)]">Surface / with waste</p>
+                            <p className="text-lg text-[var(--x-text)]">
+                              {(measurement.surfaceArea ?? measurement.totalArea).toFixed(0)} →{" "}
+                              {measurement.adjustedArea.toFixed(0)} sq ft
+                            </p>
+                            <p className="text-sm text-[var(--x-text)]">
+                              +{measurement.wastePercentage}% waste (estimate uses surface)
+                            </p>
                           </div>
                           <div>
                             <p className="mb-1 flex items-center gap-1 text-sm text-[var(--x-text)]">
                               <Layers className="h-4 w-4" />
                               Roofing Squares
                             </p>
-                            <p className="text-2xl text-[var(--x-text)]">{(measurement.adjustedArea / 100).toFixed(2)}</p>
-                            <p className="text-sm text-[var(--x-text)]">100 sq ft = 1 square</p>
+                            <p className="text-2xl text-[var(--x-text)]">
+                              {((measurement.surfaceArea ?? measurement.totalArea) / 100).toFixed(2)}
+                            </p>
+                            <p className="text-sm text-[var(--x-text)]">
+                              surface SQ · {(measurement.adjustedArea / 100).toFixed(2)} w/ waste
+                            </p>
                           </div>
                         </div>
                       </CardContent>

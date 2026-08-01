@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calculator, Save } from "lucide-react";
+import { Calculator, FileText, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -10,6 +10,8 @@ import {
   coxResultToHd2dEstimateLines,
   formatPrice,
   generateCoxEstimate,
+  measurementToCoxPrefill,
+  openCoxEstimateReport,
   pricingTiers,
   type CoxBuildingType,
   type CoxEstimateResult,
@@ -33,31 +35,49 @@ export function CoxEstimateGenerator() {
   const [roofSystem, setRoofSystem] = useState<CoxRoofSystem>("shingles");
   const [tearOffLayers, setTearOffLayers] = useState("1");
   const [selectedTier, setSelectedTier] = useState<CoxTierKey>("better");
+  const [measurementId, setMeasurementId] = useState("");
   const [result, setResult] = useState<CoxEstimateResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<"local" | "worker" | null>(null);
+  const [prefillNote, setPrefillNote] = useState<string | null>(null);
 
   const measurementOptions = useMemo(
     () =>
       measurements
         .slice()
         .reverse()
-        .map((m) => ({
-          id: m.id,
-          label: `${m.projectName} · ${Math.round(m.adjustedArea || m.totalArea)} sf`,
-          area: m.adjustedArea || m.totalArea,
-          pitch: m.pitch > 0 ? `${Math.round(m.pitch)}:12` : "6:12",
-          name: m.projectName,
-        })),
+        .map((m) => {
+          const prefill = measurementToCoxPrefill(m);
+          return {
+            id: m.id,
+            label: `${m.projectName} · ${Math.round(prefill.roofArea)} sf surface${
+              prefill.wastePercentage > 0
+                ? ` (${Math.round(prefill.adjustedArea)} w/ ${prefill.wastePercentage}% waste)`
+                : ""
+            }`,
+            prefill,
+          };
+        }),
     [measurements],
   );
 
-  const applyMeasurement = (measurementId: string) => {
-    const m = measurementOptions.find((x) => x.id === measurementId);
-    if (!m) return;
-    setProjectName(m.name);
-    if (m.area > 0) setRoofArea(String(Math.round(m.area)));
-    setPitch(m.pitch);
+  const applyMeasurement = (id: string) => {
+    const opt = measurementOptions.find((x) => x.id === id);
+    if (!opt) return;
+    const p = opt.prefill;
+    setMeasurementId(p.measurementId);
+    setProjectName(p.projectName);
+    if (p.roofArea > 0) setRoofArea(String(Math.round(p.roofArea)));
+    setPitch(p.pitch);
+    setBuildingType(p.buildingType);
+    setRoofSystem(p.roofSystem);
+    setTearOffLayers(String(p.tearOffLayers));
+    setPrefillNote(
+      `Prefill: ${Math.round(p.roofArea)} sf surface (before waste) · ${p.pitch} · ${p.roofSystem} · ${p.buildingType} · tear-off ${p.tearOffLayers}` +
+        (p.roofMaterial ? ` · from “${p.roofMaterial}”` : ""),
+    );
+    setResult(null);
+    setSource(null);
   };
 
   const runEstimate = async () => {
@@ -75,7 +95,15 @@ export function CoxEstimateGenerator() {
       if (session?.token) {
         try {
           const remote = await fetchCoxEstimateFromWorker(session.token, input);
-          setResult(remote);
+          // Worker returns package math; catalog SKUs stay local for the report.
+          const localCatalog = generateCoxEstimate(input);
+          setResult({
+            ...remote,
+            lineItems:
+              Array.isArray(remote.lineItems) && remote.lineItems.length > 0
+                ? remote.lineItems
+                : localCatalog.lineItems,
+          });
           setSource("worker");
           toast.success("Estimate calculated (server)");
           return;
@@ -107,7 +135,7 @@ export function CoxEstimateGenerator() {
     const lines = coxResultToHd2dEstimateLines(result, selectedTier);
     const estimate: Estimate = {
       id: crypto.randomUUID(),
-      measurementId: "",
+      measurementId: measurementId || "",
       projectName: result.projectName,
       date: new Date().toISOString().slice(0, 10),
       materials: lines.materials,
@@ -117,7 +145,9 @@ export function CoxEstimateGenerator() {
       total: lines.total,
     };
     addEstimate(estimate);
-    toast.success(`Saved ${pricingTiers[selectedTier].name} package to Estimates`);
+    toast.success(
+      `Saved ${pricingTiers[selectedTier].name} package${measurementId ? " (linked to measurement)" : ""}`,
+    );
   };
 
   return (
@@ -127,7 +157,8 @@ export function CoxEstimateGenerator() {
           <div>
             <CardTitle className="text-xl">Estimate</CardTitle>
             <CardDescription className="mt-1 max-w-2xl">
-              Good / Better / Best tiers ($/SQ by story &amp; pitch, tear-off $80/SQ/layer, 8% tax).
+              Atlas package pricing: $/SQ by story &amp; pitch, tear-off $80/SQ/layer, Good / Better / Best,
+              8% tax. Prefill uses surface SF before waste from your measurement.
             </CardDescription>
           </div>
           {source ? (
@@ -146,9 +177,13 @@ export function CoxEstimateGenerator() {
             <select
               id="cox-measurement"
               className={fieldClass}
-              defaultValue=""
+              value={measurementId}
               onChange={(e) => {
                 if (e.target.value) applyMeasurement(e.target.value);
+                else {
+                  setMeasurementId("");
+                  setPrefillNote(null);
+                }
               }}
             >
               <option value="">Select a measurement…</option>
@@ -158,6 +193,7 @@ export function CoxEstimateGenerator() {
                 </option>
               ))}
             </select>
+            {prefillNote ? <p className="mt-2 text-xs text-[var(--x-muted)]">{prefillNote}</p> : null}
           </div>
         ) : null}
 
@@ -176,7 +212,7 @@ export function CoxEstimateGenerator() {
           </div>
           <div>
             <label className={labelClass} htmlFor="cox-area">
-              Roof area (sq ft)
+              Roof area (sq ft, before waste)
             </label>
             <input
               id="cox-area"
@@ -190,7 +226,7 @@ export function CoxEstimateGenerator() {
           </div>
           <div>
             <label className={labelClass} htmlFor="cox-pitch">
-              Pitch (rise:run)
+              Pitch (6:12 or 6/12)
             </label>
             <input
               id="cox-pitch"
@@ -259,6 +295,15 @@ export function CoxEstimateGenerator() {
             <Save className="h-4 w-4" aria-hidden />
             Save {pricingTiers[selectedTier].name} package
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => result && openCoxEstimateReport(result, selectedTier)}
+            disabled={!result || busy}
+          >
+            <FileText className="h-4 w-4" aria-hidden />
+            Open report
+          </Button>
         </div>
 
         {result ? (
@@ -266,8 +311,9 @@ export function CoxEstimateGenerator() {
             <p className="text-sm text-[var(--x-muted)]">
               {result.squares} SQ · ${result.basePricePerSquare}/SQ base · material{" "}
               {formatPrice(result.materialCost)}
-              {result.tearOffCost > 0 ? ` · tear-off ${formatPrice(result.tearOffCost)}` : ""} · base{" "}
-              {formatPrice(result.totalBasePrice)}
+              {result.tearOffCost > 0 ? ` · tear-off ${formatPrice(result.tearOffCost)}` : ""} · package
+              base {formatPrice(result.totalBasePrice)}
+              {measurementId ? " · linked measurement" : ""}
             </p>
             <div className="grid gap-3 md:grid-cols-3">
               {(["good", "better", "best"] as const).map((tier) => {
@@ -300,6 +346,34 @@ export function CoxEstimateGenerator() {
                 );
               })}
             </div>
+
+            {result.lineItems.length > 0 ? (
+              <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--x-muted)]">
+                  Catalog reference (not the package total)
+                </p>
+                <p className="mt-1 text-xs text-[var(--x-muted)]">
+                  SKU/labor list for material discussion. Contract total is the selected tier above.
+                </p>
+                <div className="mt-3 space-y-2">
+                  {result.lineItems.map((line) => (
+                    <div
+                      key={`${line.code}-${line.name}`}
+                      className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                    >
+                      <div>
+                        <span className="text-[var(--x-text)]">{line.name}</span>
+                        <span className="ml-2 text-xs text-[var(--x-muted)]">{line.code}</span>
+                      </div>
+                      <div className="tabular-nums text-[var(--x-muted)]">
+                        {line.quantity} {line.unit} × {formatPrice(line.unitCost)} ={" "}
+                        <span className="text-[var(--x-text)]">{formatPrice(line.totalCost)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </CardContent>
