@@ -773,6 +773,7 @@ export function Canvassing() {
           payload: base,
           nominatimDisplayName: data.display_name,
           nominatimAddress: data.address,
+          parcelSiteAddress: siteFromParcel || undefined,
           lat,
           lng,
         });
@@ -782,28 +783,31 @@ export function Canvassing() {
         // Nationwide owner/contact enrichment — DealMachine covers all U.S. addresses when configured.
         for (const criteria of toTryDm) {
           const dm = await fetchDealMachinePropertyByAddress(criteria, authToken);
-          if (dm.ok) {
-            const p = dm.payload;
-            base = {
-              ...base,
-              ownerName: p.ownerName.trim() || p.ownerPmEntityLabel?.trim() || base.ownerName,
-              ownerPhone: p.ownerPhone.trim() || p.contactPersonPhone.trim() || base.ownerPhone,
-              ownerEmail: p.ownerEmail.trim() || base.ownerEmail,
-              ownerMailingAddress: p.ownerMailingAddress.trim() || base.ownerMailingAddress,
-              areaSqFt: p.areaSqFt.trim() || base.areaSqFt,
-              yearBuilt: p.yearBuilt.trim() || base.yearBuilt,
-              lotSizeSqFt: p.lotSizeSqFt.trim() || base.lotSizeSqFt,
-              ownerEntityType: p.ownerEntityType.trim() || base.ownerEntityType,
-              contactPersonName: p.contactPersonName.trim() || base.contactPersonName,
-              contactPersonPhone: p.contactPersonPhone.trim() || base.contactPersonPhone,
-              ownerPmEntityLabel: p.ownerPmEntityLabel?.trim() || base.ownerPmEntityLabel,
-              notes: [base.notes, p.notes].filter(Boolean).join("\n\n"),
-            };
-            ownerSource = "dealmachine";
-            dealMachineHit = true;
-            break;
+          if (!dm.ok) {
+            lastDmMsg = dm.message;
+            continue;
           }
-          lastDmMsg = dm.message;
+          const p = dm.payload;
+          const nextOwner = p.ownerName.trim() || p.ownerPmEntityLabel?.trim() || "";
+          base = {
+            ...base,
+            ownerName: nextOwner || base.ownerName,
+            ownerPhone: p.ownerPhone.trim() || p.contactPersonPhone.trim() || base.ownerPhone,
+            ownerEmail: p.ownerEmail.trim() || base.ownerEmail,
+            ownerMailingAddress: p.ownerMailingAddress.trim() || base.ownerMailingAddress,
+            areaSqFt: p.areaSqFt.trim() || base.areaSqFt,
+            yearBuilt: p.yearBuilt.trim() || base.yearBuilt,
+            lotSizeSqFt: p.lotSizeSqFt.trim() || base.lotSizeSqFt,
+            ownerEntityType: p.ownerEntityType.trim() || base.ownerEntityType,
+            contactPersonName: p.contactPersonName.trim() || base.contactPersonName,
+            contactPersonPhone: p.contactPersonPhone.trim() || base.contactPersonPhone,
+            ownerPmEntityLabel: p.ownerPmEntityLabel?.trim() || base.ownerPmEntityLabel,
+            notes: [base.notes, p.notes].filter(Boolean).join("\n\n"),
+          };
+          ownerSource = "dealmachine";
+          dealMachineHit = true;
+          // Keep trying alternate address forms until we get an owner name.
+          if (nextOwner) break;
         }
         if (!dealMachineHit && toTryDm.length && lastDmMsg) {
           setPanelHint((curr) => (curr ? `${curr} Property lookup: ${lastDmMsg}` : `Property lookup: ${lastDmMsg}`));
@@ -816,6 +820,8 @@ export function Canvassing() {
         }
 
         base = normalizePropertyImportPayloadContacts(base);
+        if (owner) setOwnerDisplay(base.ownerName.trim() || owner);
+        else if (base.ownerName.trim()) setOwnerDisplay(base.ownerName.trim());
 
         const org = loadOrgSettings();
         const ownerFallbackOff = org.ownerFallbackProvider === "none" && org.ownerFallbackLockedOff;
@@ -824,6 +830,7 @@ export function Canvassing() {
             payload: base,
             nominatimDisplayName: data.display_name,
             nominatimAddress: data.address,
+            parcelSiteAddress: siteFromParcel || undefined,
             lat,
             lng,
           });

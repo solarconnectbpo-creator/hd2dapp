@@ -73,7 +73,7 @@ import {
   type EstimateScopeMode,
   type FormState,
 } from "./features/measurement/measurementFormTypes";
-import { defaultFormState, hillsdaleFormTemplate } from "./features/measurement/measurementFormDefaults";
+import { defaultFormState } from "./features/measurement/measurementFormDefaults";
 import {
   accessSurchargeLabel,
   accessSurchargePerSquare,
@@ -6262,7 +6262,6 @@ function App() {
           ) : null}
           <div className="actions-row">
             <button className="run-btn" onClick={runEstimateAndRecord}>Generate Estimate</button>
-            <button className="secondary-btn" onClick={() => setForm(hillsdaleFormTemplate())}>Load Hillsdale Template</button>
             <button className="secondary-btn" onClick={saveJob}>Save Job</button>
             <button className="secondary-btn" onClick={exportTxt}>Export TXT</button>
             <button className="secondary-btn" onClick={printReport}>Print / PDF</button>

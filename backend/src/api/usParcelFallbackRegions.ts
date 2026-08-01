@@ -88,4 +88,22 @@ export const US_PARCEL_FALLBACK_REGIONS: readonly ParcelFallbackRegion[] = [
     east: -76.91,
     north: 39.0,
   },
+  {
+    id: "tx_harris_hcad",
+    /** Harris County Appraisal District parcels (Houston metro). */
+    layerUrl: "https://www.gis.hctx.net/arcgis/rest/services/HCAD/Parcels/MapServer/0",
+    west: -95.95,
+    south: 29.5,
+    east: -94.9,
+    north: 30.2,
+  },
+  {
+    id: "mn_hennepin",
+    /** Hennepin County parcels (Minneapolis metro). */
+    layerUrl: "https://gis.hennepin.us/arcgis/rest/services/HennepinData/LAND_PROPERTY/MapServer/1",
+    west: -93.77,
+    south: 44.79,
+    east: -93.15,
+    north: 45.25,
+  },
 ];

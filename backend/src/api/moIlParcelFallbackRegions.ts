@@ -68,14 +68,9 @@ export const MO_IL_PARCEL_FALLBACK_REGIONS: readonly ParcelFallbackRegion[] = [
     east: -89.45,
     north: 38.68,
   },
-  {
-    id: "madison_il",
-    layerUrl: "https://maps.madisonal.gov/server/rest/services/Layers/MapServer/6",
-    west: -90.55,
-    south: 38.55,
-    east: -89.58,
-    north: 39.2,
-  },
+  // madison_il removed: prior URL pointed at Madison AL (wrong state). Re-add when a
+  // public Madison County IL parcel FeatureServer is confirmed.
+
   {
     id: "macon_il",
     layerUrl: "https://maps.decaturil.gov/arcgis/rest/services/Public/parcels/FeatureServer/0",
