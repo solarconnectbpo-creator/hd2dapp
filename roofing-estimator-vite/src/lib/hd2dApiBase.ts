@@ -9,10 +9,14 @@
 
 import {
   apiOriginForHostname,
+  HD2D_API_ORIGIN,
   HD2D_PUBLIC_API_ORIGIN,
+  HD2D_SITE_ROOT,
   isHd2dZoneHostname,
   resolveProductionApiOrigin,
 } from "../config/siteOrigin";
+
+const HD2D_API_HOST = `api.${HD2D_SITE_ROOT}`;
 
 const RAW = import.meta.env.VITE_INTEL_API_BASE;
 
@@ -83,7 +87,10 @@ export function getHd2dApiBase(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     if (raw) {
       const overrideHost = viteOverrideHostname(raw);
-      if (overrideHost && isHd2dZoneHostname(overrideHost)) {
+      // Keep explicit Worker host (api.*) — do not fold it back to the SPA origin.
+      if (overrideHost === HD2D_API_HOST) {
+        base = HD2D_API_ORIGIN.replace(/\/$/, "");
+      } else if (overrideHost && isHd2dZoneHostname(overrideHost)) {
         base = resolveProductionApiOrigin();
       } else if (overrideHost && apiOriginForHostname(overrideHost) !== null) {
         base = resolveProductionApiOrigin();

@@ -1,4 +1,4 @@
-import { HD2D_PUBLIC_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
+import { HD2D_API_ORIGIN, HD2D_WORKER_API_ORIGIN } from "../config/siteOrigin";
 import { getHd2dApiBase } from "./hd2dApiBase";
 import { readJsonResponseBody } from "./readJsonResponse";
 import { mapAuthFailureMessage } from "./authApiMessage";
@@ -50,7 +50,7 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new Error(
-      `Empty response (${res.status} ${res.statusText || ""}). Point VITE_INTEL_API_BASE at ${HD2D_PUBLIC_API_ORIGIN} (not ${HD2D_WORKER_API_ORIGIN}) if /api/* returns HTML.`,
+      `Empty response (${res.status} ${res.statusText || ""}). Point VITE_INTEL_API_BASE at ${HD2D_API_ORIGIN} (not ${HD2D_WORKER_API_ORIGIN}) if /api/* returns HTML.`,
     );
   }
   try {
@@ -58,7 +58,7 @@ function parseFetchedJson<T>(text: string, res: Response, label: string): T {
   } catch {
     const hint = trimmed.startsWith("<") ? " (received HTML, not JSON)" : "";
     throw new Error(
-      `Invalid JSON from ${label} (${res.status})${hint}. Check VITE_INTEL_API_BASE=${HD2D_PUBLIC_API_ORIGIN}.`,
+      `Invalid JSON from ${label} (${res.status})${hint}. Check VITE_INTEL_API_BASE=${HD2D_API_ORIGIN}.`,
     );
   }
 }

@@ -6,7 +6,15 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api",
+      "destination": "https://api.hardcoredoortodoorclosers.com/api"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.hardcoredoortodoorclosers.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
