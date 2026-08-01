@@ -21,7 +21,8 @@
     "eas:build:android": "eas build --platform android --profile production",
     "eas:build:preview": "eas build --profile preview",
     "eas:submit:ios": "eas submit --platform ios --profile production",
-    "eas:submit:android": "eas submit --platform android --profile production"
+    "eas:submit:android": "eas submit --platform android --profile production",
+    "prepare": "node scripts/install-wrangler-ci-shim.mjs"
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20251202.0",
