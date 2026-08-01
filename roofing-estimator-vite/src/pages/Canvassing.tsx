@@ -1333,14 +1333,18 @@ export function Canvassing() {
               </ul>
             </div>
             {toast ? (
-              <div className="canvass-paper pointer-events-none absolute left-1/2 top-14 z-[25] -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs text-zinc-950 shadow-lg sm:top-16">
+              <div
+                className="canvass-map-chip pointer-events-none absolute left-1/2 top-14 z-[25] -translate-x-1/2 rounded-full px-4 py-1.5 text-xs shadow-lg sm:top-16"
+                style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #d1d5db" }}
+              >
                 {toast}
               </div>
             ) : null}
             {!sheetOpen ? (
               <button
                 type="button"
-                className="canvass-paper pointer-events-auto absolute bottom-4 left-1/2 z-[25] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-center text-sm text-zinc-950 shadow-lg backdrop-blur-md sm:px-5"
+                className="canvass-map-chip pointer-events-auto absolute bottom-4 left-1/2 z-[25] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full px-4 py-2.5 text-center text-sm shadow-lg sm:px-5"
+                style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #d1d5db" }}
                 onClick={() => setSheetOpen(true)}
               >
                 Tap a lead pin or Use map center — then load owner &amp; parcel
