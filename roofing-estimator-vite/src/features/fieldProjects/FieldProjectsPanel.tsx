@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
-import { Camera, ExternalLink, ImagePlus, LayoutGrid, List, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, ExternalLink, ImagePlus, LayoutGrid, List, X } from "lucide-react";
 import { useRoofing } from "../../context/RoofingContext";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -17,6 +17,7 @@ import {
 import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
 import { postRoofDamageDraft } from "../../lib/roofDamageClient";
 import { useAuth } from "../../context/AuthContext";
+import { FieldPhotoTile } from "./FieldPhotoTile";
 import { loadOrgSettings } from "../../lib/orgSettings";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
@@ -345,8 +346,8 @@ export function FieldProjectsPanel() {
           <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#71767b]">
             <strong className="text-[#e7e9ea]">List</strong> or{" "}
-            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Job details sync to your
-            account; photo images stay on the device that captured them.
+            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Jobs and photos sync to your
+            account, so they follow you to another device.
           </p>
         </div>
         <Button
@@ -915,71 +916,24 @@ export function FieldProjectsPanel() {
               ) : (
                 <ul className="grid gap-4 sm:grid-cols-2">
                   {selected.photos.map((ph) => (
-                    <li key={ph.id} className="overflow-hidden rounded-lg border border-black/10 bg-[#f8fafc]">
-                      <button
-                        type="button"
-                        className="block w-full focus:outline-none focus:ring-2 focus:ring-black/20"
-                        onClick={() => setLightboxUrl(ph.imageDataUrl)}
-                      >
-                        <img
-                          src={ph.imageDataUrl}
-                          alt={ph.caption || "Damage photo"}
-                          className="h-40 w-full object-cover"
-                        />
-                      </button>
-                      <div className="space-y-2 p-2">
-                        <input
-                          className="w-full rounded border border-black/15 bg-[#f3f4f6] px-2 py-1 text-sm text-black"
-                          placeholder="Caption"
-                          value={ph.caption ?? ""}
-                          onChange={(e) => updateFieldProjectPhotoCaption(selected.id, ph.id, e.target.value)}
-                        />
-                        <div className="flex flex-wrap gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            disabled={busyPhotoId === ph.id}
-                            onClick={() =>
-                              void runAiOnPhoto(
-                                selected.id,
-                                ph.id,
-                                ph.imageDataUrl,
-                                [selected.name, selected.address, ph.caption].filter(Boolean).join(" — "),
-                              )
-                            }
-                          >
-                            {busyPhotoId === ph.id ? (
-                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                            ) : (
-                              <Sparkles className="mr-1 h-3 w-3" />
-                            )}
-                            Draft damage notes (AI)
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-xs text-red-700"
-                            onClick={() => removeFieldProjectPhoto(selected.id, ph.id)}
-                          >
-                            <Trash2 className="mr-1 h-3 w-3" />
-                            Remove
-                          </Button>
-                        </div>
-                        {ph.aiSummary ? (
-                          <div className="rounded bg-black/5 p-2 text-xs text-black">
-                            <p className="font-semibold">{ph.aiSummary.summary}</p>
-                            <p className="mt-1">Types: {ph.aiSummary.damageTypes.join(", ") || "—"}</p>
-                            <p>
-                              Severity: {ph.aiSummary.severity}/5 · Action: {ph.aiSummary.recommendedAction}
-                            </p>
-                            {ph.aiSummary.notes ? <p className="mt-1 text-black/80">{ph.aiSummary.notes}</p> : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </li>
+                    <FieldPhotoTile
+                      key={ph.id}
+                      photo={ph}
+                      aiBusy={busyPhotoId === ph.id}
+                      onOpenLightbox={setLightboxUrl}
+                      onCaptionChange={(caption) =>
+                        updateFieldProjectPhotoCaption(selected.id, ph.id, caption)
+                      }
+                      onRunAi={(imageDataUrl) =>
+                        void runAiOnPhoto(
+                          selected.id,
+                          ph.id,
+                          imageDataUrl,
+                          [selected.name, selected.address, ph.caption].filter(Boolean).join(" — "),
+                        )
+                      }
+                      onRemove={() => removeFieldProjectPhoto(selected.id, ph.id)}
+                    />
                   ))}
                 </ul>
               )}

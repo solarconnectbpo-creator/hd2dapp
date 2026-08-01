@@ -74,6 +74,54 @@ export async function pullWorkspaceRecords(
   };
 }
 
+/**
+ * Store a photo blob so it survives a cleared browser and reaches other devices.
+ * Returns false when the server has no bucket configured — the caller keeps the local copy.
+ */
+export async function uploadWorkspaceFile(
+  token: string,
+  fileId: string,
+  blob: Blob,
+): Promise<boolean> {
+  const base = apiBase();
+  if (!base) return false;
+  const res = await fetch(`${base}/api/workspace/files/${encodeURIComponent(fileId)}`, {
+    method: "PUT",
+    mode: "cors",
+    credentials: "omit",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": blob.type || "image/jpeg",
+    },
+    body: blob,
+  });
+  if (res.status === 503) return false; // storage not configured; stay local
+  if (!res.ok) {
+    throw new WorkspaceSyncError(`Photo upload failed (${res.status}).`, res.status);
+  }
+  return true;
+}
+
+/** Fetch a stored photo as an object URL. Returns null when unavailable. */
+export async function fetchWorkspaceFileObjectUrl(
+  token: string,
+  fileId: string,
+): Promise<string | null> {
+  const base = apiBase();
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/api/workspace/files/${encodeURIComponent(fileId)}`, {
+      mode: "cors",
+      credentials: "omit",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return URL.createObjectURL(await res.blob());
+  } catch {
+    return null;
+  }
+}
+
 export type PushResult = {
   accepted: string[];
   rejected: Array<{ id: string; reason: string }>;

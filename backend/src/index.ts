@@ -168,6 +168,9 @@ interface Env {
   /** Optional R2 bucket for org agreement files larger than ~1.5MB (see orgWorkspaceRoutes). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ORG_FILES?: any;
+  /** R2 bucket for field-job photo blobs (see workspaceRoutes). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  WORKSPACE_FILES?: any;
 }
 
 type AuthEnv = Pick<

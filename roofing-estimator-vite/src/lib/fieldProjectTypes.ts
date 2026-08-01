@@ -31,8 +31,13 @@ export interface DamagePhoto {
   id: string;
   capturedAt: string;
   caption?: string;
-  /** JPEG data URL after client compress (preferred for localStorage). */
+  /**
+   * JPEG data URL after client compress. Empty on a device that pulled the project
+   * from the server but has not fetched the blob yet — use {@link remoteKey}.
+   */
   imageDataUrl: string;
+  /** Set once the image is stored in R2; fetch via GET /api/workspace/files/:key. */
+  remoteKey?: string;
   aiSummary?: DamagePhotoAiSummary;
 }
 

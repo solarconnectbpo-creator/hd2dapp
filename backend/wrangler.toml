@@ -6,6 +6,13 @@ compatibility_flags = ["nodejs_compat", "nodejs_als"]
 workers_dev = true
 preview_urls = true
 
+# Binary blobs that are too large for D1 rows: field-job damage photos (see src/api/workspaceRoutes.ts)
+# and org agreement files. Create once with: npx wrangler r2 bucket create hd2d-workspace-files
+# Until the bucket exists the Worker returns 503 for uploads and photos simply stay on-device.
+[[r2_buckets]]
+binding = "WORKSPACE_FILES"
+bucket_name = "hd2d-workspace-files"
+
 # Public API hostname on your zone (no Access app on this host). Vercel: HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com
 #
 # Requires zone `hardcoredoortodoorclosers.com` on the **same** Cloudflare account as `wrangler login`.

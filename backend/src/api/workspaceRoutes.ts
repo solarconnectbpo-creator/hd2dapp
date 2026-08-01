@@ -16,6 +16,27 @@ function jsonHeaders(cors: Record<string, string>) {
   return { ...cors, "Content-Type": "application/json" };
 }
 
+export type WorkspaceFilesEnv = AuthEnv & {
+  /** R2 bucket for photo blobs; absent means uploads are unavailable (503). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  WORKSPACE_FILES?: any;
+};
+
+/** Compressed field photos are well under this; the cap just stops abuse. */
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+const ALLOWED_FILE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** Keys are namespaced per user so one account cannot read another's blobs. */
+function fileKey(userId: string, fileId: string): string {
+  return `workspace/${userId}/${fileId}`;
+}
+
+/** Reject anything that could escape the user's key prefix. */
+function isSafeFileId(id: string): boolean {
+  return /^[A-Za-z0-9._-]{1,120}$/.test(id);
+}
+
 function json(body: unknown, status: number, headers: Record<string, string>): Response {
   return new Response(JSON.stringify(body), { status, headers });
 }
@@ -45,7 +66,7 @@ function canReadOrg(role: string | undefined): boolean {
  */
 export async function handleWorkspaceRoutes(
   request: Request,
-  env: AuthEnv,
+  env: WorkspaceFilesEnv,
   path: string,
   corsHeaders: Record<string, string>,
 ): Promise<Response | null> {
@@ -122,6 +143,74 @@ export async function handleWorkspaceRoutes(
         body.records as UpsertInput[],
       );
       return json({ success: true, ...result }, 200, j);
+    }
+
+    // PUT /api/workspace/files/:fileId — store a photo blob (raw body).
+    if (segments.length === 2 && segments[0] === "files" && request.method === "PUT") {
+      const fileId = segments[1];
+      if (!isSafeFileId(fileId)) {
+        return json({ success: false, error: "Invalid file id." }, 400, j);
+      }
+      if (!env.WORKSPACE_FILES) {
+        return json(
+          { success: false, error: "File storage is not configured on this server." },
+          503,
+          j,
+        );
+      }
+
+      const contentType = (request.headers.get("content-type") || "").split(";")[0]?.trim() || "";
+      if (!ALLOWED_FILE_TYPES.has(contentType)) {
+        return json({ success: false, error: "Only JPEG, PNG, or WebP images are accepted." }, 415, j);
+      }
+
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      if (bytes.byteLength === 0) {
+        return json({ success: false, error: "Empty file." }, 400, j);
+      }
+      if (bytes.byteLength > MAX_FILE_BYTES) {
+        return json({ success: false, error: "File is too large." }, 413, j);
+      }
+
+      await env.WORKSPACE_FILES.put(fileKey(payload.sub, fileId), bytes, {
+        httpMetadata: { contentType },
+      });
+      return json({ success: true, fileId }, 200, j);
+    }
+
+    // GET /api/workspace/files/:fileId — stream a stored photo back.
+    if (segments.length === 2 && segments[0] === "files" && request.method === "GET") {
+      const fileId = segments[1];
+      if (!isSafeFileId(fileId)) {
+        return json({ success: false, error: "Invalid file id." }, 400, j);
+      }
+      if (!env.WORKSPACE_FILES) {
+        return json({ success: false, error: "File storage is not configured." }, 503, j);
+      }
+      const obj = await env.WORKSPACE_FILES.get(fileKey(payload.sub, fileId));
+      if (!obj) {
+        return json({ success: false, error: "File not found." }, 404, j);
+      }
+      return new Response(obj.body, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": obj.httpMetadata?.contentType || "application/octet-stream",
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+
+    // DELETE /api/workspace/files/:fileId
+    if (segments.length === 2 && segments[0] === "files" && request.method === "DELETE") {
+      const fileId = segments[1];
+      if (!isSafeFileId(fileId)) {
+        return json({ success: false, error: "Invalid file id." }, 400, j);
+      }
+      if (env.WORKSPACE_FILES) {
+        await env.WORKSPACE_FILES.delete(fileKey(payload.sub, fileId));
+      }
+      return json({ success: true }, 200, j);
     }
 
     // DELETE /api/workspace/records/:kind/:id

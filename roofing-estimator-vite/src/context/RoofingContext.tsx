@@ -19,7 +19,11 @@ import {
   type SyncMeta,
   type WorkspaceKind,
 } from "../lib/workspaceSyncEngine";
-import { pullWorkspaceRecords, pushWorkspaceRecords } from "../lib/workspaceSyncClient";
+import {
+  pullWorkspaceRecords,
+  pushWorkspaceRecords,
+  uploadWorkspaceFile,
+} from "../lib/workspaceSyncClient";
 import {
   type DamagePhoto,
   type DamagePhotoAiSummary,
@@ -302,6 +306,37 @@ function saveSyncMeta(meta: SyncMetaByKind): void {
 
 function metaFor(all: SyncMetaByKind, kind: WorkspaceKind): SyncMeta {
   return all[kind] ?? emptySyncMeta();
+}
+
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) return null;
+  const [, mime, isBase64, payload] = match;
+  try {
+    if (isBase64) {
+      const bin = atob(payload);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    }
+    return new Blob([decodeURIComponent(payload)], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
+/** Upload one photo's bytes; resolves to the stored key, or null when it stays local. */
+async function uploadPhotoBlob(token: string, photo: DamagePhoto): Promise<string | null> {
+  if (!photo.imageDataUrl) return null;
+  const blob = dataUrlToBlob(photo.imageDataUrl);
+  if (!blob) return null;
+  try {
+    const stored = await uploadWorkspaceFile(token, photo.id, blob);
+    return stored ? photo.id : null;
+  } catch (e) {
+    console.warn("[roofing] photo upload failed; keeping local copy", e);
+    return null;
+  }
 }
 
 export function RoofingProvider({ children }: { children: ReactNode }) {
@@ -659,6 +694,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       },
       addFieldProjectPhoto: (projectId, imageDataUrl, caption) => {
         let added = false;
+        let newPhoto: DamagePhoto | null = null;
         setFieldProjects((prev) =>
           prev.map((p) => {
             if (p.id !== projectId) return p;
@@ -671,9 +707,30 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
               imageDataUrl,
             };
             added = true;
+            newPhoto = photo;
             return { ...p, photos: [...p.photos, photo], updatedAt: now };
           }),
         );
+        // Push the image to R2 so it is not stranded on this device. Best effort:
+        // when storage is unconfigured or offline the local copy still works.
+        if (added && newPhoto && token) {
+          const uploaded: DamagePhoto = newPhoto;
+          void uploadPhotoBlob(token, uploaded).then((remoteKey) => {
+            if (!remoteKey) return;
+            setFieldProjects((prev) =>
+              prev.map((p) =>
+                p.id === projectId
+                  ? {
+                      ...p,
+                      photos: p.photos.map((ph) =>
+                        ph.id === uploaded.id ? { ...ph, remoteKey } : ph,
+                      ),
+                    }
+                  : p,
+              ),
+            );
+          });
+        }
         return added;
       },
       removeFieldProjectPhoto: (projectId, photoId) => {
