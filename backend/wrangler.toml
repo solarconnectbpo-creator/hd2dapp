@@ -26,8 +26,8 @@ preview_urls = true
 # `api.hardcoredoortodoorclosers.com` under Workers & Pages → hd2d-backend → Domains.
 routes = [
   { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
-  { pattern = "hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
-  { pattern = "www.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
+  { pattern = "www.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
 ]
 
 # Built by CI (or locally: npm run build in roofing-estimator-vite) before deploy.
