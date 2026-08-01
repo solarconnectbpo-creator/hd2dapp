@@ -1103,6 +1103,19 @@ html body #root .canvass-paper.text-zinc-950 {
     background-color: var(--x-surface) !important;
   }
 
+  /* Same layer as .bg-white remap — higher specificity keeps canvass paper white. */
+  .canvass-paper.bg-white,
+  button.canvass-paper.bg-white,
+  .canvass-light-sheet.bg-white {
+    background-color: #ffffff !important;
+  }
+
+  button.canvass-paper,
+  button.canvass-paper.text-zinc-950 {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
   [data-slot="card"] {
     background-color: var(--x-surface) !important;
     color: var(--x-text) !important;
@@ -1456,5 +1469,14 @@ html body #root .canvass-light-sheet .text-black\/50 {
 
 html body #root .canvass-light-sheet h3 {
   color: #0f172a !important;
+}
+
+/* Final canvass map-chip guard (after all remaps): white paper + slate ink, never chrome blue-gray. */
+html body #root [data-canvass-route] button.canvass-paper,
+html body #root [data-canvass-route] .canvass-paper {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
 }
 
