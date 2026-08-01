@@ -173,7 +173,12 @@ export default defineConfig(({ mode }) => {
       output: {
         manualChunks(id) {
           if (id.includes("node_modules/maplibre-gl")) return "maplibre";
-          if (id.includes("node_modules/leaflet")) return "leaflet";
+          // leaflet-draw must NOT share the "leaflet" chunk: its UMD expects global `L`
+          // and must load only after leafletGlobal sets window.L (Contacts crash: L is not defined).
+          if (id.includes("node_modules/leaflet-draw")) return "leaflet-draw";
+          if (id.includes("node_modules/leaflet/") || id.includes("node_modules/leaflet\\")) {
+            return "leaflet";
+          }
           if (id.includes("node_modules/react-leaflet")) return "react-leaflet";
           if (id.includes("node_modules/@turf")) return "turf";
           if (id.includes("node_modules/react-dom")) return "react-dom";
