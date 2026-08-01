@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import { Camera, ExternalLink, ImagePlus, LayoutGrid, List, X } from "lucide-react";
@@ -14,11 +14,10 @@ import {
   type FieldPipelineStage,
   type FieldProject,
 } from "../../lib/fieldProjectTypes";
-import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
-import { postRoofDamageDraft } from "../../lib/roofDamageClient";
 import { useAuth } from "../../context/AuthContext";
 import { FieldPhotoTile } from "./FieldPhotoTile";
 import { loadOrgSettings } from "../../lib/orgSettings";
+import { useFieldProjectPhotoCapture } from "./useFieldProjectPhotoCapture";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
 
@@ -86,8 +85,6 @@ export function FieldProjectsPanel() {
   const [newAddress, setNewAddress] = useState("");
   const [newNotes, setNewNotes] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [boardQuery, setBoardQuery] = useState("");
   const [projectsView, setProjectsView] = useState<ProjectsViewMode>("list");
@@ -100,8 +97,22 @@ export function FieldProjectsPanel() {
   const [detailOwnerLabel, setDetailOwnerLabel] = useState("");
   const [detailTagsComma, setDetailTagsComma] = useState("");
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const {
+    cameraInputRef,
+    galleryInputRef,
+    busyPhotoId,
+    importError,
+    setImportError,
+    importFiles,
+    runAiOnPhoto,
+    openCamera,
+    openGallery,
+  } = useFieldProjectPhotoCapture({
+    fieldProjects,
+    authToken,
+    addFieldProjectPhoto,
+    setFieldProjectPhotoAiSummary,
+  });
 
   const selected = selectedId ? fieldProjects.find((p) => p.id === selectedId) : undefined;
 
@@ -272,54 +283,11 @@ export function FieldProjectsPanel() {
   };
 
   const handleFiles = useCallback(
-    async (projectId: string, files: FileList | null) => {
-      if (!files?.length) return;
-      setImportError(null);
-      const proj = fieldProjects.find((p) => p.id === projectId);
-      let remaining = proj ? MAX_FIELD_PROJECT_PHOTOS - proj.photos.length : 0;
-      if (remaining <= 0) {
-        setImportError(`Each project allows at most ${MAX_FIELD_PROJECT_PHOTOS} photos (local storage limit).`);
-        return;
-      }
-      for (let i = 0; i < files.length && remaining > 0; i++) {
-        const file = files[i];
-        if (!file.type.startsWith("image/")) continue;
-        try {
-          const dataUrl = await compressImageFileToJpegDataUrl(file);
-          const ok = addFieldProjectPhoto(projectId, dataUrl);
-          if (ok) remaining -= 1;
-        } catch (e) {
-          setImportError(e instanceof Error ? e.message : "Could not process an image.");
-        }
-      }
-      if (cameraInputRef.current) cameraInputRef.current.value = "";
-      if (galleryInputRef.current) galleryInputRef.current.value = "";
+    (projectId: string, files: FileList | null) => {
+      void importFiles(projectId, files);
     },
-    [addFieldProjectPhoto, fieldProjects],
+    [importFiles],
   );
-
-  const runAiOnPhoto = async (projectId: string, photoId: string, imageDataUrl: string, contextHint: string) => {
-    setBusyPhotoId(photoId);
-    setImportError(null);
-    try {
-      const { base64, mimeType } = dataUrlToBase64Payload(imageDataUrl);
-      const res = await postRoofDamageDraft({
-        imageBase64: base64,
-        mimeType,
-        context: contextHint || undefined,
-        token: authToken,
-      });
-      if (!res.ok) {
-        setImportError(res.error);
-        return;
-      }
-      setFieldProjectPhotoAiSummary(projectId, photoId, res.data);
-    } catch (e) {
-      setImportError(e instanceof Error ? e.message : "AI request failed");
-    } finally {
-      setBusyPhotoId(null);
-    }
-  };
 
   const onColumnDragOver = (e: DragEvent, stage: FieldPipelineStage) => {
     e.preventDefault();
@@ -894,7 +862,7 @@ export function FieldProjectsPanel() {
                     type="button"
                     variant="outline"
                     disabled={selected.photos.length >= MAX_FIELD_PROJECT_PHOTOS}
-                    onClick={() => cameraInputRef.current?.click()}
+                    onClick={openCamera}
                   >
                     <Camera className="mr-2 h-4 w-4" />
                     Take photo
@@ -903,7 +871,7 @@ export function FieldProjectsPanel() {
                     type="button"
                     variant="outline"
                     disabled={selected.photos.length >= MAX_FIELD_PROJECT_PHOTOS}
-                    onClick={() => galleryInputRef.current?.click()}
+                    onClick={openGallery}
                   >
                     <ImagePlus className="mr-2 h-4 w-4" />
                     Choose photos

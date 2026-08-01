@@ -1,7 +1,22 @@
+import { useState } from "react";
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import type { DamagePhoto } from "../../lib/fieldProjectTypes";
 import { useRemotePhotoUrl } from "./useRemotePhotoUrl";
+
+async function urlToJpegDataUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not available");
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
 
 /**
  * One photo in a field job's gallery.
@@ -26,6 +41,25 @@ export function FieldPhotoTile({
 }) {
   const src = useRemotePhotoUrl(photo);
   const pendingDownload = !src && Boolean(photo.remoteKey);
+  const [resolvingAi, setResolvingAi] = useState(false);
+  const canRunAi = Boolean(photo.imageDataUrl?.startsWith("data:image/") || src);
+
+  const handleRunAi = async () => {
+    if (photo.imageDataUrl?.startsWith("data:image/")) {
+      onRunAi(photo.imageDataUrl);
+      return;
+    }
+    if (!src) return;
+    setResolvingAi(true);
+    try {
+      const dataUrl = src.startsWith("data:image/") ? src : await urlToJpegDataUrl(src);
+      onRunAi(dataUrl);
+    } catch {
+      // Parent surfaces AI errors; leave a quiet failure here for blob decode issues.
+    } finally {
+      setResolvingAi(false);
+    }
+  };
 
   return (
     <li className="overflow-hidden rounded-lg border border-black/10 bg-[#f8fafc]">
@@ -62,11 +96,11 @@ export function FieldPhotoTile({
             size="sm"
             variant="outline"
             className="text-xs"
-            disabled={aiBusy || !photo.imageDataUrl}
-            title={photo.imageDataUrl ? undefined : "Open on the device that captured this photo"}
-            onClick={() => onRunAi(photo.imageDataUrl)}
+            disabled={aiBusy || resolvingAi || !canRunAi}
+            title={canRunAi ? undefined : "Photo not available on this device yet"}
+            onClick={() => void handleRunAi()}
           >
-            {aiBusy ? (
+            {aiBusy || resolvingAi ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             ) : (
               <Sparkles className="mr-1 h-3 w-3" />

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router";
 import { toast as sonnerToast } from "sonner";
 import {
@@ -17,6 +18,8 @@ import {
 import { Button } from "../components/ui/button";
 import { useAuth } from "../context/AuthContext";
 import { useRoofing } from "../context/RoofingContext";
+import { StormDamageCaptureSheet } from "../features/fieldProjects/StormDamageCaptureSheet";
+import { useFieldProjectPhotoCapture } from "../features/fieldProjects/useFieldProjectPhotoCapture";
 import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
 import { parseLeadsFromGeoJson } from "../lib/canvassingGeoJson";
@@ -192,7 +195,38 @@ type CanvassVisitRow = CanvassLeadState & { id: string };
 export function Canvassing() {
   const navigate = useNavigate();
   const { user, session } = useAuth();
-  const { addFieldProject } = useRoofing();
+  const {
+    fieldProjects,
+    addFieldProject,
+    addFieldProjectPhoto,
+    removeFieldProjectPhoto,
+    updateFieldProjectPhotoCaption,
+    setFieldProjectPhotoAiSummary,
+  } = useRoofing();
+  const authToken = session?.token ?? "";
+  const {
+    cameraInputRef: stormCameraInputRef,
+    galleryInputRef: stormGalleryInputRef,
+    busyPhotoId: stormBusyPhotoId,
+    importing: stormImporting,
+    importError: stormImportError,
+    setImportError: setStormImportError,
+    importFiles: importStormFiles,
+    runAiOnPhoto: runStormAiOnPhoto,
+    openCamera: openStormCamera,
+    openGallery: openStormGallery,
+  } = useFieldProjectPhotoCapture({
+    fieldProjects,
+    authToken,
+    addFieldProjectPhoto,
+    setFieldProjectPhotoAiSummary,
+  });
+  const [stormReportProjectId, setStormReportProjectId] = useState<string | null>(null);
+  const [stormAutoAi, setStormAutoAi] = useState(true);
+  const [stormLightboxUrl, setStormLightboxUrl] = useState<string | null>(null);
+  const stormReportProject = stormReportProjectId
+    ? fieldProjects.find((p) => p.id === stormReportProjectId) ?? null
+    : null;
   const viewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 38.63, lon: -90.2 });
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => ({
     lat: viewCenterRef.current.lat,
@@ -405,10 +439,20 @@ export function Canvassing() {
     }
     const shortAddr = siteAddress.split(/\r?\n/)[0].trim().slice(0, 120);
     const name = `${shortAddr} — storm damage`.slice(0, 200);
+    const lat =
+      lastPayload.latitude?.trim() ||
+      (selectedLead?.lat != null ? String(selectedLead.lat) : "") ||
+      (mapCenter.lat != null ? String(mapCenter.lat) : "");
+    const lng =
+      lastPayload.longitude?.trim() ||
+      (selectedLead?.lng != null ? String(selectedLead.lng) : "") ||
+      (mapCenter.lng != null ? String(mapCenter.lng) : "");
     const notesParts = [
       `Storm damage report — ${new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`,
       parcelIdDisplay ? `Parcel / ID: ${parcelIdDisplay}` : null,
       selectedLead ? `Route: ${selectedLead.name || selectedLead.address || "Lead"}` : null,
+      lat && lng ? `Capture pin: ${lat}, ${lng}` : null,
+      ownerDisplay ? `Owner: ${ownerDisplay}` : null,
     ].filter(Boolean);
     const p = addFieldProject({
       name,
@@ -417,16 +461,60 @@ export function Canvassing() {
       tags: ["storm", "damage-report"],
       pipelineStage: "documentation",
     });
-    sonnerToast.success("Field job created — add photos on Projects");
-    navigate(`/projects?openProject=${encodeURIComponent(p.id)}`);
+    setStormReportProjectId(p.id);
+    setStormImportError(null);
+    sonnerToast.success("Storm damage job ready — take site photos");
+    // Open rear camera once the sheet mounts (native capture on mobile / PWA).
+    window.setTimeout(() => openStormCamera(), 180);
   }, [
     addFieldProject,
     addressLine,
     lastPayload,
-    navigate,
+    mapCenter.lat,
+    mapCenter.lng,
+    openStormCamera,
+    ownerDisplay,
     parcelIdDisplay,
     selectedLead,
+    setStormImportError,
   ]);
+
+  const stormContextHint = useMemo(() => {
+    if (!stormReportProject) return "";
+    return [stormReportProject.name, stormReportProject.address, "storm damage documentation"]
+      .filter(Boolean)
+      .join(" — ");
+  }, [stormReportProject]);
+
+  const onStormCameraFiles = useCallback(
+    (files: FileList | null) => {
+      if (!stormReportProjectId) return;
+      void importStormFiles(stormReportProjectId, files, {
+        autoAi: stormAutoAi && Boolean(authToken),
+        contextHint: stormContextHint,
+      }).then((res) => {
+        if (res.added > 0) {
+          sonnerToast.success(
+            res.added === 1 ? "Photo saved to damage report" : `${res.added} photos saved`,
+          );
+        }
+      });
+    },
+    [authToken, importStormFiles, stormAutoAi, stormContextHint, stormReportProjectId],
+  );
+
+  const onStormGalleryFiles = useCallback(
+    (files: FileList | null) => {
+      onStormCameraFiles(files);
+    },
+    [onStormCameraFiles],
+  );
+
+  useEffect(() => {
+    if (stormReportProjectId && !stormReportProject) {
+      setStormReportProjectId(null);
+    }
+  }, [stormReportProject, stormReportProjectId]);
 
   const leadsRef = useRef(leads);
   const enrichmentRef = useRef(enrichment);
@@ -1505,7 +1593,7 @@ export function Canvassing() {
                   Storm damage report
                 </Button>
                 <p className="text-[11px] leading-snug text-zinc-600">
-                  Creates a field job with photo documentation. Opens Projects to capture site images.
+                  Creates a field job and opens the camera so you can document damage on-site.
                 </p>
                 <label className="canvass-footer-checkbox flex flex-row items-center gap-2 text-xs text-zinc-950">
                   <input
@@ -1528,6 +1616,73 @@ export function Canvassing() {
             </aside>
             ) : null}
           </div>
+
+      {/* Always mounted so auto-open camera after create is not racing the sheet portal. */}
+      <input
+        ref={stormCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => onStormCameraFiles(e.target.files)}
+      />
+      <input
+        ref={stormGalleryInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => onStormGalleryFiles(e.target.files)}
+      />
+
+      {stormReportProject ? (
+        <StormDamageCaptureSheet
+          project={stormReportProject}
+          open
+          onClose={() => setStormReportProjectId(null)}
+          onOpenFullJob={() => {
+            const id = stormReportProject.id;
+            setStormReportProjectId(null);
+            navigate(`/projects?openProject=${encodeURIComponent(id)}`);
+          }}
+          openCamera={openStormCamera}
+          openGallery={openStormGallery}
+          importing={stormImporting}
+          importError={stormImportError}
+          onDismissError={() => setStormImportError(null)}
+          busyPhotoId={stormBusyPhotoId}
+          autoAi={stormAutoAi}
+          onAutoAiChange={setStormAutoAi}
+          canUseAi={Boolean(authToken)}
+          onCaptionChange={(photoId, caption) =>
+            updateFieldProjectPhotoCaption(stormReportProject.id, photoId, caption)
+          }
+          onRunAi={(photoId, imageDataUrl) =>
+            void runStormAiOnPhoto(stormReportProject.id, photoId, imageDataUrl, stormContextHint)
+          }
+          onRemovePhoto={(photoId) => removeFieldProjectPhoto(stormReportProject.id, photoId)}
+          onOpenLightbox={setStormLightboxUrl}
+        />
+      ) : null}
+
+      {stormLightboxUrl
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setStormLightboxUrl(null)}
+            >
+              <img
+                src={stormLightboxUrl}
+                alt="Damage photo"
+                className="max-h-full max-w-full rounded-lg object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>,
+            document.getElementById("root") ?? document.body,
+          )
+        : null}
     </div>
   );
 }

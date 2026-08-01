@@ -145,12 +145,18 @@ export function normalizeDamagePhoto(raw: Record<string, unknown>): DamagePhoto 
   if (typeof id !== "string" || typeof capturedAt !== "string" || typeof imageDataUrl !== "string") {
     return null;
   }
-  if (!imageDataUrl.startsWith("data:image/")) return null;
+  const remoteKey = optString(raw.remoteKey, 512);
+  // Sync strips JPEG bytes (`""`) and keeps captions/AI/remoteKey. Accept empty
+  // imageDataUrl so pull+merge can reattach local bytes or fetch via remoteKey.
+  const hasLocalJpeg = imageDataUrl.startsWith("data:image/");
+  const hasPlaceholder = imageDataUrl === "";
+  if (!hasLocalJpeg && !hasPlaceholder) return null;
   return {
     id,
     capturedAt,
     caption: optString(raw.caption, 500),
-    imageDataUrl,
+    imageDataUrl: hasLocalJpeg ? imageDataUrl : "",
+    ...(remoteKey ? { remoteKey } : {}),
     aiSummary: normalizeAiSummary(raw.aiSummary),
   };
 }

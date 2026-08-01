@@ -150,7 +150,8 @@ interface RoofingContextType {
   ) => void;
   deleteFieldProject: (id: string) => void;
   setFieldProjectPipelineStage: (id: string, stage: FieldPipelineStage) => void;
-  addFieldProjectPhoto: (projectId: string, imageDataUrl: string, caption?: string) => boolean;
+  /** Returns the new photo when added, or null if the project is missing / at the photo cap. */
+  addFieldProjectPhoto: (projectId: string, imageDataUrl: string, caption?: string) => DamagePhoto | null;
   removeFieldProjectPhoto: (projectId: string, photoId: string) => void;
   updateFieldProjectPhotoCaption: (projectId: string, photoId: string, caption: string) => void;
   setFieldProjectPhotoAiSummary: (
@@ -697,7 +698,6 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         );
       },
       addFieldProjectPhoto: (projectId, imageDataUrl, caption) => {
-        let added = false;
         let newPhoto: DamagePhoto | null = null;
         setFieldProjects((prev) =>
           prev.map((p) => {
@@ -710,14 +710,13 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
               caption: caption?.trim().slice(0, 500),
               imageDataUrl,
             };
-            added = true;
             newPhoto = photo;
             return { ...p, photos: [...p.photos, photo], updatedAt: now };
           }),
         );
         // Push the image to R2 so it is not stranded on this device. Best effort:
         // when storage is unconfigured or offline the local copy still works.
-        if (added && newPhoto && token) {
+        if (newPhoto && token) {
           const uploaded: DamagePhoto = newPhoto;
           void uploadPhotoBlob(token, uploaded).then((remoteKey) => {
             if (!remoteKey) return;
@@ -735,7 +734,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
             );
           });
         }
-        return added;
+        return newPhoto;
       },
       removeFieldProjectPhoto: (projectId, photoId) => {
         const now = new Date().toISOString();
