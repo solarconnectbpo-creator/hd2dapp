@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   Building2,
   ClipboardPaste,
   ExternalLink,
   FileDown,
   KeyRound,
-  Landmark,
   Loader2,
   Phone,
+  Search,
   Sparkles,
   Upload,
   UserSearch,
@@ -70,12 +70,16 @@ const MANUAL_LOOKUP_SOURCE = "manual";
 /** Browser read + string size guard for huge CSVs (memory is still ~file size + parsed rows). */
 const MAX_PROPERTY_CSV_BYTES = 180 * 1024 * 1024;
 
+const fieldClass =
+  "w-full rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm text-[var(--x-text)] outline-none placeholder:text-[var(--x-muted)] focus:border-sky-500/50";
+
 export function PropertyScraper() {
   const { user } = useAuth();
   const isAdmin = user?.user_type === "admin";
   const showVendorEnrichment = isAdmin && import.meta.env.VITE_PROPERTY_SCRAPER_OFFLINE !== "true";
   const propertyScraperOffline = import.meta.env.VITE_PROPERTY_SCRAPER_OFFLINE === "true";
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [jsonPaste, setJsonPaste] = useState("");
@@ -109,6 +113,26 @@ export function PropertyScraper() {
 
   /** Typed after manual people search (pasted name optional; phones via clipboard). */
   const [manualFpsOwnerName, setManualFpsOwnerName] = useState("");
+
+  const anyBusy = busy || enrichBusy || pdlEnrichBusy || dealmachineBusy;
+
+  const statusLine = useMemo(() => {
+    if (csvParseProgress) {
+      return {
+        kind: "ok" as const,
+        text:
+          csvParseProgress.phase === "parsing"
+            ? `Parsing CSV… ${csvParseProgress.rows.toLocaleString()} rows so far`
+            : `Ranking ${csvParseProgress.rows.toLocaleString()} rows…`,
+      };
+    }
+    return message;
+  }, [csvParseProgress, message]);
+
+  useEffect(() => {
+    const fromQuery = searchParams.get("address")?.trim();
+    if (fromQuery) setDealmachineAddressLine(fromQuery);
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -655,446 +679,166 @@ export function PropertyScraper() {
     });
   }, [applyMergedPreviewToTable, manualFpsOwnerName, preview]);
 
+  const hasRows = commResults.length > 0;
+  const hasPreview = Boolean(preview);
+
   return (
     <div className="hd2d-page-shell max-w-5xl text-[var(--x-text)]">
-      <div className="mb-8">
-        <h1 className="mb-2 text-2xl font-semibold text-[var(--x-text)] sm:text-3xl">Property records</h1>
-        <p className="max-w-3xl text-[var(--x-muted)]">
-          <strong className="text-[var(--x-text)]">Open parcel data does not include owner phone numbers.</strong> The app cannot invent 50,000 accurate
-          phones or contacts — that requires a <strong className="text-[var(--x-text)]">file you are licensed to use</strong> (CRM export, dialer list, data
-          vendor, etc.) with <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">phone</code>,{" "}
-          <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">contact_person_name</code>, and{" "}
-          <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">email</code> columns, or slow manual / SOS research per row.
-        </p>
-        <p className="max-w-3xl mt-3 text-[var(--x-muted)]">
-          Import a <strong>CSV</strong> with property address, owner / entity name, mailing address, and any phones you
-          already have. For bulk web-sourced fields (where allowed), use your editor&apos;s bulk-enrichment workflow and{" "}
-          <strong>re-upload</strong> the enriched file.
-          {isAdmin && !propertyScraperOffline ? (
-            <> Optional in-browser API-assisted enrichment is available when you add keys (localhost dev proxy).</>
-          ) : propertyScraperOffline ? (
-            <>
-              {" "}
-              API enrichment panels are off (
-              <code className="text-xs bg-gray-100 px-1 rounded text-[var(--x-text)]">VITE_PROPERTY_SCRAPER_OFFLINE=true</code>).
-            </>
-          ) : (
-            <> Administrator accounts can enable optional API-assisted enrichment after CSV import.</>
-          )}{" "}
-          <a href={FAST_PEOPLE_SEARCH_HOME_LANG_EN} className="text-[var(--x-accent)] underline hover:opacity-90" target="_blank" rel="noreferrer">
-            People search
-          </a>{" "}
-          (manual): open links from the preview row, then <strong>merge phones from clipboard</strong> per row.
+      <div className="mb-6">
+        <h1 className="mb-2 text-2xl font-semibold sm:text-3xl">Property records</h1>
+        <p className="max-w-2xl text-[var(--x-muted)]">
+          Look up an owner by address, or import a CSV. Open a row in Measurement when you&apos;re ready to estimate.
         </p>
       </div>
 
-      {csvParseProgress ? (
-        <div className="mb-4 rounded-lg border border-blue-500/35 bg-blue-950/40 px-4 py-2 text-sm text-[var(--x-text)]">
-          {csvParseProgress.phase === "parsing"
-            ? `Parsing CSV… ${csvParseProgress.rows.toLocaleString()} rows converted so far (large files may take a minute).`
-            : `Ranking ${csvParseProgress.rows.toLocaleString()} rows by commercial lead score…`}
-        </div>
-      ) : null}
-
-      {message ? (
+      {statusLine ? (
         <div
           className={
-            message.kind === "err"
-              ? "mb-4 rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-2 text-sm text-[var(--x-text)]"
-              : "mb-4 rounded-lg border border-emerald-500/35 bg-emerald-950/35 px-4 py-2 text-sm text-[var(--x-text)]"
+            statusLine.kind === "err"
+              ? "mb-4 rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-2 text-sm"
+              : "mb-4 rounded-lg border border-emerald-500/35 bg-emerald-950/35 px-4 py-2 text-sm"
           }
+          role="status"
         >
-          {message.text}
+          {statusLine.text}
         </div>
       ) : null}
 
       <div className="space-y-6">
-        <Card className="border-emerald-500/30 bg-emerald-950/25 text-[var(--x-text)]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Landmark className="w-5 h-5" />
-              County assessor &amp; free public records
+        {/* 1. Lookup */}
+        <Card className="border-white/[0.08] bg-[var(--x-surface)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Search className="h-5 w-5" aria-hidden />
+              Look up address
             </CardTitle>
-            <CardDescription className="text-[var(--x-muted)]">
-              No API keys required. Use your county <strong className="text-[var(--x-text)]">assessor</strong> (or cadastral) site for owner, mailing address,
-              parcel, and building use; use state <strong className="text-[var(--x-text)]">Secretary of State</strong> (or business registry) for registered
-              agent and entity address. Download <strong className="text-[var(--x-text)]">Blank template (manual research)</strong> under Upload CSV, fill
-              columns, then re-import. Extra columns (registered agent, brokerage) map into notes automatically.
+            <CardDescription>
+              Street, City, ST (ZIP optional). Uses your org&apos;s property-record lookup on the server.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {isAdmin ? (
-              <>
-                <p className="font-medium">Optional bulk web enrichment</p>
-                <p className="text-[var(--x-muted)]">
-                  After you <strong>Export outreach CSV</strong>, you can run bulk enrichment from your editor using your
-                  team&apos;s tooling. Comply with each provider&apos;s terms and each website&apos;s rules.
-                </p>
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        {showVendorEnrichment ? (
-          <>
-          <Card className="border-blue-500/30 bg-blue-950/25 text-[var(--x-text)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <KeyRound className="w-5 h-5" />
-                API keys &amp; data enhancement
-              </CardTitle>
-              <CardDescription className="text-[var(--x-muted)]">
-                Optional in-browser enrichers after CSV import. Keys stay in this browser (localStorage) or{" "}
-                <code className="text-xs rounded bg-[#1a1d26] px-1 text-[var(--x-text)]">.env.local</code>. Set phone and contact API keys per your
-                env file; address lookup uses the Worker&apos;s property-record secret. For manual people search, use the
-                preview links — new tabs only.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
-              <label className="text-sm block">
-                <span className="mb-1 block font-medium">Phone lookup (maps API key)</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  value={placesKey}
-                  onChange={(e) => setPlacesKey(e.target.value)}
-                  placeholder="API key"
-                />
-                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={persistPlacesKey}>
-                  Save
-                </Button>
-              </label>
-              <label className="text-sm block">
-                <span className="mb-1 block font-medium">Contact enrichment API key</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  value={pdlKey}
-                  onChange={(e) => setPdlKey(e.target.value)}
-                  placeholder="X-Api-Key"
-                />
-                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={persistPdlKey}>
-                  Save
-                </Button>
-              </label>
-            </div>
-            <div className="border-t border-white/[0.08] pt-4 space-y-3">
-              <p className="text-sm font-medium">Contact enrichment options (bulk + preview)</p>
-              <div className="flex flex-wrap gap-4 items-center text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pdlCompanyRows}
-                    onChange={(e) => setPdlCompanyRows(e.target.checked)}
-                  />
-                  Organization / LLC rows
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pdlIncludeIndividuals}
-                    onChange={(e) => setPdlIncludeIndividuals(e.target.checked)}
-                  />
-                  Individual owners
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={enrichBusinessOnly}
-                    onChange={(e) => setEnrichBusinessOnly(e.target.checked)}
-                  />
-                  Phone lookup: LLC / org-style names only
-                </label>
-                <label className="flex items-center gap-2">
-                  <span>Phone lookup max/run</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    value={enrichLimit}
-                    onChange={(e) => setEnrichLimit(Number.parseInt(e.target.value, 10) || 25)}
-                  />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span>Contact enrichment max/run</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    value={pdlEnrichLimit}
-                    onChange={(e) => setPdlEnrichLimit(Number.parseInt(e.target.value, 10) || 15)}
-                  />
-                </label>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-500/30 bg-amber-950/25 text-[var(--x-text)]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Address lookup — property records
-            </CardTitle>
-            <CardDescription className="text-[var(--x-muted)]">
-              Parsed US address (commas required; ZIP optional). Merged rows only fill <strong className="text-[var(--x-text)]">empty</strong> fields.
-              Configure the Worker secret and API base for local dev.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="text-sm block">
-              <span className="mb-1 block font-medium">Address line</span>
+          <CardContent className="space-y-3">
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-[var(--x-muted)]">
+                Address
+              </span>
               <input
                 type="text"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className={fieldClass}
                 value={dealmachineAddressLine}
                 onChange={(e) => setDealmachineAddressLine(e.target.value)}
-                placeholder="123 Main St, City, ST 12345 — or without ZIP"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void onFetchDealMachineSingle();
+                  }
+                }}
+                placeholder="123 Main St, City, ST 12345"
+                disabled={!isDealMachineLikelyConfigured()}
               />
-              <span className="mt-1 block text-xs text-[var(--x-muted)]">
-                Format: <strong>Street, City, ST</strong> or <strong>Street, City, ST ZIP</strong>. Fills from the selected row or
-                preview when this field is empty.
-              </span>
             </label>
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant="default"
-                disabled={dealmachineBusy || enrichBusy || pdlEnrichBusy || !isDealMachineLikelyConfigured()}
+                disabled={anyBusy || !isDealMachineLikelyConfigured()}
                 onClick={() => void onFetchDealMachineSingle()}
               >
-                {dealmachineBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Fetch / merge this address
+                {dealmachineBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                Find owner
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={
-                  dealmachineBusy || enrichBusy || pdlEnrichBusy || !isDealMachineLikelyConfigured() || !commResults.length
-                }
-                onClick={() => void onFetchDealMachineBulk()}
-              >
-                Table batch (up to {dealmachineLimit} calls)
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-4 items-center border-t border-amber-500/25 pt-3 text-sm">
-              <label className="flex items-center gap-2">
-                <span>Max calls</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  value={dealmachineLimit}
-                  onChange={(e) => setDealmachineLimit(Number.parseInt(e.target.value, 10) || 15)}
-                />
-              </label>
-              <label className="flex items-center gap-2">
-                <span>Delay ms</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={5000}
-                  className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  value={dealmachineDelayMs}
-                  onChange={(e) => setDealmachineDelayMs(Number.parseInt(e.target.value, 10) || 0)}
-                />
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={dealmachineSkipIfOwner}
-                  onChange={(e) => setDealmachineSkipIfOwner(e.target.checked)}
-                />
-                Skip rows that already have Owner filled
-              </label>
+              {!isDealMachineLikelyConfigured() ? (
+                <span className="self-center text-xs text-[var(--x-muted)]">
+                  Lookup API not configured for this environment.
+                </span>
+              ) : null}
             </div>
           </CardContent>
         </Card>
-          </>
-        ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="bg-[var(--x-surface)] text-[var(--x-text)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="w-5 h-5" />
-                Upload CSV
-              </CardTitle>
-              <CardDescription className="text-[var(--x-muted)]">
-                Headers: Address, Owner, Phone, Email, State, etc. No API call. You can import very large lists (e.g.{" "}
-                <strong className="text-[var(--x-text)]">100,000</strong> commercial / PM rows): parsing yields to the UI, the table is{" "}
-                <strong className="text-[var(--x-text)]">virtualized</strong> (only visible rows render), and the full file must stay under ~180MB. For
-                free manual research, download the template (assessor + SOS columns) and re-upload when filled.
-                {isAdmin ? (
-                  <>
-                    {" "}
-                    Missouri open-parcel scripts:{" "}
-                    <code className="rounded bg-gray-100 px-1 text-xs text-[var(--x-text)]">npm run data:mo-parcels</code> → import the generated
-                    CSV. Large-building sample:{" "}
-                    <code className="rounded bg-gray-100 px-1 text-xs text-[var(--x-text)]">npm run data:mo-commercial-50k</code> (empty phone /
-                    contact / email columns for you to fill from a licensed list).
-                  </>
-                ) : null}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv,text/plain"
-                className="hidden"
-                onChange={onCsvFile}
-              />
-              <Button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()}>
-                {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                Choose CSV
-              </Button>
-              <Button type="button" variant="secondary" disabled={busy} onClick={onLoadMoOpenDataSample}>
-                Load MO open-data sample (200 rows)
-              </Button>
-              <Button type="button" variant="secondary" onClick={onDownloadFreeRecordsTemplate}>
-                <FileDown className="w-4 h-4 mr-2" />
-                Blank template (manual research)
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[var(--x-surface)] text-[var(--x-text)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardPaste className="w-5 h-5" />
-                Paste JSON
-              </CardTitle>
-              <CardDescription className="text-[var(--x-muted)]">Single property object; clears the results table.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <textarea
-                className="min-h-[100px] w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm placeholder:text-[var(--x-muted)]"
-                value={jsonPaste}
-                onChange={(e) => setJsonPaste(e.target.value)}
-                placeholder='{ "formattedAddress": "123 Main St, City, ST 12345" }'
-              />
-              <Button type="button" variant="secondary" onClick={onParseJson}>
-                Parse JSON
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {isAdmin ? (
-        <Card className="border-violet-500/30 bg-violet-950/25 text-[var(--x-text)]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5" />
-              Bulk enrichment (editor)
+        {/* 2. Import */}
+        <Card className="border-white/[0.08] bg-[var(--x-surface)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Upload className="h-5 w-5" aria-hidden />
+              Import list
             </CardTitle>
-            <CardDescription className="text-[var(--x-muted)]">
-              Run bulk owner / phone / contact enrichment from your development environment (not on this page). Example
-              intent: property mailing address; assessor-style owner entity; main phone; registered-agent or principal
-              contact where visible. Start with a CSV that has at least <code className="rounded bg-[#1a1d26] px-1 text-xs text-[var(--x-text)]">property_address</code>{" "}
-              or owner + city columns, then import the enriched file here.
+            <CardDescription>
+              CSV with address, owner, and any phones you already have. Large files use a virtualized table.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 rounded-md border border-white/[0.08] bg-black/25 p-4 text-sm">
-            <ol className="list-decimal pl-5 space-y-2">
-              <li>Install and configure your team&apos;s bulk-enrichment CLI in the editor.</li>
-              <li>
-                Run it with a seed CSV (property address and/or owner entity) and the fields you need for outreach.
-              </li>
-              <li>
-                When the job finishes, use <strong>Choose CSV</strong> above to import the enriched file (map headers to the
-                template if needed).
-              </li>
-            </ol>
+          <CardContent className="space-y-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv,text/plain"
+              className="hidden"
+              onChange={onCsvFile}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()}>
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                Choose CSV
+              </Button>
+              <Button type="button" variant="secondary" onClick={onDownloadFreeRecordsTemplate}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Blank template
+              </Button>
+              <Button type="button" variant="outline" disabled={busy} onClick={onLoadMoOpenDataSample}>
+                Sample (200 rows)
+              </Button>
+            </div>
+            <details className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
+              <summary className="cursor-pointer text-[var(--x-muted)] hover:text-[var(--x-text)]">
+                Paste JSON (single property)
+              </summary>
+              <div className="mt-3 space-y-2">
+                <textarea
+                  className={`${fieldClass} min-h-[88px] font-mono`}
+                  value={jsonPaste}
+                  onChange={(e) => setJsonPaste(e.target.value)}
+                  placeholder='{ "formattedAddress": "123 Main St, City, ST 12345" }'
+                />
+                <Button type="button" variant="secondary" size="sm" onClick={onParseJson}>
+                  Parse JSON
+                </Button>
+              </div>
+            </details>
           </CardContent>
         </Card>
+
+        {/* Empty state */}
+        {!hasRows && !hasPreview ? (
+          <Card className="border-dashed border-white/15 bg-transparent">
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <Building2 className="mb-3 h-10 w-10 text-[var(--x-muted)]" aria-hidden />
+              <p className="text-lg font-medium">No properties yet</p>
+              <p className="mt-1 max-w-sm text-sm text-[var(--x-muted)]">
+                Enter an address and find the owner, or drop a CSV to build your list.
+              </p>
+            </CardContent>
+          </Card>
         ) : null}
 
-        {commResults.length > 0 || preview ? (
-          <div className="flex flex-wrap gap-2 items-center">
+        {/* Results toolbar + table */}
+        {hasRows || hasPreview ? (
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={onDownloadCampaignCsv}>
-              <FileDown className="w-4 h-4 mr-2" />
-              {commResults.length > 0
-                ? `Export outreach CSV (${commResults.length} rows)`
-                : "Export outreach CSV (current preview)"}
+              <FileDown className="mr-2 h-4 w-4" />
+              {hasRows
+                ? `Export CSV (${commResults.length.toLocaleString()} rows)`
+                : "Export preview CSV"}
             </Button>
-            <span className="text-xs text-[var(--x-muted)]">
-              Spreadsheet / mail merge — same columns as the manual-research template.
-            </span>
+            {hasPreview ? (
+              <Button type="button" size="sm" onClick={sendToMeasurement}>
+                Open in Measurement
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
-        {commResults.length > 0 ? (
+        {hasRows ? (
           <div className="space-y-2">
-            <div className="flex flex-wrap gap-2 items-center">
-              {showVendorEnrichment ? (
-                <>
-                  <span className="text-sm font-medium text-[var(--x-text)]">Data enhancement (loaded rows)</span>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={enrichBusy || pdlEnrichBusy || dealmachineBusy || !placesKey.trim()}
-                    onClick={() => void onEnrichBulk()}
-                  >
-                    {enrichBusy ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Phone className="w-4 h-4 mr-2" />
-                    )}
-                    Phone lookup (up to {enrichLimit})
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={
-                      enrichBusy ||
-                      pdlEnrichBusy ||
-                      dealmachineBusy ||
-                      !pdlKey.trim() ||
-                      (!pdlCompanyRows && !pdlIncludeIndividuals)
-                    }
-                    onClick={() => void onEnrichBulkPdl()}
-                  >
-                    {pdlEnrichBusy ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <UserSearch className="w-4 h-4 mr-2" />
-                    )}
-                    Contact enrichment (up to {pdlEnrichLimit})
-                  </Button>
-                  <span className="text-xs text-[var(--x-muted)]">Skips rows that already have digits in Phone(s).</span>
-                </>
-              ) : propertyScraperOffline ? (
-                <span className="text-xs text-[var(--x-muted)]">
-                  CSV-only mode: add <code className="rounded bg-gray-100 px-1 text-xs text-[var(--x-text)]">phone</code> / contact columns in
-                  your spreadsheet, then re-import — or use manual people search / clipboard merge below.
-                </span>
-              ) : (
-                <span className="text-xs text-[var(--x-muted)]">
-                  API-assisted row enrichment is limited to administrator accounts. Add phone and contact columns in your CSV,
-                  or use manual people search below.
-                </span>
-              )}
-            </div>
             <p className="text-xs text-[var(--x-muted)]">
-              Manual people search: use the preview row shortcuts below, or open{" "}
-              <a
-                className="text-[var(--x-accent)] underline hover:opacity-90"
-                href={FAST_PEOPLE_SEARCH_HOME_LANG_EN}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                a search site
-              </a>{" "}
-              in a new tab.
+              {commResults.length.toLocaleString()} rows · click a row to preview · ranked by commercial lead score
             </p>
             <VirtualizedPropertyLeadTable
               rows={commResults}
@@ -1108,227 +852,346 @@ export function PropertyScraper() {
         ) : null}
 
         {preview ? (
-          <Card className="bg-[var(--x-surface)] text-[var(--x-text)]">
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-              <CardDescription className="text-[var(--x-muted)]">Selected property row</CardDescription>
+          <Card className="border-white/[0.08] bg-[var(--x-surface)] text-[var(--x-text)]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Selected property</CardTitle>
+              <CardDescription>{preview.address || "No address"}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div>
-                  <span className="font-medium block">Address</span>
-                  <div className="font-medium">{preview.address}</div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Owner</dt>
+                  <dd className="mt-0.5 whitespace-pre-wrap font-medium">{preview.ownerName || "—"}</dd>
                 </div>
                 <div>
-                  <span className="font-medium block">State</span>
-                  <div>{preview.stateCode || "—"}</div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Phone(s)</dt>
+                  <dd className="mt-0.5 whitespace-pre-wrap">{preview.ownerPhone || "—"}</dd>
                 </div>
                 <div>
-                  <span className="font-medium block">Lat / Lng</span>
-                  <div>
-                    {preview.latitude || "—"}, {preview.longitude || "—"}
-                  </div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Mailing</dt>
+                  <dd className="mt-0.5 whitespace-pre-wrap">{preview.ownerMailingAddress || "—"}</dd>
                 </div>
                 <div>
-                  <span className="font-medium block">Living area (SF)</span>
-                  <div>{preview.areaSqFt || "—"}</div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Email</dt>
+                  <dd className="mt-0.5 break-all whitespace-pre-wrap">{preview.ownerEmail || "—"}</dd>
                 </div>
                 <div>
-                  <span className="font-medium block">Lot (SF)</span>
-                  <div>{preview.lotSizeSqFt || "—"}</div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Living / lot (SF)</dt>
+                  <dd className="mt-0.5">
+                    {preview.areaSqFt || "—"} / {preview.lotSizeSqFt || "—"}
+                  </dd>
                 </div>
                 <div>
-                  <span className="font-medium block">Year built</span>
-                  <div>{preview.yearBuilt || "—"}</div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Year · type · score</dt>
+                  <dd className="mt-0.5">
+                    {[preview.yearBuilt || "—", preview.propertyType || "—", preview.leadScore != null ? `${preview.leadScore}/100` : "—"].join(
+                      " · ",
+                    )}
+                  </dd>
                 </div>
-                <div>
-                  <span className="font-medium block">Type</span>
-                  <div>{preview.propertyType}</div>
-                </div>
-                <div>
-                  <span className="font-medium block">Commercial lead score</span>
-                  <div>{preview.leadScore != null ? `${preview.leadScore}/100` : "—"}</div>
-                </div>
-                <div>
-                  <span className="font-medium block">Portfolio (same owner, this batch)</span>
-                  <div>{preview.ownerPortfolioCount != null ? preview.ownerPortfolioCount : "—"}</div>
-                </div>
-                {preview.leadScoreReasons?.length ? (
+                {(preview.contactPersonName || preview.contactPersonPhone) && (
                   <div className="sm:col-span-2">
-                    <span className="font-medium block">Score factors</span>
-                    <ul className="list-disc pl-5 text-xs space-y-0.5 mt-1">
-                      {preview.leadScoreReasons.map((line, idx) => (
-                        <li key={idx}>{line}</li>
-                      ))}
-                    </ul>
+                    <dt className="text-xs uppercase tracking-wide text-[var(--x-muted)]">Contact person</dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap">
+                      {[preview.contactPersonName, preview.contactPersonPhone].filter(Boolean).join(" · ") || "—"}
+                    </dd>
                   </div>
-                ) : null}
-                <div className="sm:col-span-2">
-                  <span className="font-medium block">Owner name (deed or assessor)</span>
-                  <div className="whitespace-pre-wrap">{preview.ownerName || "—"}</div>
-                </div>
-                <div>
-                  <span className="font-medium block">PM / organization label</span>
-                  <div>{preview.ownerPmEntityLabel?.trim() || "—"}</div>
-                </div>
-                <div>
-                  <span className="font-medium block">Entity type</span>
-                  <div>{preview.ownerEntityType || "—"}</div>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="font-medium block">Owner mailing</span>
-                  <div className="whitespace-pre-wrap">{preview.ownerMailingAddress || "—"}</div>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="font-medium block">Phone(s) — main / alternate</span>
-                  <div className="whitespace-pre-wrap">{preview.ownerPhone || "—"}</div>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="font-medium block">Contact person (individual)</span>
-                  <div className="whitespace-pre-wrap">{preview.contactPersonName || "—"}</div>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="font-medium block">Contact person phone</span>
-                  <div className="whitespace-pre-wrap">{preview.contactPersonPhone || "—"}</div>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="font-medium block">Email(s)</span>
-                  <div className="whitespace-pre-wrap break-all">{preview.ownerEmail || "—"}</div>
-                </div>
+                )}
               </dl>
-              {preview.notes ? (
-                <p className="border-t border-white/[0.1] pt-3 text-xs whitespace-pre-wrap text-[var(--x-muted)]">{preview.notes}</p>
-              ) : null}
-              <div className="space-y-2 border-t border-white/[0.08] pt-3">
-                <p className="text-xs font-medium text-[var(--x-text)]">Manual people search</p>
-                <p className="text-xs text-[var(--x-muted)]">
-                  Opens new tabs only — this app does not scrape third-party sites. After you find a match, type the{" "}
-                  <strong>person&apos;s name</strong> below and/or copy a snippet with their numbers, then{" "}
-                  <strong>Merge phones from clipboard</strong> (saved as contact person phone; main lines stay in Phone(s)).
-                  Lead score updates when numbers are added. Comply with site terms and privacy law.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={FAST_PEOPLE_SEARCH_HOME_LANG_EN} target="_blank" rel="noreferrer noopener">
-                      <ExternalLink className="w-4 h-4" />
-                      People search (home)
-                    </a>
-                  </Button>
-                  {(() => {
-                    const primary = (preview.contactPersonName || primaryOwnerName(preview.ownerName)).trim();
-                    const ownerQ = [
-                      primary,
-                      extractCityFromPropertyAddress(preview.address),
-                      preview.stateCode.trim().toUpperCase().slice(0, 2),
-                    ]
-                      .filter(Boolean)
-                      .join(" ")
-                      .trim();
-                    return primary ? (
+
+              <details className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
+                <summary className="cursor-pointer text-[var(--x-muted)] hover:text-[var(--x-text)]">
+                  Manual people search &amp; merge
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-[var(--x-muted)]">
+                    Opens new tabs only — nothing is scraped. Paste a name and/or copy phones, then merge into this row.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={FAST_PEOPLE_SEARCH_HOME_LANG_EN} target="_blank" rel="noreferrer noopener">
+                        <ExternalLink className="h-4 w-4" />
+                        People search
+                      </a>
+                    </Button>
+                    {(() => {
+                      const primary = (preview.contactPersonName || primaryOwnerName(preview.ownerName)).trim();
+                      const ownerQ = [
+                        primary,
+                        extractCityFromPropertyAddress(preview.address),
+                        preview.stateCode.trim().toUpperCase().slice(0, 2),
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim();
+                      return primary ? (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={googleSiteSearchFastPeopleUrl(ownerQ)} target="_blank" rel="noreferrer noopener">
+                            <ExternalLink className="h-4 w-4" />
+                            Owner + area
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="outline" size="sm" disabled>
+                          <ExternalLink className="h-4 w-4" />
+                          Owner + area
+                        </Button>
+                      );
+                    })()}
+                    {preview.address.trim() ? (
                       <Button variant="outline" size="sm" asChild>
                         <a
-                          href={googleSiteSearchFastPeopleUrl(ownerQ)}
+                          href={googleSiteSearchFastPeopleUrl(preview.address)}
                           target="_blank"
                           rel="noreferrer noopener"
                         >
-                          <ExternalLink className="w-4 h-4" />
-                          Search (owner + area)
+                          <ExternalLink className="h-4 w-4" />
+                          By address
                         </a>
                       </Button>
-                    ) : (
-                      <Button type="button" variant="outline" size="sm" disabled title="Need owner name for this search">
-                        <ExternalLink className="w-4 h-4" />
-                        Search (owner + area)
-                      </Button>
-                    );
-                  })()}
-                  {preview.address.trim() ? (
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={googleSiteSearchFastPeopleUrl(preview.address)}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Search (property address)
-                      </a>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                    <label className="min-w-[220px] flex-1 text-xs">
+                      <span className="mb-1 block font-medium">Contact person name</span>
+                      <input
+                        className={fieldClass}
+                        value={manualFpsOwnerName}
+                        onChange={(e) => setManualFpsOwnerName(e.target.value)}
+                        placeholder="Name from your search…"
+                      />
+                    </label>
+                    <Button type="button" variant="secondary" size="sm" onClick={onApplyManualOwnerNameFps}>
+                      Add name
                     </Button>
-                  ) : (
-                    <Button type="button" variant="outline" size="sm" disabled title="Need property address">
-                      <ExternalLink className="w-4 h-4" />
-                      Search (property address)
+                    <Button type="button" variant="secondary" size="sm" onClick={() => void onMergeClipboardPhonesFps()}>
+                      <ClipboardPaste className="h-4 w-4" />
+                      Merge phones
                     </Button>
-                  )}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-                  <label className="text-xs flex-1 min-w-[220px]">
-                    <span className="mb-1 block font-medium">Contact person name (from lookup)</span>
-                    <input
-                      className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                      value={manualFpsOwnerName}
-                      onChange={(e) => setManualFpsOwnerName(e.target.value)}
-                      placeholder="Type the name from your search…"
-                    />
-                  </label>
-                  <Button type="button" variant="secondary" size="sm" onClick={onApplyManualOwnerNameFps}>
-                    Add name to record
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => void onMergeClipboardPhonesFps()}>
-                    <ClipboardPaste className="w-4 h-4" />
-                    Merge phones from clipboard
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 pt-2">
-                {showVendorEnrichment ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={enrichBusy || pdlEnrichBusy || dealmachineBusy || !placesKey.trim()}
-                      onClick={() => void onEnrichPreview()}
-                    >
-                      {enrichBusy ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Phone className="w-4 h-4 mr-2" />
-                      )}
-                      Enhance: phone lookup
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={
-                        enrichBusy ||
-                        pdlEnrichBusy ||
-                        dealmachineBusy ||
-                        !pdlKey.trim() ||
-                        (!pdlCompanyRows && !pdlIncludeIndividuals)
-                      }
-                      onClick={() => void onEnrichPreviewPdl()}
-                    >
-                      {pdlEnrichBusy ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <UserSearch className="w-4 h-4 mr-2" />
-                      )}
-                      Enhance: contacts
-                    </Button>
-                  </>
-                ) : null}
+              </details>
+
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={sendToMeasurement}>
-                  Open in New Measurement
+                  Open in Measurement
                 </Button>
                 <Link to="/measurement/new">
                   <Button type="button" variant="outline">
-                    Go without importing
+                    Measurement without import
                   </Button>
                 </Link>
               </div>
             </CardContent>
           </Card>
+        ) : null}
+
+        {/* 3. Advanced enrich (admin) */}
+        {showVendorEnrichment ? (
+          <details className="rounded-xl border border-white/10 bg-[var(--x-surface)] px-4 py-3">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-[var(--x-muted)] hover:text-[var(--x-text)] [&::-webkit-details-marker]:hidden">
+              <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+              Advanced — bulk lookup &amp; enrich
+            </summary>
+            <div className="mt-4 space-y-6 border-t border-white/10 pt-4">
+              <p className="text-xs text-[var(--x-muted)]">
+                Optional vendor APIs for admins. Keys stay in this browser. Prefer county assessor / open data when you can.
+              </p>
+
+              <div className="space-y-3">
+                <h3 className="flex items-center gap-2 text-sm font-medium">
+                  <KeyRound className="h-4 w-4" aria-hidden />
+                  API keys
+                </h3>
+                <label className="block text-xs">
+                  <span className="mb-1 block text-[var(--x-muted)]">Google Places (phone lookup)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      className={`${fieldClass} min-w-[200px] flex-1`}
+                      value={placesKey}
+                      onChange={(e) => setPlacesKey(e.target.value)}
+                      placeholder="AIza…"
+                    />
+                    <Button type="button" variant="secondary" size="sm" onClick={persistPlacesKey}>
+                      Save
+                    </Button>
+                  </div>
+                </label>
+                <label className="block text-xs">
+                  <span className="mb-1 block text-[var(--x-muted)]">People Data Labs (contacts)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      className={`${fieldClass} min-w-[200px] flex-1`}
+                      value={pdlKey}
+                      onChange={(e) => setPdlKey(e.target.value)}
+                      placeholder="PDL key…"
+                    />
+                    <Button type="button" variant="secondary" size="sm" onClick={persistPdlKey}>
+                      Save
+                    </Button>
+                  </div>
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Bulk property-record lookup</h3>
+                <p className="text-xs text-[var(--x-muted)]">
+                  Runs on imported CSV rows (not the single address box above). Cap API calls per run.
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-xs">
+                    <span className="mb-1 block text-[var(--x-muted)]">Max calls</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      className={`${fieldClass} w-24`}
+                      value={dealmachineLimit}
+                      onChange={(e) => setDealmachineLimit(Number(e.target.value) || 15)}
+                    />
+                  </label>
+                  <label className="text-xs">
+                    <span className="mb-1 block text-[var(--x-muted)]">Delay (ms)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={5000}
+                      className={`${fieldClass} w-28`}
+                      value={dealmachineDelayMs}
+                      onChange={(e) => setDealmachineDelayMs(Number(e.target.value) || 0)}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={dealmachineSkipIfOwner}
+                      onChange={(e) => setDealmachineSkipIfOwner(e.target.checked)}
+                    />
+                    Skip rows that already have an owner
+                  </label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={anyBusy || !commResults.length || !isDealMachineLikelyConfigured()}
+                    onClick={() => void onFetchDealMachineBulk()}
+                  >
+                    {dealmachineBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                    Lookup missing owners
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Phone &amp; contact enrich</h3>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-xs">
+                    <span className="mb-1 block text-[var(--x-muted)]">Places limit</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      className={`${fieldClass} w-24`}
+                      value={enrichLimit}
+                      onChange={(e) => setEnrichLimit(Number(e.target.value) || 25)}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={enrichBusinessOnly}
+                      onChange={(e) => setEnrichBusinessOnly(e.target.checked)}
+                    />
+                    Business-like rows only
+                  </label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={anyBusy || !commResults.length || !placesKey.trim()}
+                    onClick={() => void onEnrichBulk()}
+                  >
+                    {enrichBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
+                    Enrich phones (bulk)
+                  </Button>
+                  {preview ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={anyBusy || !placesKey.trim()}
+                      onClick={() => void onEnrichPreview()}
+                    >
+                      Phone (selected)
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-xs">
+                    <span className="mb-1 block text-[var(--x-muted)]">PDL limit</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      className={`${fieldClass} w-24`}
+                      value={pdlEnrichLimit}
+                      onChange={(e) => setPdlEnrichLimit(Number(e.target.value) || 15)}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={pdlCompanyRows} onChange={(e) => setPdlCompanyRows(e.target.checked)} />
+                    Companies
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={pdlIncludeIndividuals}
+                      onChange={(e) => setPdlIncludeIndividuals(e.target.checked)}
+                    />
+                    Individuals
+                  </label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={
+                      anyBusy ||
+                      !commResults.length ||
+                      !pdlKey.trim() ||
+                      (!pdlCompanyRows && !pdlIncludeIndividuals)
+                    }
+                    onClick={() => void onEnrichBulkPdl()}
+                  >
+                    {pdlEnrichBusy ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <UserSearch className="mr-2 h-4 w-4" />
+                    )}
+                    Enrich contacts (bulk)
+                  </Button>
+                  {preview ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={anyBusy || !pdlKey.trim() || (!pdlCompanyRows && !pdlIncludeIndividuals)}
+                      onClick={() => void onEnrichPreviewPdl()}
+                    >
+                      Contacts (selected)
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </details>
+        ) : null}
+
+        {propertyScraperOffline ? (
+          <p className="text-xs text-[var(--x-muted)]">Offline mode: vendor enrich APIs are disabled.</p>
         ) : null}
       </div>
     </div>
