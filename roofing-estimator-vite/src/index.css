@@ -1072,7 +1072,17 @@ html body #root .canvass-light-sheet button.bg-zinc-900 svg {
   color: #fafafa !important;
 }
 
-html body #root .canvass-paper {
+/* Map hint pill + toast chips: beat global `button { background:#101214; color:--x-text }` (blue-gray on black). */
+html body #root .canvass-paper,
+html body #root button.canvass-paper {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
+}
+
+html body #root button.canvass-paper.text-zinc-950,
+html body #root .canvass-paper.text-zinc-950 {
   color: #0f172a !important;
 }
 
