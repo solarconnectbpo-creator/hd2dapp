@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
-import { Camera, ImagePlus, LayoutGrid, List, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, ExternalLink, ImagePlus, LayoutGrid, List, Loader2, Sparkles, Trash2, X } from "lucide-react";
 import { useRoofing } from "../../context/RoofingContext";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -17,6 +17,7 @@ import {
 import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
 import { postRoofDamageDraft } from "../../lib/roofDamageClient";
 import { useAuth } from "../../context/AuthContext";
+import { loadOrgSettings } from "../../lib/orgSettings";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
 
@@ -57,6 +58,14 @@ export function FieldProjectsPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
   const authToken = session?.token ?? "";
+  const orgCrmBaseUrl = loadOrgSettings().ghlBaseUrl?.trim() ?? "";
+
+  /** A job's own CRM deep link, else the org-wide CRM board from Contacts settings. */
+  const crmLinkFor = useCallback(
+    (project: { ghlUrl?: string }): string | null =>
+      project.ghlUrl?.trim() || orgCrmBaseUrl || null,
+    [orgCrmBaseUrl],
+  );
 
   const {
     fieldProjects,
@@ -817,6 +826,16 @@ export function FieldProjectsPanel() {
                 >
                   Save deal fields
                 </Button>
+                {crmLinkFor(selected) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => window.open(crmLinkFor(selected) as string, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open in CRM
+                  </Button>
+                ) : null}
               </div>
 
               <div>
