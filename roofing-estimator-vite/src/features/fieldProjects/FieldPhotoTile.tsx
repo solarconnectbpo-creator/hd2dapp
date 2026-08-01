@@ -119,10 +119,10 @@ export function FieldPhotoTile({
           </Button>
         </div>
         {photo.aiSummary ? (
-          <div className="rounded bg-black/5 p-2 text-xs text-black">
-            <p className="font-semibold">{photo.aiSummary.summary}</p>
-            <p className="mt-1">Types: {photo.aiSummary.damageTypes.join(", ") || "—"}</p>
-            <p>
+          <div className="hd2d-report-panel rounded p-2 text-xs">
+            <p className="font-semibold text-black">{photo.aiSummary.summary}</p>
+            <p className="mt-1 text-black">Types: {photo.aiSummary.damageTypes.join(", ") || "—"}</p>
+            <p className="text-black">
               Severity: {photo.aiSummary.severity}/5 · Action: {photo.aiSummary.recommendedAction}
             </p>
             {photo.aiSummary.notes ? (

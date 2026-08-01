@@ -38,7 +38,7 @@ function Thumb({
   return (
     <li className="relative overflow-hidden rounded-xl bg-[#e2e8f0]">
       {src ? (
-        <button type="button" className="hd2d-btn-on-dark block w-full" onClick={() => onOpen(src)}>
+        <button type="button" className="block w-full border-0 bg-transparent p-0" onClick={() => onOpen(src)}>
           <img src={src} alt={photo.caption || "Site photo"} className="h-20 w-full object-cover" />
         </button>
       ) : (
