@@ -9,7 +9,9 @@ import {
   FileJson,
   FileSpreadsheet,
   Layers,
+  MessageSquare,
   Navigation,
+  Phone,
   Ruler,
   Sparkles,
   Trash2,
@@ -85,6 +87,8 @@ import {
 } from "../lib/geoFootprintMeasure";
 import { Map3D, type Map3DPoint } from "../components/Map3D";
 import { getScopedStorageKey } from "../lib/userScopedStorage";
+import { postSmsEvent } from "../lib/smsEmitEvent";
+import { telHref } from "../lib/smsClient";
 
 const AUTO_OPEN_ESTIMATE_BASE = "roofing-canvass-auto-open-estimate-v1";
 const REQUIRE_OWNER_INFO_BASE = "roofing-canvass-require-owner-info-v1";
@@ -1618,6 +1622,46 @@ export function Canvassing() {
                   <Camera className="h-4 w-4" />
                   Storm damage report
                 </Button>
+                <div className="flex flex-wrap gap-2">
+                  {contactOwnerPhone && telHref(contactOwnerPhone) ? (
+                    <Button type="button" size="sm" variant="secondary" className="flex-1 gap-2" asChild>
+                      <a href={telHref(contactOwnerPhone)}>
+                        <Phone className="h-4 w-4" />
+                        Call
+                      </a>
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="flex-1 gap-2"
+                    disabled={!lastPayload || !contactOwnerPhone || panelBusy}
+                    onClick={() => {
+                      if (!lastPayload || !contactOwnerPhone) return;
+                      void (async () => {
+                        const res = await postSmsEvent({
+                          event: "lead.created",
+                          phone: contactOwnerPhone,
+                          name: lastPayload.ownerName || lastPayload.contactPersonName || "",
+                          address: lastPayload.address || addressLine || "",
+                        });
+                        if (res.ok) {
+                          sonnerToast.success(
+                            res.started
+                              ? `SMS follow-up started (${res.started} sequence${res.started === 1 ? "" : "s"})`
+                              : "Lead saved to SMS inbox",
+                          );
+                        } else {
+                          sonnerToast.error(res.error || "SMS follow-up failed — check Telnyx setup");
+                        }
+                      })();
+                    }}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Text / enroll
+                  </Button>
+                </div>
                 <p className="text-[11px] leading-snug text-zinc-600">
                   Opens the camera for many site photos and builds an AI storm damage report as you shoot.
                 </p>

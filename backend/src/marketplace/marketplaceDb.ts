@@ -24,6 +24,8 @@ export type MarketplaceAppointmentRow = {
   city: string | null;
   state: string | null;
   zip: string | null;
+  phone: string | null;
+  email: string | null;
   scheduled_at: number | null;
   price_usd: number | null;
   notes: string | null;
