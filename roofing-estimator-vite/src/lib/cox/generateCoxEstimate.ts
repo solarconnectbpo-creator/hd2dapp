@@ -3,6 +3,7 @@
  */
 
 import { getLaborRate, getMaterial } from "./coxPricingDatabase";
+import { normalizePitchToColon } from "./normalizePitch";
 import {
   calculateTieredEstimateWithTax,
   COX_DEFAULT_TAX_RATE,
@@ -56,8 +57,6 @@ export type CoxEstimateResult = {
   generatedAt: string;
 };
 
-const PITCH_RE = /^\d+:\d+$/;
-
 export function assertRoofArea(roofArea: number): void {
   if (!Number.isFinite(roofArea) || roofArea <= 0) {
     throw new Error("Roof area must be greater than 0");
@@ -67,16 +66,9 @@ export function assertRoofArea(roofArea: number): void {
   }
 }
 
-export function assertPitch(pitch: string): void {
-  if (!PITCH_RE.test(pitch)) {
-    throw new Error("Pitch must be in format 'rise:run'");
-  }
-  const [riseRaw, runRaw] = pitch.split(":");
-  const rise = Number(riseRaw);
-  const run = Number(runRaw);
-  if (!(rise >= 0 && rise <= 12 && run > 0 && run <= 12)) {
-    throw new Error("Pitch must be between 0:12 and 12:12");
-  }
+/** Accepts `6:12`, `6/12`, `6 on 12`, or plain rise; returns canonical `N:12`. */
+export function assertPitch(pitch: string): string {
+  return normalizePitchToColon(pitch).colon;
 }
 
 export function assertTearOffLayers(layers: number): void {
@@ -91,8 +83,8 @@ export function resolveBasePricePerSquare(
   roofSystem: CoxRoofSystem,
   pitch: string,
 ): number {
-  assertPitch(pitch);
-  const [riseRaw, runRaw] = pitch.split(":");
+  const normalized = assertPitch(pitch);
+  const [riseRaw, runRaw] = normalized.split(":");
   const rise = Number(riseRaw);
   const run = Number(runRaw);
   const pitchRatio = rise / run;
@@ -185,7 +177,6 @@ function buildCatalogLines(squares: number, tearOffLayers: number, roofSystem: C
 
 export function generateCoxEstimate(input: CoxEstimateInput): CoxEstimateResult {
   assertRoofArea(input.roofArea);
-  assertPitch(input.pitch);
   assertTearOffLayers(input.tearOffLayers);
 
   const buildingTypes: CoxBuildingType[] = ["oneStory", "twoStory", "threeStory"];
@@ -198,8 +189,9 @@ export function generateCoxEstimate(input: CoxEstimateInput): CoxEstimateResult 
   }
 
   const taxRate = input.taxRate ?? COX_DEFAULT_TAX_RATE;
+  const pitch = assertPitch(input.pitch);
   const squares = roundMoney(input.roofArea / 100);
-  const basePricePerSquare = resolveBasePricePerSquare(input.buildingType, input.roofSystem, input.pitch);
+  const basePricePerSquare = resolveBasePricePerSquare(input.buildingType, input.roofSystem, pitch);
   const materialCost = roundMoney(squares * basePricePerSquare);
   const tearOffCost = roundMoney(squares * 80 * input.tearOffLayers);
   const totalBasePrice = roundMoney(materialCost + tearOffCost);
@@ -213,7 +205,7 @@ export function generateCoxEstimate(input: CoxEstimateInput): CoxEstimateResult 
     projectName,
     roofArea: input.roofArea,
     squares,
-    pitch: input.pitch,
+    pitch,
     buildingType: input.buildingType,
     roofSystem: input.roofSystem,
     tearOffLayers: input.tearOffLayers,

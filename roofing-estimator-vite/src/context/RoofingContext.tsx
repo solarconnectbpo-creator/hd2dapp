@@ -68,9 +68,17 @@ export interface Measurement {
   length: number;
   width: number;
   pitch: number;
+  /** Roof surface SF before waste (preferred Atlas/Cox `roofArea` input). */
   totalArea: number;
   wastePercentage: number;
+  /** Surface SF × (1 + waste%). Display / takeoff effective area. */
   adjustedArea: number;
+  /** Explicit surface SF when present (same intent as totalArea on new saves). */
+  surfaceArea?: number;
+  /** Building stories from intake when known. */
+  stories?: number;
+  /** Tear-off layers for package estimates (0–4). */
+  tearOffLayers?: number;
 }
 
 export interface Estimate {
@@ -241,6 +249,10 @@ export function normalizeMeasurement(raw: Record<string, unknown>): Measurement 
     }
   }
 
+  const surfaceAreaRaw = raw.surfaceArea;
+  const storiesRaw = raw.stories;
+  const tearOffRaw = raw.tearOffLayers;
+
   return {
     id,
     projectName,
@@ -253,6 +265,21 @@ export function normalizeMeasurement(raw: Record<string, unknown>): Measurement 
     totalArea: num("totalArea", 0),
     wastePercentage: num("wastePercentage", 0),
     adjustedArea: num("adjustedArea", 0),
+    surfaceArea:
+      typeof surfaceAreaRaw === "number" && Number.isFinite(surfaceAreaRaw) && surfaceAreaRaw > 0
+        ? surfaceAreaRaw
+        : undefined,
+    stories:
+      typeof storiesRaw === "number" && Number.isFinite(storiesRaw) && storiesRaw > 0
+        ? storiesRaw
+        : undefined,
+    tearOffLayers:
+      typeof tearOffRaw === "number" &&
+      Number.isInteger(tearOffRaw) &&
+      tearOffRaw >= 0 &&
+      tearOffRaw <= 4
+        ? tearOffRaw
+        : undefined,
   };
 }
 

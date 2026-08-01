@@ -97,7 +97,7 @@ export async function handleCoxEstimateRoutes(
       JSON.stringify({
         success: false,
         error:
-          "Required: roofArea (number), pitch (e.g. 6:12), buildingType, roofSystem, tearOffLayers (0–4).",
+          "Required: roofArea (number), pitch (e.g. 6:12 or 6/12), buildingType, roofSystem, tearOffLayers (0–4).",
       }),
       { status: 400, headers: j },
     );

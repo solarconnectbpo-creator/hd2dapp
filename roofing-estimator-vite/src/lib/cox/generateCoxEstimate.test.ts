@@ -46,4 +46,16 @@ describe("generateCoxEstimate", () => {
     expect(Math.round(matSum * 100) / 100).toBe(lines.subtotal);
     expect(lines.total).toBe(result.estimate.total.good);
   });
+
+  it("accepts slash pitch and prices two-story bands", () => {
+    const result = generateCoxEstimate({
+      roofArea: 1000,
+      pitch: "9/12",
+      buildingType: "twoStory",
+      roofSystem: "shingles",
+      tearOffLayers: 0,
+    });
+    expect(result.pitch).toBe("9:12");
+    expect(result.basePricePerSquare).toBe(750);
+  });
 });

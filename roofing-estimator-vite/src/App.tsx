@@ -4625,8 +4625,16 @@ function App() {
       const roofForm = inferRoofFormType(preparedWithSectionTotals.roofType, preparedWithSectionTotals.roofStructure);
       const pitchRise = parsePitchRise(preparedWithSectionTotals.roofPitch) ?? 6;
       const waste = Number.parseFloat(preparedWithSectionTotals.wastePercent) || computed.wastePct;
-      const adjustedArea = computed.effectiveSquares * 100;
-      const approxSide = Math.sqrt(adjustedArea);
+      // Surface SF before waste → Atlas package input; adjusted includes waste for takeoff display.
+      const surfaceArea = round2(computed.surfaceSquares * 100);
+      const adjustedArea = round2(computed.effectiveSquares * 100);
+      const approxSide = Math.sqrt(surfaceArea > 0 ? surfaceArea : adjustedArea);
+      const storiesNum = Number.parseFloat(preparedWithSectionTotals.stories);
+      const tearOffLayers =
+        preparedWithSectionTotals.estimateScopeMode === "repair" ||
+        /coating|overlay|recover/i.test(preparedWithSectionTotals.roofType)
+          ? 0
+          : 1;
 
       addMeasurement({
         id: measurementId,
@@ -4637,9 +4645,12 @@ function App() {
         length: Number.isFinite(approxSide) ? round2(approxSide) : 0,
         width: Number.isFinite(approxSide) ? round2(approxSide) : 0,
         pitch: pitchRise,
-        totalArea: adjustedArea,
+        totalArea: surfaceArea,
         wastePercentage: waste,
         adjustedArea,
+        surfaceArea,
+        stories: Number.isFinite(storiesNum) && storiesNum > 0 ? storiesNum : undefined,
+        tearOffLayers,
       });
 
       const estimateId = `e_${Date.now()}`;
