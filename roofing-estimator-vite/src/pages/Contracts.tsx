@@ -1,12 +1,13 @@
 import { Link } from "react-router";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { WorkspaceSyncBadge } from "../components/WorkspaceSyncBadge";
 
 export function Contracts() {
-  const { contracts, updateContract } = useRoofing();
+  const { contracts, updateContract, deleteContract } = useRoofing();
 
   return (
     <div className="hd2d-page-shell text-[var(--x-text)]">
@@ -16,6 +17,7 @@ export function Contracts() {
           <p className="text-[var(--x-muted)]">
             Reopen a proposal to edit client details, scope language, and pricing in Proposal Builder.
           </p>
+          <WorkspaceSyncBadge className="mt-2" />
         </div>
         <Link to="/measurement/new" className="shrink-0">
           <Button className="w-full sm:w-auto">
@@ -84,12 +86,26 @@ export function Contracts() {
                       <option value="signed">Signed</option>
                     </select>
                   </label>
-                  <Link to={`/measurement/new?contractId=${encodeURIComponent(c.id)}`}>
-                    <Button type="button" variant="outline" className="w-full">
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit in Proposal Builder
+                  <div className="flex gap-2">
+                    <Link to={`/measurement/new?contractId=${encodeURIComponent(c.id)}`} className="flex-1">
+                      <Button type="button" variant="outline" className="w-full">
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </Button>
+                    </Link>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={`Delete proposal ${c.projectName}`}
+                      onClick={() => {
+                        if (window.confirm(`Delete the proposal for ${c.projectName}?`)) {
+                          deleteContract(c.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  </Link>
+                  </div>
                   {!c.builderSnapshot ? (
                     <p className="text-xs text-[var(--x-muted)]">
                       Older save — client fields will load; re-run Generate Estimate to refresh pricing.

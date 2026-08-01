@@ -75,6 +75,10 @@ import {
 } from "./features/measurement/measurementFormTypes";
 import { defaultFormState, hillsdaleFormTemplate } from "./features/measurement/measurementFormDefaults";
 import {
+  accessSurchargeLabel,
+  accessSurchargePerSquare,
+} from "./features/measurement/accessSurcharge";
+import {
   normalizeProposalState,
   type ProposalProfile,
   type ProposalState,
@@ -232,17 +236,6 @@ interface SavedJob {
   /** When set, Save/Print updates this contract instead of creating a new one. */
   contractId?: string;
   estimateId?: string;
-}
-
-interface SavedApiReport {
-  id: number;
-  total_area_sqft: number;
-  roof_sections: number;
-  created_at: string;
-  address?: string;
-  state?: string;
-  pitch?: string;
-  features?: Array<Record<string, unknown>>;
 }
 
 interface PropertyOwnerRecord {
@@ -660,8 +653,6 @@ type PricingCatalogLine = {
   tax: number;
 };
 
-const STEEP_SURCHARGE: Record<string, number> = { "4-6": 18.50, "7-9": 32.00, "10+": 55.00 };
-const HEIGHT_SURCHARGE: Record<string, number> = { "2story": 8.10, "3story": 15.50, "4story": 24.00 };
 const GENERAL_CONDITIONS: MaterialLineItem[] = [
   { code: "GEN-DMP", description: "Dumpster load (~40 yds)", unit: "EA", replace: 913, qtyFn: "dumpster" },
   { code: "GEN-SAF", description: "Safety: fall protection setup", unit: "EA", replace: 385, qtyFn: "fixed1" },
@@ -1653,8 +1644,22 @@ function buildScopeLines(
 
   appendEstimateAddonScopeLines(lines, form, profile, scope, effectiveSquares, regional, lengths);
 
-  void STEEP_SURCHARGE;
-  void HEIGHT_SURCHARGE;
+  // Steep-slope and multi-story access cost real labor; price it as its own visible line
+  // rather than burying it in the per-square rate.
+  const accessPitchRise = parsePitchRise(form.roofPitch);
+  const accessStories = Number.parseFloat(form.stories) || null;
+  const accessPerSq = accessSurchargePerSquare(accessPitchRise, accessStories);
+  const accessLabel = accessSurchargeLabel(accessPitchRise, accessStories);
+  if (accessPerSq > 0 && effectiveSquares > 0 && accessLabel) {
+    lines.push({
+      code: "ACC-STEEP",
+      description: `Steep / height access (${accessLabel})`,
+      quantity: round2(effectiveSquares),
+      unit: "SQ",
+      unitCost: round2(accessPerSq * regional),
+      total: 0,
+    });
+  }
 
   const materialSubtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
   if (materialSubtotal > 0) {
@@ -3000,9 +3005,6 @@ function App() {
   const [aiMeasureBusy, setAiMeasureBusy] = useState(false);
   const [aiMeasureNote, setAiMeasureNote] = useState("");
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
-  const [savedReports, setSavedReports] = useState<SavedApiReport[]>([]);
-  const [reportsBusy, setReportsBusy] = useState(false);
-  const [reportsStatus, setReportsStatus] = useState("");
   const [geoStatus, setGeoStatus] = useState("");
   const [geoBusy, setGeoBusy] = useState(false);
   const [propertyEnrichBusy, setPropertyEnrichBusy] = useState(false);
@@ -3160,11 +3162,6 @@ function App() {
       profile: org.defaultTemplateProfile,
     }));
   }, [storageUserId]);
-
-  useEffect(() => {
-    fetchSavedReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const lat = Number.parseFloat(form.latitude);
@@ -4936,63 +4933,6 @@ function App() {
     for (const line of drawnRoofLines) sums[line.type] += line.lengthFt;
     return sums;
   }, [drawnRoofLines]);
-  const saveMapboxReport = async () => {
-    if (!mapboxFeatures.length || mapboxAreaSqFt <= 0) {
-      toast.error("Draw roof polygons before saving.");
-      return;
-    }
-    try {
-      const res = await fetch("http://localhost:5000/api/report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          features: mapboxFeatures,
-          area: mapboxAreaSqFt,
-          address: form.address,
-          state: form.stateCode,
-          pitch: form.roofPitch,
-        }),
-      });
-      if (!res.ok) throw new Error("Report save failed");
-      toast.success("Map report saved.");
-      await fetchSavedReports();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Report save failed");
-    }
-  };
-
-  const fetchSavedReports = async () => {
-    setReportsBusy(true);
-    setReportsStatus("Loading saved reports...");
-    try {
-      const res = await fetch("http://localhost:5000/api/reports");
-      if (!res.ok) throw new Error("Unable to load reports");
-      const data = await parseJsonResponse<SavedApiReport[]>(res, "Saved reports");
-      setSavedReports(Array.isArray(data) ? data : []);
-      setReportsStatus(`Loaded ${Array.isArray(data) ? data.length : 0} report(s).`);
-    } catch (error) {
-      setReportsStatus(
-        error instanceof Error ? `Report load failed: ${error.message}` : "Report load failed.",
-      );
-    } finally {
-      setReportsBusy(false);
-    }
-  };
-
-  const loadSavedReportToForm = (report: SavedApiReport) => {
-    const area = Number(report.total_area_sqft || 0);
-    setForm((curr) => ({
-      ...curr,
-      areaSqFt: area > 0 ? area.toFixed(2) : curr.areaSqFt,
-      measuredSquares: area > 0 ? (area / 100).toFixed(2) : curr.measuredSquares,
-      address: report.address || curr.address,
-      stateCode: (report.state || curr.stateCode).toUpperCase().slice(0, 2),
-      roofPitch: report.pitch || curr.roofPitch,
-    }));
-    setMapboxFeatures(report.features ?? []);
-    setMapboxAreaSqFt(area > 0 ? area : 0);
-    setRunId((id) => id + 1);
-  };
 
   const applyProposalProfile = (profile: ProposalProfile) => {
     setProposal((curr) => {
@@ -6090,9 +6030,6 @@ function App() {
             <button className="secondary-btn" onClick={applyDrawnAreaToEstimate}>
               Apply All Measurements To Estimate
             </button>
-            <button className="secondary-btn" onClick={saveMapboxReport}>
-              Save Draw Report (API)
-            </button>
             {drawnRoofLines.length > 0 ? (
               <button className="secondary-btn danger" onClick={clearAllRoofLines}>
                 Clear All Lines
@@ -6148,39 +6085,6 @@ function App() {
             </>
           ) : null}
 
-          <h3>Saved Draw Reports</h3>
-          <div className="actions-row">
-            <button
-              className="secondary-btn"
-              onClick={fetchSavedReports}
-              disabled={reportsBusy}
-            >
-              {reportsBusy ? "Refreshing..." : "Refresh Reports"}
-            </button>
-            {reportsStatus ? <span className="muted">{reportsStatus}</span> : null}
-          </div>
-          {savedReports.length > 0 ? (
-            <div className="tiles">
-              {savedReports.slice(0, 24).map((report) => (
-                <div key={report.id} className="tile">
-                  <span>{new Date(report.created_at).toLocaleString()}</span>
-                  <strong>{report.address || "Unknown property"}</strong>
-                  <span>
-                    {Number(report.total_area_sqft || 0).toFixed(2)} sq ft | Sections:{" "}
-                    {report.roof_sections}
-                  </span>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => loadSavedReportToForm(report)}
-                  >
-                    Load Into Estimate
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">No saved draw reports yet.</p>
-          )}
 
           <h3>Contacts</h3>
           <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
