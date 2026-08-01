@@ -75,6 +75,7 @@ async function readJsonResponse(res: Response): Promise<unknown> {
  */
 export async function fetchDealMachinePropertyByAddress(
   criteria: UsAddressSearchCriteria,
+  token?: string,
 ): Promise<DealMachineSearchOk | DealMachineSearchErr> {
   if (!criteria.street_address?.trim() || !criteria.city?.trim() || !criteria.state?.trim()) {
     return { ok: false, message: "Street, city, and state are required for property lookup." };
@@ -100,6 +101,8 @@ export async function fetchDealMachinePropertyByAddress(
     "Content-Type": "application/json",
     Accept: "application/json",
   };
+  // The Worker requires a signed-in caller: each lookup bills the org's DealMachine quota.
+  if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`;
 
   let res: Response;
   try {

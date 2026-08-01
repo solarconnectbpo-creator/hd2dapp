@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { ImagePlus, Send, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "./ui/utils";
+import { useAuth } from "../context/AuthContext";
 import { useMeasurementChatBridge } from "../context/MeasurementChatBridge";
 import { fetchWithRetry } from "../lib/fetchWithRetry";
 import { getHd2dApiBase, isHd2dApiConfigured } from "../lib/hd2dApiBase";
@@ -46,6 +47,8 @@ function splitName(full: string): { firstName: string; lastName: string } {
 }
 
 export function EstimatorChatWidget() {
+  const { session } = useAuth();
+  const authToken = session?.token ?? "";
   const { getBridge } = useMeasurementChatBridge();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<CopilotMode>("general");
@@ -106,7 +109,12 @@ export function EstimatorChatWidget() {
       const base = getHd2dApiBase();
       const res = await fetch(`${base}/api/ghl/submit-lead`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          // Worker requires a signed-in caller: this writes into the org's CRM.
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({
           firstName: firstName || undefined,
           lastName: lastName || undefined,

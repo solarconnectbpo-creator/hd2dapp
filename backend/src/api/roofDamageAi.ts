@@ -1,10 +1,12 @@
+import type { AuthEnv } from "./authRoutes";
+import { getBearerPayload } from "./authRoutes";
 /**
  * POST /api/ai/roof-damage — vision-assisted draft of damage types, severity, and action from roof photos.
  */
 
-interface Env {
+type Env = AuthEnv & {
   OPENAI_API_KEY?: string;
-}
+};
 
 type RoofDamageAiBody = {
   imageUrl?: string;
@@ -142,6 +144,15 @@ export async function handleRoofDamageAi(
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
+  }
+
+  // Vision calls bill against the org's OpenAI key — require a signed-in caller.
+  const authPayload = await getBearerPayload(request, env);
+  if (!authPayload) {
+    return new Response(JSON.stringify({ success: false, error: "Sign in required." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   if (!env.OPENAI_API_KEY?.trim()) {

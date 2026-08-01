@@ -16,6 +16,7 @@ import {
 } from "../../lib/fieldProjectTypes";
 import { compressImageFileToJpegDataUrl, dataUrlToBase64Payload } from "../../lib/fieldPhotoCompress";
 import { postRoofDamageDraft } from "../../lib/roofDamageClient";
+import { useAuth } from "../../context/AuthContext";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
 
@@ -54,6 +55,8 @@ type ListSortKey = "updated" | "name" | "value" | "stage";
 
 export function FieldProjectsPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { session } = useAuth();
+  const authToken = session?.token ?? "";
 
   const {
     fieldProjects,
@@ -294,6 +297,7 @@ export function FieldProjectsPanel() {
         imageBase64: base64,
         mimeType,
         context: contextHint || undefined,
+        token: authToken,
       });
       if (!res.ok) {
         setImportError(res.error);

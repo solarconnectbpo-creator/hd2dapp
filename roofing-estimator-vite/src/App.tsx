@@ -2967,7 +2967,8 @@ function buildProposalHtml(
 }
 
 function App() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const authToken = session?.token ?? "";
   const storageUserId = user?.id ?? null;
   const [searchParams, setSearchParams] = useSearchParams();
   /** Captured once for /measurement/new?auto=1 instant estimate (avoid stale searchParams in one-shot import effect). */
@@ -3601,7 +3602,7 @@ function App() {
   ): Promise<PropertyOwnerRecord> => {
     if (!criteria || !isDealMachineLikelyConfigured()) return base;
     if (propertyOwnerRecordHasRequiredContact(base)) return base;
-    const dm = await fetchDealMachinePropertyByAddress(criteria);
+    const dm = await fetchDealMachinePropertyByAddress(criteria, authToken);
     if (!dm.ok) {
       setGeoStatus((curr) => (curr ? `${curr} | Property lookup: ${dm.message}` : `Property lookup: ${dm.message}`));
       return base;
