@@ -839,9 +839,9 @@ export function FieldProjectsPanel() {
               ) : null}
 
               {selected.aiReport ? (
-                <div className="rounded-lg border border-black/10 bg-white p-3">
+                <div className="hd2d-report-panel rounded-lg border p-3">
                   <p className="mb-2 text-sm font-medium text-black">AI storm damage report</p>
-                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-black/80">
+                  <pre className="hd2d-report-body m-0 max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed">
                     {selected.aiReport}
                   </pre>
                 </div>

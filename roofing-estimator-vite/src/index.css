@@ -1293,3 +1293,133 @@ html body #root .canvass-light-sheet.canvass-property-sheet textarea {
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
+/*
+ * Light ink panels (storm damage sheet, report cards, light modals).
+ * Global utilities remap `.bg-white` → `--x-surface` and `.text-black*` / `h3` / `label`
+ * → chrome colors, which reads as blue/gray type on a black box. Force paper + ink.
+ */
+html body #root .hd2d-light-ink {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+html body #root .hd2d-light-ink .bg-white,
+html body #root .hd2d-light-ink .bg-white\/70,
+html body #root .hd2d-light-ink .bg-white\/80,
+html body #root .hd2d-light-ink .bg-white\/90,
+html body #root .hd2d-light-ink .bg-slate-50,
+html body #root .hd2d-light-ink .bg-gray-50 {
+  background-color: #ffffff !important;
+}
+
+html body #root .hd2d-light-ink h1,
+html body #root .hd2d-light-ink h2,
+html body #root .hd2d-light-ink h3 {
+  color: #0f172a !important;
+}
+
+html body #root .hd2d-light-ink p,
+html body #root .hd2d-light-ink span,
+html body #root .hd2d-light-ink li,
+html body #root .hd2d-light-ink summary {
+  color: #0f172a;
+}
+
+html body #root .hd2d-light-ink label {
+  color: #475569 !important;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+html body #root .hd2d-light-ink .text-black,
+html body #root .hd2d-light-ink .text-black\/80,
+html body #root .hd2d-light-ink .text-black\/70,
+html body #root .hd2d-light-ink .text-black\/60,
+html body #root .hd2d-light-ink .text-black\/50,
+html body #root .hd2d-light-ink .text-slate-600,
+html body #root .hd2d-light-ink .text-zinc-950 {
+  color: #0f172a !important;
+}
+
+html body #root .hd2d-light-ink .text-zinc-600,
+html body #root .hd2d-light-ink .text-muted-foreground {
+  color: #475569 !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-report-panel {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-report-body,
+html body #root .hd2d-light-ink pre {
+  color: #334155 !important;
+  background: transparent !important;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-ink-muted {
+  color: #64748b !important;
+}
+
+html body #root .hd2d-light-ink .hd2d-ink-accent {
+  color: #0f766e !important;
+}
+
+/* Default chrome `button` is dark + --x-text (reads blue-gray). Light panels need ink. */
+html body #root .hd2d-light-ink button {
+  color: #0f172a;
+}
+
+html body #root .hd2d-light-ink button.hd2d-btn-on-dark,
+html body #root .hd2d-light-ink button.hd2d-btn-primary {
+  color: #ffffff !important;
+  background-color: #0f172a !important;
+  border-color: transparent !important;
+}
+
+html body #root .hd2d-light-ink button.hd2d-btn-accent {
+  color: #ffffff !important;
+  background-color: #0f766e !important;
+  border-color: transparent !important;
+}
+
+html body #root .hd2d-light-ink button.hd2d-btn-secondary {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+html body #root .hd2d-light-ink input[type="checkbox"] {
+  background-color: #ffffff !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  border-radius: 0.25rem;
+}
+
+/* Same report ink fixes inside existing canvass light modals (Projects). */
+html body #root .canvass-light-sheet .hd2d-report-panel {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html body #root .canvass-light-sheet .hd2d-report-body,
+html body #root .canvass-light-sheet pre.hd2d-report-body {
+  color: #334155 !important;
+  background: transparent !important;
+}
+
+html body #root .canvass-light-sheet .text-black\/80,
+html body #root .canvass-light-sheet .text-black\/70,
+html body #root .canvass-light-sheet .text-black\/60,
+html body #root .canvass-light-sheet .text-black\/50 {
+  color: #334155 !important;
+}
+
+html body #root .canvass-light-sheet h3 {
+  color: #0f172a !important;
+}
+
