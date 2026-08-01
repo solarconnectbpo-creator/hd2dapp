@@ -676,11 +676,11 @@ ul {
   color: #000000;
 }
 
-/* ── Professional Results Section ── */
+/* ── Professional Results Section (dark shell) ── */
 
 .result-hero {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 2px solid #d4af37;
+  background: linear-gradient(135deg, rgba(29, 155, 240, 0.12) 0%, rgba(212, 175, 55, 0.08) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.45);
   border-radius: 12px;
   padding: 20px 24px;
   text-align: center;
@@ -697,21 +697,21 @@ ul {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #000000;
+  color: var(--x-muted);
   font-weight: 600;
 }
 
 .result-hero-value {
   font-size: 36px;
   font-weight: 800;
-  color: #000000;
+  color: var(--x-text);
   letter-spacing: -0.01em;
 }
 
 .result-hero-meta {
   margin-top: 10px;
   font-size: 12px;
-  color: #000000;
+  color: var(--x-muted);
 }
 
 .result-grid-2 {
@@ -722,8 +722,8 @@ ul {
 }
 
 .result-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--x-surface);
+  border: 1px solid var(--x-border);
   border-radius: 10px;
   padding: 14px 16px;
 }
@@ -732,10 +732,10 @@ ul {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #000000;
+  color: var(--x-muted);
   font-weight: 700;
   margin-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--x-border);
   padding-bottom: 6px;
 }
 
@@ -748,11 +748,11 @@ ul {
 }
 
 .result-card-row span {
-  color: #000000;
+  color: var(--x-muted);
 }
 
 .result-card-row strong {
-  color: #000000;
+  color: var(--x-text);
   font-weight: 600;
   text-align: right;
   max-width: 60%;
@@ -764,30 +764,35 @@ ul {
 .result-table-wrap {
   overflow-x: auto;
   margin-bottom: 8px;
+  border: 1px solid var(--x-border);
+  border-radius: 10px;
+  background: var(--x-surface);
 }
 
 .result-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  color: var(--x-text);
 }
 
 .result-table th {
-  background: #f3f4f6;
-  color: #000000;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--x-muted);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 7px 10px;
-  border-bottom: 2px solid #d1d5db;
+  border-bottom: 1px solid var(--x-border);
   text-align: left;
 }
 
 .result-table td {
   padding: 6px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #000000;
+  border-bottom: 1px solid var(--x-border);
+  color: var(--x-text);
+  background: transparent;
 }
 
 .result-table .r {
@@ -797,12 +802,12 @@ ul {
 .result-table .code-cell {
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: 12px;
-  color: #000000;
+  color: #7dd3fc;
   white-space: nowrap;
 }
 
 .result-table tbody tr:hover td {
-  background: #f9fafb;
+  background: var(--x-surface-hover);
 }
 
 .result-table.compact th,
@@ -812,22 +817,22 @@ ul {
 }
 
 .result-table .subtotal-row td {
-  border-top: 2px solid #d1d5db;
+  border-top: 1px solid var(--x-border);
   font-weight: 700;
-  color: #000000;
-  background: #f3f4f6;
+  color: var(--x-text);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .result-table.summary td:first-child {
-  color: #000000;
+  color: var(--x-muted);
 }
 
 .result-table .grand-total-row td {
-  border-top: 2px solid #d4af37;
+  border-top: 2px solid rgba(212, 175, 55, 0.55);
   font-weight: 800;
   font-size: 15px;
-  color: #000000;
-  background: #fffbeb;
+  color: var(--x-text);
+  background: rgba(212, 175, 55, 0.12);
   padding: 10px;
 }
 
@@ -835,8 +840,8 @@ ul {
   text-align: center;
   margin: 8px 0 16px;
   padding: 12px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--x-surface);
+  border: 1px solid var(--x-border);
   border-radius: 10px;
   overflow-x: auto;
 }
@@ -855,9 +860,9 @@ ul {
   position: relative;
   padding: 6px 10px 6px 22px;
   font-size: 13px;
-  color: #000000;
-  background: #fef9c3;
-  border: 1px solid #eab308;
+  color: #fde68a;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.4);
   border-radius: 6px;
   margin-bottom: 6px;
 }
