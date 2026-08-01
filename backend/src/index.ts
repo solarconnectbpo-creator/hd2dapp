@@ -27,6 +27,7 @@ import { handleCoursesCatalogGet, handleAdminCoursesCatalogRoutes } from "./api/
 import { handleLeadsCheckoutSession, type LeadsCheckoutEnv } from "./api/leadsCheckout";
 import { handleMarketplaceRoutes } from "./api/marketplaceRoutes";
 import { handleCoxEstimateRoutes } from "./api/coxEstimateRoutes";
+import { handleWorkspaceRoutes } from "./api/workspaceRoutes";
 import { handleOrgWorkspaceRoutes } from "./api/orgWorkspaceRoutes";
 import { releaseExpiredReservations } from "./marketplace/marketplaceDb";
 import { handleCallCenterCheckoutSession, type CallCenterCheckoutEnv } from "./api/callCenterCheckout";
@@ -271,6 +272,9 @@ const worker = {
       } else if (path.startsWith("/api/leads/marketplace")) {
         const mr = await handleMarketplaceRoutes(request, env as AuthEnv, path, corsHeaders);
         if (mr) return mr;
+      } else if (path.startsWith("/api/workspace")) {
+        const ws = await handleWorkspaceRoutes(request, env as AuthEnv, path, corsHeaders);
+        if (ws) return ws;
       } else if (path.startsWith("/api/estimates")) {
         const coxRes = await handleCoxEstimateRoutes(request, env as AuthEnv, path, corsHeaders);
         if (coxRes) return coxRes;

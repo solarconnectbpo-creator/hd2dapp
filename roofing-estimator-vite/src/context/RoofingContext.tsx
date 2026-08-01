@@ -1,6 +1,25 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAuth } from "./AuthContext";
 import { getScopedStorageKey } from "../lib/userScopedStorage";
+import {
+  applyRemote,
+  commitPush,
+  diffLocal,
+  emptySyncMeta,
+  type PushRecord,
+  type SyncMeta,
+  type WorkspaceKind,
+} from "../lib/workspaceSyncEngine";
+import { pullWorkspaceRecords, pushWorkspaceRecords } from "../lib/workspaceSyncClient";
 import {
   type DamagePhoto,
   type DamagePhotoAiSummary,
@@ -141,7 +160,22 @@ interface RoofingContextType {
   getMeasurementById: (id: string) => Measurement | undefined;
   getEstimateById: (id: string) => Estimate | undefined;
   getFieldProjectById: (id: string) => FieldProject | undefined;
+  /** Remove an estimate (and any measurement no longer referenced by another estimate). */
+  deleteEstimate: (id: string) => void;
+  deleteContract: (id: string) => void;
+  deleteMeasurement: (id: string) => void;
+  /** Server sync state for the "saved to your account" indicator. */
+  sync: WorkspaceSyncState;
+  /** Force a pull+push cycle (e.g. a Retry button). */
+  syncNow: () => void;
 }
+
+export type WorkspaceSyncState = {
+  /** 'off' when signed out or the API is unreachable-by-config. */
+  status: "off" | "idle" | "syncing" | "error";
+  lastSyncedAt: number | null;
+  error: string | null;
+};
 
 const RoofingContext = createContext<RoofingContextType | undefined>(undefined);
 
@@ -208,9 +242,44 @@ function newPhotoId(): string {
   return `ph-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Collections mirrored to the Worker, in the order they are pulled. */
+const SYNC_KINDS: WorkspaceKind[] = ["measurement", "estimate", "contract", "field_project"];
+
+const SYNC_META_KEY_BASE = "roofing-workspace-sync-meta-v1";
+
+type SyncMetaByKind = Partial<Record<WorkspaceKind, SyncMeta>>;
+
+function loadSyncMeta(): SyncMetaByKind {
+  if (typeof window === "undefined") return {};
+  const key = getScopedStorageKey(SYNC_META_KEY_BASE);
+  if (!key) return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as SyncMetaByKind) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSyncMeta(meta: SyncMetaByKind): void {
+  if (typeof window === "undefined") return;
+  const key = getScopedStorageKey(SYNC_META_KEY_BASE);
+  if (!key) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(meta));
+  } catch {
+    // Quota exceeded — sync still works, it just re-pushes more than needed next time.
+  }
+}
+
+function metaFor(all: SyncMetaByKind, kind: WorkspaceKind): SyncMeta {
+  return all[kind] ?? emptySyncMeta();
+}
+
 export function RoofingProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const storageUserId = user?.id ?? null;
+  const token = session?.token ?? "";
 
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
@@ -265,11 +334,178 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined" || !storageUserId) return;
     const key = getScopedStorageKey(LS_KEY_BASE);
     if (!key) return;
-    window.localStorage.setItem(
-      key,
-      JSON.stringify({ measurements, estimates, contracts, fieldProjects }),
-    );
+    try {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ measurements, estimates, contracts, fieldProjects }),
+      );
+    } catch (e) {
+      // Local cache is best-effort; the server copy is the durable one.
+      console.warn("[roofing] local cache write failed (quota?)", e);
+    }
   }, [measurements, estimates, contracts, fieldProjects, storageUserId]);
+
+  // ---- Server sync -------------------------------------------------------
+  // localStorage above is a fast offline cache; D1 via /api/workspace is the source of truth.
+
+  const [sync, setSync] = useState<WorkspaceSyncState>({
+    status: "off",
+    lastSyncedAt: null,
+    error: null,
+  });
+
+  const syncMetaRef = useRef<SyncMetaByKind>({});
+  const runningRef = useRef(false);
+  const rerunRef = useRef(false);
+  const hydratedRef = useRef(false);
+  // Read collections inside the sync loop without making it a dependency.
+  const latestRef = useRef({ measurements, estimates, contracts, fieldProjects });
+  latestRef.current = { measurements, estimates, contracts, fieldProjects };
+
+  useEffect(() => {
+    hydratedRef.current = false;
+    syncMetaRef.current = storageUserId ? loadSyncMeta() : {};
+    setSync({ status: storageUserId ? "idle" : "off", lastSyncedAt: null, error: null });
+  }, [storageUserId]);
+
+  const runSync = useCallback(async () => {
+    if (!token || !storageUserId) return;
+    if (runningRef.current) {
+      rerunRef.current = true;
+      return;
+    }
+    runningRef.current = true;
+    setSync((s) => ({ ...s, status: "syncing", error: null }));
+
+    try {
+      const meta = { ...syncMetaRef.current };
+
+      // 1) Pull anything changed on other devices since our watermark.
+      const lowestWatermark = SYNC_KINDS.reduce(
+        (min, kind) => Math.min(min, metaFor(meta, kind).watermark),
+        Number.POSITIVE_INFINITY,
+      );
+      const since = Number.isFinite(lowestWatermark) ? lowestWatermark : 0;
+      const pulled = await pullWorkspaceRecords(token, SYNC_KINDS, since);
+
+      const byKind = new Map<WorkspaceKind, typeof pulled.records>();
+      for (const rec of pulled.records) {
+        const list = byKind.get(rec.kind) ?? [];
+        list.push(rec);
+        byKind.set(rec.kind, list);
+      }
+
+      const applyKind = <T,>(
+        kind: WorkspaceKind,
+        items: T[],
+        getId: (t: T) => string,
+        toItem: (d: unknown) => T | null,
+        setItems: (next: T[]) => void,
+      ) => {
+        const res = applyRemote(items, byKind.get(kind) ?? [], getId, metaFor(meta, kind), toItem);
+        meta[kind] = res.nextMeta;
+        if (res.changed) setItems(res.items);
+        return res.items;
+      };
+
+      const cur = latestRef.current;
+      const nextMeasurements = applyKind<Measurement>(
+        "measurement",
+        cur.measurements,
+        (m) => m.id,
+        (d) => (d && typeof d === "object" ? normalizeMeasurement(d as Record<string, unknown>) : null),
+        setMeasurements,
+      );
+      const nextEstimates = applyKind<Estimate>(
+        "estimate",
+        cur.estimates,
+        (e) => e.id,
+        (d) => (d && typeof d === "object" && typeof (d as Estimate).id === "string" ? (d as Estimate) : null),
+        setEstimates,
+      );
+      const nextContracts = applyKind<Contract>(
+        "contract",
+        cur.contracts,
+        (c) => c.id,
+        (d) => (d && typeof d === "object" && typeof (d as Contract).id === "string" ? (d as Contract) : null),
+        setContracts,
+      );
+      const nextFieldProjects = applyKind<FieldProject>(
+        "field_project",
+        cur.fieldProjects,
+        (p) => p.id,
+        (d) => (d && typeof d === "object" ? normalizeFieldProject(d as Record<string, unknown>) : null),
+        setFieldProjects,
+      );
+
+      // 2) Push local creates/edits/deletes.
+      const nowSec = Math.floor(Date.now() / 1000);
+      const outgoing: PushRecord[] = [];
+      const stageDiff = <T,>(kind: WorkspaceKind, items: T[], getId: (t: T) => string) => {
+        const d = diffLocal(kind, items, getId, metaFor(meta, kind), nowSec);
+        meta[kind] = d.nextMeta;
+        outgoing.push(...d.push);
+        return d.push;
+      };
+
+      const pushed: PushRecord[] = [
+        ...stageDiff<Measurement>("measurement", nextMeasurements, (m) => m.id),
+        ...stageDiff<Estimate>("estimate", nextEstimates, (e) => e.id),
+        ...stageDiff<Contract>("contract", nextContracts, (c) => c.id),
+        ...stageDiff<FieldProject>("field_project", nextFieldProjects, (p) => p.id),
+      ];
+
+      if (outgoing.length > 0) {
+        const result = await pushWorkspaceRecords(token, outgoing);
+        for (const kind of SYNC_KINDS) {
+          const forKind = pushed.filter((r) => r.kind === kind);
+          if (forKind.length > 0) {
+            meta[kind] = commitPush(metaFor(meta, kind), forKind, result.watermark);
+          }
+        }
+        if (result.rejected.length > 0) {
+          console.warn("[roofing] server rejected records", result.rejected);
+        }
+      }
+
+      for (const kind of SYNC_KINDS) {
+        const m = metaFor(meta, kind);
+        meta[kind] = { ...m, watermark: Math.max(m.watermark, pulled.watermark) };
+      }
+
+      syncMetaRef.current = meta;
+      saveSyncMeta(meta);
+      hydratedRef.current = true;
+      setSync({ status: "idle", lastSyncedAt: Date.now(), error: null });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Sync failed.";
+      // Offline or a 5xx is expected sometimes — local cache still holds the work.
+      setSync((s) => ({ status: "error", lastSyncedAt: s.lastSyncedAt, error: message }));
+    } finally {
+      runningRef.current = false;
+      if (rerunRef.current) {
+        rerunRef.current = false;
+        void runSync();
+      }
+    }
+  }, [token, storageUserId]);
+
+  // Initial hydrate on sign-in.
+  useEffect(() => {
+    if (!token || !storageUserId) return;
+    void runSync();
+  }, [token, storageUserId, runSync]);
+
+  // Debounced push after local edits settle.
+  useEffect(() => {
+    if (!token || !storageUserId || !hydratedRef.current) return;
+    const t = window.setTimeout(() => void runSync(), 1500);
+    return () => window.clearTimeout(t);
+  }, [measurements, estimates, contracts, fieldProjects, token, storageUserId, runSync]);
+
+  const syncNow = useCallback(() => {
+    void runSync();
+  }, [runSync]);
 
   const api = useMemo<RoofingContextType>(
     () => ({
@@ -452,8 +688,26 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       getMeasurementById: (id: string) => measurements.find((m) => m.id === id),
       getEstimateById: (id: string) => estimates.find((e) => e.id === id),
       getFieldProjectById: (id: string) => fieldProjects.find((p) => p.id === id),
+      deleteEstimate: (id: string) => {
+        const removed = estimates.find((e) => e.id === id);
+        setEstimates((prev) => prev.filter((e) => e.id !== id));
+        setContracts((prev) => prev.filter((c) => c.estimateId !== id));
+        // Drop the measurement too when no other estimate still references it.
+        if (removed?.measurementId) {
+          const stillUsed = estimates.some(
+            (e) => e.id !== id && e.measurementId === removed.measurementId,
+          );
+          if (!stillUsed) {
+            setMeasurements((prev) => prev.filter((m) => m.id !== removed.measurementId));
+          }
+        }
+      },
+      deleteContract: (id: string) => setContracts((prev) => prev.filter((c) => c.id !== id)),
+      deleteMeasurement: (id: string) => setMeasurements((prev) => prev.filter((m) => m.id !== id)),
+      sync,
+      syncNow,
     }),
-    [contracts, estimates, fieldProjects, measurements],
+    [contracts, estimates, fieldProjects, measurements, sync, syncNow],
   );
 
   return <RoofingContext.Provider value={api}>{children}</RoofingContext.Provider>;
