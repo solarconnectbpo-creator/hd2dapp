@@ -66,6 +66,7 @@ import {
 import { buildFootprintDxfFromPolygons, type FootprintFeature } from "./lib/roofDxfExport";
 import { compareDrawnVsHeuristic, type TakeoffComparisonRow } from "./lib/roofTakeoffComparison";
 import { getScopedStorageKey } from "./lib/userScopedStorage";
+import { postSmsEvent } from "./lib/smsEmitEvent";
 import { Map3D, type Map3DHandle } from "./components/Map3D";
 import {
   DAMAGE_TYPES,
@@ -4678,6 +4679,16 @@ function App() {
         estimateMarkup: computed.estimateMarkupAmount,
         total: computed.finalCost,
       });
+
+      const smsPhone = (proposal.clientPhone || activeProperty?.ownerPhone || "").trim();
+      if (smsPhone) {
+        void postSmsEvent({
+          event: "estimate.sent",
+          phone: smsPhone,
+          name: proposal.clientName || activeProperty?.ownerName || "",
+          address: preparedWithSectionTotals.address || form.address || "",
+        });
+      }
 
     }
 

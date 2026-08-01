@@ -5,7 +5,8 @@ import {
   updateUserBillingAndStripe,
   updateUserStripeSmsSubscriptionItem,
 } from "../auth/userDb";
-import { finalizePurchaseFromStripe } from "../marketplace/marketplaceDb";
+import { finalizePurchaseFromStripe, listPurchasedAppointments } from "../marketplace/marketplaceDb";
+import { deliverLeadToBuyerCrm, loadOrgCrmSettings } from "../services/crm/orgCrmDelivery";
 import { retryWithBackoffWhen } from "../utils/retry";
 
 export type StripeWebhookEnv = AuthEnv & {
@@ -16,6 +17,8 @@ export type StripeWebhookEnv = AuthEnv & {
   MEMBERSHIP_STRIPE_PRICE_ID?: string;
   MEMBERSHIP_STRIPE_PRICE_ID_SOLO?: string;
   MEMBERSHIP_STRIPE_PRICE_ID_COMPANY?: string;
+  GHL_PRIVATE_INTEGRATION_TOKEN?: string;
+  GHL_LOCATION_ID?: string;
 };
 
 type StripeObj = Record<string, unknown>;
@@ -103,12 +106,85 @@ async function dispatchStripeWebhookEvent(
     const sessionId = typeof obj.id === "string" ? obj.id : "";
     const buyerFromMeta = typeof meta.hd2d_user_id === "string" ? meta.hd2d_user_id.trim() : "";
     const buyerId = buyerFromMeta || clientRef;
-    if (mode === "payment" && aptIdsRaw && sessionId && buyerId) {
-      const ids = aptIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
-      if (ids.length) {
-        const fin = await finalizePurchaseFromStripe(env.DB, buyerId, ids, sessionId);
-        if (!fin.ok) {
-          console.error("[stripe-webhook] marketplace finalize failed", sessionId, buyerId);
+    if (mode === "payment" && sessionId && buyerId) {
+      if (aptIdsRaw) {
+        const ids = aptIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+        if (ids.length) {
+          const fin = await finalizePurchaseFromStripe(env.DB, buyerId, ids, sessionId);
+          if (!fin.ok) {
+            console.error("[stripe-webhook] marketplace finalize failed", sessionId, buyerId);
+          }
+          // Auto-push newly sold appointments into the buyer's CRM when configured.
+          const purchased = await listPurchasedAppointments(env.DB, buyerId);
+          const byId = new Map(purchased.map((r) => [r.id, r]));
+          for (const id of fin.soldIds) {
+            const row = byId.get(id);
+            if (!row) continue;
+            const del = await deliverLeadToBuyerCrm(
+              env.DB,
+              buyerId,
+              {
+                source: "HD2D Buy Leads",
+                name: row.homeowner_name,
+                phone: row.phone,
+                email: row.email,
+                address: row.address,
+                city: row.city,
+                state: row.state,
+                zip: row.zip,
+                notes: row.notes,
+                scheduledAt: row.scheduled_at,
+                appointmentId: row.id,
+                stripeSessionId: sessionId,
+              },
+              env,
+            );
+            if (!del.ok) {
+              console.warn("[stripe-webhook] CRM push failed", id, del.error);
+            }
+          }
+        }
+      } else {
+        // Package-only checkout — record purchase + notify buyer CRM webhook (no inventory PII).
+        const kind = typeof meta.hd2d_checkout_kind === "string" ? meta.hd2d_checkout_kind.trim() : "";
+        if (kind === "leads_package" || !aptIdsRaw) {
+          const priceId = typeof meta.hd2d_price_id === "string" ? meta.hd2d_price_id.trim() : "";
+          const amountTotal = typeof obj.amount_total === "number" ? obj.amount_total : null;
+          const currency = typeof obj.currency === "string" ? obj.currency : null;
+          const t = Math.floor(Date.now() / 1000);
+          const org = await loadOrgCrmSettings(env.DB, buyerId);
+          try {
+            await env.DB.prepare(
+              `INSERT INTO lead_package_purchases
+                 (id, user_id, org_id, stripe_session_id, stripe_price_id, amount_total, currency, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'paid', ?)
+               ON CONFLICT(stripe_session_id) DO NOTHING`,
+            )
+              .bind(crypto.randomUUID(), buyerId, org?.orgId ?? null, sessionId, priceId || null, amountTotal, currency, t)
+              .run();
+          } catch (e) {
+            console.warn("[stripe-webhook] package purchase ledger", e);
+          }
+          if (org?.crmWebhookUrl) {
+            const del = await deliverLeadToBuyerCrm(
+              env.DB,
+              buyerId,
+              {
+                source: "HD2D Lead Package",
+                notes: `Package purchased. Stripe session ${sessionId}${priceId ? ` price ${priceId}` : ""}. Inventory fulfillment may follow separately.`,
+                stripeSessionId: sessionId,
+              },
+              env,
+            );
+            if (del.ok) {
+              await env.DB.prepare(
+                `UPDATE lead_package_purchases SET crm_pushed_at = ? WHERE stripe_session_id = ?`,
+              )
+                .bind(t, sessionId)
+                .run()
+                .catch(() => null);
+            }
+          }
         }
       }
     }

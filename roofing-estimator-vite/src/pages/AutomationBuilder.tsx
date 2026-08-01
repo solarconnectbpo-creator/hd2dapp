@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Seo } from "../components/Seo";
+import { SmsInboxPanel } from "../components/SmsInboxPanel";
 import { useAuth } from "../context/AuthContext";
 import { getHd2dApiBase } from "../lib/hd2dApiBase";
 import { getStoredSession } from "../lib/authClient";
@@ -182,6 +183,8 @@ export function AutomationBuilder() {
   const [canonicalTriggers, setCanonicalTriggers] = useState<string[]>(["manual"]);
   const [setup, setSetup] = useState<SmsSetupStatus | null>(null);
   const [copyHint, setCopyHint] = useState<string | null>(null);
+  const [tab, setTab] = useState<"inbox" | "sequences" | "setup">("inbox");
+  const [enabled, setEnabled] = useState(true);
 
   const stepsJson = useMemo(() => uiStepsToJson(steps), [steps]);
 
@@ -244,6 +247,7 @@ export function AutomationBuilder() {
     if (w) {
       setName(w.name);
       setTrigger(w.trigger || "manual");
+      setEnabled(Number(w.enabled) !== 0);
       const parsed = parseUiSteps(w.steps_json);
       setSteps(parsed ?? [{ key: newKey(), kind: "sms", text: "" }]);
     }
@@ -258,7 +262,7 @@ export function AutomationBuilder() {
       const res = await fetch(`${base}/api/sms/workflows/${encodeURIComponent(selectedId)}`, {
         method: "PUT",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ name, trigger, steps_json: stepsJson }),
+        body: JSON.stringify({ name, trigger, steps_json: stepsJson, enabled }),
       });
       const data = await readJsonResponseBody<{ success?: boolean; error?: string }>(res);
       if (!res.ok || !data.success) {
@@ -268,6 +272,36 @@ export function AutomationBuilder() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createWorkflow() {
+    setBusy(true);
+    setError(null);
+    try {
+      const base = getHd2dApiBase().replace(/\/$/, "");
+      const res = await fetch(`${base}/api/sms/workflows`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "New follow-up",
+          trigger: "manual",
+          steps_json: JSON.stringify({ steps: [{ type: "sms", text: "Hi {{name}}, this is {{company}} — thanks for connecting." }] }),
+          enabled: true,
+        }),
+      });
+      const data = await readJsonResponseBody<{ success?: boolean; workflow?: WorkflowRow; error?: string }>(res);
+      if (!res.ok || !data.success || !data.workflow) {
+        setError(data.error || "Could not create sequence");
+        return;
+      }
+      await load();
+      setSelectedId(data.workflow.id);
+      setTab("sequences");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create sequence");
     } finally {
       setBusy(false);
     }
@@ -342,17 +376,42 @@ export function AutomationBuilder() {
   }
 
   return (
-    <div className="hd2d-page-shell max-w-3xl space-y-8">
-      <Seo title="SMS follow-up - Door to Door Closers" description="Automated SMS follow-up sequences, Telnyx setup, and AI reply drafts." path="/sms-automation" />
+    <div className="hd2d-page-shell max-w-5xl space-y-6">
+      <Seo title="SMS follow-up - Door to Door Closers" description="Text leads, call from your phone, and run automated SMS follow-up sequences." path="/sms-automation" />
       <div>
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#71767b]">Messaging</p>
         <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS follow-up</h1>
-        <p className="text-sm text-[#71767b] mt-2">
-          Design automated text sequences that run when a trigger fires (new lead, no response, etc.). Sending and receiving
-          uses Telnyx once your number is connected below.
+        <p className="mt-2 text-sm text-[#71767b]">
+          Text and call leads, enroll them in follow-up sequences, and connect Telnyx for delivery.
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="SMS sections">
+        {(
+          [
+            ["inbox", "Inbox"],
+            ["sequences", "Sequences"],
+            ["setup", "Setup"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+              tab === id ? "bg-sky-500 text-white" : "bg-white/[0.06] text-[#e7e9ea] hover:bg-white/[0.1]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "inbox" ? <SmsInboxPanel workflows={workflows} /> : null}
+
+      {tab === "sequences" ? (
       <section
         className="rounded-xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.06] to-transparent p-5 ring-1 ring-sky-500/20"
         aria-labelledby="sms-followup-heading"
@@ -375,7 +434,17 @@ export function AutomationBuilder() {
 
         <div className="mt-6 grid gap-6 md:grid-cols-[1fr_2fr]">
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-[#e7e9ea]">Your sequences</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#e7e9ea]">Your sequences</h3>
+              <button
+                type="button"
+                className="rounded-md border border-white/15 bg-white/[0.06] px-2 py-1 text-xs text-[#e7e9ea] hover:bg-white/[0.1]"
+                disabled={busy}
+                onClick={() => void createWorkflow()}
+              >
+                + New
+              </button>
+            </div>
             <ul className="space-y-1">
               {workflows.map((w) => (
                 <li key={w.id}>
@@ -387,6 +456,9 @@ export function AutomationBuilder() {
                     }`}
                   >
                     {w.name}
+                    {Number(w.enabled) === 0 ? (
+                      <span className="ml-2 text-[10px] uppercase text-[#8b9199]">off</span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -420,6 +492,10 @@ export function AutomationBuilder() {
                   ))}
                 </select>
               </div>
+              <label className="flex items-center gap-2 text-sm text-[#e7e9ea]">
+                <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+                Sequence enabled
+              </label>
 
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -547,7 +623,10 @@ export function AutomationBuilder() {
           ) : null}
         </div>
       </section>
+      ) : null}
 
+      {tab === "setup" ? (
+      <>
       <section
         className="rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.07] to-transparent p-5 ring-1 ring-amber-500/15"
         aria-labelledby="sms-setup-heading"
@@ -677,6 +756,8 @@ export function AutomationBuilder() {
           </p>
         ) : null}
       </section>
+      </>
+      ) : null}
     </div>
   );
 }

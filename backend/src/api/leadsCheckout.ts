@@ -163,9 +163,13 @@ export async function handleLeadsCheckoutSession(
   if (payload.email) {
     params.set("customer_email", payload.email);
   }
+  params.set("metadata[hd2d_user_id]", payload.sub);
+  params.set("metadata[hd2d_price_id]", priceId);
   if (appointmentIds.length > 0) {
-    params.set("metadata[hd2d_user_id]", payload.sub);
     params.set("metadata[hd2d_appointment_ids]", appointmentIds.join(","));
+    params.set("metadata[hd2d_checkout_kind]", "leads_appointments");
+  } else {
+    params.set("metadata[hd2d_checkout_kind]", "leads_package");
   }
 
   const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {

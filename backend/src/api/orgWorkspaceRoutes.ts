@@ -72,12 +72,142 @@ export async function handleOrgWorkspaceRoutes(
         .bind(membership.orgId)
         .first<Record<string, unknown>>();
       const profile = await env.DB.prepare(
-        `SELECT phone, website, address, logo_url, updated_at FROM org_profiles WHERE org_id = ?`,
+        `SELECT phone, website, address, logo_url, crm_webhook_url, ghl_location_id,
+                CASE WHEN ghl_api_token IS NOT NULL AND length(trim(ghl_api_token)) > 0 THEN 1 ELSE 0 END AS ghl_token_set,
+                updated_at
+           FROM org_profiles WHERE org_id = ?`,
       )
         .bind(membership.orgId)
         .first<Record<string, unknown>>();
       return new Response(
-        JSON.stringify({ success: true, role: membership.role, organization: org ?? null, profile: profile ?? null }),
+        JSON.stringify({
+          success: true,
+          role: membership.role,
+          organization: org ?? null,
+          profile: profile
+            ? {
+                phone: profile.phone ?? null,
+                website: profile.website ?? null,
+                address: profile.address ?? null,
+                logo_url: profile.logo_url ?? null,
+                crm_webhook_url: profile.crm_webhook_url ?? null,
+                ghl_location_id: profile.ghl_location_id ?? null,
+                ghl_token_set: Number(profile.ghl_token_set) === 1,
+                updated_at: profile.updated_at ?? null,
+              }
+            : null,
+        }),
+        { status: 200, headers: j },
+      );
+    }
+
+    // GET /api/org/crm-delivery
+    if (segments.length === 1 && segments[0] === "crm-delivery" && request.method === "GET") {
+      const profile = await env.DB.prepare(
+        `SELECT crm_webhook_url, ghl_location_id,
+                CASE WHEN ghl_api_token IS NOT NULL AND length(trim(ghl_api_token)) > 0 THEN 1 ELSE 0 END AS ghl_token_set
+           FROM org_profiles WHERE org_id = ?`,
+      )
+        .bind(membership.orgId)
+        .first<{ crm_webhook_url: string | null; ghl_location_id: string | null; ghl_token_set: number }>();
+      return new Response(
+        JSON.stringify({
+          success: true,
+          role: membership.role,
+          crmWebhookUrl: profile?.crm_webhook_url ?? "",
+          ghlLocationId: profile?.ghl_location_id ?? "",
+          ghlTokenSet: Number(profile?.ghl_token_set) === 1,
+        }),
+        { status: 200, headers: j },
+      );
+    }
+
+    // PUT /api/org/crm-delivery — body { crmWebhookUrl?, ghlApiToken?, ghlLocationId?, clearGhlToken? }
+    if (segments.length === 1 && segments[0] === "crm-delivery" && (request.method === "PUT" || request.method === "PATCH")) {
+      if (!canManage(membership.role)) {
+        return new Response(JSON.stringify({ success: false, error: "Owner or admin role required." }), {
+          status: 403,
+          headers: j,
+        });
+      }
+      let body: {
+        crmWebhookUrl?: string;
+        ghlApiToken?: string;
+        ghlLocationId?: string;
+        clearGhlToken?: boolean;
+      } = {};
+      try {
+        body = (await request.json()) as typeof body;
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: "Invalid JSON body." }), {
+          status: 400,
+          headers: j,
+        });
+      }
+      const t = nowSec();
+      const existing = await env.DB.prepare(
+        `SELECT phone, website, address, logo_url, crm_webhook_url, ghl_api_token, ghl_location_id FROM org_profiles WHERE org_id = ?`,
+      )
+        .bind(membership.orgId)
+        .first<{
+          phone: string | null;
+          website: string | null;
+          address: string | null;
+          logo_url: string | null;
+          crm_webhook_url: string | null;
+          ghl_api_token: string | null;
+          ghl_location_id: string | null;
+        }>();
+
+      let webhook = existing?.crm_webhook_url ?? null;
+      if (body.crmWebhookUrl !== undefined) {
+        const u = body.crmWebhookUrl.trim();
+        if (u && !/^https:\/\//i.test(u)) {
+          return new Response(JSON.stringify({ success: false, error: "CRM webhook must be an https:// URL." }), {
+            status: 400,
+            headers: j,
+          });
+        }
+        webhook = u.slice(0, 1000) || null;
+      }
+      let ghlLoc = existing?.ghl_location_id ?? null;
+      if (body.ghlLocationId !== undefined) {
+        ghlLoc = body.ghlLocationId.trim().slice(0, 80) || null;
+      }
+      let ghlTok = existing?.ghl_api_token ?? null;
+      if (body.clearGhlToken) ghlTok = null;
+      else if (typeof body.ghlApiToken === "string" && body.ghlApiToken.trim()) {
+        ghlTok = body.ghlApiToken.trim().slice(0, 500);
+      }
+
+      await env.DB.prepare(
+        `INSERT INTO org_profiles (org_id, phone, website, address, logo_url, crm_webhook_url, ghl_api_token, ghl_location_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(org_id) DO UPDATE SET
+           crm_webhook_url = excluded.crm_webhook_url,
+           ghl_api_token = excluded.ghl_api_token,
+           ghl_location_id = excluded.ghl_location_id,
+           updated_at = excluded.updated_at`,
+      )
+        .bind(
+          membership.orgId,
+          existing?.phone ?? null,
+          existing?.website ?? null,
+          existing?.address ?? null,
+          existing?.logo_url ?? null,
+          webhook,
+          ghlTok,
+          ghlLoc,
+          t,
+        )
+        .run();
+      return new Response(
+        JSON.stringify({
+          success: true,
+          crmWebhookUrl: webhook ?? "",
+          ghlLocationId: ghlLoc ?? "",
+          ghlTokenSet: Boolean(ghlTok),
+        }),
         { status: 200, headers: j },
       );
     }
