@@ -100,14 +100,14 @@ export function Estimates() {
                     <p className="text-sm text-[var(--x-muted)]">Tax</p>
                     <p className="text-lg">{money(estimate.tax)}</p>
                   </div>
-                  {estimate.rcvBeforeMarkup != null && estimate.estimateMarkup != null ? (
+                  {estimate.estimateMarkup != null && estimate.estimateMarkup > 0 ? (
                     <>
                       <div>
                         <p className="text-sm text-[var(--x-muted)]">Cost basis (line items + tax)</p>
-                        <p className="text-lg">{money(estimate.rcvBeforeMarkup)}</p>
+                        <p className="text-lg">{money(estimate.rcvBeforeMarkup ?? estimate.subtotal + estimate.tax)}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-[var(--x-muted)]">Profit markup (+50%)</p>
+                        <p className="text-sm text-[var(--x-muted)]">Legacy markup</p>
                         <p className="text-lg">{money(estimate.estimateMarkup)}</p>
                       </div>
                     </>

@@ -206,9 +206,9 @@ interface EstimateResult {
   drawingMeasurements: DrawingMeasurement[];
   lineItemTotal: number;
   materialSalesTax: number;
-  /** Line items + material sales tax, before estimate markup. */
+  /** Line items + material sales tax (= RCV; kept for saved-estimate fields). */
   rcvSubtotalBeforeMarkup: number;
-  /** Added to `rcvSubtotalBeforeMarkup` so RCV = × ESTIMATE_TOTAL_MARKUP_MULTIPLIER. */
+  /** Always 0 — global +50% RCV markup removed. */
   estimateMarkupAmount: number;
   replacementCostValue: number;
   depreciation: number;
@@ -596,12 +596,6 @@ function inferPropertyTypeFromParcel(parcel: Record<string, unknown> | null): "r
 function money(n: number): string {
   return `$${Math.round(n).toLocaleString()}`;
 }
-
-/**
- * Applied after line items + reference material sales tax to produce RCV / proposal total.
- * Default 1.5 = 50% markup on RCV subtotal (adjust only with pricing policy review).
- */
-const ESTIMATE_TOTAL_MARKUP_MULTIPLIER = 1.5;
 
 // ── MOSL8X_OCT25 Material Pricing Database (from AI cheat sheet CSVs) ──
 
@@ -1907,8 +1901,8 @@ function buildResult(form: FormState): EstimateResult | null {
     lineItemTotal * getReferenceMaterialSalesTaxRate(form.stateCode),
   );
   const rcvSubtotalBeforeMarkup = lineItemTotal + materialSalesTax;
-  const replacementCostValue = Math.round(rcvSubtotalBeforeMarkup * ESTIMATE_TOTAL_MARKUP_MULTIPLIER);
-  const estimateMarkupAmount = replacementCostValue - rcvSubtotalBeforeMarkup;
+  const replacementCostValue = Math.round(rcvSubtotalBeforeMarkup);
+  const estimateMarkupAmount = 0;
   const depreciationRate = clamp(0.15 + form.severity * 0.05, 0.2, 0.45);
   const depreciation = Math.round(replacementCostValue * depreciationRate);
   const actualCashValue = Math.max(0, replacementCostValue - depreciation);
@@ -2079,15 +2073,14 @@ function buildReportText(form: FormState, result: EstimateResult): string {
     `  ${"".padEnd(50)} ${"─".repeat(9)} ${"─".repeat(11)}`,
     `  ${"Subtotal".padEnd(60)} ${money(result.lineItemTotal).padStart(11)}`,
     `  ${"Material Sales Tax".padEnd(60)} ${money(result.materialSalesTax).padStart(11)}`,
-    `  ${"RCV subtotal (pre-markup)".padEnd(60)} ${money(result.rcvSubtotalBeforeMarkup).padStart(11)}`,
-    `  ${"Estimate adjustment (+50%)".padEnd(60)} ${money(result.estimateMarkupAmount).padStart(11)}`,
+    `  ${"RCV".padEnd(60)} ${money(result.replacementCostValue).padStart(11)}`,
     "",
     "▸ ESTIMATE SUMMARY",
     `  Scope ..................... ${result.scope.toUpperCase()}`,
     `  Total squares (takeoff) .. ${result.surfaceSquares} SQ (surface, before waste)`,
     `  Effective squares ........ ${result.effectiveSquares} SQ (incl. ${result.wastePct}% waste)`,
     `  Regional Multiplier ...... ×${result.regional.toFixed(2)} (${form.stateCode})`,
-    `  RCV (after +50% adjustment) ${money(result.replacementCostValue)}`,
+    `  RCV ...................... ${money(result.replacementCostValue)}`,
     `  Less Depreciation ........ (${money(result.depreciation)})`,
     `  ACV ...................... ${money(result.actualCashValue)}`,
     `  Confidence ............... ${result.confidence}`,
@@ -2225,13 +2218,12 @@ function buildProposalText(form: FormState, result: EstimateResult, proposal: Pr
     `  ${"".padEnd(50)} ${"─".repeat(9)} ${"─".repeat(11)}`,
     `  ${"Subtotal".padEnd(60)} ${money(result.lineItemTotal).padStart(11)}`,
     `  ${"Material Sales Tax".padEnd(60)} ${money(result.materialSalesTax).padStart(11)}`,
-    `  ${"RCV subtotal (pre-markup)".padEnd(60)} ${money(result.rcvSubtotalBeforeMarkup).padStart(11)}`,
-    `  ${"Estimate adjustment (+50%)".padEnd(60)} ${money(result.estimateMarkupAmount).padStart(11)}`,
+    `  ${"RCV".padEnd(60)} ${money(result.replacementCostValue).padStart(11)}`,
     "",
     "▸ PRICING SUMMARY",
     `  Total squares (takeoff) .. ${result.surfaceSquares} SQ (surface, before waste)`,
     `  Effective squares ........ ${result.effectiveSquares} SQ (incl. ${result.wastePct}% waste)`,
-    `  RCV (after +50% adjustment) ${money(result.replacementCostValue)}`,
+    `  RCV ...................... ${money(result.replacementCostValue)}`,
     `  Less Depreciation ........ (${money(result.depreciation)})`,
     `  ACV ...................... ${money(result.actualCashValue)}`,
     `  Confidence ............... ${result.confidence} (${result.quality}/100)`,
@@ -2920,8 +2912,7 @@ function buildProposalHtml(
     <tbody>${scopeRows}
       <tr class="total-row"><td colspan="4">Line Item Subtotal</td><td class="r">${money(result.lineItemTotal)}</td></tr>
       <tr class="total-row"><td colspan="4">Material Sales Tax</td><td class="r">${money(result.materialSalesTax)}</td></tr>
-      <tr class="total-row"><td colspan="4">RCV subtotal (pre-markup)</td><td class="r">${money(result.rcvSubtotalBeforeMarkup)}</td></tr>
-      <tr class="total-row"><td colspan="4">Estimate adjustment (+50%)</td><td class="r">${money(result.estimateMarkupAmount)}</td></tr>
+      <tr class="total-row"><td colspan="4">RCV</td><td class="r">${money(result.replacementCostValue)}</td></tr>
     </tbody>
   </table>
 
@@ -2932,7 +2923,7 @@ function buildProposalHtml(
       <tr><td>Total squares (takeoff, before waste)</td><td class="r">${result.surfaceSquares} SQ</td></tr>
       <tr><td>Effective squares (incl. ${result.wastePct}% waste)</td><td class="r">${result.effectiveSquares} SQ</td></tr>
       <tr><td>Regional Multiplier (${form.stateCode})</td><td class="r">×${result.regional.toFixed(2)}</td></tr>
-      <tr><td>Replacement Cost Value (RCV, after +50% adjustment)</td><td class="r">${money(result.replacementCostValue)}</td></tr>
+      <tr><td>Replacement Cost Value (RCV)</td><td class="r">${money(result.replacementCostValue)}</td></tr>
       <tr><td>Less Depreciation</td><td class="r">(${money(result.depreciation)})</td></tr>
       <tr><td>Actual Cash Value (ACV)</td><td class="r">${money(result.actualCashValue)}</td></tr>
       <tr><td>Confidence</td><td class="r">${result.confidence} (${result.quality}/100)</td></tr>
@@ -6678,12 +6669,8 @@ function App() {
                       <td className="r">{money(result.materialSalesTax)}</td>
                     </tr>
                     <tr className="subtotal-row">
-                      <td colSpan={4}>RCV subtotal (pre-markup)</td>
-                      <td className="r">{money(result.rcvSubtotalBeforeMarkup)}</td>
-                    </tr>
-                    <tr className="subtotal-row">
-                      <td colSpan={4}>Estimate adjustment (+50%)</td>
-                      <td className="r">{money(result.estimateMarkupAmount)}</td>
+                      <td colSpan={4}>RCV</td>
+                      <td className="r">{money(result.replacementCostValue)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -6698,7 +6685,7 @@ function App() {
                     <tr><td>Total squares (takeoff, before waste)</td><td className="r">{result.surfaceSquares} SQ</td></tr>
                     <tr><td>Effective squares (incl. {result.wastePct}% waste)</td><td className="r">{result.effectiveSquares} SQ</td></tr>
                     <tr><td>Regional multiplier ({form.stateCode})</td><td className="r">×{result.regional.toFixed(2)}</td></tr>
-                    <tr><td>Replacement Cost Value (RCV, after +50% adjustment)</td><td className="r">{money(result.replacementCostValue)}</td></tr>
+                    <tr><td>Replacement Cost Value (RCV)</td><td className="r">{money(result.replacementCostValue)}</td></tr>
                     <tr><td>Less Depreciation</td><td className="r">({money(result.depreciation)})</td></tr>
                     <tr><td>Actual Cash Value (ACV)</td><td className="r">{money(result.actualCashValue)}</td></tr>
                     <tr className="grand-total-row"><td>Final Cost</td><td className="r">{money(result.finalCost)}</td></tr>
