@@ -1257,6 +1257,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
           }}
         >
         <div
+          className="hd2d-light-ink"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -1302,6 +1303,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                   border: "1px solid #cbd5e1",
                   cursor: "pointer",
                   background: "#fff",
+                  color: "#0f172a",
                   fontWeight: 600,
                 }}
               >
@@ -1318,6 +1320,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                   border: "1px solid #cbd5e1",
                   cursor: "pointer",
                   background: "#fff",
+                  color: "#0f172a",
                   fontWeight: 600,
                 }}
               >
@@ -1334,6 +1337,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                   border: "1px solid #cbd5e1",
                   cursor: "pointer",
                   background: "#fff",
+                  color: "#0f172a",
                   fontWeight: 600,
                 }}
               >
@@ -1350,6 +1354,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                   border: "1px solid #cbd5e1",
                   cursor: "pointer",
                   background: "#fff",
+                  color: "#0f172a",
                   fontWeight: 700,
                 }}
               >
@@ -1366,6 +1371,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                   border: "1px solid #cbd5e1",
                   cursor: "pointer",
                   background: "#fff",
+                  color: "#0f172a",
                   fontWeight: 700,
                 }}
               >
@@ -1382,6 +1388,7 @@ export const Map3D = forwardRef<Map3DHandle, Props>(function Map3DInner({
                   border: "1px solid #cbd5e1",
                   cursor: "pointer",
                   background: "#fff",
+                  color: "#0f172a",
                   fontWeight: 700,
                 }}
               >
