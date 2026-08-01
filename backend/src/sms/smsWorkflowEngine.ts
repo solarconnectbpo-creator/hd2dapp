@@ -536,7 +536,7 @@ export async function processSmsNoResponseSweep(env: SmsWorkflowEnv): Promise<vo
   }
 }
 
-export async function resolveOrgForCompanyUser(db: D1, userId: string, userType: string): Promise<string | null> {
-  if (userType === "admin") return null;
+export async function resolveOrgForCompanyUser(db: D1, userId: string, _userType?: string): Promise<string | null> {
+  // Platform admins may also belong to an org (org_members) for SMS / CRM ops.
   return getPrimaryOrgIdForUser(db, userId);
 }

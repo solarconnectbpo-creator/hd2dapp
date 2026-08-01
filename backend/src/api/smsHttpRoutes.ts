@@ -98,15 +98,19 @@ export async function handleSmsHttpRoutes(
   }
 
   const orgId = await resolveOrgForCompanyUser(env.DB, payload.sub, payload.user_type);
-  if (!orgId && payload.user_type !== "admin") {
-    return json({ success: false, error: "No organization for this account." }, 403, j);
+  if (!orgId) {
+    return json(
+      {
+        success: false,
+        error:
+          "No organization for this account. Join or create a company org under Company, or ask an admin to add you to org_members.",
+      },
+      403,
+      j,
+    );
   }
 
-  if (payload.user_type !== "admin" && !orgId) {
-    return json({ success: false, error: "No organization." }, 403, j);
-  }
-
-  const oid = orgId as string;
+  const oid = orgId;
 
   if (base === "/api/sms/workflows" && request.method === "GET") {
     await seedDefaultSmsWorkflowsIfEmpty(env.DB, oid);
