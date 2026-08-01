@@ -348,17 +348,6 @@ export function AutomationBuilder() {
     setSteps((s) => s.map((x) => (x.key === key ? ({ ...x, ...patch } as UiStep) : x)));
   }
 
-  if (user?.user_type === "admin") {
-    return (
-      <div className="hd2d-page-shell max-w-lg space-y-4">
-        <h1 className="text-2xl font-semibold text-[#e7e9ea]">SMS follow-up</h1>
-        <p className="text-sm text-[#71767b]">
-          Sign in with a company account to edit follow-up sequences for that organization.
-        </p>
-      </div>
-    );
-  }
-
   const apiBase = getHd2dApiBase().replace(/\/$/, "");
   const webhookUrl = `${apiBase}/api/webhooks/telnyx`;
   const orgId = setup?.org_id ?? "";
