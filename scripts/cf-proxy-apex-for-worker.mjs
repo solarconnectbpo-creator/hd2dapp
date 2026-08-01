@@ -24,39 +24,47 @@ async function api(path, init = {}) {
   });
   const json = await res.json();
   if (!json.success) {
-    throw new Error(JSON.stringify(json.errors || json));
+    const err = JSON.stringify(json.errors || json);
+    // Workers Builds tokens often lack Zone DNS Edit — do not fail the deploy.
+    console.warn(`[cf-proxy-apex] API error (non-fatal): ${err}`);
+    process.exit(0);
   }
   return json;
 }
 
-const zones = await api(`/zones?name=${encodeURIComponent(ZONE_NAME)}`);
-const zone = zones.result?.[0];
-if (!zone) {
-  console.warn("[cf-proxy-apex] zone not found");
+try {
+  const zones = await api(`/zones?name=${encodeURIComponent(ZONE_NAME)}`);
+  const zone = zones.result?.[0];
+  if (!zone) {
+    console.warn("[cf-proxy-apex] zone not found");
+    process.exit(0);
+  }
+
+  const recs = await api(`/zones/${zone.id}/dns_records?per_page=100`);
+  let updated = 0;
+  for (const rec of recs.result || []) {
+    const name = (rec.name || "").replace(/\.$/, "").toLowerCase();
+    if (!HOSTS.has(name)) continue;
+    if (rec.proxied === true) {
+      console.log(`[cf-proxy-apex] already proxied: ${name} (${rec.type})`);
+      continue;
+    }
+    if (rec.type !== "A" && rec.type !== "AAAA" && rec.type !== "CNAME") continue;
+    await api(`/zones/${zone.id}/dns_records/${rec.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        type: rec.type,
+        name: rec.name,
+        content: rec.content,
+        ttl: 1,
+        proxied: true,
+      }),
+    });
+    console.log(`[cf-proxy-apex] proxied ${name} (${rec.type} → ${rec.content})`);
+    updated += 1;
+  }
+  console.log(`[cf-proxy-apex] done; updated=${updated}`);
+} catch (e) {
+  console.warn(`[cf-proxy-apex] skipped: ${e?.message || e}`);
   process.exit(0);
 }
-
-const recs = await api(`/zones/${zone.id}/dns_records?per_page=100`);
-let updated = 0;
-for (const rec of recs.result || []) {
-  const name = (rec.name || "").replace(/\.$/, "").toLowerCase();
-  if (!HOSTS.has(name)) continue;
-  if (rec.proxied === true) {
-    console.log(`[cf-proxy-apex] already proxied: ${name} (${rec.type})`);
-    continue;
-  }
-  if (rec.type !== "A" && rec.type !== "AAAA" && rec.type !== "CNAME") continue;
-  await api(`/zones/${zone.id}/dns_records/${rec.id}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      type: rec.type,
-      name: rec.name,
-      content: rec.content,
-      ttl: 1,
-      proxied: true,
-    }),
-  });
-  console.log(`[cf-proxy-apex] proxied ${name} (${rec.type} → ${rec.content})`);
-  updated += 1;
-}
-console.log(`[cf-proxy-apex] done; updated=${updated}`);

@@ -1,18 +1,9 @@
-{
+﻿{
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "hd2d-closers.vercel.app"
-        }
-      ],
-      "destination": "https://www.hardcoredoortodoorclosers.com/:path*",
-      "permanent": true
-    }
-  ],
+  "framework": "vite",
+  "installCommand": "npm ci --no-audit --no-fund",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/(.*)",
