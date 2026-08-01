@@ -245,6 +245,34 @@ function newPhotoId(): string {
 /** Collections mirrored to the Worker, in the order they are pulled. */
 const SYNC_KINDS: WorkspaceKind[] = ["measurement", "estimate", "contract", "field_project"];
 
+/**
+ * Photos are base64 JPEGs — 24 of them would be several MB and exceed the server's
+ * per-record cap, which would reject the whole project (losing the text sync too).
+ * Sync the project without image bytes; the photos stay on the capturing device until
+ * blob upload to R2 exists. Captions and AI summaries are small, so they still travel.
+ */
+function fieldProjectForSync(project: FieldProject): FieldProject {
+  return {
+    ...project,
+    photos: project.photos.map((p) => ({ ...p, imageDataUrl: "" })),
+  };
+}
+
+/**
+ * Re-attach locally held image bytes to a project coming back from the server, so a
+ * pull never blanks photos that only exist on this device.
+ */
+function mergeFieldProjectPhotos(incoming: FieldProject, local: FieldProject | undefined): FieldProject {
+  if (!local) return incoming;
+  const localById = new Map(local.photos.map((p) => [p.id, p]));
+  return {
+    ...incoming,
+    photos: incoming.photos.map((p) =>
+      p.imageDataUrl ? p : { ...p, imageDataUrl: localById.get(p.id)?.imageDataUrl ?? "" },
+    ),
+  };
+}
+
 const SYNC_META_KEY_BASE = "roofing-workspace-sync-meta-v1";
 
 type SyncMetaByKind = Partial<Record<WorkspaceKind, SyncMeta>>;
@@ -430,11 +458,16 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         (d) => (d && typeof d === "object" && typeof (d as Contract).id === "string" ? (d as Contract) : null),
         setContracts,
       );
+      const localProjectsById = new Map(cur.fieldProjects.map((p) => [p.id, p]));
       const nextFieldProjects = applyKind<FieldProject>(
         "field_project",
         cur.fieldProjects,
         (p) => p.id,
-        (d) => (d && typeof d === "object" ? normalizeFieldProject(d as Record<string, unknown>) : null),
+        (d) => {
+          if (!d || typeof d !== "object") return null;
+          const parsed = normalizeFieldProject(d as Record<string, unknown>);
+          return parsed ? mergeFieldProjectPhotos(parsed, localProjectsById.get(parsed.id)) : null;
+        },
         setFieldProjects,
       );
 
@@ -452,7 +485,11 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         ...stageDiff<Measurement>("measurement", nextMeasurements, (m) => m.id),
         ...stageDiff<Estimate>("estimate", nextEstimates, (e) => e.id),
         ...stageDiff<Contract>("contract", nextContracts, (c) => c.id),
-        ...stageDiff<FieldProject>("field_project", nextFieldProjects, (p) => p.id),
+        ...stageDiff<FieldProject>(
+          "field_project",
+          nextFieldProjects.map(fieldProjectForSync),
+          (p) => p.id,
+        ),
       ];
 
       if (outgoing.length > 0) {

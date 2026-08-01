@@ -345,8 +345,8 @@ export function FieldProjectsPanel() {
           <h2 className="text-xl font-semibold text-black">Field jobs &amp; pipeline</h2>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#71767b]">
             <strong className="text-[#e7e9ea]">List</strong> or{" "}
-            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Data stays in this browser
-            until you export.
+            <strong className="text-[#e7e9ea]">board</strong> — deal value, tags, photos. Job details sync to your
+            account; photo images stay on the device that captured them.
           </p>
         </div>
         <Button
