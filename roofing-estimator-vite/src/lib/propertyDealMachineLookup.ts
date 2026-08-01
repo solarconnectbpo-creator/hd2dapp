@@ -11,6 +11,7 @@ import {
   parseUsAddressLineForSearch,
   type UsAddressSearchCriteria,
 } from "./propertyAddressCriteria";
+import { getStoredSession } from "./authClient";
 import { getHd2dApiBase, isHd2dApiConfigured } from "./hd2dApiBase";
 import { mapRecordToImportPayload, type PropertyImportPayload } from "./propertyScraper";
 
@@ -102,7 +103,10 @@ export async function fetchDealMachinePropertyByAddress(
     Accept: "application/json",
   };
   // The Worker requires a signed-in caller: each lookup bills the org's DealMachine quota.
-  if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`;
+  // Prefer an explicit token; otherwise use the stored session so Canvassing/property flows
+  // get nationwide owner records without every call site threading auth manually.
+  const bearer = (token ?? getStoredSession()?.token ?? "").trim();
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
 
   let res: Response;
   try {
@@ -121,7 +125,9 @@ export async function fetchDealMachinePropertyByAddress(
     if (res.status === 401) {
       return {
         ok: false,
-        message: `Property lookup is not available (${res.status}${suffix}). Ask your administrator to enable server-side records lookup on the API.`,
+        message: bearer
+          ? `Property lookup is not available (${res.status}${suffix}). Ask your administrator to enable DealMachine (DEALMACHINE_API_KEY) on the API.`
+          : "Sign in to look up nationwide property owners, or ask your administrator to enable DealMachine on the API.",
       };
     }
     return { ok: false, message: `Property lookup failed (${res.status}${suffix}).` };

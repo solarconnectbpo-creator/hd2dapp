@@ -1,4 +1,5 @@
 import type { OrgSettings } from "./orgSettings";
+import { getStoredSession } from "./authClient";
 import {
   fetchDealMachinePropertyByAddress,
   isDealMachineLikelyConfigured,
@@ -126,8 +127,9 @@ export async function runOwnerFallbackLookup(
   }
 
   let latestError = "";
+  const token = getStoredSession()?.token;
   for (const criteria of candidates) {
-    const res = await fetchDealMachinePropertyByAddress(criteria);
+    const res = await fetchDealMachinePropertyByAddress(criteria, token);
     if (!res.ok) {
       latestError = res.message;
       continue;

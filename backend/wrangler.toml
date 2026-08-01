@@ -6,12 +6,18 @@ compatibility_flags = ["nodejs_compat", "nodejs_als"]
 workers_dev = true
 preview_urls = true
 
-# Binary blobs that are too large for D1 rows: field-job damage photos (see src/api/workspaceRoutes.ts)
-# and org agreement files. Create once with: npx wrangler r2 bucket create hd2d-workspace-files
-# Until the bucket exists the Worker returns 503 for uploads and photos simply stay on-device.
-[[r2_buckets]]
-binding = "WORKSPACE_FILES"
-bucket_name = "hd2d-workspace-files"
+# Binary blobs too large for D1 rows: field-job damage photos (see src/api/workspaceRoutes.ts).
+#
+# Left commented because `wrangler deploy` FAILS when a bound bucket does not exist, which
+# would block every backend release. The Worker treats WORKSPACE_FILES as optional: without
+# it, photo upload returns 503 and images stay on the device that captured them.
+#
+# To turn photo sync on, create the bucket once and then uncomment the three lines below:
+#   npx wrangler r2 bucket create hd2d-workspace-files
+#
+# [[r2_buckets]]
+# binding = "WORKSPACE_FILES"
+# bucket_name = "hd2d-workspace-files"
 
 # Public API hostname on your zone (no Access app on this host). Vercel: HD2D_WORKER_UPSTREAM=https://api.hardcoredoortodoorclosers.com
 #

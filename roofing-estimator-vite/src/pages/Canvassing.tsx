@@ -191,7 +191,7 @@ type CanvassVisitRow = CanvassLeadState & { id: string };
 
 export function Canvassing() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { addFieldProject } = useRoofing();
   const viewCenterRef = useRef<{ lat: number; lon: number }>({ lat: 38.63, lon: -90.2 });
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => ({
@@ -492,16 +492,20 @@ export function Canvassing() {
 
         let intelParcel: Record<string, unknown> | null = null;
         let ownerSource: OwnerEnrichmentSource = "base";
-        if (isInMissouriBbox(lat, lng)) {
-          const stl = await fetchStlIntelAtPoint(lat, lng);
-          intelParcel = stl?.parcel ?? null;
-          if (intelParcel && Object.keys(intelParcel).length > 0) {
-            ownerSource = "stl";
-          }
+
+        // Kick off GIS + building lookups in parallel. Nationwide owners come from DealMachine
+        // (address search) after reverse geocode — that runs below once we have street/city/state.
+        const stlPromise = isInMissouriBbox(lat, lng) ? fetchStlIntelAtPoint(lat, lng) : Promise.resolve(null);
+        const parcelPromise = queryArcgisAtPointViaBackend("parcel", lat, lng);
+        const buildingPromise = fetchUsBuildingFootprintAtPoint(lat, lng);
+
+        const [stl, parcelOut, buildingOutEarly] = await Promise.all([stlPromise, parcelPromise, buildingPromise]);
+        if (stl?.parcel && Object.keys(stl.parcel).length > 0) {
+          intelParcel = stl.parcel;
+          ownerSource = "stl";
         }
 
         let arcgisRestAttrs: Record<string, unknown> | null = null;
-        const parcelOut = await queryArcgisAtPointViaBackend("parcel", lat, lng);
         if (parcelOut.ok) {
           arcgisRestAttrs = parcelOut.attributes;
         } else if (parcelOut.reason === "network" || parcelOut.reason === "api") {
@@ -516,7 +520,7 @@ export function Canvassing() {
         const mapHitEmpty = !arcgisFeatureProps || Object.keys(arcgisFeatureProps).length === 0;
 
         const parcel = mergeParcelAttributes(intelParcel, arcgisMerged);
-        const buildingOut = await fetchUsBuildingFootprintAtPoint(lat, lng);
+        const buildingOut = buildingOutEarly;
         let buildingNotes = "";
         const buildingFlat: Record<string, unknown> = {};
         let hadFootprintGeometry = false;
@@ -656,6 +660,7 @@ export function Canvassing() {
         base = normalizePropertyImportPayloadContacts(base);
 
         let dealMachineHit = false;
+        const authToken = session?.token;
         const primary =
           nominatimReverseToAddressCriteria({
             display_name: data.display_name,
@@ -671,8 +676,9 @@ export function Canvassing() {
         const toTryDm =
           fromBuilder.length > 0 ? fromBuilder : primary ? [primary] : [];
         let lastDmMsg = "";
+        // Nationwide owner/contact enrichment — DealMachine covers all U.S. addresses when configured.
         for (const criteria of toTryDm) {
-          const dm = await fetchDealMachinePropertyByAddress(criteria);
+          const dm = await fetchDealMachinePropertyByAddress(criteria, authToken);
           if (dm.ok) {
             const p = dm.payload;
             base = {
@@ -774,32 +780,37 @@ export function Canvassing() {
 
         const fromGis = Boolean(arcgisMerged && Object.keys(arcgisMerged).length > 0);
         const intelHit = intelParcel && Object.keys(intelParcel).length > 0;
-        if (fromGis && owner && intelHit) {
+        const displayOwner = (base.ownerName || owner).trim();
+        if (dealMachineHit && displayOwner) {
+          setPanelHint(
+            fromGis || intelHit
+              ? "Nationwide owner records loaded for this address; local parcel data filled GIS fields. Confirm before quoting."
+              : "Nationwide owner records loaded for this address. Confirm before quoting.",
+          );
+        } else if (fromGis && displayOwner && intelHit) {
           setPanelHint(
             "Owner and fields use regional parcel data when available; the map layer fills gaps. Confirm before quoting.",
           );
-        } else if (fromGis && owner) {
+        } else if (fromGis && displayOwner) {
           setPanelHint(
             mapHitEmpty && arcgisRestAttrs
               ? "Owner and property details from the parcel record at this point. Verify before quoting."
               : "Owner and property details from the map layer you tapped. Verify before quoting.",
           );
-        } else if (fromGis && !owner) {
+        } else if (fromGis && !displayOwner) {
           setPanelHint(
             mapHitEmpty && arcgisRestAttrs
-              ? "Parcel attributes found — owner name is not on this layer; check assessor or parcel details."
-              : "Map layer loaded — owner name is not on this layer; check parcel details.",
+              ? "Parcel attributes found — owner name is not on this layer. Sign in so nationwide records lookup can fill the owner."
+              : "Map layer loaded — owner name is not on this layer. Sign in so nationwide records lookup can fill the owner.",
           );
-        } else if (intelHit && owner) {
+        } else if (intelHit && displayOwner) {
           setPanelHint("Regional parcel record loaded. Confirm owner and building details on the assessor before quoting.");
+        } else if (!displayOwner) {
+          setPanelHint(
+            "No owner yet for this pin — try the building center for a cleaner address, sign in for nationwide records lookup, or enter owner details manually.",
+          );
         } else if (isInMoIlParcelCoverageBbox(lat, lng) && !parcel) {
           setPanelHint("No parcel record at this pin — try the building center or a different spot.");
-        } else if (!isInMoIlParcelCoverageBbox(lat, lng) && !fromGis) {
-          setPanelHint(
-            "Parcel overlays use MO/IL/MN county GIS layers where configured (built-in + optional Worker JSON). Outside those regions or rural gaps — verify the owner locally.",
-          );
-        } else if (!owner) {
-          setPanelHint("Parcel found — owner field not labeled on this layer; see details below.");
         }
         if (buildingOut.ok && (buildingOut.attributes || buildingOut.geometry)) {
           setPanelHint((curr) =>
@@ -822,7 +833,7 @@ export function Canvassing() {
         setPanelBusy(false);
       }
     },
-    [autoOpenEstimate, hasRequiredOwnerInfo, openPayloadInEstimator, requireOwnerInfoBeforeOpen],
+    [autoOpenEstimate, hasRequiredOwnerInfo, openPayloadInEstimator, requireOwnerInfoBeforeOpen, session?.token],
   );
 
   const flyTo = useCallback((lat: number, lng: number) => {

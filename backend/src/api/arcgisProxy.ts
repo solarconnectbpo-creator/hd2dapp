@@ -132,32 +132,24 @@ async function fetchLayerGeoJson(
 
 const SPATIAL_RELS = ["esriSpatialRelIntersects", "esriSpatialRelWithin"] as const;
 
-async function queryAttributesAtPoint(
-  layerBaseUrl: string,
-  lat: number,
-  lng: number,
+/** ~20 m buffer so clicks near a lot line / centroid layers still hit. */
+const NEAR_POINT_BUFFER_DEG = 0.00018;
+
+async function queryAttributesWithGeometry(
+  base: string,
+  geometry: string,
+  geometryType: "esriGeometryPoint" | "esriGeometryEnvelope",
   token: string | undefined,
 ): Promise<{
   ok: true;
   attributes: Record<string, unknown>;
 } | { ok: false; reason: "no_hit" | "api"; message?: string }> {
-  const base = normalizeArcgisQueryableLayerUrl(layerBaseUrl);
-  if (!base) {
-    return { ok: false, reason: "api", message: "Invalid layer URL." };
-  }
-
-  const geometry = JSON.stringify({
-    x: lng,
-    y: lat,
-    spatialReference: { wkid: 4326 },
-  });
-
   for (const spatialRel of SPATIAL_RELS) {
     const params = new URLSearchParams({
       f: "json",
       where: "1=1",
       geometry,
-      geometryType: "esriGeometryPoint",
+      geometryType,
       inSR: "4326",
       spatialRel,
       outFields: "*",
@@ -194,6 +186,39 @@ async function queryAttributesAtPoint(
   }
 
   return { ok: false, reason: "no_hit" };
+}
+
+async function queryAttributesAtPoint(
+  layerBaseUrl: string,
+  lat: number,
+  lng: number,
+  token: string | undefined,
+): Promise<{
+  ok: true;
+  attributes: Record<string, unknown>;
+} | { ok: false; reason: "no_hit" | "api"; message?: string }> {
+  const base = normalizeArcgisQueryableLayerUrl(layerBaseUrl);
+  if (!base) {
+    return { ok: false, reason: "api", message: "Invalid layer URL." };
+  }
+
+  const pointGeom = JSON.stringify({
+    x: lng,
+    y: lat,
+    spatialReference: { wkid: 4326 },
+  });
+  const pointOut = await queryAttributesWithGeometry(base, pointGeom, "esriGeometryPoint", token);
+  if (pointOut.ok || pointOut.reason === "api") return pointOut;
+
+  // Retry with a small envelope — helps pin clicks near lot lines and statewide centroids.
+  const envelopeGeom = JSON.stringify({
+    xmin: lng - NEAR_POINT_BUFFER_DEG,
+    ymin: lat - NEAR_POINT_BUFFER_DEG,
+    xmax: lng + NEAR_POINT_BUFFER_DEG,
+    ymax: lat + NEAR_POINT_BUFFER_DEG,
+    spatialReference: { wkid: 4326 },
+  });
+  return queryAttributesWithGeometry(base, envelopeGeom, "esriGeometryEnvelope", token);
 }
 
 /** Point query with geometry — used for building footprints on the map (GeoJSON polygon). */
@@ -440,13 +465,22 @@ export async function handleArcgisRequest(
       const tried = new Set<string>();
       if (primaryNorm) tried.add(primaryNorm);
       if (cityNorm) tried.add(cityNorm);
-      for (const fbUrl of parcelFallbackUrlsForPoint(lat, lng, env)) {
+      const fallbackUrls = parcelFallbackUrlsForPoint(lat, lng, env).filter((fbUrl) => {
         const fn = normalizeArcgisQueryableLayerUrl(fbUrl);
-        if (!fn || tried.has(fn)) continue;
+        if (!fn || tried.has(fn)) return false;
         tried.add(fn);
-        const fbOut = await queryAttributesAtPoint(fbUrl, lat, lng, token);
-        if (fbOut.ok) {
-          return new Response(JSON.stringify({ ok: true, attributes: fbOut.attributes }), { status: 200, headers: j });
+        return true;
+      });
+      // Query matching regional layers in parallel — first hit wins (nationwide canvassing).
+      const settled = await Promise.allSettled(
+        fallbackUrls.map((fbUrl) => queryAttributesAtPoint(fbUrl, lat, lng, token)),
+      );
+      for (const result of settled) {
+        if (result.status === "fulfilled" && result.value.ok) {
+          return new Response(JSON.stringify({ ok: true, attributes: result.value.attributes }), {
+            status: 200,
+            headers: j,
+          });
         }
       }
       return new Response(JSON.stringify({ ok: false, reason: "no_hit" }), { status: 200, headers: j });
