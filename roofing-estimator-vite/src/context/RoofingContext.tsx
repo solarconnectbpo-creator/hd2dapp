@@ -97,9 +97,9 @@ export interface Estimate {
   }[];
   subtotal: number;
   tax: number;
-  /** Line items + tax before +50% estimate adjustment (when present). */
+  /** Line items + tax (= RCV). Legacy field name retained for saved estimates. */
   rcvBeforeMarkup?: number;
-  /** Dollar amount added for +50% RCV adjustment (when present). */
+  /** Legacy +50% RCV markup amount; new estimates store 0. */
   estimateMarkup?: number;
   total: number;
 }
