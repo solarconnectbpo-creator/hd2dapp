@@ -13,8 +13,16 @@ import {
   isFieldPipelineStage,
 } from "../lib/fieldProjectTypes";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
+import type { FormState } from "../features/measurement/measurementFormTypes";
+import type { ProposalState } from "../features/measurement/proposalTypes";
 
 export type RoofFormKind = "gable" | "hip" | "flat" | "mansard" | "complex";
+
+/** Snapshot so a printed proposal can be reopened in Proposal Builder. */
+export interface ContractBuilderSnapshot {
+  form: FormState;
+  proposal: ProposalState;
+}
 
 export interface Measurement {
   id: string;
@@ -74,6 +82,8 @@ export interface Contract {
   totalAmount: number;
   depositAmount: number;
   status: "draft" | "sent" | "signed";
+  /** Present when created/updated from New Measurement Proposal Builder. */
+  builderSnapshot?: ContractBuilderSnapshot;
 }
 
 export type { DamagePhoto, DamagePhotoAiSummary, FieldPipelineStage, FieldProject };
@@ -86,6 +96,9 @@ interface RoofingContextType {
   addMeasurement: (measurement: Measurement) => void;
   addEstimate: (estimate: Estimate) => void;
   addContract: (contract: Contract) => void;
+  updateContract: (id: string, patch: Partial<Omit<Contract, "id">>) => void;
+  updateEstimate: (id: string, patch: Partial<Omit<Estimate, "id">>) => void;
+  getContractById: (id: string) => Contract | undefined;
   addFieldProject: (input: {
     name: string;
     address?: string;
@@ -268,6 +281,15 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setMeasurements((prev) => [...prev, measurement]),
       addEstimate: (estimate: Estimate) => setEstimates((prev) => [...prev, estimate]),
       addContract: (contract: Contract) => setContracts((prev) => [...prev, contract]),
+      updateContract: (id, patch) =>
+        setContracts((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, ...patch, id: c.id } : c)),
+        ),
+      updateEstimate: (id, patch) =>
+        setEstimates((prev) =>
+          prev.map((e) => (e.id === id ? { ...e, ...patch, id: e.id } : e)),
+        ),
+      getContractById: (id) => contracts.find((c) => c.id === id),
       addFieldProject: (input) => {
         const now = new Date().toISOString();
         const ghlUrl = input.ghlUrl ? optHttpsUrl(input.ghlUrl.trim()) : undefined;

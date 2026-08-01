@@ -6,11 +6,15 @@ import {
   Layers,
   Loader2,
   MapPin,
+  Pencil,
+  Plus,
   Save,
+  Trash2,
   Upload,
   UserRound,
   FileSpreadsheet,
   ExternalLink,
+  X,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -33,6 +37,34 @@ function canAutoEstimateFromContact(c: ContactRecord): boolean {
   const a = Number.parseFloat(c.areaSqFt ?? "");
   const sq = Number.parseFloat(c.measuredSquares ?? "");
   return (Number.isFinite(a) && a > 0) || (Number.isFinite(sq) && sq > 0);
+}
+
+function blankContact(id?: string): ContactRecord {
+  return {
+    id: id ?? `contact_${Date.now()}`,
+    name: "",
+    company: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+    lat: null,
+    lng: null,
+    areaSqFt: "",
+    measuredSquares: "",
+    roofType: "",
+    roofPitch: "",
+    perimeterFt: "",
+    wastePercent: "",
+    notes: "",
+  };
+}
+
+function parseOptionalCoord(raw: string): number | null {
+  const n = Number.parseFloat(raw.trim());
+  return Number.isFinite(n) ? n : null;
 }
 
 async function compressLogoToDataUrl(file: File): Promise<string> {
@@ -89,6 +121,10 @@ export function ContactsSettings() {
   const [banner, setBanner] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [geocodeBusy, setGeocodeBusy] = useState(false);
+  const [editingContact, setEditingContact] = useState<ContactRecord | null>(null);
+  const [isNewContact, setIsNewContact] = useState(false);
+  const [latDraft, setLatDraft] = useState("");
+  const [lngDraft, setLngDraft] = useState("");
 
   useEffect(() => {
     orgRef.current = org;
@@ -195,6 +231,93 @@ export function ContactsSettings() {
     [contacts, openContact],
   );
 
+  const startAddContact = useCallback(() => {
+    const next = blankContact();
+    setEditingContact(next);
+    setIsNewContact(true);
+    setLatDraft("");
+    setLngDraft("");
+    setSelectedLeadId(next.id);
+  }, []);
+
+  const startEditContact = useCallback((c: ContactRecord) => {
+    setEditingContact({ ...blankContact(c.id), ...c });
+    setIsNewContact(false);
+    setLatDraft(c.lat != null ? String(c.lat) : "");
+    setLngDraft(c.lng != null ? String(c.lng) : "");
+    setSelectedLeadId(c.id);
+  }, []);
+
+  const cancelEditContact = useCallback(() => {
+    setEditingContact(null);
+    setIsNewContact(false);
+    setLatDraft("");
+    setLngDraft("");
+  }, []);
+
+  const saveEditingContact = useCallback(() => {
+    if (!editingContact) return;
+    const name = editingContact.name.trim();
+    const address = editingContact.address.trim();
+    if (!name && !address) {
+      setBanner({ kind: "error", text: "Add a name or street address before saving." });
+      return;
+    }
+    const next: ContactRecord = {
+      ...editingContact,
+      name,
+      company: editingContact.company.trim(),
+      email: editingContact.email.trim(),
+      phone: editingContact.phone.trim(),
+      address,
+      city: editingContact.city.trim(),
+      state: editingContact.state.trim().toUpperCase().slice(0, 2),
+      zip: editingContact.zip.trim(),
+      lat: parseOptionalCoord(latDraft),
+      lng: parseOptionalCoord(lngDraft),
+      areaSqFt: editingContact.areaSqFt?.trim() || undefined,
+      measuredSquares: editingContact.measuredSquares?.trim() || undefined,
+      roofType: editingContact.roofType?.trim() || undefined,
+      roofPitch: editingContact.roofPitch?.trim() || undefined,
+      perimeterFt: editingContact.perimeterFt?.trim() || undefined,
+      wastePercent: editingContact.wastePercent?.trim() || undefined,
+      notes: editingContact.notes?.trim() || undefined,
+    };
+    setContacts((prev) => {
+      const idx = prev.findIndex((c) => c.id === next.id);
+      if (idx < 0) return [next, ...prev];
+      const copy = prev.slice();
+      copy[idx] = next;
+      return copy;
+    });
+    setBanner({
+      kind: "success",
+      text: isNewContact ? "Contact added." : "Contact updated.",
+    });
+    window.setTimeout(() => setBanner(null), 4000);
+    setEditingContact(null);
+    setIsNewContact(false);
+    setSelectedLeadId(next.id);
+  }, [editingContact, isNewContact, latDraft, lngDraft]);
+
+  const deleteContact = useCallback(
+    (id: string) => {
+      const c = contacts.find((x) => x.id === id);
+      const label = c?.name?.trim() || c?.address?.trim() || "this contact";
+      if (!window.confirm(`Delete ${label}?`)) return;
+      setContacts((prev) => prev.filter((x) => x.id !== id));
+      if (editingContact?.id === id) cancelEditContact();
+      if (selectedLeadId === id) setSelectedLeadId(null);
+      setBanner({ kind: "success", text: "Contact deleted." });
+      window.setTimeout(() => setBanner(null), 4000);
+    },
+    [cancelEditContact, contacts, editingContact?.id, selectedLeadId],
+  );
+
+  const patchEditing = useCallback((patch: Partial<ContactRecord>) => {
+    setEditingContact((curr) => (curr ? { ...curr, ...patch } : curr));
+  }, []);
+
   const contactRows = useMemo(
     () =>
       contacts.map((c) => ({
@@ -209,7 +332,7 @@ export function ContactsSettings() {
       <div className="mb-8">
         <h1 className="mb-2 text-2xl text-[var(--x-text)] sm:text-3xl">Contacts &amp; settings</h1>
         <p className="text-[var(--x-text)]">
-          Upload a contact list (CSV), set company branding and report defaults. Everything is stored locally in your
+          Add or edit contacts anytime, upload a CSV, and set company branding. Everything is stored locally in your
           browser.
         </p>
       </div>
@@ -421,6 +544,10 @@ export function ContactsSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-3 items-center">
+              <Button type="button" variant="default" size="sm" onClick={startAddContact}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add contact
+              </Button>
               <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
                 <Download className="w-4 h-4 mr-2" />
                 Download CSV template
@@ -457,9 +584,97 @@ export function ContactsSettings() {
               <span className="text-sm text-[var(--x-text)]">{contacts.length} saved</span>
             </div>
 
-            {contactRows.length === 0 ? (
-              <p className="text-sm text-[var(--x-text)]">No contacts yet. Upload a CSV or add rows from the estimator map page.</p>
-            ) : (
+            {editingContact ? (
+              <div className="rounded-lg border border-[var(--x-border)] bg-[var(--x-bg)]/40 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-[var(--x-text)]">
+                    {isNewContact ? "New contact" : "Edit contact"}
+                  </h3>
+                  <Button type="button" variant="ghost" size="sm" onClick={cancelEditContact}>
+                    <X className="w-4 h-4 mr-1" />
+                    Cancel
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {(
+                    [
+                      ["name", "Name"],
+                      ["company", "Company"],
+                      ["email", "Email"],
+                      ["phone", "Phone"],
+                      ["address", "Street address"],
+                      ["city", "City"],
+                      ["state", "State"],
+                      ["zip", "ZIP"],
+                      ["areaSqFt", "Area (sq ft)"],
+                      ["measuredSquares", "Measured squares"],
+                      ["roofType", "Roof type"],
+                      ["roofPitch", "Pitch"],
+                      ["perimeterFt", "Perimeter (ft)"],
+                      ["wastePercent", "Waste %"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="flex flex-col gap-1 text-xs text-[var(--x-muted)]">
+                      {label}
+                      <input
+                        className="rounded-md border border-[var(--x-border)] bg-[var(--x-surface)] px-3 py-2 text-sm text-[var(--x-text)]"
+                        value={editingContact[key] ?? ""}
+                        onChange={(e) => patchEditing({ [key]: e.target.value })}
+                      />
+                    </label>
+                  ))}
+                  <label className="flex flex-col gap-1 text-xs text-[var(--x-muted)]">
+                    Latitude
+                    <input
+                      className="rounded-md border border-[var(--x-border)] bg-[var(--x-surface)] px-3 py-2 text-sm text-[var(--x-text)]"
+                      value={latDraft}
+                      onChange={(e) => setLatDraft(e.target.value)}
+                      placeholder="optional"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-[var(--x-muted)]">
+                    Longitude
+                    <input
+                      className="rounded-md border border-[var(--x-border)] bg-[var(--x-surface)] px-3 py-2 text-sm text-[var(--x-text)]"
+                      value={lngDraft}
+                      onChange={(e) => setLngDraft(e.target.value)}
+                      placeholder="optional"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-[var(--x-muted)] sm:col-span-2">
+                    Notes
+                    <textarea
+                      rows={3}
+                      className="rounded-md border border-[var(--x-border)] bg-[var(--x-surface)] px-3 py-2 text-sm text-[var(--x-text)]"
+                      value={editingContact.notes ?? ""}
+                      onChange={(e) => patchEditing({ notes: e.target.value })}
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={saveEditingContact}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {isNewContact ? "Add contact" : "Save changes"}
+                  </Button>
+                  {!isNewContact ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => deleteContact(editingContact.id)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {contactRows.length === 0 && !editingContact ? (
+              <p className="text-sm text-[var(--x-text)]">
+                No contacts yet. Click <strong>Add contact</strong>, or upload a CSV.
+              </p>
+            ) : contactRows.length === 0 ? null : (
               <>
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-[var(--x-text)] flex items-center gap-2">
@@ -517,6 +732,19 @@ export function ContactsSettings() {
                               className="mr-1"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                startEditContact(c);
+                              }}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="mr-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 openContact(c, false);
                               }}
                             >
@@ -528,7 +756,7 @@ export function ContactsSettings() {
                               variant="default"
                               size="sm"
                               disabled={!canAuto}
-                              title={canAuto ? "Runs estimate from CSV numbers" : "Add area_sqft or measured_squares in CSV"}
+                              title={canAuto ? "Runs estimate from contact numbers" : "Add area or squares to enable"}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openContact(c, true);

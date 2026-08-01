@@ -74,6 +74,11 @@ import {
   type FormState,
 } from "./features/measurement/measurementFormTypes";
 import { defaultFormState, hillsdaleFormTemplate } from "./features/measurement/measurementFormDefaults";
+import {
+  normalizeProposalState,
+  type ProposalProfile,
+  type ProposalState,
+} from "./features/measurement/proposalTypes";
 import pricingCatalog from "./data/ai-cheatsheet-pricing.json";
 
 type RoofLineType = "ridge" | "hip" | "valley" | "eave" | "rake" | "wall-flashing" | "step-flashing";
@@ -223,6 +228,10 @@ interface SavedJob {
   name: string;
   createdAtIso: string;
   form: FormState;
+  proposal?: ProposalState;
+  /** When set, Save/Print updates this contract instead of creating a new one. */
+  contractId?: string;
+  estimateId?: string;
 }
 
 interface SavedApiReport {
@@ -278,30 +287,6 @@ interface TaggedDamagePhoto {
   name: string;
   previewUrl: string;
   tags: string[];
-}
-
-type ProposalProfile = "residential" | "commercial";
-
-interface ProposalState {
-  profile: ProposalProfile;
-  companyName: string;
-  companyAddress: string;
-  companyWebsite: string;
-  logoDataUrl: string;
-  preparedBy: string;
-  clientName: string;
-  clientCompany: string;
-  clientEmail: string;
-  clientPhone: string;
-  contactEmail: string;
-  contactPhone: string;
-  proposalTitle: string;
-  inclusions: string;
-  exclusions: string;
-  paymentSchedule: string;
-  warranty: string;
-  alternates: string;
-  financingNotes: string;
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -3023,6 +3008,8 @@ function App() {
   const [propertyEnrichBusy, setPropertyEnrichBusy] = useState(false);
   const [runId, setRunId] = useState(0);
   const [lastEstimateId, setLastEstimateId] = useState<string>("");
+  /** When set, Print Proposal updates this contract instead of appending a new one. */
+  const [editingContractId, setEditingContractId] = useState<string>("");
   const [pricingPreset, setPricingPreset] = useState<PricingPreset>("standard");
   const [propertyDb, setPropertyDb] = useState<PropertyOwnerRecord[]>([]);
   const [activeProperty, setActiveProperty] = useState<PropertyOwnerRecord | null>(null);
@@ -3037,7 +3024,15 @@ function App() {
   const [nwsAlertBannerDismissed, setNwsAlertBannerDismissed] = useState(false);
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"all" | "residential" | "commercial" | "other">("all");
   const [damagePhotos, setDamagePhotos] = useState<TaggedDamagePhoto[]>([]);
-  const { addContract, addEstimate, addMeasurement } = useRoofing();
+  const {
+    contracts,
+    addContract,
+    addEstimate,
+    addMeasurement,
+    updateContract,
+    updateEstimate,
+    getContractById,
+  } = useRoofing();
   const { registerBridge } = useMeasurementChatBridge();
   const formBridgeRef = useRef(form);
   const proposalBridgeRef = useRef(proposal);
@@ -4354,27 +4349,45 @@ function App() {
     setRunId((id) => id + 1);
   };
 
+  const mergeFormState = (partial: Partial<FormState> | FormState | undefined): FormState => {
+    const base = defaultFormState();
+    if (!partial) return base;
+    const merged = { ...base };
+    for (const key of Object.keys(base) as (keyof FormState)[]) {
+      const value = partial[key];
+      if (value !== undefined) {
+        (merged as Record<string, unknown>)[key] = value;
+      }
+    }
+    return merged;
+  };
+
   const saveJob = () => {
-    const name = window.prompt("Name this saved job:", form.address || "Roof estimate");
+    const name = window.prompt("Name this saved job:", form.address || proposal.proposalTitle || "Roof estimate");
     if (!name?.trim()) return;
-    const job: SavedJob = { id: `job_${Date.now()}`, name: name.trim(), createdAtIso: new Date().toISOString(), form };
+    const job: SavedJob = {
+      id: `job_${Date.now()}`,
+      name: name.trim(),
+      createdAtIso: new Date().toISOString(),
+      form,
+      proposal: { ...proposal },
+      contractId: editingContractId || undefined,
+      estimateId: lastEstimateId || undefined,
+    };
     persistJobs([job, ...savedJobs].slice(0, 30));
+    toast.success("Job saved — reopen it anytime to keep editing.");
   };
 
   const loadJob = (id: string) => {
     const job = savedJobs.find((x) => x.id === id);
     if (!job) return;
-    {
-      const base = defaultFormState();
-      const merged = { ...base };
-      for (const key of Object.keys(base) as (keyof FormState)[]) {
-        const value = job.form[key];
-        if (value !== undefined) {
-          (merged as Record<string, unknown>)[key] = value;
-        }
-      }
-      setForm(merged);
+    setForm(mergeFormState(job.form));
+    if (job.proposal) {
+      setProposal(normalizeProposalState(job.proposal, defaultProposalState(job.proposal.profile)));
     }
+    setEditingContractId(job.contractId ?? "");
+    if (job.estimateId) setLastEstimateId(job.estimateId);
+    toast.message(job.proposal ? "Loaded job (form + proposal)." : "Loaded job form.");
   };
 
   const deleteJob = (id: string) => {
@@ -4429,11 +4442,13 @@ function App() {
       return;
     }
     if (lastEstimateId) {
-      const id = `contract_${Date.now()}`;
-      addContract({
-        id,
+      const snapshot = {
+        form: { ...form },
+        proposal: { ...proposal },
+      };
+      const payload = {
         estimateId: lastEstimateId,
-        projectName: form.address || "Roof Project",
+        projectName: form.address || proposal.proposalTitle || "Roof Project",
         clientName: proposal.clientName || "Client",
         clientAddress: form.address || "",
         clientPhone: proposal.clientPhone || "",
@@ -4446,8 +4461,35 @@ function App() {
           .join("\n\n"),
         totalAmount: result.finalCost,
         depositAmount: Math.round(result.finalCost * 0.35),
-        status: "draft",
-      });
+        builderSnapshot: snapshot,
+      };
+      if (editingContractId && getContractById(editingContractId)) {
+        const existing = getContractById(editingContractId);
+        updateContract(editingContractId, {
+          ...payload,
+          status: existing?.status ?? "draft",
+          startDate: existing?.startDate ?? "",
+          completionDate: existing?.completionDate ?? "",
+        });
+        updateEstimate(lastEstimateId, {
+          projectName: payload.projectName,
+          total: result.finalCost,
+          subtotal: result.lineItemTotal,
+          tax: result.materialSalesTax,
+          rcvBeforeMarkup: result.rcvSubtotalBeforeMarkup,
+          estimateMarkup: result.estimateMarkupAmount,
+        });
+        toast.success("Proposal updated — reopen anytime from Contracts & Proposals.");
+      } else {
+        const id = `contract_${Date.now()}`;
+        addContract({
+          id,
+          ...payload,
+          status: "draft",
+        });
+        setEditingContractId(id);
+        toast.success("Proposal saved — reopen anytime from Contracts & Proposals.");
+      }
     }
     const drawnPolyPrint = mapboxFeatures.find(
       (f: { geometry?: { type?: string } }) => f?.geometry?.type === "Polygon",
@@ -4651,7 +4693,12 @@ function App() {
     const contactId = searchParams.get("contactId");
     if (!contactId || !storageUserId) return;
     const auto = searchParams.get("auto") === "1";
-    setSearchParams({}, { replace: true });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("contactId");
+      next.delete("auto");
+      return next;
+    }, { replace: true });
     const list = loadContactsFromStorage();
     const c = list.find((x) => x.id === contactId);
     if (!c) return;
@@ -4672,7 +4719,54 @@ function App() {
       const clng = c.lng;
       queueMicrotask(() => flyMapTo(clat, clng));
     }
-  }, [searchParams]);
+  }, [searchParams, storageUserId]);
+
+  // Reopen a saved proposal/contract into Proposal Builder for editing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deep link; waits until contracts hydrate
+  useEffect(() => {
+    const contractId = searchParams.get("contractId");
+    if (!contractId || !storageUserId) return;
+    const contract = contracts.find((c) => c.id === contractId);
+    if (!contract) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("contractId");
+      return next;
+    }, { replace: true });
+    setEditingContractId(contract.id);
+    if (contract.estimateId) setLastEstimateId(contract.estimateId);
+    if (contract.builderSnapshot) {
+      setForm(mergeFormState(contract.builderSnapshot.form));
+      setProposal(
+        normalizeProposalState(
+          contract.builderSnapshot.proposal,
+          defaultProposalState(
+            contract.builderSnapshot.proposal?.profile === "commercial" ? "commercial" : "residential",
+          ),
+        ),
+      );
+      queueMicrotask(() => {
+        const prepared = prepareFormFromMapMeasurements(mergeFormState(contract.builderSnapshot!.form));
+        setForm(prepared);
+        runEstimatePipeline(prepared, { forceLowReadiness: true });
+      });
+      toast.message("Proposal loaded for editing.");
+      return;
+    }
+    // Legacy contracts without a full builder snapshot — restore client fields at least.
+    setProposal((curr) => ({
+      ...curr,
+      clientName: contract.clientName || curr.clientName,
+      clientEmail: contract.clientEmail || curr.clientEmail,
+      clientPhone: contract.clientPhone || curr.clientPhone,
+      proposalTitle: contract.projectName || curr.proposalTitle,
+      inclusions: contract.terms || curr.inclusions,
+    }));
+    if (contract.clientAddress) {
+      setForm((curr) => ({ ...curr, address: contract.clientAddress }));
+    }
+    toast.message("Proposal client details loaded. Re-run estimate to refresh pricing.");
+  }, [searchParams, storageUserId, contracts]);
 
   // One-shot import from Property records / Canvassing (localStorage + sessionStorage handoff).
   // Runs when the signed-in user id is known so keys match `stashPendingPropertyImport`.
@@ -6290,8 +6384,23 @@ function App() {
           <h2>Proposal Builder</h2>
           <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
             Upload contacts CSV, company logo, and default templates on{" "}
-            <Link to="/contacts">Contacts &amp; settings</Link> (saved in this browser).
+            <Link to="/contacts">Contacts &amp; settings</Link> (saved in this browser). Reopen saved proposals from{" "}
+            <Link to="/contracts">Contracts &amp; Proposals</Link>.
           </p>
+          {editingContractId ? (
+            <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+              Editing saved proposal <code style={{ fontSize: 11 }}>{editingContractId}</code>
+              {" · "}
+              <button
+                type="button"
+                className="secondary-btn"
+                style={{ padding: "2px 8px", fontSize: 11 }}
+                onClick={() => setEditingContractId("")}
+              >
+                Detach (save as new next print)
+              </button>
+            </p>
+          ) : null}
           <div className="form-grid">
             <label>
               Profile

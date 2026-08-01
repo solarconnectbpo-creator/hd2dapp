@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { DollarSign, FileSignature, Plus } from "lucide-react";
+import { DollarSign, FileSignature, Pencil, Plus } from "lucide-react";
 import { useRoofing } from "../context/RoofingContext";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -139,13 +139,21 @@ export function Estimates() {
                   {(() => {
                     const proposal = contracts.find((ct) => ct.estimateId === estimate.id);
                     return proposal ? (
-                      <div className="border-t border-white/[0.08] pt-3 text-sm">
-                        <span className="text-[var(--x-muted)]">Proposal: </span>
-                        <Link
-                          className="font-medium text-[var(--x-accent)] hover:underline"
-                          to="/contracts"
-                        >
-                          {proposal.status} · {proposal.clientName || "Client TBD"}
+                      <div className="space-y-2 border-t border-white/[0.08] pt-3 text-sm">
+                        <div>
+                          <span className="text-[var(--x-muted)]">Proposal: </span>
+                          <Link
+                            className="font-medium text-[var(--x-accent)] hover:underline"
+                            to="/contracts"
+                          >
+                            {proposal.status} · {proposal.clientName || "Client TBD"}
+                          </Link>
+                        </div>
+                        <Link to={`/measurement/new?contractId=${encodeURIComponent(proposal.id)}`}>
+                          <Button type="button" variant="outline" size="sm" className="w-full">
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit proposal
+                          </Button>
                         </Link>
                       </div>
                     ) : (
