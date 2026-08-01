@@ -29,12 +29,21 @@ import {
   type DamagePhotoAiSummary,
   type FieldPipelineStage,
   type FieldProject,
+  MAX_FIELD_PROJECT_AI_REPORT,
   MAX_FIELD_PROJECT_PHOTOS,
+  mergeFieldProjectPhotos,
   normalizeFieldProject,
   normalizeTagList,
   optHttpsUrl,
   isFieldPipelineStage,
 } from "../lib/fieldProjectTypes";
+import {
+  deleteFieldPhotoBlob,
+  deleteFieldPhotoBlobs,
+  hydrateFieldProjectPhotosFromIdb,
+  putFieldPhotoBlob,
+} from "../lib/fieldPhotoBlobStore";
+import { buildStormDamageReport } from "../lib/stormDamageReport";
 import { inferRoofFormType } from "../lib/roofGeometryFromPolygons";
 import type { FormState } from "../features/measurement/measurementFormTypes";
 import type { ProposalState } from "../features/measurement/proposalTypes";
@@ -141,7 +150,10 @@ interface RoofingContextType {
   updateFieldProject: (
     id: string,
     patch: Partial<
-      Pick<FieldProject, "name" | "address" | "notes" | "linkedMeasurementId" | "ghlUrl" | "ghlEmbedUrl">
+      Pick<
+        FieldProject,
+        "name" | "address" | "notes" | "aiReport" | "linkedMeasurementId" | "ghlUrl" | "ghlEmbedUrl"
+      >
     > & {
       monetaryValueUsd?: number | null;
       ownerLabel?: string | null;
@@ -267,19 +279,22 @@ function fieldProjectForSync(project: FieldProject): FieldProject {
   };
 }
 
-/**
- * Re-attach locally held image bytes to a project coming back from the server, so a
- * pull never blanks photos that only exist on this device.
- */
-function mergeFieldProjectPhotos(incoming: FieldProject, local: FieldProject | undefined): FieldProject {
-  if (!local) return incoming;
-  const localById = new Map(local.photos.map((p) => [p.id, p]));
-  return {
-    ...incoming,
-    photos: incoming.photos.map((p) =>
-      p.imageDataUrl ? p : { ...p, imageDataUrl: localById.get(p.id)?.imageDataUrl ?? "" },
-    ),
-  };
+/** Metadata-only cache so multi-photo JPEGs do not blow localStorage quota. */
+function fieldProjectsForLocalCache(projects: FieldProject[]): FieldProject[] {
+  return projects.map((p) => ({
+    ...p,
+    photos: p.photos.map((ph) => ({ ...ph, imageDataUrl: "" })),
+  }));
+}
+
+function isStormDamageProject(p: FieldProject): boolean {
+  return p.tags.some((t) => t === "storm" || t === "damage-report");
+}
+
+function withRefreshedStormReport(project: FieldProject): FieldProject {
+  if (!isStormDamageProject(project)) return project;
+  const aiReport = buildStormDamageReport(project).slice(0, MAX_FIELD_PROJECT_AI_REPORT);
+  return { ...project, aiReport };
 }
 
 const SYNC_META_KEY_BASE = "roofing-workspace-sync-meta-v1";
@@ -355,6 +370,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
   const [fieldProjects, setFieldProjects] = useState<FieldProject[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     setMeasurements([]);
     setEstimates([]);
     setContracts([]);
@@ -387,15 +403,53 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         const fp: FieldProject[] = [];
         for (const row of parsed.fieldProjects) {
           if (row && typeof row === "object") {
+            // Prefer raw photos that still embed data URLs (legacy cache) before normalize.
+            const rawPhotos = Array.isArray((row as { photos?: unknown }).photos)
+              ? ((row as { photos: unknown[] }).photos as Record<string, unknown>[])
+              : [];
+            const legacyBytes = new Map<string, string>();
+            for (const ph of rawPhotos) {
+              if (
+                ph &&
+                typeof ph.id === "string" &&
+                typeof ph.imageDataUrl === "string" &&
+                ph.imageDataUrl.startsWith("data:image/")
+              ) {
+                legacyBytes.set(ph.id, ph.imageDataUrl);
+                void putFieldPhotoBlob(ph.id, ph.imageDataUrl);
+              }
+            }
             const p = normalizeFieldProject(row as Record<string, unknown>);
-            if (p) fp.push(p);
+            if (p) {
+              fp.push({
+                ...p,
+                photos: p.photos.map((ph) =>
+                  ph.imageDataUrl ? ph : { ...ph, imageDataUrl: legacyBytes.get(ph.id) ?? "" },
+                ),
+              });
+            }
           }
         }
         setFieldProjects(fp);
+        void hydrateFieldProjectPhotosFromIdb(fp).then((hydrated) => {
+          if (cancelled) return;
+          setFieldProjects((prev) => {
+            // Only fill empty slots so we don't clobber photos added while hydrating.
+            const byId = new Map(hydrated.map((p) => [p.id, p]));
+            return prev.map((p) => {
+              const h = byId.get(p.id);
+              if (!h) return p;
+              return mergeFieldProjectPhotos(p, h);
+            });
+          });
+        });
       }
     } catch {
       // ignore invalid storage
     }
+    return () => {
+      cancelled = true;
+    };
   }, [storageUserId]);
 
   useEffect(() => {
@@ -405,10 +459,15 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         key,
-        JSON.stringify({ measurements, estimates, contracts, fieldProjects }),
+        JSON.stringify({
+          measurements,
+          estimates,
+          contracts,
+          fieldProjects: fieldProjectsForLocalCache(fieldProjects),
+        }),
       );
     } catch (e) {
-      // Local cache is best-effort; the server copy is the durable one.
+      // Local cache is best-effort; IndexedDB + server hold the durable photo bytes.
       console.warn("[roofing] local cache write failed (quota?)", e);
     }
   }, [measurements, estimates, contracts, fieldProjects, storageUserId]);
@@ -554,6 +613,33 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       saveSyncMeta(meta);
       hydratedRef.current = true;
       setSync({ status: "idle", lastSyncedAt: Date.now(), error: null });
+
+      // Retry R2 upload for photos that still only exist locally.
+      const pendingUploads: Array<{ projectId: string; photo: DamagePhoto }> = [];
+      for (const project of latestRef.current.fieldProjects) {
+        for (const photo of project.photos) {
+          if (photo.imageDataUrl?.startsWith("data:image/") && !photo.remoteKey) {
+            pendingUploads.push({ projectId: project.id, photo });
+          }
+        }
+      }
+      for (const { projectId, photo } of pendingUploads.slice(0, 8)) {
+        void uploadPhotoBlob(token, photo).then((remoteKey) => {
+          if (!remoteKey) return;
+          setFieldProjects((prev) =>
+            prev.map((p) =>
+              p.id === projectId
+                ? {
+                    ...p,
+                    photos: p.photos.map((ph) =>
+                      ph.id === photo.id ? { ...ph, remoteKey } : ph,
+                    ),
+                  }
+                : p,
+            ),
+          );
+        });
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Sync failed.";
       // Offline or a 5xx is expected sometimes — local cache still holds the work.
@@ -616,7 +702,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           const v = Math.max(0, input.monetaryValueUsd);
           monetaryValueUsd = Math.round(v * 100) / 100;
         }
-        const p: FieldProject = {
+        const p: FieldProject = withRefreshedStormReport({
           id: newFieldProjectId(),
           name: input.name.trim().slice(0, 200),
           address: input.address?.trim().slice(0, 500),
@@ -631,7 +717,7 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           ...(ownerLabel ? { ownerLabel } : {}),
           ...(ghlUrl ? { ghlUrl } : {}),
           ...(ghlEmbedUrl ? { ghlEmbedUrl } : {}),
-        };
+        });
         setFieldProjects((prev) => [...prev, p]);
         return p;
       },
@@ -649,6 +735,11 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
             if (patch.notes !== undefined) {
               const n = patch.notes?.trim().slice(0, 2000);
               next = { ...next, notes: n || undefined };
+            }
+            if (patch.aiReport !== undefined) {
+              const r = patch.aiReport?.trim().slice(0, MAX_FIELD_PROJECT_AI_REPORT);
+              if (r) next = { ...next, aiReport: r };
+              else delete next.aiReport;
             }
             if (patch.linkedMeasurementId !== undefined) {
               next = { ...next, linkedMeasurementId: patch.linkedMeasurementId ?? null };
@@ -690,7 +781,13 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
           }),
         );
       },
-      deleteFieldProject: (id) => setFieldProjects((prev) => prev.filter((p) => p.id !== id)),
+      deleteFieldProject: (id) => {
+        const existing = fieldProjects.find((p) => p.id === id);
+        if (existing?.photos.length) {
+          void deleteFieldPhotoBlobs(existing.photos.map((ph) => ph.id));
+        }
+        setFieldProjects((prev) => prev.filter((p) => p.id !== id));
+      },
       setFieldProjectPipelineStage: (id, stage) => {
         const now = new Date().toISOString();
         setFieldProjects((prev) =>
@@ -711,11 +808,15 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
               imageDataUrl,
             };
             newPhoto = photo;
-            return { ...p, photos: [...p.photos, photo], updatedAt: now };
+            const next: FieldProject = { ...p, photos: [...p.photos, photo], updatedAt: now };
+            return withRefreshedStormReport(next);
           }),
         );
+        if (newPhoto) {
+          void putFieldPhotoBlob(newPhoto.id, imageDataUrl);
+        }
         // Push the image to R2 so it is not stranded on this device. Best effort:
-        // when storage is unconfigured or offline the local copy still works.
+        // when storage is unconfigured or offline the local IndexedDB copy still works.
         if (newPhoto && token) {
           const uploaded: DamagePhoto = newPhoto;
           void uploadPhotoBlob(token, uploaded).then((remoteKey) => {
@@ -738,12 +839,17 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
       },
       removeFieldProjectPhoto: (projectId, photoId) => {
         const now = new Date().toISOString();
+        void deleteFieldPhotoBlob(photoId);
         setFieldProjects((prev) =>
-          prev.map((p) =>
-            p.id === projectId
-              ? { ...p, photos: p.photos.filter((x) => x.id !== photoId), updatedAt: now }
-              : p,
-          ),
+          prev.map((p) => {
+            if (p.id !== projectId) return p;
+            const next: FieldProject = {
+              ...p,
+              photos: p.photos.filter((x) => x.id !== photoId),
+              updatedAt: now,
+            };
+            return withRefreshedStormReport(next);
+          }),
         );
       },
       updateFieldProjectPhotoCaption: (projectId, photoId, caption) => {
@@ -751,13 +857,14 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setFieldProjects((prev) =>
           prev.map((p) => {
             if (p.id !== projectId) return p;
-            return {
+            const next: FieldProject = {
               ...p,
               photos: p.photos.map((ph) =>
                 ph.id === photoId ? { ...ph, caption: caption.trim().slice(0, 500) } : ph,
               ),
               updatedAt: now,
             };
+            return withRefreshedStormReport(next);
           }),
         );
       },
@@ -766,13 +873,14 @@ export function RoofingProvider({ children }: { children: ReactNode }) {
         setFieldProjects((prev) =>
           prev.map((p) => {
             if (p.id !== projectId) return p;
-            return {
+            const next: FieldProject = {
               ...p,
               photos: p.photos.map((ph) =>
                 ph.id === photoId ? { ...ph, aiSummary: summary } : ph,
               ),
               updatedAt: now,
             };
+            return withRefreshedStormReport(next);
           }),
         );
       },

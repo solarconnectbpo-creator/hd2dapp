@@ -284,9 +284,14 @@ export function FieldProjectsPanel() {
 
   const handleFiles = useCallback(
     (projectId: string, files: FileList | null) => {
-      void importFiles(projectId, files);
+      const proj = fieldProjects.find((p) => p.id === projectId);
+      const stormish = proj?.tags.some((t) => t === "storm" || t === "damage-report");
+      void importFiles(projectId, files, {
+        autoAi: Boolean(stormish && authToken),
+        contextHint: [proj?.name, proj?.address, "storm damage documentation"].filter(Boolean).join(" — "),
+      });
     },
-    [importFiles],
+    [authToken, fieldProjects, importFiles],
   );
 
   const onColumnDragOver = (e: DragEvent, stage: FieldPipelineStage) => {
@@ -833,13 +838,22 @@ export function FieldProjectsPanel() {
                 </p>
               ) : null}
 
+              {selected.aiReport ? (
+                <div className="rounded-lg border border-black/10 bg-white p-3">
+                  <p className="mb-2 text-sm font-medium text-black">AI storm damage report</p>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-black/80">
+                    {selected.aiReport}
+                  </pre>
+                </div>
+              ) : null}
+
               <div>
                 <p className="mb-2 text-sm font-medium text-black">
                   Damage photos ({selected.photos.length}/{MAX_FIELD_PROJECT_PHOTOS})
                 </p>
                 <p className="mb-3 text-xs text-black/70">
-                  Photos are resized on device before save to fit browser storage. Use rear camera on site when
-                  possible.
+                  Photos are compressed on-device and saved to IndexedDB + your account. Use the rear camera on site
+                  when possible.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <input

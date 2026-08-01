@@ -20,6 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRoofing } from "../context/RoofingContext";
 import { StormDamageCaptureSheet } from "../features/fieldProjects/StormDamageCaptureSheet";
 import { useFieldProjectPhotoCapture } from "../features/fieldProjects/useFieldProjectPhotoCapture";
+import { MAX_FIELD_PROJECT_PHOTOS } from "../lib/fieldProjectTypes";
 import { parseContactsCsv, type ContactRecord } from "../lib/contactsCsv";
 import { geocodeContactsMissing } from "../lib/geocodeContact";
 import { parseLeadsFromGeoJson } from "../lib/canvassingGeoJson";
@@ -200,19 +201,17 @@ export function Canvassing() {
     addFieldProject,
     addFieldProjectPhoto,
     removeFieldProjectPhoto,
-    updateFieldProjectPhotoCaption,
     setFieldProjectPhotoAiSummary,
   } = useRoofing();
   const authToken = session?.token ?? "";
   const {
     cameraInputRef: stormCameraInputRef,
     galleryInputRef: stormGalleryInputRef,
-    busyPhotoId: stormBusyPhotoId,
     importing: stormImporting,
+    analyzing: stormAnalyzing,
     importError: stormImportError,
     setImportError: setStormImportError,
     importFiles: importStormFiles,
-    runAiOnPhoto: runStormAiOnPhoto,
     openCamera: openStormCamera,
     openGallery: openStormGallery,
   } = useFieldProjectPhotoCapture({
@@ -222,7 +221,8 @@ export function Canvassing() {
     setFieldProjectPhotoAiSummary,
   });
   const [stormReportProjectId, setStormReportProjectId] = useState<string | null>(null);
-  const [stormAutoAi, setStormAutoAi] = useState(true);
+  const [stormKeepShooting, setStormKeepShooting] = useState(true);
+  const stormKeepShootingRef = useRef(true);
   const [stormLightboxUrl, setStormLightboxUrl] = useState<string | null>(null);
   const stormReportProject = stormReportProjectId
     ? fieldProjects.find((p) => p.id === stormReportProjectId) ?? null
@@ -462,6 +462,8 @@ export function Canvassing() {
       pipelineStage: "documentation",
     });
     setStormReportProjectId(p.id);
+    setStormKeepShooting(true);
+    stormKeepShootingRef.current = true;
     setStormImportError(null);
     sonnerToast.success("Storm damage job ready — take site photos");
     // Open rear camera once the sheet mounts (native capture on mobile / PWA).
@@ -489,25 +491,38 @@ export function Canvassing() {
   const onStormCameraFiles = useCallback(
     (files: FileList | null) => {
       if (!stormReportProjectId) return;
+      // Save + reopen camera immediately; AI report builds in the background.
       void importStormFiles(stormReportProjectId, files, {
-        autoAi: stormAutoAi && Boolean(authToken),
+        autoAi: Boolean(authToken),
+        awaitAi: false,
         contextHint: stormContextHint,
       }).then((res) => {
-        if (res.added > 0) {
-          sonnerToast.success(
-            res.added === 1 ? "Photo saved to damage report" : `${res.added} photos saved`,
-          );
-        }
+        if (res.added <= 0) return;
+        sonnerToast.success(res.added === 1 ? "Photo saved" : `${res.added} photos saved`);
+        if (!stormKeepShootingRef.current) return;
+        if (res.photoCountAfter >= MAX_FIELD_PROJECT_PHOTOS) return;
+        window.setTimeout(() => {
+          if (stormKeepShootingRef.current) openStormCamera();
+        }, 250);
       });
     },
-    [authToken, importStormFiles, stormAutoAi, stormContextHint, stormReportProjectId],
+    [authToken, importStormFiles, openStormCamera, stormContextHint, stormReportProjectId],
   );
 
   const onStormGalleryFiles = useCallback(
     (files: FileList | null) => {
-      onStormCameraFiles(files);
+      if (!stormReportProjectId) return;
+      void importStormFiles(stormReportProjectId, files, {
+        autoAi: Boolean(authToken),
+        awaitAi: false,
+        contextHint: stormContextHint,
+      }).then((res) => {
+        if (res.added > 0) {
+          sonnerToast.success(res.added === 1 ? "Photo saved" : `${res.added} photos saved`);
+        }
+      });
     },
-    [onStormCameraFiles],
+    [authToken, importStormFiles, stormContextHint, stormReportProjectId],
   );
 
   useEffect(() => {
@@ -1593,7 +1608,7 @@ export function Canvassing() {
                   Storm damage report
                 </Button>
                 <p className="text-[11px] leading-snug text-zinc-600">
-                  Creates a field job and opens the camera so you can document damage on-site.
+                  Opens the camera for multiple site photos and builds an AI storm damage report as you shoot.
                 </p>
                 <label className="canvass-footer-checkbox flex flex-row items-center gap-2 text-xs text-zinc-950">
                   <input
@@ -1639,27 +1654,30 @@ export function Canvassing() {
         <StormDamageCaptureSheet
           project={stormReportProject}
           open
-          onClose={() => setStormReportProjectId(null)}
+          onClose={() => {
+            stormKeepShootingRef.current = false;
+            setStormKeepShooting(false);
+            setStormReportProjectId(null);
+          }}
           onOpenFullJob={() => {
             const id = stormReportProject.id;
+            stormKeepShootingRef.current = false;
+            setStormKeepShooting(false);
             setStormReportProjectId(null);
             navigate(`/projects?openProject=${encodeURIComponent(id)}`);
           }}
           openCamera={openStormCamera}
           openGallery={openStormGallery}
           importing={stormImporting}
+          analyzing={stormAnalyzing}
           importError={stormImportError}
           onDismissError={() => setStormImportError(null)}
-          busyPhotoId={stormBusyPhotoId}
-          autoAi={stormAutoAi}
-          onAutoAiChange={setStormAutoAi}
+          keepShooting={stormKeepShooting}
+          onKeepShootingChange={(v) => {
+            stormKeepShootingRef.current = v;
+            setStormKeepShooting(v);
+          }}
           canUseAi={Boolean(authToken)}
-          onCaptionChange={(photoId, caption) =>
-            updateFieldProjectPhotoCaption(stormReportProject.id, photoId, caption)
-          }
-          onRunAi={(photoId, imageDataUrl) =>
-            void runStormAiOnPhoto(stormReportProject.id, photoId, imageDataUrl, stormContextHint)
-          }
           onRemovePhoto={(photoId) => removeFieldProjectPhoto(stormReportProject.id, photoId)}
           onOpenLightbox={setStormLightboxUrl}
         />

@@ -12,6 +12,10 @@ export type ImportFilesResult = {
   added: number;
   photoIds: string[];
   error: string | null;
+  /** True when every newly added photo finished AI (or AI was skipped). */
+  aiComplete: boolean;
+  /** Photo count on the project after this import (best-effort). */
+  photoCountAfter: number;
 };
 
 type CaptureDeps = {
@@ -35,7 +39,10 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  /** Tracks in-flight AI jobs so the UI can show “building report…”. */
+  const aiInFlightRef = useRef(0);
 
   const resetFileInputs = useCallback(() => {
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -48,6 +55,8 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
         setImportError("AI draft needs the original photo on this device.");
         return false;
       }
+      aiInFlightRef.current += 1;
+      setAnalyzing(true);
       setBusyPhotoId(photoId);
       setImportError(null);
       try {
@@ -68,6 +77,8 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
         setImportError(e instanceof Error ? e.message : "AI request failed");
         return false;
       } finally {
+        aiInFlightRef.current = Math.max(0, aiInFlightRef.current - 1);
+        if (aiInFlightRef.current === 0) setAnalyzing(false);
         setBusyPhotoId(null);
       }
     },
@@ -81,24 +92,37 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
       options?: {
         /** Run roof-damage AI on each newly added photo (requires auth). */
         autoAi?: boolean;
+        /** Await AI before resolving (storm report consolidation). */
+        awaitAi?: boolean;
         contextHint?: string;
       },
     ): Promise<ImportFilesResult> => {
-      if (!files?.length) return { added: 0, photoIds: [], error: null };
+      if (!files?.length) {
+        const proj0 = fieldProjects.find((p) => p.id === projectId);
+        return {
+          added: 0,
+          photoIds: [],
+          error: null,
+          aiComplete: true,
+          photoCountAfter: proj0?.photos.length ?? 0,
+        };
+      }
       setImportError(null);
       setImporting(true);
       const proj = fieldProjects.find((p) => p.id === projectId);
-      let remaining = proj ? MAX_FIELD_PROJECT_PHOTOS - proj.photos.length : 0;
+      const startingCount = proj?.photos.length ?? 0;
+      let remaining = proj ? MAX_FIELD_PROJECT_PHOTOS - startingCount : 0;
       if (remaining <= 0) {
-        const error = `Each project allows at most ${MAX_FIELD_PROJECT_PHOTOS} photos (local storage limit).`;
+        const error = `Each project allows at most ${MAX_FIELD_PROJECT_PHOTOS} photos.`;
         setImportError(error);
         setImporting(false);
         resetFileInputs();
-        return { added: 0, photoIds: [], error };
+        return { added: 0, photoIds: [], error, aiComplete: true, photoCountAfter: startingCount };
       }
 
       let added = 0;
       const photoIds: string[] = [];
+      const aiJobs: Array<Promise<boolean>> = [];
       let lastError: string | null = null;
 
       for (let i = 0; i < files.length && remaining > 0; i++) {
@@ -112,7 +136,9 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
           remaining -= 1;
           photoIds.push(photo.id);
           if (options?.autoAi && authToken) {
-            void runAiOnPhoto(projectId, photo.id, dataUrl, options.contextHint ?? "");
+            const job = runAiOnPhoto(projectId, photo.id, dataUrl, options.contextHint ?? "");
+            if (options.awaitAi) aiJobs.push(job);
+            else void job;
           }
         } catch (e) {
           lastError = e instanceof Error ? e.message : "Could not process an image.";
@@ -122,7 +148,20 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
 
       resetFileInputs();
       setImporting(false);
-      return { added, photoIds, error: lastError };
+
+      let aiComplete = true;
+      if (aiJobs.length > 0) {
+        const results = await Promise.all(aiJobs);
+        aiComplete = results.every(Boolean);
+      }
+
+      return {
+        added,
+        photoIds,
+        error: lastError,
+        aiComplete,
+        photoCountAfter: startingCount + added,
+      };
     },
     [addFieldProjectPhoto, authToken, fieldProjects, resetFileInputs, runAiOnPhoto],
   );
@@ -140,6 +179,7 @@ export function useFieldProjectPhotoCapture(deps: CaptureDeps) {
     galleryInputRef,
     busyPhotoId,
     importing,
+    analyzing,
     importError,
     setImportError,
     importFiles,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { normalizeDamagePhoto, normalizeFieldProject, optHttpsUrl } from "./fieldProjectTypes";
+import {
+  mergeFieldProjectPhotos,
+  normalizeDamagePhoto,
+  normalizeFieldProject,
+  optHttpsUrl,
+  type FieldProject,
+} from "./fieldProjectTypes";
 
 describe("optHttpsUrl", () => {
   it("accepts https URLs", () => {
@@ -94,5 +100,72 @@ describe("normalizeDamagePhoto", () => {
         imageDataUrl: "https://example.com/x.jpg",
       }),
     ).toBeNull();
+  });
+});
+
+describe("mergeFieldProjectPhotos", () => {
+  const base = (over: Partial<FieldProject> = {}): FieldProject => ({
+    id: "fp-1",
+    name: "Job",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-02T00:00:00.000Z",
+    pipelineStage: "documentation",
+    photos: [],
+    tags: ["storm"],
+    ...over,
+  });
+
+  it("keeps local-only photos when remote list is shorter", () => {
+    const local = base({
+      photos: [
+        {
+          id: "ph-local",
+          capturedAt: "2026-01-01T01:00:00.000Z",
+          imageDataUrl: "data:image/jpeg;base64,local",
+        },
+      ],
+    });
+    const incoming = base({
+      updatedAt: "2026-01-03T00:00:00.000Z",
+      notes: "edited on other device",
+      photos: [],
+    });
+    const merged = mergeFieldProjectPhotos(incoming, local);
+    expect(merged.photos).toHaveLength(1);
+    expect(merged.photos[0]?.id).toBe("ph-local");
+    expect(merged.notes).toBe("edited on other device");
+  });
+
+  it("reattaches local bytes onto synced placeholders", () => {
+    const local = base({
+      photos: [
+        {
+          id: "ph-1",
+          capturedAt: "2026-01-01T01:00:00.000Z",
+          imageDataUrl: "data:image/jpeg;base64,bytes",
+          remoteKey: "ph-1",
+        },
+      ],
+    });
+    const incoming = base({
+      photos: [
+        {
+          id: "ph-1",
+          capturedAt: "2026-01-01T01:00:00.000Z",
+          imageDataUrl: "",
+          remoteKey: "ph-1",
+          aiSummary: {
+            damageTypes: ["Hail"],
+            severity: 3,
+            recommendedAction: "Further Inspection",
+            notes: "n",
+            summary: "s",
+          },
+        },
+      ],
+    });
+    const merged = mergeFieldProjectPhotos(incoming, local);
+    expect(merged.photos[0]?.imageDataUrl).toContain("data:image/jpeg");
+    expect(merged.photos[0]?.aiSummary?.summary).toBe("s");
   });
 });

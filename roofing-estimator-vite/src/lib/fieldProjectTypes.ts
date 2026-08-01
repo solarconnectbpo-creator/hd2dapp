@@ -46,6 +46,11 @@ export interface FieldProject {
   name: string;
   address?: string;
   notes?: string;
+  /**
+   * Auto-generated storm / damage documentation from photo AI drafts.
+   * Kept separate from `notes` so site metadata is not overwritten.
+   */
+  aiReport?: string;
   createdAt: string;
   updatedAt: string;
   pipelineStage: FieldPipelineStage;
@@ -61,6 +66,39 @@ export interface FieldProject {
   ghlUrl?: string;
   /** Optional separate URL for iframe embed; if unset, embed is not suggested when only ghlUrl is set. */
   ghlEmbedUrl?: string;
+}
+
+export const MAX_FIELD_PROJECT_AI_REPORT = 8000;
+
+/**
+ * Union-merge photos so a remote project with fewer ids cannot wipe local captures.
+ * Prefer non-empty local JPEG bytes; keep remoteKey / AI / caption from the richer side.
+ */
+export function mergeFieldProjectPhotos(incoming: FieldProject, local: FieldProject | undefined): FieldProject {
+  if (!local) return incoming;
+  const localById = new Map(local.photos.map((p) => [p.id, p]));
+  const incomingIds = new Set(incoming.photos.map((p) => p.id));
+  const merged: DamagePhoto[] = incoming.photos.map((remote) => {
+    const loc = localById.get(remote.id);
+    if (!loc) return remote;
+    return {
+      ...remote,
+      imageDataUrl: remote.imageDataUrl || loc.imageDataUrl || "",
+      remoteKey: remote.remoteKey || loc.remoteKey,
+      caption: remote.caption ?? loc.caption,
+      aiSummary: remote.aiSummary ?? loc.aiSummary,
+    };
+  });
+  for (const loc of local.photos) {
+    if (!incomingIds.has(loc.id)) merged.push(loc);
+  }
+  merged.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+  const aiReport = incoming.aiReport || local.aiReport;
+  return {
+    ...incoming,
+    photos: merged.slice(0, MAX_FIELD_PROJECT_PHOTOS),
+    ...(aiReport ? { aiReport } : {}),
+  };
 }
 
 export const MAX_FIELD_PROJECT_PHOTOS = 24;
@@ -191,12 +229,14 @@ export function normalizeFieldProject(raw: Record<string, unknown>): FieldProjec
   const monetaryValueUsd = optNonNegativeMoney(raw.monetaryValueUsd);
   const ownerLabel = optString(raw.ownerLabel, 120);
   const tags = normalizeTagList(raw.tags);
+  const aiReport = optString(raw.aiReport, MAX_FIELD_PROJECT_AI_REPORT);
 
   return {
     id,
     name: name.slice(0, 200),
     address: optString(raw.address, 500),
     notes: optString(raw.notes, 2000),
+    ...(aiReport ? { aiReport } : {}),
     createdAt,
     updatedAt: typeof updatedAt === "string" ? updatedAt : createdAt,
     pipelineStage,

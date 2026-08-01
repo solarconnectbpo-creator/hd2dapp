@@ -1,9 +1,9 @@
 import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Camera, ExternalLink, ImagePlus, Loader2, X } from "lucide-react";
+import { Camera, Check, ExternalLink, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "../../components/ui/button";
-import { MAX_FIELD_PROJECT_PHOTOS, type FieldProject } from "../../lib/fieldProjectTypes";
-import { FieldPhotoTile } from "./FieldPhotoTile";
+import { MAX_FIELD_PROJECT_PHOTOS, type DamagePhoto, type FieldProject } from "../../lib/fieldProjectTypes";
+import { useRemotePhotoUrl } from "./useRemotePhotoUrl";
 
 type Props = {
   project: FieldProject;
@@ -13,21 +13,57 @@ type Props = {
   openCamera: () => void;
   openGallery: () => void;
   importing: boolean;
+  analyzing: boolean;
   importError: string | null;
   onDismissError: () => void;
-  busyPhotoId: string | null;
-  autoAi: boolean;
-  onAutoAiChange: (v: boolean) => void;
+  keepShooting: boolean;
+  onKeepShootingChange: (v: boolean) => void;
   canUseAi: boolean;
-  onCaptionChange: (photoId: string, caption: string) => void;
-  onRunAi: (photoId: string, imageDataUrl: string) => void;
   onRemovePhoto: (photoId: string) => void;
   onOpenLightbox: (url: string) => void;
 };
 
+function Thumb({
+  photo,
+  analyzing,
+  onOpen,
+  onRemove,
+}: {
+  photo: DamagePhoto;
+  analyzing: boolean;
+  onOpen: (url: string) => void;
+  onRemove: () => void;
+}) {
+  const src = useRemotePhotoUrl(photo);
+  return (
+    <li className="relative overflow-hidden rounded-xl bg-[#0f172a]/10">
+      {src ? (
+        <button type="button" className="block w-full" onClick={() => onOpen(src)}>
+          <img src={src} alt={photo.caption || "Site photo"} className="h-20 w-full object-cover" />
+        </button>
+      ) : (
+        <div className="flex h-20 items-center justify-center text-[10px] text-[#64748b]">Saving…</div>
+      )}
+      {analyzing ? (
+        <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-0.5 text-[10px] text-white">
+          <Loader2 className="h-3 w-3 animate-spin" /> AI
+        </span>
+      ) : null}
+      <button
+        type="button"
+        className="absolute right-1 top-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] text-white"
+        onClick={onRemove}
+        aria-label="Remove photo"
+      >
+        ✕
+      </button>
+    </li>
+  );
+}
+
 /**
- * In-canvass storm damage documentation: take photos with the rear camera,
- * attach to the field job, optional AI drafts — without leaving the map.
+ * In-canvass storm damage documentation: continuous rear-camera capture,
+ * durable photo save, and a live AI report — without leaving the map.
  */
 export function StormDamageCaptureSheet({
   project,
@@ -37,14 +73,12 @@ export function StormDamageCaptureSheet({
   openCamera,
   openGallery,
   importing,
+  analyzing,
   importError,
   onDismissError,
-  busyPhotoId,
-  autoAi,
-  onAutoAiChange,
+  keepShooting,
+  onKeepShootingChange,
   canUseAi,
-  onCaptionChange,
-  onRunAi,
   onRemovePhoto,
   onOpenLightbox,
 }: Props) {
@@ -52,10 +86,20 @@ export function StormDamageCaptureSheet({
     typeof document !== "undefined" ? document.getElementById("root") ?? document.body : null;
 
   const atCap = project.photos.length >= MAX_FIELD_PROJECT_PHOTOS;
-  const recentPhotos = useMemo(
-    () => [...project.photos].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt)).slice(0, 6),
+  const photos = useMemo(
+    () => [...project.photos].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt)),
     [project.photos],
   );
+  const analyzed = photos.filter((p) => p.aiSummary).length;
+  const statusLine = importing
+    ? "Saving photo…"
+    : analyzing
+      ? "AI is writing your storm damage report…"
+      : photos.length === 0
+        ? "Open the camera and document the roof"
+        : keepShooting && !atCap
+          ? "Photo saved — camera ready for the next shot"
+          : `${photos.length} photo${photos.length === 1 ? "" : "s"} saved · report ready`;
 
   useEffect(() => {
     if (!open) return;
@@ -77,17 +121,18 @@ export function StormDamageCaptureSheet({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/45"
+        className="absolute inset-0 bg-[#0b1220]/55 backdrop-blur-[2px]"
         aria-label="Close damage report"
         onClick={onClose}
       />
-      <div className="relative z-[1] flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-[#e2e8f0] bg-[#f8fafc] shadow-2xl sm:rounded-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-[#e2e8f0] bg-white px-4 py-3">
+      <div className="relative z-[1] flex max-h-[min(94vh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] shadow-[0_-12px_40px_rgba(15,23,42,0.25)] sm:rounded-3xl">
+        <div className="flex items-start justify-between gap-3 px-4 pb-2 pt-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
+            <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+              <Sparkles className="h-3.5 w-3.5" />
               Storm damage report
             </p>
-            <h2 id="storm-damage-sheet-title" className="truncate text-base font-semibold text-[#0f172a]">
+            <h2 id="storm-damage-sheet-title" className="mt-1 truncate text-lg font-semibold tracking-tight text-[#0f172a]">
               {project.name}
             </h2>
             {project.address ? (
@@ -96,7 +141,7 @@ export function StormDamageCaptureSheet({
           </div>
           <button
             type="button"
-            className="rounded-lg p-1.5 text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+            className="rounded-full p-2 text-[#64748b] hover:bg-black/5 hover:text-[#0f172a]"
             aria-label="Close"
             onClick={onClose}
           >
@@ -104,14 +149,25 @@ export function StormDamageCaptureSheet({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-          <p className="text-sm leading-relaxed text-[#475569]">
-            Use the rear camera for site photos. Images are compressed on-device and saved to this field
-            job ({project.photos.length}/{MAX_FIELD_PROJECT_PHOTOS}).
-          </p>
+        <div className="mx-4 mb-3 rounded-2xl border border-[#cbd5e1]/80 bg-white/80 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 text-xs font-medium text-[#334155]">
+            <span className="inline-flex items-center gap-1.5">
+              {(importing || analyzing) && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#0f766e]" />}
+              {!importing && !analyzing && photos.length > 0 ? (
+                <Check className="h-3.5 w-3.5 text-[#0f766e]" />
+              ) : null}
+              {statusLine}
+            </span>
+            <span className="tabular-nums text-[#64748b]">
+              {photos.length}/{MAX_FIELD_PROJECT_PHOTOS}
+              {canUseAi ? ` · AI ${analyzed}/${photos.length}` : ""}
+            </span>
+          </div>
+        </div>
 
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-3">
           {importError ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               {importError}
               <button type="button" className="ml-2 underline" onClick={onDismissError}>
                 Dismiss
@@ -119,70 +175,87 @@ export function StormDamageCaptureSheet({
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button
               type="button"
               size="lg"
-              className="w-full gap-2 bg-zinc-900 font-semibold text-white hover:bg-zinc-800"
+              className="h-12 w-full gap-2 rounded-2xl bg-[#0f172a] text-base font-semibold text-white hover:bg-[#1e293b]"
               disabled={atCap || importing}
-              onClick={openCamera}
+              onClick={() => {
+                onKeepShootingChange(true);
+                openCamera();
+              }}
             >
               {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-              Take photo
+              {photos.length === 0 ? "Take first photo" : "Take another photo"}
             </Button>
             <Button
               type="button"
               size="lg"
               variant="outline"
-              className="w-full gap-2 border-zinc-300 font-semibold text-zinc-950"
+              className="h-12 w-full gap-2 rounded-2xl border-[#cbd5e1] bg-white font-semibold text-[#0f172a]"
               disabled={atCap || importing}
               onClick={openGallery}
             >
               <ImagePlus className="h-4 w-4" />
-              Gallery
+              Add from gallery
             </Button>
           </div>
 
-          <label className="flex items-start gap-2 text-xs text-[#475569]">
+          <label className="flex items-start gap-2 text-xs leading-relaxed text-[#475569]">
             <input
               type="checkbox"
               className="mt-0.5"
-              checked={autoAi}
-              disabled={!canUseAi}
-              onChange={(e) => onAutoAiChange(e.target.checked)}
+              checked={keepShooting}
+              onChange={(e) => onKeepShootingChange(e.target.checked)}
             />
             <span>
-              Auto-draft damage notes with AI after each photo
-              {!canUseAi ? " (sign in required)" : ""}
+              Keep the camera open after each shot for rapid multi-photo documentation
+              {!canUseAi ? ". Sign in to auto-build the AI report." : ". AI updates the report after every photo."}
             </span>
           </label>
 
-          {recentPhotos.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#cbd5e1] bg-white px-4 py-8 text-center text-sm text-[#64748b]">
-              No photos yet — tap Take photo to open the camera.
+          {photos.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-[#94a3b8] bg-white/70 px-4 py-10 text-center text-sm text-[#64748b]">
+              Capture elevations, slopes, and close-ups. Each photo is saved immediately and fed into the report.
             </p>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {recentPhotos.map((ph) => (
-                <FieldPhotoTile
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {photos.map((ph) => (
+                <Thumb
                   key={ph.id}
                   photo={ph}
-                  aiBusy={busyPhotoId === ph.id}
-                  onOpenLightbox={onOpenLightbox}
-                  onCaptionChange={(caption) => onCaptionChange(ph.id, caption)}
-                  onRunAi={(imageDataUrl) => onRunAi(ph.id, imageDataUrl)}
+                  analyzing={analyzing && !ph.aiSummary}
+                  onOpen={onOpenLightbox}
                   onRemove={() => onRemovePhoto(ph.id)}
                 />
               ))}
             </ul>
           )}
+
+          <section className="rounded-2xl border border-[#cbd5e1] bg-white p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#0f172a]">AI storm damage report</h3>
+              {analyzing ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-[#0f766e]">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Updating
+                </span>
+              ) : null}
+            </div>
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-[#334155]">
+              {project.aiReport?.trim() ||
+                (canUseAi
+                  ? "Report will appear here as soon as the first photo is analyzed."
+                  : "Sign in to generate an automatic AI storm damage report from your photos.")}
+            </pre>
+          </section>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-[#e2e8f0] bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row">
+        <div className="flex flex-col gap-2 border-t border-[#e2e8f0] bg-white/90 px-4 py-3 pb-[max(0.85rem,env(safe-area-inset-bottom))] sm:flex-row">
           <Button
             type="button"
             variant="outline"
-            className="w-full gap-2 border-zinc-300 font-semibold"
+            className="w-full gap-2 rounded-2xl border-[#cbd5e1] font-semibold"
             onClick={onOpenFullJob}
           >
             <ExternalLink className="h-4 w-4" />
@@ -190,10 +263,13 @@ export function StormDamageCaptureSheet({
           </Button>
           <Button
             type="button"
-            className="w-full bg-[#1d9bf0] font-semibold text-white hover:bg-[#1a8cd8]"
-            onClick={onClose}
+            className="w-full rounded-2xl bg-[#0f766e] font-semibold text-white hover:bg-[#0d9488]"
+            onClick={() => {
+              onKeepShootingChange(false);
+              onClose();
+            }}
           >
-            Done — stay on map
+            Finish report
           </Button>
         </div>
       </div>
