@@ -148,7 +148,8 @@ export function Estimates() {
                               <div key={`${line.description}-${index}`} className="text-sm">
                                 <div>{line.description}</div>
                                 <div className="text-xs text-[var(--x-muted)]">
-                                  {line.hours} hr × {money(line.hourlyRate)} = {money(line.totalCost)}
+                                  {line.hours} {line.unit ?? "hr"} × {money(line.hourlyRate)} ={" "}
+                                  {money(line.totalCost)}
                                 </div>
                               </div>
                             ))}

@@ -4656,8 +4656,11 @@ function App() {
         .filter((l) => isLaborScopeLine(l.code))
         .map((l) => ({
           description: `${l.code} ${l.description}`,
-          hours: 1,
-          hourlyRate: l.total,
+          // Roofing labor is priced per SQ/LF/EA, so carry the real quantity and rate
+          // instead of collapsing to "1 hr × total", which misreports the breakdown.
+          hours: l.quantity,
+          hourlyRate: l.unitCost,
+          unit: l.unit,
           totalCost: l.total,
         }));
 

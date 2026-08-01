@@ -77,8 +77,12 @@ export interface Estimate {
   }[];
   labor: {
     description: string;
+    /** Billed quantity in {@link unit} — not necessarily hours (roofing labor is priced per SQ). */
     hours: number;
+    /** Rate per {@link unit}. */
     hourlyRate: number;
+    /** Unit for the quantity above; defaults to hours for older saved estimates. */
+    unit?: string;
     totalCost: number;
   }[];
   subtotal: number;
