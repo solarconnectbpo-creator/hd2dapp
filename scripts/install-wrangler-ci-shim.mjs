@@ -1,11 +1,11 @@
 /**
- * Cloudflare Workers Builds runs: `npx wrangler versions upload`
- * That only uploads a version — it does NOT shift production traffic.
+ * Cloudflare Workers Builds auth can deploy Workers, but not Pages (token scope).
+ * Production SPA is therefore bundled as Worker static assets and routed on apex/www.
  *
- * This prepare hook wraps the local wrangler CLI so a successful
- * `versions upload` is followed by:
- *   1) `wrangler deploy --keep-vars true` (API to 100% traffic)
- *   2) Vite build + `wrangler pages deploy` (SPA → hd2d-closers)
+ * Intercepts:
+ *   - `wrangler deploy` / `wrangler versions upload`
+ * Pre: build roofing-estimator-vite → dist (assets directory)
+ * Post (versions upload only): `wrangler deploy --keep-vars true`
  */
 import { chmodSync, copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -22,68 +22,60 @@ if (!existsSync(realJs)) {
 }
 
 const current = readFileSync(realJs, "utf8");
-if (current.includes("WRANGLER_CI_SHIM_V2")) {
+if (current.includes("WRANGLER_CI_SHIM_V3")) {
   process.exit(0);
 }
 
-if (!existsSync(backupJs)) {
-  copyFileSync(realJs, backupJs);
-} else if (!current.includes("WRANGLER_CI_SHIM")) {
-  // Real binary was restored by a fresh install; refresh backup.
+if (!existsSync(backupJs) || !current.includes("WRANGLER_CI_SHIM")) {
   copyFileSync(realJs, backupJs);
 }
 
 const shim = `#!/usr/bin/env node
-/* WRANGLER_CI_SHIM_V2 */
+/* WRANGLER_CI_SHIM_V3 */
 const { spawnSync } = require("node:child_process");
-const { existsSync } = require("node:fs");
+const { existsSync, mkdirSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
 const real = join(__dirname, "wrangler.real.js");
 const args = process.argv.slice(2);
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
-function run(cmd, cmdArgs, opts) {
+function run(cmd, cmdArgs, opts = {}) {
   const r = spawnSync(cmd, cmdArgs, { stdio: "inherit", shell: process.platform === "win32", ...opts });
   return r.status ?? 1;
+}
+
+const isDeploy = args[0] === "deploy";
+const isVersionsUpload = args[0] === "versions" && args[1] === "upload";
+const repoRoot = process.cwd();
+const viteDir = join(repoRoot, "roofing-estimator-vite");
+const distDir = join(viteDir, "dist");
+
+function ensureSpaBuilt() {
+  if (process.env.WRANGLER_CI_SKIP_SPA === "1") return 0;
+  if (!existsSync(join(viteDir, "package.json"))) {
+    console.warn("[wrangler-ci-shim] SPA package missing; writing placeholder dist");
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, "index.html"), "<!doctype html><title>HD2D</title><p>SPA build missing</p>");
+    return 0;
+  }
+  console.log("[wrangler-ci-shim] building SPA for Worker static assets…");
+  if (run(npm, ["ci", "--no-audit", "--no-fund"], { cwd: viteDir }) !== 0) return 1;
+  if (run(npm, ["run", "build"], { cwd: viteDir }) !== 0) return 1;
+  return 0;
+}
+
+if (isDeploy || isVersionsUpload) {
+  const b = ensureSpaBuilt();
+  if (b !== 0) process.exit(b);
 }
 
 const status = run(process.execPath, [real, ...args], {});
 if (status !== 0) process.exit(status);
 
-const isVersionsUpload = args[0] === "versions" && args[1] === "upload";
-if (!isVersionsUpload || process.env.WRANGLER_CI_SKIP_DEPLOY === "1") process.exit(0);
-
-console.log("[wrangler-ci-shim] versions upload ok — deploying Worker to 100% production…");
-const dep = run(process.execPath, [real, "deploy", "--keep-vars", "true"], {});
-if (dep !== 0) process.exit(dep);
-
-if (process.env.WRANGLER_CI_SKIP_PAGES === "1") process.exit(0);
-
-const repoRoot = process.cwd();
-const viteDir = join(repoRoot, "roofing-estimator-vite");
-const pkg = join(viteDir, "package.json");
-if (!existsSync(pkg)) {
-  console.warn("[wrangler-ci-shim] roofing-estimator-vite missing; skip Pages deploy");
-  process.exit(0);
-}
-
-console.log("[wrangler-ci-shim] building SPA for Cloudflare Pages…");
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-if (run(npm, ["ci", "--no-audit", "--no-fund"], { cwd: viteDir }) !== 0) process.exit(1);
-if (run(npm, ["run", "build"], { cwd: viteDir }) !== 0) process.exit(1);
-
-console.log("[wrangler-ci-shim] deploying SPA to Pages project hd2d-closers…");
-const pages = run(
-  process.execPath,
-  [real, "pages", "deploy", "dist", "--project-name", "hd2d-closers", "--commit-dirty", "true"],
-  { cwd: viteDir },
-);
-if (pages !== 0) process.exit(pages);
-
-// Best-effort: point apex DNS at Pages when the build token can edit DNS.
-const dnsScript = join(viteDir, "scripts", "fix-apex-dns-for-pages.mjs");
-if (existsSync(dnsScript)) {
-  console.log("[wrangler-ci-shim] attempting apex DNS → Pages…");
-  run(process.execPath, [dnsScript], { cwd: viteDir });
+if (isVersionsUpload && process.env.WRANGLER_CI_SKIP_DEPLOY !== "1") {
+  console.log("[wrangler-ci-shim] versions upload ok — deploying Worker (+ SPA assets) to production…");
+  const dep = run(process.execPath, [real, "deploy", "--keep-vars", "true"], {});
+  process.exit(dep);
 }
 process.exit(0);
 `;
@@ -94,4 +86,4 @@ try {
 } catch {
   /* ignore */
 }
-console.log("[wrangler-ci-shim] installed v2 (versions upload → worker deploy → pages deploy)");
+console.log("[wrangler-ci-shim] installed v3 (build SPA → worker deploy with assets)");

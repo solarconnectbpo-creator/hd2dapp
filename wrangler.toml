@@ -1,5 +1,5 @@
-# Cloudflare Workers Builds runs from the monorepo root (`pnpm install` + `npx wrangler versions upload`).
-# Canonical Worker config lives in `backend/wrangler.toml` — keep bindings/vars in sync when changing either.
+# Cloudflare Workers Builds runs from the monorepo root.
+# Canonical API config also lives in backend/wrangler.toml — keep bindings in sync.
 name = "hd2d-backend"
 main = "backend/src/index.ts"
 compatibility_date = "2024-12-02"
@@ -8,12 +8,22 @@ compatibility_flags = ["nodejs_compat", "nodejs_als"]
 workers_dev = true
 preview_urls = true
 
+# API host + apex/www so the Vite SPA (Worker assets) replaces the stale Vercel HTML.
 routes = [
   { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
+  { pattern = "hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "www.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
 ]
 
 [triggers]
 crons = ["*/10 * * * *", "* * * * *"]
+
+# SPA from roofing-estimator-vite (built in CI before deploy). /api/* hits the Worker first.
+[assets]
+directory = "roofing-estimator-vite/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 [vars]
 APP_PUBLIC_ORIGIN = "https://hardcoredoortodoorclosers.com"

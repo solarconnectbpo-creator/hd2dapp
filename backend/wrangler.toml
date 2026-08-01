@@ -26,7 +26,16 @@ preview_urls = true
 # `api.hardcoredoortodoorclosers.com` under Workers & Pages → hd2d-backend → Domains.
 routes = [
   { pattern = "api.hardcoredoortodoorclosers.com", zone_name = "hardcoredoortodoorclosers.com", custom_domain = true },
+  { pattern = "hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
+  { pattern = "www.hardcoredoortodoorclosers.com/*", zone_name = "hardcoredoortodoorclosers.com" },
 ]
+
+# Built by CI (or locally: npm run build in roofing-estimator-vite) before deploy.
+[assets]
+directory = "../roofing-estimator-vite/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 # Retry Meta Page posts that failed Graph API (pending rows in D1).
 [triggers]
