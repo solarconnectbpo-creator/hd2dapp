@@ -46,4 +46,9 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      # backend/wrangler.toml [assets] points at the SPA dist; CI does not build the Vite app here.
+      - name: Stub SPA assets directory for wrangler build
+        run: |
+          mkdir -p ../roofing-estimator-vite/dist
+          printf '%s\n' '<!doctype html><title>HD2D</title>' > ../roofing-estimator-vite/dist/index.html
       - run: npm run build
