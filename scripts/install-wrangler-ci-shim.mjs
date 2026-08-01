@@ -18,7 +18,7 @@ if (!existsSync(realJs)) {
 }
 
 const current = readFileSync(realJs, "utf8");
-if (current.includes("WRANGLER_CI_SHIM_V4")) {
+if (current.includes("WRANGLER_CI_SHIM_V5")) {
   process.exit(0);
 }
 
@@ -27,7 +27,7 @@ if (!existsSync(backupJs) || !current.includes("WRANGLER_CI_SHIM")) {
 }
 
 const shim = `#!/usr/bin/env node
-/* WRANGLER_CI_SHIM_V4 */
+/* WRANGLER_CI_SHIM_V5 */
 const { spawnSync } = require("node:child_process");
 const { existsSync, mkdirSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
@@ -41,17 +41,23 @@ function run(cmd, cmdArgs, opts = {}) {
 }
 
 const isDeploy = args[0] === "deploy";
+const isBuild = args[0] === "build";
 const isVersionsUpload = args[0] === "versions" && args[1] === "upload";
 const repoRoot = process.cwd();
 const viteDir = join(repoRoot, "roofing-estimator-vite");
 const distDir = join(viteDir, "dist");
 
+function ensureSpaDistExists() {
+  if (existsSync(join(distDir, "index.html"))) return 0;
+  mkdirSync(distDir, { recursive: true });
+  writeFileSync(join(distDir, "index.html"), "<!doctype html><title>HD2D</title>");
+  return 0;
+}
+
 function ensureSpaBuilt() {
-  if (process.env.WRANGLER_CI_SKIP_SPA === "1") return 0;
+  if (process.env.WRANGLER_CI_SKIP_SPA === "1") return ensureSpaDistExists();
   if (!existsSync(join(viteDir, "package.json"))) {
-    mkdirSync(distDir, { recursive: true });
-    writeFileSync(join(distDir, "index.html"), "<!doctype html><title>HD2D</title>");
-    return 0;
+    return ensureSpaDistExists();
   }
   console.log("[wrangler-ci-shim] building SPA for Worker static assets…");
   if (run(npm, ["ci", "--no-audit", "--no-fund"], { cwd: viteDir }) !== 0) return 1;
@@ -62,6 +68,11 @@ function ensureSpaBuilt() {
     writeFileSync(redirects, "# managed by Worker assets SPA fallback\\n");
   }
   return 0;
+}
+
+// \`wrangler build\` only needs the assets directory to exist (CI stub OK).
+if (isBuild) {
+  ensureSpaDistExists();
 }
 
 if (isDeploy || isVersionsUpload) {
@@ -94,4 +105,4 @@ try {
 } catch {
   /* ignore */
 }
-console.log("[wrangler-ci-shim] installed v4 (SPA assets + proxy DNS)");
+console.log("[wrangler-ci-shim] installed v5 (SPA assets + build stub + proxy DNS)");
