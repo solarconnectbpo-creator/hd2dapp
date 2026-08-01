@@ -45,6 +45,8 @@ import {
   saveCanvassLeads,
   saveCanvassStates,
 } from "../lib/canvassingStorage";
+import { useWorkspaceCollectionSync } from "../lib/useWorkspaceCollectionSync";
+import { SyncStatusText } from "../components/SyncStatusText";
 import {
   emptyPropertyImportPayload,
   inferStateCodeFromAddressLine,
@@ -184,6 +186,9 @@ const STATUS_RANK: Record<CanvassVisitStatus, number> = {
   skip: 3,
 };
 
+/** One row per lead for syncing the visit-status map as individual records. */
+type CanvassVisitRow = CanvassLeadState & { id: string };
+
 export function Canvassing() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -290,6 +295,46 @@ export function Canvassing() {
   useEffect(() => {
     saveCanvassStates(states);
   }, [states]);
+
+  // Mirror route pins and door outcomes to the account so a cleared browser or a second
+  // device does not lose a day of knocking. localStorage above stays as the offline cache.
+  const leadSync = useWorkspaceCollectionSync<ContactRecord>({
+    kind: "canvass_lead",
+    items: leads,
+    getId: (l) => l.id,
+    onRemoteMerge: setLeads,
+    toItem: (d) =>
+      d && typeof d === "object" && typeof (d as ContactRecord).id === "string"
+        ? (d as ContactRecord)
+        : null,
+  });
+
+  // Visit status is a map keyed by lead id; sync it as one record per lead.
+  const visitRows = useMemo(
+    () => Object.entries(states).map(([id, s]) => ({ id, ...s })),
+    [states],
+  );
+  const visitSync = useWorkspaceCollectionSync<CanvassVisitRow>({
+    kind: "canvass_visit",
+    items: visitRows,
+    getId: (r) => r.id,
+    onRemoteMerge: (rows) => {
+      const next: Record<string, CanvassLeadState> = {};
+      for (const { id, ...rest } of rows) next[id] = rest;
+      setStates(next);
+    },
+    toItem: (d) => {
+      if (!d || typeof d !== "object") return null;
+      const row = d as CanvassVisitRow;
+      return typeof row.id === "string" && row.id ? row : null;
+    },
+  });
+
+  const canvassSyncState = leadSync.state.status === "error" ? leadSync.state : visitSync.state;
+  const syncCanvassNow = useCallback(() => {
+    leadSync.syncNow();
+    visitSync.syncNow();
+  }, [leadSync, visitSync]);
   useEffect(() => {
     saveCanvassEnrichment(enrichment);
   }, [enrichment]);
@@ -999,6 +1044,11 @@ export function Canvassing() {
               <span className="hidden text-xs text-zinc-700 sm:inline">
                 Tap parcel or pin — owner + lead match (120m) — property panel opens without covering map controls
               </span>
+              <SyncStatusText
+                state={canvassSyncState}
+                onRetry={syncCanvassNow}
+                className="hidden md:inline-flex"
+              />
               <div className="ml-auto flex flex-wrap items-center gap-1">
                 {leads.length > 0 ? (
                   <span className="mr-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-zinc-950" title="Emerald = owner + contact ready">
