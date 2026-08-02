@@ -84,6 +84,7 @@ import {
   type ProposalProfile,
   type ProposalState,
 } from "./features/measurement/proposalTypes";
+import { buildCoxIlContractHtml, mapCoxIlContractFields } from "./lib/cox/ilContract";
 import pricingCatalog from "./data/ai-cheatsheet-pricing.json";
 
 type RoofLineType = "ridge" | "hip" | "valley" | "eave" | "rake" | "wall-flashing" | "step-flashing";
@@ -4515,6 +4516,33 @@ function App() {
     setTimeout(() => win.print(), 250);
   };
 
+  /** Full Cox Illinois restoration contract + 815 ILCS 513 disclosure packet (print / Save as PDF). */
+  const printCoxIlContract = () => {
+    const fields = mapCoxIlContractFields({
+      proposal,
+      address: form.address || proposal.clientCompany || "",
+      stateCode: form.stateCode,
+      propertyNotes: form.propertyRecordNotes,
+    });
+    if (!fields.customerName.trim() && !fields.lossAddress.trim()) {
+      toast.error("Add client name and loss address in Proposal Builder first.");
+      return;
+    }
+    if ((form.stateCode || "").trim().toUpperCase() !== "IL") {
+      toast.message("Printing Cox IL contract pack — confirm the job is in Illinois.");
+    }
+    const html = buildCoxIlContractHtml(fields);
+    const win = window.open("", "_blank", "width=980,height=900");
+    if (!win) {
+      toast.error("Pop-up blocked — allow pop-ups to print the IL contract.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 250);
+  };
+
   const exportFootprintDxf = useCallback(() => {
     const polys = mapboxFeatures.filter((f: { geometry?: { type?: string } }) => f.geometry?.type === "Polygon");
     if (!polys.length) {
@@ -6508,10 +6536,25 @@ function App() {
             <button className="secondary-btn" onClick={printProposal}>
               Print Proposal / PDF
             </button>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={printCoxIlContract}
+              title="Cox Roofing Illinois restoration contract + cancel notices, lien notice, and consumer rights (815 ILCS 513)"
+            >
+              Print Cox IL Contract Pack
+            </button>
             <button type="button" className="secondary-btn" onClick={exportFootprintDxf} title="2D footprint in feet (local plane) for CAD">
               Export footprint DXF
             </button>
           </div>
+          {(form.stateCode || "").trim().toUpperCase() === "IL" ? (
+            <p className="muted" style={{ marginTop: 8 }}>
+              Illinois job — use <strong>Print Cox IL Contract Pack</strong> for the Oak Brook restoration contract,
+              Terms &amp; Conditions, cancellation notices (incl. senior + insurance denial), mechanic&apos;s lien notice,
+              and &quot;Know Your Consumer Rights&quot; acknowledgment.
+            </p>
+          ) : null}
         </section>
         <section className="panel full" id="section-results">
           <h2>Estimate Results</h2>
