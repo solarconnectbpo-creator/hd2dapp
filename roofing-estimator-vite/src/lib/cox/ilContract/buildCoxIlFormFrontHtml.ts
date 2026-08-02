@@ -1,8 +1,12 @@
 import { COX_IL_COMPANY } from "./coxIlCompany";
 
 /** Dark-blue header form front matching Cox IL field layout (no license line, 877 phone). */
-export function buildCoxIlFormFrontHtml(): string {
+export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
   const C = COX_IL_COMPANY;
+  const logoSrc = (logoDataUrl || "").trim();
+  const logoHtml = logoSrc
+    ? `<img class="logo-img" src="${logoSrc}" alt="Cox Roofing" />`
+    : `<div class="logo-mark"><span class="cox">COX</span> <span class="roof">ROOFING</span></div>`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,14 +21,14 @@ export function buildCoxIlFormFrontHtml(): string {
     background: #0b2a4a; color: #fff; padding: 10px 12px; border-radius: 2px;
   }
   .logo-box {
-    background: #fff; color: #0b2a4a; padding: 6px 10px; min-width: 118px;
+    background: #fff; color: #0b2a4a; padding: 4px 8px; min-width: 150px;
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     border-radius: 2px;
   }
+  .logo-img { display: block; width: 148px; height: auto; max-height: 56px; object-fit: contain; }
   .logo-mark { font-size: 11px; letter-spacing: 0.02em; }
   .logo-mark .cox { color: #1d4ed8; font-weight: 800; font-style: italic; }
   .logo-mark .roof { color: #dc2626; font-weight: 800; font-style: italic; }
-  .logo-houses { font-size: 18px; line-height: 1; margin-bottom: 2px; }
   .brand { flex: 1; padding-top: 2px; }
   .brand h1 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
   .brand p { margin: 0 0 2px; font-size: 11px; line-height: 1.35; }
@@ -66,8 +70,7 @@ export function buildCoxIlFormFrontHtml(): string {
 <body>
   <div class="header">
     <div class="logo-box">
-      <div class="logo-houses">⌂⌂⌂</div>
-      <div class="logo-mark"><span class="cox">COX</span> <span class="roof">ROOFING</span></div>
+      ${logoHtml}
     </div>
     <div class="brand">
       <h1>${C.legalName}</h1>
@@ -157,7 +160,7 @@ export function buildCoxIlFormFrontHtml(): string {
   <div class="page2">
     <div class="header">
       <div class="logo-box">
-        <div class="logo-mark"><span class="cox">COX</span> <span class="roof">ROOFING</span></div>
+        ${logoHtml}
       </div>
       <div class="brand">
         <h1>Terms and Conditions</h1>
