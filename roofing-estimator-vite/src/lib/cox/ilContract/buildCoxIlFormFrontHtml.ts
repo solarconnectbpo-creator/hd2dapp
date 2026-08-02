@@ -32,10 +32,10 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     background-color: #fff;
     background-image: repeating-linear-gradient(
       90deg,
-      rgba(220, 38, 38, 0.10) 0,
-      rgba(220, 38, 38, 0.10) 28px,
-      rgba(255, 255, 255, 0.92) 28px,
-      rgba(255, 255, 255, 0.92) 56px
+      rgba(220, 38, 38, 0.12) 0,
+      rgba(220, 38, 38, 0.12) 72px,
+      rgba(255, 255, 255, 0.95) 72px,
+      rgba(255, 255, 255, 0.95) 144px
     );
     color: #0b2a4a;
     padding: 10px 14px;
