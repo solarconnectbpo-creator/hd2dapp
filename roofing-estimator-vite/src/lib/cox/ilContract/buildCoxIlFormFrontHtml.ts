@@ -28,9 +28,18 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     display: flex;
     align-items: center;
     gap: 14px;
-    background: #0b2a4a;
-    color: #fff;
+    /* Faint wide red & white stripes (original Cox letterhead feel) */
+    background-color: #fff;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(220, 38, 38, 0.10) 0,
+      rgba(220, 38, 38, 0.10) 28px,
+      rgba(255, 255, 255, 0.92) 28px,
+      rgba(255, 255, 255, 0.92) 56px
+    );
+    color: #0b2a4a;
     padding: 10px 14px;
+    border: 1px solid #e2e8f0;
   }
   .logo-box {
     flex: 0 0 auto;
@@ -48,16 +57,17 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     object-fit: contain;
   }
   .logo-fallback { font-size: 14px; font-weight: 800; font-style: italic; letter-spacing: 0.02em; }
-  .logo-fallback .cox { color: #60a5fa; }
-  .logo-fallback .roof { color: #f87171; margin-left: 4px; }
+  .logo-fallback .cox { color: #1d4ed8; }
+  .logo-fallback .roof { color: #dc2626; margin-left: 4px; }
   .brand { flex: 1; min-width: 0; }
   .brand h1 {
     margin: 0 0 3px;
     font-size: 17px;
     font-weight: 800;
     letter-spacing: 0.01em;
+    color: #0b2a4a;
   }
-  .brand p { margin: 0; font-size: 10.5px; line-height: 1.4; opacity: 0.96; }
+  .brand p { margin: 0; font-size: 10.5px; line-height: 1.4; color: #1e293b; }
   .grid {
     display: grid;
     grid-template-columns: 1.35fr 1fr 1fr;
