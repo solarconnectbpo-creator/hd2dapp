@@ -3,7 +3,7 @@
 export const COX_IL_COMPANY = {
   legalName: "Cox Roofing & Restoration LLC",
   shortName: "Cox Roofing",
-  addressLine1: "700 Commerce Dr, Suite 500",
+  addressLine1: "Oak Brook Pointe, 700 Commerce Drive",
   cityStateZip: "Oak Brook, IL 60523",
   phoneDisplay: "(877) 816-4245",
   phoneE164: "+18778164245",
