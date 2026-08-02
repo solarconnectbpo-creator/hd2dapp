@@ -32,3 +32,14 @@ export {
   type CoxEstimateResult,
   type CoxRoofSystem,
 } from "./generateCoxEstimate";
+
+export {
+  COX_IL_COMPANY,
+  buildCoxIlContractHtml,
+  coxIlAddressBlock,
+  coxIlFooterLine,
+  emptyCoxIlContractFields,
+  mapCoxIlContractFields,
+  splitLossAddress,
+  type CoxIlContractFields,
+} from "./ilContract";
