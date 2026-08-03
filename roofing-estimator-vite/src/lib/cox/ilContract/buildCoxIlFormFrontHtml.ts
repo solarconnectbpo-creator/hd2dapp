@@ -4,9 +4,15 @@ import { COX_IL_COMPANY } from "./coxIlCompany";
 export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
   const C = COX_IL_COMPANY;
   const logoSrc = (logoDataUrl || "").trim();
+  // Houses graphic + HTML wordmark so "COX ROOFING" is never clipped by the PNG crop.
   const logoHtml = logoSrc
-    ? `<img class="logo-img" src="${logoSrc}" alt="Cox Roofing" />`
-    : `<div class="logo-fallback"><span class="cox">COX</span><span class="roof">ROOFING</span></div>`;
+    ? `<div class="logo-stack">
+        <img class="logo-img" src="${logoSrc}" alt="" />
+        <div class="logo-wordmark" aria-label="Cox Roofing">
+          <span class="cox">COX</span><span class="roof">ROOFING</span>
+        </div>
+      </div>`
+    : `<div class="logo-wordmark" aria-label="Cox Roofing"><span class="cox">COX</span><span class="roof">ROOFING</span></div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -49,17 +55,43 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     justify-content: center;
     padding: 2px 0;
     background: transparent;
+    overflow: visible;
+  }
+  .logo-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
   .logo-img {
     display: block;
-    width: 250px;
+    width: 210px;
     height: auto;
-    max-height: 88px;
+    max-height: 58px;
     object-fit: contain;
+    object-position: left center;
   }
-  .logo-fallback { font-size: 14px; font-weight: 800; font-style: italic; letter-spacing: 0.02em; }
-  .logo-fallback .cox { color: #1d4ed8; }
-  .logo-fallback .roof { color: #dc2626; margin-left: 4px; }
+  .logo-wordmark {
+    display: flex;
+    align-items: stretch;
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .logo-wordmark .cox {
+    color: #1d4ed8;
+    font-size: 20px;
+    padding: 3px 4px 3px 0;
+  }
+  .logo-wordmark .roof {
+    color: #fff;
+    background: #dc2626;
+    font-size: 20px;
+    padding: 3px 10px 3px 8px;
+    clip-path: polygon(6px 0, 100% 0, 100% 100%, 0 100%);
+  }
   .brand { flex: 1; min-width: 0; }
   .brand h1 {
     margin: 0 0 3px;
