@@ -44,8 +44,9 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
       rgba(255, 255, 255, 0.95) 144px
     );
     color: #0b2a4a;
-    padding: 12px 14px;
-    min-height: 96px;
+    padding: 14px 14px 16px;
+    min-height: 110px;
+    overflow: visible;
     border: 1px solid #e2e8f0;
   }
   .logo-box {
