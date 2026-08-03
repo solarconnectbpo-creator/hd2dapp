@@ -4,14 +4,8 @@ import { COX_IL_COMPANY } from "./coxIlCompany";
 export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
   const C = COX_IL_COMPANY;
   const logoSrc = (logoDataUrl || "").trim();
-  // Houses graphic + HTML wordmark so "COX ROOFING" is never clipped by the PNG crop.
   const logoHtml = logoSrc
-    ? `<div class="logo-stack">
-        <img class="logo-img" src="${logoSrc}" alt="" />
-        <div class="logo-wordmark" aria-label="Cox Roofing">
-          <span class="cox">COX</span><span class="roof">ROOFING</span>
-        </div>
-      </div>`
+    ? `<img class="logo-img" src="${logoSrc}" alt="Cox Roofing" />`
     : `<div class="logo-wordmark" aria-label="Cox Roofing"><span class="cox">COX</span><span class="roof">ROOFING</span></div>`;
 
   return `<!DOCTYPE html>
@@ -33,7 +27,7 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
   .header {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
     /* Faint wide red & white stripes (original Cox letterhead feel) */
     background-color: #fff;
     background-image: repeating-linear-gradient(
@@ -44,8 +38,8 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
       rgba(255, 255, 255, 0.95) 144px
     );
     color: #0b2a4a;
-    padding: 14px 14px 16px;
-    min-height: 110px;
+    padding: 10px 14px;
+    min-height: 132px;
     overflow: visible;
     border: 1px solid #e2e8f0;
   }
@@ -53,23 +47,16 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     padding: 2px 0;
     background: transparent;
     overflow: visible;
   }
-  .logo-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    overflow: visible;
-  }
   .logo-img {
     display: block;
-    width: 200px;
-    height: auto;
-    max-height: 52px;
+    width: auto;
+    height: 108px;
+    max-width: 260px;
     object-fit: contain;
     object-position: left center;
   }
@@ -79,23 +66,21 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     font-style: italic;
     font-weight: 800;
     letter-spacing: 0.03em;
-    line-height: 1.15;
+    line-height: 1.2;
     white-space: nowrap;
-    overflow: visible;
   }
   .logo-wordmark .cox {
-    color: #1d4ed8;
-    font-size: 18px;
+    color: #244891;
+    font-size: 20px;
     padding: 5px 6px 5px 1px;
-    line-height: 1.2;
   }
   .logo-wordmark .roof {
     color: #fff;
-    background: #dc2626;
-    font-size: 18px;
+    background: #aa3530;
+    font-size: 20px;
     padding: 5px 12px;
-    line-height: 1.2;
     display: inline-block;
+    transform: skewX(-12deg);
   }
   .brand { flex: 1; min-width: 0; }
   .brand h1 {
@@ -221,17 +206,69 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     border-left: 3px solid #ea580c;
     padding: 4px 6px;
   }
-  .page2 { page-break-before: always; }
-  .page2 .header { margin-bottom: 10px; }
+  .page2 {
+    page-break-before: always;
+    /* Explicit print height so the back fills letter (minus @page margins) */
+    min-height: 10in;
+    height: 10in;
+    display: flex;
+    flex-direction: column;
+  }
+  .page2 .header {
+    margin-bottom: 12px;
+    flex: 0 0 auto;
+    min-height: 100px;
+    padding: 8px 12px;
+  }
+  .page2 .logo-img {
+    height: 84px;
+    max-width: 210px;
+  }
+  .page2 .terms-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 8.55in;
+    height: 8.55in;
+  }
+  .terms-grid {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 30px;
+    min-height: 8.05in;
+    height: 8.05in;
+    align-items: stretch;
+  }
   ol.terms {
     margin: 0;
-    padding-left: 16px;
-    columns: 2;
-    column-gap: 20px;
-    font-size: 8.8px;
+    padding-left: 20px;
+    height: 8.05in;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 11.6px;
+    line-height: 1.48;
   }
-  ol.terms li { margin-bottom: 7px; break-inside: avoid; }
-  ol.terms strong { font-size: 9px; }
+  ol.terms li {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    min-height: 1.25in;
+    padding: 8px 8px 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  ol.terms li:last-child { border-bottom: none; }
+  ol.terms li > span { display: block; width: 100%; }
+  ol.terms strong { font-size: 12px; }
+  .page2 .terms-foot {
+    flex: 0 0 auto;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #cbd5e1;
+    font-size: 9.2px;
+    color: #334155;
+  }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -345,20 +382,30 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
         <p>${C.legalName} · Oak Brook Pointe, 700 Commerce Drive, Oak Brook, IL 60523 · ${C.phoneDisplay}</p>
       </div>
     </header>
-    <ol class="terms">
-      <li><strong>Changes.</strong> All changes require a written Change Order signed by both parties and may result in additional charges.</li>
-      <li><strong>Performance.</strong> Work begins within 180 days after insurer approval of scope and price, or as soon as practicable, subject to weather and supply delays beyond Contractor’s control.</li>
-      <li><strong>Warranty.</strong> Except statutory warranties that may apply, Contractor disclaims all other warranties, express or implied. Customer must give written notice within six months of discovery; Contractor has the right to cure within 30 days before legal action.</li>
-      <li><strong>Insurance proceeds.</strong> Customer shall pay Contractor all insurance proceeds for the Work and cooperate on supplements. Contractor is not a public adjuster and does not negotiate claims on Customer’s behalf.</li>
-      <li><strong>Access &amp; conditions.</strong> Customer provides clear access and utilities, and assumes responsibility for pre-existing or concealed conditions and normal construction vibration/debris risk.</li>
-      <li><strong>Hazardous materials.</strong> Customer is responsible for asbestos, mold, lead, and similar conditions at the property.</li>
-      <li><strong>Insurance.</strong> Contractor maintains general liability and workers’ compensation as required by Illinois law (815 ILCS 513/25).</li>
-      <li><strong>Cancellation.</strong> If Customer cancels without a legal right to do so, Contractor is entitled to payment for work performed, restocking/non-returnable materials, plus 10% of the insurer-offered repair price as liquidated damages.</li>
-      <li><strong>Payment.</strong> Final payment is due upon substantial completion and is a condition of warranty. Past-due amounts may accrue interest at the lesser of 8% per annum or the maximum allowed by Illinois law. Customer pays collection costs and reasonable attorneys’ fees if Contractor prevails.</li>
-      <li><strong>Governing law.</strong> Illinois law governs. Venue lies in DuPage County, Illinois.</li>
-      <li><strong>Entire agreement.</strong> This writing is the entire agreement between the parties. If any provision is unenforceable, the remainder remains in effect.</li>
-      <li><strong>Advertising.</strong> Customer authorizes a yard sign and photos/video of the Work for promotional use.</li>
-    </ol>
+    <div class="terms-body">
+      <div class="terms-grid">
+        <ol class="terms">
+          <li><span><strong>Changes.</strong> All changes require a written Change Order signed by both parties and may result in additional charges. Verbal instructions are not binding until confirmed in a signed Change Order.</span></li>
+          <li><span><strong>Performance.</strong> Work begins within 180 days after insurer approval of scope and price, or as soon as practicable, subject to weather, material availability, access, and other delays beyond Contractor’s reasonable control. Scheduling is approximate.</span></li>
+          <li><span><strong>Warranty.</strong> Except statutory warranties that may apply, Contractor disclaims all other warranties, express or implied. Customer must give written notice within six months of discovery; Contractor has the right to cure within 30 days before legal action. Warranty is conditioned on full payment.</span></li>
+          <li><span><strong>Insurance proceeds.</strong> Customer shall pay Contractor all insurance proceeds for the Work and cooperate on supplements. Contractor is not a public adjuster and does not negotiate claims on Customer’s behalf. Customer remains solely responsible for the deductible.</span></li>
+          <li><span><strong>Access &amp; conditions.</strong> Customer provides clear access and utilities, and assumes responsibility for pre-existing or concealed conditions and normal construction vibration/debris risk. Customer must move vehicles and valuables from the work area.</span></li>
+          <li><span><strong>Hazardous materials.</strong> Customer is responsible for asbestos, mold, lead, and similar conditions at the property. Discovery of hazardous materials may suspend work until Customer arranges compliant remediation.</span></li>
+        </ol>
+        <ol class="terms" start="7">
+          <li><span><strong>Insurance.</strong> Contractor maintains general liability and workers’ compensation as required by Illinois law (815 ILCS 513/25). Certificates are available upon written request.</span></li>
+          <li><span><strong>Cancellation.</strong> If Customer cancels without a legal right to do so, Contractor is entitled to payment for work performed, restocking/non-returnable materials, plus 10% of the insurer-offered repair price as liquidated damages.</span></li>
+          <li><span><strong>Payment.</strong> Final payment is due upon substantial completion and is a condition of warranty. Past-due amounts may accrue interest at the lesser of 8% per annum or the maximum allowed by Illinois law. Customer pays collection costs and reasonable attorneys’ fees if Contractor prevails.</span></li>
+          <li><span><strong>Governing law.</strong> Illinois law governs. Venue lies in DuPage County, Illinois. Jury trial is waived to the extent permitted by law.</span></li>
+          <li><span><strong>Entire agreement.</strong> This writing is the entire agreement between the parties and supersedes prior proposals. If any provision is unenforceable, the remainder remains in effect. Amendments must be in writing and signed.</span></li>
+          <li><span><strong>Advertising.</strong> Customer authorizes a yard sign and photos/video of the Work for promotional use, unless Customer delivers written opt-out before installation begins.</span></li>
+        </ol>
+      </div>
+      <p class="terms-foot">
+        This page is the reverse side of the ${C.legalName} Illinois Restoration Contract and forms part of the agreement.
+        Questions: ${C.phoneDisplay} · ${C.website}
+      </p>
+    </div>
   </div>
 </body>
 </html>`;
