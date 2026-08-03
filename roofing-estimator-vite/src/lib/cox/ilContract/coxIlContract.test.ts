@@ -74,6 +74,9 @@ describe("Cox IL contract pack", () => {
     expect(html).toContain("letterhead");
     expect(html).toContain("COX");
     expect(html).toContain("ROOFING");
+    expect(html).toContain("page-break-inside: avoid");
+    expect(html).toContain("keep-block");
+    expect(html).toContain("RIGHT OF CANCELLATION");
   });
 
   it("builds IL damage report permission & authorization contingency form", () => {

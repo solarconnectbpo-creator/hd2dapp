@@ -56,10 +56,25 @@ function sharedStyles(): string {
     }
     p { margin: 0 0 7px; }
     ${coxIlLetterheadStyles()}
-    .letterhead { margin-bottom: 10px; }
+    .letterhead {
+      margin-bottom: 8px;
+      min-height: 96px;
+      padding: 6px 10px;
+    }
+    .letterhead .logo-img { height: 82px; max-width: 210px; }
+    .letterhead .brand-copy .name { font-size: 14px; }
+    .letterhead .brand-copy p { font-size: 9.5px; }
     .page { page-break-after: always; }
     .page:last-child { page-break-after: auto; }
     .fine { font-size: 9.5px; color: #334155; }
+    .callout,
+    .warn,
+    .check,
+    .keep-block {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      -webkit-column-break-inside: avoid;
+    }
     .callout {
       background: #f0f9ff;
       border: 1px solid #7dd3fc;
@@ -114,6 +129,27 @@ function sharedStyles(): string {
       border: 1px solid #cbd5e1;
       background: #f8fafc;
     }
+    .contract-front h1 { margin: 0 0 5px; font-size: 15px; }
+    .contract-front p { margin: 0 0 4px; font-size: 9.2px; line-height: 1.32; }
+    .contract-front h2 { margin: 8px 0 4px; font-size: 11px; }
+    .contract-front .grid2 { margin: 4px 0; gap: 3px 12px; }
+    .contract-front .field .val { min-height: 14px; font-size: 10px; padding: 1px 0 2px; }
+    .contract-front .field .lab { font-size: 8px; }
+    .contract-front .callout,
+    .contract-front .warn,
+    .contract-front .check { margin: 5px 0; padding: 5px 7px; font-size: 9px; }
+    .contract-front .sig-row { margin-top: 6px; gap: 12px; }
+    .contract-front .sig-box { margin-top: 16px; }
+    .contract-front .footer-line { margin-top: 8px; }
+    .contract-front .letterhead {
+      min-height: 78px;
+      padding: 5px 8px;
+      margin-bottom: 6px;
+    }
+    .contract-front .letterhead .logo-img { height: 68px; max-width: 175px; }
+    .contract-front .letterhead .brand-copy .name { font-size: 13px; margin-bottom: 1px; }
+    .contract-front .letterhead .brand-copy .sub { font-size: 10px; margin-bottom: 2px; }
+    .contract-front .letterhead .brand-copy p { font-size: 9px; line-height: 1.3; }
     .checkbox {
       display: inline-block;
       width: 11px;
@@ -282,14 +318,13 @@ function consumerRightsPage(fields: CoxIlContractFields, logoDataUrl?: string): 
 
 function contractFront(fields: CoxIlContractFields, logoDataUrl?: string): string {
   return `
-  <section class="page">
+  <section class="page contract-front">
     ${brandHeader("Illinois Restoration Contract", logoDataUrl)}
     <h1>Restoration Contract</h1>
-    <p>By signing this Restoration Contract (the "Contract" or "Agreement"), the customer identified below (the "Customer" or "You") authorizes <strong>${esc(C.legalName)}</strong> ("Contractor") to: (1) conduct an inspection and document damage to the Loss Address identified below; (2) discuss with the Customer's insurance company (the "Insurer") the scope of damage it identifies and the scope and price of the work needed to repair certain damages; and (3) perform repairs if and when Contractor approves Insurer's scope and price. The Insurer's proposed scope and price is subject to Contractor's approval, without exception. If you have not already received an estimate from your Insurer, attached you will find Contractor's good faith estimate of identified damages. Such amounts are estimates only, are not guaranteed, and are subject to change.</p>
-    <p>Customer's signature below authorizes Contractor to complete approved repairs at the Replacement Cost Value described on the Insurer's loss statement (the "Work"), subject to the Terms and Conditions on the reverse side, with no additional cost to the Customer except for its insurance deductible, provided that the Customer shall also be responsible to pay the costs of: (1) any additional work requested but not included in the Insurer's loss statement; (2) necessary repairs to satisfy building code requirements, to the extent not reimbursable by your insurance policy; (3) any emergency repairs; and (4) any of the replacement cost value not recoverable under the applicable policy. By signing this Agreement, You confirm You know and/or have confirmed with Insurer the coverages available under your policy and acknowledge that Contractor has not and will not advise on any policy coverage matters.</p>
-    <p>Customer further agrees that any supplemental work Contractor may later identify as necessary shall become part of this Agreement. Customer acknowledges that Contractor is a General Contractor and charges overhead and profit as part of the Work.</p>
-    <p><strong>About Your Insurance Funds:</strong> When your insurance company releases payment for approved repairs, those funds are designated to pay for the work covered under this Agreement. Customer agrees to forward all insurance proceeds received for the Work to Contractor promptly upon receipt. If your insurer provides only a partial approval, Contractor will work with you and re-approach the insurer with photos, documentation, and scope support to pursue full approval — though Contractor cannot act as your public adjuster or negotiate your claim on your behalf (that requires a separately licensed public adjuster). Customer shall not redirect or spend any insurance proceeds related to the Work without Contractor's prior written consent.</p>
-    <p class="fine">This Agreement consists of: (i) this contract and the Terms &amp; Conditions on the reverse side; (ii) the Insurer's loss statement(s); (iii) any written change orders; and (iv) the documents acknowledged below. This Agreement merges all agreements between the Parties, and any representations not in writing herein are not included.</p>
+    <p>By signing this Restoration Contract (the "Agreement"), the customer identified below (the "Customer") authorizes <strong>${esc(C.legalName)}</strong> ("Contractor") to: (1) inspect and document damage at the Loss Address; (2) discuss with Customer's insurer (the "Insurer") the scope and price of repairs; and (3) perform repairs when Contractor approves Insurer's scope and price. Insurer's proposed scope/price is subject to Contractor's approval. Any attached estimate is good-faith only and may change.</p>
+    <p>Customer authorizes Contractor to complete approved repairs at Replacement Cost Value on the Insurer's loss statement (the "Work"), subject to the Terms &amp; Conditions on the reverse side, with no additional cost except Customer's insurance deductible, plus: (1) extra work not on the loss statement; (2) code-required work not reimbursable by the policy; (3) emergency repairs; and (4) RCV amounts not recoverable under the policy. Customer confirms policy coverages with Insurer; Contractor does not advise on coverage.</p>
+    <p>Supplemental work later identified as necessary becomes part of this Agreement. Contractor is a General Contractor and charges overhead and profit as part of the Work. <strong>Insurance funds:</strong> Customer shall promptly forward all insurance proceeds for the Work to Contractor and shall not redirect them without written consent. Contractor may support supplements with documentation but cannot act as a public adjuster.</p>
+    <p class="fine">This Agreement consists of: (i) this contract and reverse-side Terms &amp; Conditions; (ii) Insurer's loss statement(s); (iii) written change orders; and (iv) documents acknowledged below. This writing is the entire agreement.</p>
 
     <h2>Customer &amp; Loss Information</h2>
     <div class="grid2">
@@ -304,37 +339,39 @@ function contractFront(fields: CoxIlContractFields, logoDataUrl?: string): strin
       ${fieldCell("Claim No. (if known)", fields.claimNumber)}
       ${fieldCell("Contract Date", fields.contractDate)}
     </div>
-    <div class="field" style="margin-top:6px">
+    <div class="field" style="margin-top:4px">
       <span class="lab">Notes</span>
-      <span class="val" style="min-height:28px">${blank(fields.notes, " ")}</span>
+      <span class="val" style="min-height:18px">${blank(fields.notes, " ")}</span>
     </div>
 
-    <h2>Acceptance of Agreement</h2>
-    <p>By Customer's signature below, Customer acknowledges and agrees that it understands and accepts this Agreement; that Contractor has notified Customer both orally and in writing of its right to cancel; that Contractor will perform the Work subject to the terms of this Agreement; and that Customer will be responsible for payment of Customer's insurance deductible.</p>
-    <div class="callout">
-      <strong>RIGHT OF CANCELLATION:</strong>
-      If this Agreement was procured through a home solicitation sale, you may cancel at any time prior to midnight of the third (3rd) business day after the date of this transaction (or the fifteenth (15th) business day if you are age 65 or older — 815 ILCS 513/22). See attached Notice of Cancellation forms.
-    </div>
-    <div class="warn">
-      ILLINOIS LAW (815 ILCS 513/18 &amp; 513/30): It is illegal for a contractor to pay, waive, rebate, or promise to pay any portion of your insurance deductible as an inducement to sale. You are solely responsible for paying your deductible.
-    </div>
-    <div class="check">
-      <span class="checkbox"></span>
-      By checking this box I/we confirm receipt prior to signing of: (1) Notice of Cancellation (2 copies); (2) Notice of Cancellation Due to Insurance Claim Denial (2 copies); and (3) Illinois Deductible Rebating Prohibition Notice (815 ILCS 513/18 &amp; 513/30). Note: The "Home Repair: Know Your Consumer Rights" pamphlet is acknowledged separately by dual signature as required by 815 ILCS 513/20.
-    </div>
-    <div class="sig-row">
-      <div>
-        <div class="sig-box">Customer Signature · Date</div>
+    <div class="keep-block">
+      <h2>Acceptance of Agreement</h2>
+      <p>By Customer's signature below, Customer acknowledges and agrees that it understands and accepts this Agreement; that Contractor has notified Customer both orally and in writing of its right to cancel; that Contractor will perform the Work subject to the terms of this Agreement; and that Customer will be responsible for payment of Customer's insurance deductible.</p>
+      <div class="callout">
+        <strong>RIGHT OF CANCELLATION:</strong>
+        If this Agreement was procured through a home solicitation sale, you may cancel at any time prior to midnight of the third (3rd) business day after the date of this transaction (or the fifteenth (15th) business day if you are age 65 or older — 815&nbsp;ILCS&nbsp;513/22). See attached Notice of Cancellation forms.
       </div>
-      <div>
-        <div class="sig-box">Customer Signature (2nd, if applicable) · Date</div>
+      <div class="warn">
+        ILLINOIS LAW (815 ILCS 513/18 &amp; 513/30): It is illegal for a contractor to pay, waive, rebate, or promise to pay any portion of your insurance deductible as an inducement to sale. You are solely responsible for paying your deductible.
       </div>
-      <div>
-        <div class="sig-box">Contractor Signature · Date</div>
-        <p class="fine" style="margin-top:4px">${blank(fields.contractorRepName, esc(C.legalName))}</p>
+      <div class="check">
+        <span class="checkbox"></span>
+        By checking this box I/we confirm receipt prior to signing of: (1) Notice of Cancellation (2 copies); (2) Notice of Cancellation Due to Insurance Claim Denial (2 copies); and (3) Illinois Deductible Rebating Prohibition Notice (815 ILCS 513/18 &amp; 513/30). Note: The "Home Repair: Know Your Consumer Rights" pamphlet is acknowledged separately by dual signature as required by 815 ILCS 513/20.
       </div>
-      <div>
-        <p class="fine" style="margin-top:28px"><strong>${esc(C.legalName)}</strong><br/>${esc(coxIlAddressBlock())}<br/>${esc(C.phoneDisplay)} · ${esc(C.website)}</p>
+      <div class="sig-row">
+        <div>
+          <div class="sig-box">Customer Signature · Date</div>
+        </div>
+        <div>
+          <div class="sig-box">Customer Signature (2nd, if applicable) · Date</div>
+        </div>
+        <div>
+          <div class="sig-box">Contractor Signature · Date</div>
+          <p class="fine" style="margin-top:4px">${blank(fields.contractorRepName, esc(C.legalName))}</p>
+        </div>
+        <div>
+          <p class="fine" style="margin-top:28px"><strong>${esc(C.legalName)}</strong><br/>${esc(coxIlAddressBlock())}<br/>${esc(C.phoneDisplay)} · ${esc(C.website)}</p>
+        </div>
       </div>
     </div>
     <div class="footer-line">${esc(coxIlFooterLine())}</div>
