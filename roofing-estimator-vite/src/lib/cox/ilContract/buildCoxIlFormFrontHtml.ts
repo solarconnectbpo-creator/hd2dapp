@@ -27,7 +27,7 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
   .header {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     /* Faint wide red & white stripes (original Cox letterhead feel) */
     background-color: #fff;
     background-image: repeating-linear-gradient(
@@ -38,7 +38,8 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
       rgba(255, 255, 255, 0.95) 144px
     );
     color: #0b2a4a;
-    padding: 10px 14px;
+    padding: 12px 14px;
+    min-height: 96px;
     border: 1px solid #e2e8f0;
   }
   .logo-box {
@@ -51,9 +52,9 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
   }
   .logo-img {
     display: block;
-    width: 168px;
+    width: 250px;
     height: auto;
-    max-height: 58px;
+    max-height: 88px;
     object-fit: contain;
   }
   .logo-fallback { font-size: 14px; font-weight: 800; font-style: italic; letter-spacing: 0.02em; }
