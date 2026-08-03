@@ -61,36 +61,40 @@ export function buildCoxIlFormFrontHtml(logoDataUrl?: string): string {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
+    gap: 4px;
+    overflow: visible;
   }
   .logo-img {
     display: block;
-    width: 210px;
+    width: 200px;
     height: auto;
-    max-height: 58px;
+    max-height: 52px;
     object-fit: contain;
     object-position: left center;
   }
   .logo-wordmark {
-    display: flex;
-    align-items: stretch;
+    display: inline-flex;
+    align-items: center;
     font-style: italic;
     font-weight: 800;
-    letter-spacing: 0.02em;
-    line-height: 1;
+    letter-spacing: 0.03em;
+    line-height: 1.15;
     white-space: nowrap;
+    overflow: visible;
   }
   .logo-wordmark .cox {
     color: #1d4ed8;
-    font-size: 20px;
-    padding: 3px 4px 3px 0;
+    font-size: 18px;
+    padding: 5px 6px 5px 1px;
+    line-height: 1.2;
   }
   .logo-wordmark .roof {
     color: #fff;
     background: #dc2626;
-    font-size: 20px;
-    padding: 3px 10px 3px 8px;
-    clip-path: polygon(6px 0, 100% 0, 100% 100%, 0 100%);
+    font-size: 18px;
+    padding: 5px 12px;
+    line-height: 1.2;
+    display: inline-block;
   }
   .brand { flex: 1; min-width: 0; }
   .brand h1 {
