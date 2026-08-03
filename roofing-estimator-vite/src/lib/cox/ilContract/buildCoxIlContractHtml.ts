@@ -1,4 +1,5 @@
 import { COX_IL_COMPANY, coxIlAddressBlock, coxIlFooterLine } from "./coxIlCompany";
+import { coxIlLetterheadHtml, coxIlLetterheadStyles } from "./coxIlLetterhead";
 import type { CoxIlContractFields } from "./coxIlContractTypes";
 
 function esc(s: string): string {
@@ -22,7 +23,7 @@ const C = COX_IL_COMPANY;
 
 function sharedStyles(): string {
   return `
-    @page { size: letter; margin: 0.55in 0.6in; }
+    @page { size: letter; margin: 0.42in 0.48in; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -54,17 +55,8 @@ function sharedStyles(): string {
       color: #0f172a;
     }
     p { margin: 0 0 7px; }
-    .brand {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #0c4a6e;
-    }
-    .brand .name { font-size: 15px; font-weight: 700; color: #0c4a6e; }
-    .brand .meta { font-size: 9.5px; color: #334155; text-align: right; line-height: 1.4; }
+    ${coxIlLetterheadStyles()}
+    .letterhead { margin-bottom: 10px; }
     .page { page-break-after: always; }
     .page:last-child { page-break-after: auto; }
     .fine { font-size: 9.5px; color: #334155; }
@@ -179,25 +171,14 @@ function sharedStyles(): string {
   `;
 }
 
-function brandHeader(subtitle: string): string {
-  return `
-    <div class="brand">
-      <div>
-        <div class="name">${esc(C.legalName)}</div>
-        <div class="fine">${esc(subtitle)}</div>
-      </div>
-      <div class="meta">
-        ${esc(C.addressLine1)}<br/>
-        ${esc(C.cityStateZip)}<br/>
-        ${esc(C.phoneDisplay)} · ${esc(C.website)}
-      </div>
-    </div>`;
+function brandHeader(subtitle: string, logoDataUrl?: string): string {
+  return coxIlLetterheadHtml({ logoDataUrl, subtitle });
 }
 
-function cancellationNotice(copyLabel: string, fields: CoxIlContractFields): string {
+function cancellationNotice(copyLabel: string, fields: CoxIlContractFields, logoDataUrl?: string): string {
   return `
   <section class="page">
-    ${brandHeader("Illinois Home Repair & Remodeling — Notice of Cancellation")}
+    ${brandHeader("Illinois Home Repair & Remodeling — Notice of Cancellation", logoDataUrl)}
     <span class="copy-tag">${esc(copyLabel)}</span>
     <h1>Notice of Cancellation</h1>
     <p class="fine">NOTICE OF CANCELLATION OF HOME REPAIR AND REMODELING CONTRACT ENTERED BY AND BETWEEN THE UNDERSIGNED AND ${esc(C.legalName)}</p>
@@ -223,10 +204,10 @@ function cancellationNotice(copyLabel: string, fields: CoxIlContractFields): str
   </section>`;
 }
 
-function insuranceDenialNotice(copyLabel: string, fields: CoxIlContractFields): string {
+function insuranceDenialNotice(copyLabel: string, fields: CoxIlContractFields, logoDataUrl?: string): string {
   return `
   <section class="page">
-    ${brandHeader("Illinois — Notice of Cancellation Due to Insurance Claim Denial")}
+    ${brandHeader("Illinois — Notice of Cancellation Due to Insurance Claim Denial", logoDataUrl)}
     <span class="copy-tag">${esc(copyLabel)}</span>
     <h1>Notice of Cancellation Due to Insurance Claim Denial</h1>
     <p>If your insurer notifies you that all or any part of your claim or contract is not a covered loss under your insurance policy, you may cancel this contract by mailing or delivering a signed and dated copy of this cancellation notice or any other written notice to ${esc(C.legalName)} (the "Contractor") at ${esc(coxIlAddressBlock())} — at any time prior to midnight on the earlier of:</p>
@@ -253,10 +234,10 @@ function insuranceDenialNotice(copyLabel: string, fields: CoxIlContractFields): 
   </section>`;
 }
 
-function mechanicsLienPage(): string {
+function mechanicsLienPage(logoDataUrl?: string): string {
   return `
   <section class="page">
-    ${brandHeader("Illinois Mechanics Lien Notice")}
+    ${brandHeader("Illinois Mechanics Lien Notice", logoDataUrl)}
     <h1>Mechanic's Lien Notice</h1>
     <p>(a) Any person or company supplying labor or materials for this improvement to your property may file a lien against your property if that person or company is not paid for the contributions; and</p>
     <p>(b) Under Illinois law, you have the right to pay persons who supplied labor or materials for this improvement directly and deduct this amount from our contract price, or withhold the amounts due them from us until 90 days after completion of the improvement unless we give you a lien waiver signed by persons who supplied any labor or material for the improvement and who gave you timely notice.</p>
@@ -265,10 +246,10 @@ function mechanicsLienPage(): string {
   </section>`;
 }
 
-function consumerRightsPage(fields: CoxIlContractFields): string {
+function consumerRightsPage(fields: CoxIlContractFields, logoDataUrl?: string): string {
   return `
   <section class="page">
-    ${brandHeader("Home Repair: Know Your Consumer Rights")}
+    ${brandHeader("Home Repair: Know Your Consumer Rights", logoDataUrl)}
     <h1>Home Repair: Know Your Consumer Rights</h1>
     <p class="fine"><strong>Illinois Home Repair and Remodeling Act · 815 ILCS 513</strong><br/>
     CONSUMER RIGHTS ACKNOWLEDGMENT FORM — Required by 815 ILCS 513/20 — In Duplicate — Contractor retains original / Customer retains duplicate</p>
@@ -299,10 +280,10 @@ function consumerRightsPage(fields: CoxIlContractFields): string {
   </section>`;
 }
 
-function contractFront(fields: CoxIlContractFields): string {
+function contractFront(fields: CoxIlContractFields, logoDataUrl?: string): string {
   return `
   <section class="page">
-    ${brandHeader("Illinois Restoration Contract")}
+    ${brandHeader("Illinois Restoration Contract", logoDataUrl)}
     <h1>Restoration Contract</h1>
     <p>By signing this Restoration Contract (the "Contract" or "Agreement"), the customer identified below (the "Customer" or "You") authorizes <strong>${esc(C.legalName)}</strong> ("Contractor") to: (1) conduct an inspection and document damage to the Loss Address identified below; (2) discuss with the Customer's insurance company (the "Insurer") the scope of damage it identifies and the scope and price of the work needed to repair certain damages; and (3) perform repairs if and when Contractor approves Insurer's scope and price. The Insurer's proposed scope and price is subject to Contractor's approval, without exception. If you have not already received an estimate from your Insurer, attached you will find Contractor's good faith estimate of identified damages. Such amounts are estimates only, are not guaranteed, and are subject to change.</p>
     <p>Customer's signature below authorizes Contractor to complete approved repairs at the Replacement Cost Value described on the Insurer's loss statement (the "Work"), subject to the Terms and Conditions on the reverse side, with no additional cost to the Customer except for its insurance deductible, provided that the Customer shall also be responsible to pay the costs of: (1) any additional work requested but not included in the Insurer's loss statement; (2) necessary repairs to satisfy building code requirements, to the extent not reimbursable by your insurance policy; (3) any emergency repairs; and (4) any of the replacement cost value not recoverable under the applicable policy. By signing this Agreement, You confirm You know and/or have confirmed with Insurer the coverages available under your policy and acknowledge that Contractor has not and will not advise on any policy coverage matters.</p>
@@ -360,10 +341,10 @@ function contractFront(fields: CoxIlContractFields): string {
   </section>`;
 }
 
-function termsBack(): string {
+function termsBack(logoDataUrl?: string): string {
   return `
   <section class="page">
-    ${brandHeader("Terms and Conditions (Reverse Side)")}
+    ${brandHeader("Terms and Conditions (Reverse Side)", logoDataUrl)}
     <h1>Terms &amp; Conditions</h1>
     <p class="fine">The following Terms and Conditions are incorporated into and made a part of the Restoration Contract with ${esc(C.legalName)} (the "Contractor").</p>
     <ol class="terms">
@@ -395,7 +376,7 @@ function termsBack(): string {
  * 7) Mechanic's lien notice
  * 8) Consumer rights acknowledgment
  */
-export function buildCoxIlContractHtml(fields: CoxIlContractFields): string {
+export function buildCoxIlContractHtml(fields: CoxIlContractFields, logoDataUrl?: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -404,14 +385,14 @@ export function buildCoxIlContractHtml(fields: CoxIlContractFields): string {
   <style>${sharedStyles()}</style>
 </head>
 <body>
-${contractFront(fields)}
-${termsBack()}
-${cancellationNotice("Copy 1 of 2 — Customer retains", fields)}
-${cancellationNotice("Copy 2 of 2 — Customer retains", fields)}
-${insuranceDenialNotice("Copy 1 of 2 — Customer retains", fields)}
-${insuranceDenialNotice("Copy 2 of 2 — Customer retains", fields)}
-${mechanicsLienPage()}
-${consumerRightsPage(fields)}
+${contractFront(fields, logoDataUrl)}
+${termsBack(logoDataUrl)}
+${cancellationNotice("Copy 1 of 2 — Customer retains", fields, logoDataUrl)}
+${cancellationNotice("Copy 2 of 2 — Customer retains", fields, logoDataUrl)}
+${insuranceDenialNotice("Copy 1 of 2 — Customer retains", fields, logoDataUrl)}
+${insuranceDenialNotice("Copy 2 of 2 — Customer retains", fields, logoDataUrl)}
+${mechanicsLienPage(logoDataUrl)}
+${consumerRightsPage(fields, logoDataUrl)}
 </body>
 </html>`;
 }

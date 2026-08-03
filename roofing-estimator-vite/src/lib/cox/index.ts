@@ -36,6 +36,7 @@ export {
 export {
   COX_IL_COMPANY,
   buildCoxIlContractHtml,
+  buildCoxIlDamageReportHtml,
   coxIlAddressBlock,
   coxIlFooterLine,
   emptyCoxIlContractFields,

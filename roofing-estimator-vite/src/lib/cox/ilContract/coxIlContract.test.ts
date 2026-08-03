@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCoxIlContractHtml } from "./buildCoxIlContractHtml";
+import { buildCoxIlDamageReportHtml } from "./buildCoxIlDamageReportHtml";
 import { COX_IL_COMPANY } from "./coxIlCompany";
 import { emptyCoxIlContractFields } from "./coxIlContractTypes";
 import { mapCoxIlContractFields, splitLossAddress } from "./mapCoxIlContractFields";
@@ -70,5 +71,36 @@ describe("Cox IL contract pack", () => {
     expect(html).not.toContain("Naperville");
     expect(html).not.toContain("RSMo");
     expect(html).not.toContain("St. Louis County");
+    expect(html).toContain("letterhead");
+    expect(html).toContain("COX");
+    expect(html).toContain("ROOFING");
+  });
+
+  it("builds IL damage report permission & authorization contingency form", () => {
+    const html = buildCoxIlDamageReportHtml(
+      emptyCoxIlContractFields({
+        customerName: "Test Customer",
+        lossAddress: "1 Test Rd",
+        cityStateZip: "Oak Brook, IL 60523",
+        insuranceCompany: "State Farm",
+        dateOfLoss: "7/1/2026",
+        claimNumber: "CLM-99",
+      }),
+    );
+    expect(html).toContain("Permission &amp; Authorization");
+    expect(html).toContain("DAMAGE REPORT");
+    expect(html).toContain("Front Elevation");
+    expect(html).toContain("HAIL = H");
+    expect(html).toContain(COX_IL_COMPANY.phoneDisplay);
+    expect(html).toContain(COX_IL_COMPANY.addressLine1);
+    expect(html).toContain("Oak Brook, IL 60523");
+    expect(html).toContain("Test Customer");
+    expect(html).toContain("State Farm");
+    expect(html).toContain("815 ILCS 513");
+    expect(html).toContain("another contractor");
+    expect(html).not.toContain("Financing");
+    expect(html).not.toContain("314-310-7663");
+    expect(html).not.toContain("Hanley");
+    expect(html).not.toContain("cotractor");
   });
 });
