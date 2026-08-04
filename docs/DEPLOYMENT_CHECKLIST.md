@@ -69,8 +69,8 @@ Redeploy the Worker after changing secrets if the runtime must pick them up (Wra
 | Area | Check |
 |------|--------|
 | **Auth** | Login / sign-up / session |
-| **Canvassing** | Map loads; property sheet; **Storm damage report** creates a field job and opens **Projects** |
-| **Projects** | Field jobs list; **Take photo** / CRM links if used |
+| **Canvassing** | Map loads; property sheet; **Storm damage report** creates a field job; **Print / PDF for customer** opens branded packet |
+| **Projects** | Field jobs list; **Take photo** / CRM links; customer **Print / PDF** + **Download HTML** from report panel |
 | **Marketing** | Social / Ad maker need Worker + Meta + `OPENAI_API_KEY` where applicable |
 | **Call center** | Page loads; any dialer/API features you rely on |
 | **Estimator / chat** | If using estimator chat AI, Worker route + `OPENAI_API_KEY` |

@@ -1,8 +1,16 @@
 import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Check, ExternalLink, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
+import { Camera, Check, Download, ExternalLink, ImagePlus, Loader2, Printer, Sparkles, X } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { MAX_FIELD_PROJECT_PHOTOS, type DamagePhoto, type FieldProject } from "../../lib/fieldProjectTypes";
+import { loadOrgSettings } from "../../lib/orgSettings";
+import {
+  buildCustomerStormDamageReportHtml,
+  customerStormDamageReportFilename,
+  downloadCustomerStormDamageReportHtml,
+  printCustomerStormDamageReportHtml,
+} from "../../lib/stormDamageReport";
 import { useRemotePhotoUrl } from "./useRemotePhotoUrl";
 
 type Props = {
@@ -111,6 +119,46 @@ export function StormDamageCaptureSheet({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  const canShareCustomerPacket = photos.length > 0 || Boolean(project.aiReport?.trim());
+
+  const customerHtml = () => {
+    const org = loadOrgSettings();
+    return buildCustomerStormDamageReportHtml(project, {
+      companyName: org.companyName,
+      companyAddress: org.companyAddress,
+      companyWebsite: org.companyWebsite,
+      preparedBy: org.preparedBy,
+      contactEmail: org.contactEmail,
+      contactPhone: org.contactPhone,
+      logoDataUrl: org.logoDataUrl,
+    });
+  };
+
+  const sharePrintPdf = () => {
+    if (!canShareCustomerPacket) {
+      sonnerToast.message("Add at least one site photo before sharing with the customer");
+      return;
+    }
+    const ok = printCustomerStormDamageReportHtml(customerHtml());
+    if (!ok) {
+      sonnerToast.error("Pop-up blocked — allow pop-ups, then use Print → Save as PDF");
+      return;
+    }
+    sonnerToast.success("Customer report opened — choose Print → Save as PDF");
+  };
+
+  const downloadHtml = () => {
+    if (!canShareCustomerPacket) {
+      sonnerToast.message("Add at least one site photo before downloading the report");
+      return;
+    }
+    downloadCustomerStormDamageReportHtml(
+      customerHtml(),
+      customerStormDamageReportFilename(project),
+    );
+    sonnerToast.success("Customer damage report downloaded");
+  };
 
   if (!open || !mount) return null;
 
@@ -260,6 +308,28 @@ export function StormDamageCaptureSheet({
                   ? "Report will appear here as soon as the first photo is analyzed."
                   : "Sign in to generate an automatic AI storm damage report from your photos.")}
             </pre>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="hd2d-btn-secondary w-full gap-2 rounded-xl text-xs font-semibold"
+                disabled={!canShareCustomerPacket}
+                onClick={sharePrintPdf}
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print / PDF for customer
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="hd2d-btn-secondary w-full gap-2 rounded-xl text-xs font-semibold"
+                disabled={!canShareCustomerPacket}
+                onClick={downloadHtml}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download HTML
+              </Button>
+            </div>
           </section>
         </div>
 
