@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
-import { Camera, ExternalLink, ImagePlus, LayoutGrid, List, X } from "lucide-react";
+import { Camera, Download, ExternalLink, ImagePlus, LayoutGrid, List, Printer, X } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
 import { useRoofing } from "../../context/RoofingContext";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -17,6 +18,12 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { FieldPhotoTile } from "./FieldPhotoTile";
 import { loadOrgSettings } from "../../lib/orgSettings";
+import {
+  buildCustomerStormDamageReportHtml,
+  customerStormDamageReportFilename,
+  downloadCustomerStormDamageReportHtml,
+  printCustomerStormDamageReportHtml,
+} from "../../lib/stormDamageReport";
 import { useFieldProjectPhotoCapture } from "./useFieldProjectPhotoCapture";
 
 const DND_MIME = "application/x-hd2d-field-project-id";
@@ -838,12 +845,75 @@ export function FieldProjectsPanel() {
                 </p>
               ) : null}
 
-              {selected.aiReport ? (
+              {selected.aiReport || selected.photos.length > 0 ? (
                 <div className="hd2d-report-panel rounded-lg border p-3">
-                  <p className="mb-2 text-sm font-medium text-black">AI storm damage report</p>
-                  <pre className="hd2d-report-body m-0 max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed">
-                    {selected.aiReport}
-                  </pre>
+                  <p className="mb-2 text-sm font-medium text-black">
+                    {selected.aiReport ? "AI storm damage report" : "Customer damage report"}
+                  </p>
+                  {selected.aiReport ? (
+                    <pre className="hd2d-report-body m-0 max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed">
+                      {selected.aiReport}
+                    </pre>
+                  ) : (
+                    <p className="m-0 text-xs text-black/70">
+                      Photos are on this job — share a branded customer packet even before AI finishes.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const org = loadOrgSettings();
+                        const html = buildCustomerStormDamageReportHtml(selected, {
+                          companyName: org.companyName,
+                          companyAddress: org.companyAddress,
+                          companyWebsite: org.companyWebsite,
+                          preparedBy: org.preparedBy,
+                          contactEmail: org.contactEmail,
+                          contactPhone: org.contactPhone,
+                          logoDataUrl: org.logoDataUrl,
+                        });
+                        const ok = printCustomerStormDamageReportHtml(html);
+                        if (!ok) {
+                          sonnerToast.error("Pop-up blocked — allow pop-ups, then use Print → Save as PDF");
+                          return;
+                        }
+                        sonnerToast.success("Customer report opened — choose Print → Save as PDF");
+                      }}
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      Print / PDF for customer
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const org = loadOrgSettings();
+                        const html = buildCustomerStormDamageReportHtml(selected, {
+                          companyName: org.companyName,
+                          companyAddress: org.companyAddress,
+                          companyWebsite: org.companyWebsite,
+                          preparedBy: org.preparedBy,
+                          contactEmail: org.contactEmail,
+                          contactPhone: org.contactPhone,
+                          logoDataUrl: org.logoDataUrl,
+                        });
+                        downloadCustomerStormDamageReportHtml(
+                          html,
+                          customerStormDamageReportFilename(selected),
+                        );
+                        sonnerToast.success("Customer damage report downloaded");
+                      }}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download HTML
+                    </Button>
+                  </div>
                 </div>
               ) : null}
 
