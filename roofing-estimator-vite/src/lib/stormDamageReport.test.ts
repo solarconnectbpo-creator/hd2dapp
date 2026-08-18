@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildCustomerStormDamageReportHtml,
   buildCustomerStormDamageReportText,
+  buildHoaBoardDiscoveryHtml,
   buildStormDamageReport,
   customerStormDamageReportFilename,
+  hoaBoardDiscoveryFilename,
 } from "./stormDamageReport";
 
 const sampleProject = {
@@ -100,6 +102,22 @@ describe("customer storm damage report", () => {
   it("creates a safe download filename", () => {
     expect(customerStormDamageReportFilename({ name: "Job", address: "123 Main St!" })).toMatch(
       /^damage-report-123-Main-St-\d{4}-\d{2}-\d{2}\.html$/,
+    );
+  });
+
+  it("builds an HOA board discovery packet with claim motion", () => {
+    const html = buildHoaBoardDiscoveryHtml(sampleProject, {
+      companyName: "Hardcore Closers Roofing",
+      preparedBy: "Alex Rep",
+    });
+    expect(html).toContain("Board of Directors packet");
+    expect(html).toContain("Storm Damage Discovery Report");
+    expect(html).toContain("Suggested Board motion");
+    expect(html).toContain("Hardcore Closers Roofing");
+    expect(html).toContain("9 Oak Ave");
+    expect(html).toContain("Association reserves");
+    expect(hoaBoardDiscoveryFilename({ name: "Job", address: "9 Oak Ave" })).toMatch(
+      /^hoa-damage-discovery-9-Oak-Ave-\d{4}-\d{2}-\d{2}\.html$/,
     );
   });
 });

@@ -20,8 +20,10 @@ import { FieldPhotoTile } from "./FieldPhotoTile";
 import { loadOrgSettings } from "../../lib/orgSettings";
 import {
   buildCustomerStormDamageReportHtml,
+  buildHoaBoardDiscoveryHtml,
   customerStormDamageReportFilename,
   downloadCustomerStormDamageReportHtml,
+  hoaBoardDiscoveryFilename,
   printCustomerStormDamageReportHtml,
 } from "../../lib/stormDamageReport";
 import { useFieldProjectPhotoCapture } from "./useFieldProjectPhotoCapture";
@@ -912,6 +914,35 @@ export function FieldProjectsPanel() {
                     >
                       <Download className="h-3.5 w-3.5" />
                       Download HTML
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const org = loadOrgSettings();
+                        const html = buildHoaBoardDiscoveryHtml(selected, {
+                          companyName: org.companyName,
+                          companyAddress: org.companyAddress,
+                          companyWebsite: org.companyWebsite,
+                          preparedBy: org.preparedBy,
+                          contactEmail: org.contactEmail,
+                          contactPhone: org.contactPhone,
+                          logoDataUrl: org.logoDataUrl,
+                        });
+                        const ok = printCustomerStormDamageReportHtml(html);
+                        if (!ok) {
+                          downloadCustomerStormDamageReportHtml(
+                            html,
+                            hoaBoardDiscoveryFilename(selected),
+                          );
+                          sonnerToast.message("Pop-up blocked — HOA board packet downloaded instead");
+                          return;
+                        }
+                        sonnerToast.success("HOA board packet opened — Print → Save as PDF");
+                      }}
+                    >
+                      HOA board discovery
                     </Button>
                   </div>
                 </div>

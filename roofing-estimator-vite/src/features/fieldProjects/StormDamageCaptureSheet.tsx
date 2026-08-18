@@ -7,8 +7,10 @@ import { MAX_FIELD_PROJECT_PHOTOS, type DamagePhoto, type FieldProject } from ".
 import { loadOrgSettings } from "../../lib/orgSettings";
 import {
   buildCustomerStormDamageReportHtml,
+  buildHoaBoardDiscoveryHtml,
   customerStormDamageReportFilename,
   downloadCustomerStormDamageReportHtml,
+  hoaBoardDiscoveryFilename,
   printCustomerStormDamageReportHtml,
 } from "../../lib/stormDamageReport";
 import { useRemotePhotoUrl } from "./useRemotePhotoUrl";
@@ -158,6 +160,30 @@ export function StormDamageCaptureSheet({
       customerStormDamageReportFilename(project),
     );
     sonnerToast.success("Customer damage report downloaded");
+  };
+
+  const shareHoaBoardPacket = () => {
+    if (!canShareCustomerPacket) {
+      sonnerToast.message("Add at least one site photo before building the HOA board packet");
+      return;
+    }
+    const org = loadOrgSettings();
+    const html = buildHoaBoardDiscoveryHtml(project, {
+      companyName: org.companyName,
+      companyAddress: org.companyAddress,
+      companyWebsite: org.companyWebsite,
+      preparedBy: org.preparedBy,
+      contactEmail: org.contactEmail,
+      contactPhone: org.contactPhone,
+      logoDataUrl: org.logoDataUrl,
+    });
+    const ok = printCustomerStormDamageReportHtml(html);
+    if (!ok) {
+      downloadCustomerStormDamageReportHtml(html, hoaBoardDiscoveryFilename(project));
+      sonnerToast.message("Pop-up blocked — HOA board packet downloaded instead");
+      return;
+    }
+    sonnerToast.success("HOA board packet opened — Print → Save as PDF");
   };
 
   if (!open || !mount) return null;
@@ -328,6 +354,15 @@ export function StormDamageCaptureSheet({
               >
                 <Download className="h-3.5 w-3.5" />
                 Download HTML
+              </Button>
+              <Button
+                type="button"
+                className="hd2d-btn-accent w-full gap-2 rounded-xl text-xs font-semibold sm:col-span-2"
+                disabled={!canShareCustomerPacket}
+                onClick={shareHoaBoardPacket}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                HOA board damage discovery
               </Button>
             </div>
           </section>
