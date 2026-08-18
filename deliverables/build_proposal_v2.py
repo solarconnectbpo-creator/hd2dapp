@@ -13,7 +13,7 @@ EXHIBITS = [
          aspect="4/3",
          notes=[
              "Twelve-plus soft-metal box vents across ridges — primary hail test surfaces (circled clusters).",
-             "Multi-tonal granule discoloration scattered across south- and west-facing slopes.",
+             "Multi-tonal granule discoloration scattered across south- and west-facing slopes — flag tonal breaks along ridge and rake lines for wind-lift (broken seal) verification on the roof walk.",
              "Establishes formal inspection: ladder and crew visible at the drive.",
          ],
          marks=[dict(x=36, y=38, rx=14, ry=8, label="1"),
@@ -76,15 +76,16 @@ EXHIBITS = [
          marks=[dict(x=17, y=25, rx=11, ry=9, label="1"),
                 dict(x=82, y=22, rx=11, ry=9, label="2"),
                 dict(x=50, y=60, rx=13, ry=9, label="3")]),
-    dict(letter="H", group="Shingle field", title="Shingle close-up — horizontal courses",
+    dict(letter="H", group="Shingle field", title="Shingle close-up — wind crease + bruising",
          meta="Test-square candidate · laminate field",
          aspect="4/3",
          notes=[
-             "Circular granule displacement exposing black asphalt mat (circles) — the industry definition of hail bruising.",
+             "WIND: diagonal crease line across the laminate tab right of center (circle 1) — the signature of a wind-lifted shingle that folded back and re-set; the seal strip is broken even though the tab lies flat.",
+             "Circular granule displacement exposing black asphalt mat (circles 2–3) — the industry definition of hail bruising.",
              "Impact points sit mid-tab, not at edges — storm pattern rather than foot scuffing.",
          ],
-         marks=[dict(x=46, y=44, rx=7, ry=6, label="1"),
-                dict(x=64, y=28, rx=6, ry=5, label="2"),
+         marks=[dict(x=58, y=38, rx=10, ry=9, label="1"),
+                dict(x=64, y=26, rx=6, ry=5, label="2"),
                 dict(x=30, y=64, rx=6, ry=5, label="3")]),
     dict(letter="I", group="Shingle field", title="Shingle field — angled frame 1",
          meta="Test-square candidate · random-pattern granule loss",
@@ -120,23 +121,27 @@ EXHIBITS = [
              "Single distinct dark strike with mat bruise at center frame (circle) — flagship bruise photo for the claim file.",
          ],
          marks=[dict(x=44, y=48, rx=8, ry=7, label="1")]),
-    dict(letter="M", group="Elevations", title="Front elevation — unit 456",
+    dict(letter="M", group="Elevations — wind-blown shingles", title="Front elevation — unit 456",
          meta="GPS 41.7392° N, 88.1183° W · 8/14/2026 2:42 PM",
          aspect="4/3",
          notes=[
+             "WIND: gable roofline above the second story (circle 1) — wind-blown/lifted shingle tabs and broken seal lines sighted from grade along the rake and ridge; flag for ladder verification during the adjuster walk.",
              "Establishes subject unit 456 Timber Trail Ct (job #5467, insurance type).",
-             "Metal pent roof over garage (circle 1) and gutter/roof line (circle 2) are soft-metal witness surfaces.",
+             "Metal pent roof over garage (circle 2) and neighbor gable roofline (circle 3) are matching witness surfaces across units.",
          ],
-         marks=[dict(x=48, y=52, rx=17, ry=6, label="1"),
-                dict(x=42, y=22, rx=16, ry=7, label="2")]),
-    dict(letter="N", group="Elevations", title="Side elevation — unit 463",
+         marks=[dict(x=44, y=11, rx=15, ry=7, label="1"),
+                dict(x=48, y=52, rx=17, ry=6, label="2"),
+                dict(x=82, y=16, rx=11, ry=6, label="3")]),
+    dict(letter="N", group="Elevations — wind-blown shingles", title="Side elevation — unit 463",
          meta="GPS 41.7391° N, 88.1183° W · 8/14/2026 2:46 PM",
          aspect="3/4",
          notes=[
-             "Full-height white downspout run (circle) — leads directly to the impact damage in Exhibits O and Q.",
-             "Gutter and fascia line at gable to be sighted for dings during adjuster walk.",
+             "WIND: rake edge and gable roofline (circle 1) — wind-exposure edge where blown/lifted shingles start; the side elevations take the direct wind fetch between buildings.",
+             "Full-height white downspout run (circle 2) — leads directly to the impact damage in Exhibits O and Q.",
+             "Gutter and fascia line at the gable to be sighted for dings during the adjuster walk.",
          ],
-         marks=[dict(x=60, y=35, rx=7, ry=22, label="1")]),
+         marks=[dict(x=55, y=14, rx=16, ry=6, label="1"),
+                dict(x=60, y=40, rx=7, ry=20, label="2")]),
     dict(letter="O", group="Soft-metal collateral", title="Downspout impact damage — brick corner",
          meta="GPS 41.7391° N, 88.1182° W · 8/14/2026 2:46 PM",
          aspect="3/4",
@@ -164,14 +169,17 @@ EXHIBITS = [
              "Pair with Exhibit O in the adjuster walk to anchor storm energy before roof close-ups.",
          ],
          marks=[dict(x=49, y=46, rx=12, ry=14, label="1")]),
-    dict(letter="R", group="Elevations", title="Front elevation — unit 463 building",
+    dict(letter="R", group="Elevations — wind-blown shingles", title="Front elevation — unit 463 building",
          meta="GPS 41.7390° N, 88.1183° W · 8/14/2026 2:48 PM",
          aspect="4/3",
          notes=[
-             "Metal pent roofs over both garages (circles 1–2) — repeat soft-metal surfaces across units confirm association-wide exposure.",
+             "WIND: left gable roofline (circle 1) and right gable roofline (circle 2) — wind-blown/lifted shingles along both rakes visible from the elevation; the paired gables channel gusts across the field tabs.",
+             "Metal pent roofs over both garages (circles 3–4) — repeat soft-metal surfaces across units confirm association-wide exposure.",
          ],
-         marks=[dict(x=22, y=50, rx=16, ry=6, label="1"),
-                dict(x=88, y=52, rx=10, ry=5, label="2")]),
+         marks=[dict(x=26, y=12, rx=14, ry=7, label="1"),
+                dict(x=79, y=15, rx=12, ry=7, label="2"),
+                dict(x=22, y=50, rx=16, ry=6, label="3"),
+                dict(x=88, y=52, rx=10, ry=5, label="4")]),
     dict(letter="S", group="Openings", title="Window screen — puncture line",
          meta="GPS 41.7393° N, 88.1187° W · 8/14/2026 2:50 PM",
          aspect="3/4",
@@ -414,6 +422,7 @@ HTML = f"""<!doctype html>
         </div>
 
         <div class="pill-row">
+          <span class="pill">Wind-blown / creased shingles</span>
           <span class="pill">Hail bruising / granule loss</span>
           <span class="pill">Downspout impact dents</span>
           <span class="pill">Vent lid strikes</span>
@@ -445,7 +454,8 @@ HTML = f"""<!doctype html>
         <table>
           <thead><tr><th>System</th><th>Observed condition (exhibits)</th><th>Claim relevance</th><th>Sev.</th></tr></thead>
           <tbody>
-            <tr><td>Architectural shingles</td><td>Circular granule loss exposing asphalt mat across multiple frames (H–L)</td><td>Functional damage / accelerated failure</td><td><span class="sev">5</span></td></tr>
+            <tr><td>Architectural shingles — wind</td><td>Diagonal wind crease in laminate tab (H); wind-blown/lifted shingles along gable rooflines sighted from elevations (M, N, R)</td><td>Broken seal strips = functional wind damage even where tabs lie flat</td><td><span class="sev">5</span></td></tr>
+            <tr><td>Architectural shingles — hail</td><td>Circular granule loss exposing asphalt mat across multiple frames (H–L)</td><td>Functional damage / accelerated failure</td><td><span class="sev">5</span></td></tr>
             <tr><td>Attic box vents</td><td>Lid indentations, flange scour (F, G); 40+ vents across four buildings (A–D)</td><td>Classic soft-metal collateral</td><td><span class="sev">5</span></td></tr>
             <tr><td>Downspouts / gutters</td><td>Dent clusters with coating scuffed to bright metal (O, Q); runs flagged (N, P)</td><td>Vertical-surface impact = wind-driven hail vector</td><td><span class="sev">4</span></td></tr>
             <tr><td>Garage pent roofs</td><td>Soft-metal awnings over garages, both buildings (M, R)</td><td>Persuasive corroboration surfaces</td><td><span class="sev">4</span></td></tr>
@@ -486,7 +496,8 @@ HTML = f"""<!doctype html>
         <h2>5. Photo exhibits A–T — circled &amp; notated</h2>
         <p class="muted sans">
           Red circles mark wind/hail evidence; numbered notes below each frame explain what is circled and why it
-          matters to the claim. GPS/time stamps are burned into the ground-survey photos.
+          matters to the claim. Wind-blown shingle callouts are flagged <strong>WIND</strong> on the elevation
+          exhibits (M, N, R) and the creased-tab close-up (H). GPS/time stamps are burned into the ground-survey photos.
         </p>
         <div class="exhibits">{exhibits_markup}
         </div>
