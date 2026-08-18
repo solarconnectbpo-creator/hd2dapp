@@ -3,7 +3,7 @@
 import html as htmllib
 import json
 
-LOGO = open("/tmp/logo_datauri.txt").read().strip()
+LOGO = open("/tmp/cox_logo_datauri.txt").read().strip()
 
 # Each exhibit: letter, title, meta, notes (list), marks (list of dicts x,y,rx,ry,label)
 # x/y/rx/ry are percentages of the photo frame. aspect = width/height hint for the slot.
@@ -275,11 +275,12 @@ HTML = f"""<!doctype html>
       background: linear-gradient(135deg, rgba(36,52,71,0.96), rgba(18,23,31,0.92)),
         repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.02) 8px, rgba(255,255,255,0.02) 16px);
     }}
-    .brandline {{ display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }}
-    .brandline img {{ width: 54px; height: 54px; border-radius: 12px; }}
+    .brandline {{ display: flex; align-items: center; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }}
+    .brandline img {{ width: 118px; height: auto; border-radius: 10px; background: #fff; padding: 6px 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }}
     .brandline div {{ font-family: "IBM Plex Sans","Segoe UI",sans-serif; }}
-    .brandline strong {{ display: block; font-size: 0.95rem; letter-spacing: 0.02em; }}
-    .brandline span {{ font-size: 0.72rem; color: #c9d4e1; letter-spacing: 0.14em; text-transform: uppercase; }}
+    .brandline strong {{ display: block; font-size: 0.98rem; letter-spacing: 0.02em; }}
+    .brandline span {{ display: block; font-size: 0.72rem; color: #c9d4e1; letter-spacing: 0.14em; text-transform: uppercase; }}
+    .brandline .contact {{ font-size: 0.74rem; color: #9fb0c3; letter-spacing: 0.02em; text-transform: none; margin-top: 3px; }}
     .cover .eyebrow {{ margin: 0 0 12px; font-family: "IBM Plex Sans","Segoe UI",sans-serif; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: #c9d4e1; }}
     .cover h1 {{ margin: 0; font-size: clamp(1.8rem, 4vw, 2.55rem); line-height: 1.12; letter-spacing: -0.03em; max-width: 16ch; }}
     .cover .lede {{ margin: 16px 0 0; max-width: 50ch; font-size: 1.05rem; color: #d7e0ea; }}
@@ -377,10 +378,11 @@ HTML = f"""<!doctype html>
     <article class="sheet">
       <header class="cover">
         <div class="brandline">
-          <img src="{LOGO}" alt="Hardcore D2D Closers" />
+          <img src="{LOGO}" alt="Cox Roofing — Your Roof, Our Legacy" />
           <div>
-            <strong>Hardcore D2D Closers</strong>
+            <strong>Cox Roofing &amp; Restoration LLC</strong>
             <span>Storm damage discovery · claim support</span>
+            <span class="contact">700 Commerce Dr, Suite 500, Oak Brook, IL 60523 · (877) 816-4245 · COXROOF.COM</span>
           </div>
         </div>
         <p class="eyebrow">Confidential · Board of Directors packet · Rev. 2 with annotated photo exhibits</p>
@@ -467,7 +469,7 @@ HTML = f"""<!doctype html>
           <p style="margin:0">
             <strong>Motion:</strong> That the Board of Directors authorize the filing of a property insurance claim
             for storm-related damage documented on August 14, 2026 at the Timber Trail Ct buildings surveyed
-            (including units 456 and 463); direct management to notify the carrier; and engage Hardcore D2D Closers
+            (including units 456 and 463); direct management to notify the carrier; and engage Cox Roofing &amp; Restoration LLC
             to present damage discovery Exhibits A–T, attend the adjuster inspection, and report back with carrier
             findings and recommended restoration scope — with the intent that covered storm damage not be paid
             solely from Association reserves.
@@ -498,7 +500,8 @@ HTML = f"""<!doctype html>
         <p><strong>Recommended next step today:</strong> adopt the motion in §4, transmit this packet, and calendar the adjuster inspection.</p>
 
         <p class="footnote">
-          Damage discovery packet prepared by Hardcore D2D Closers as a field documentation and board decision aid.
+          Damage discovery packet prepared by Cox Roofing &amp; Restoration LLC · 700 Commerce Dr, Suite 500, Oak Brook, IL 60523 ·
+          (877) 816-4245 · COXROOF.COM — a field documentation and board decision aid.
           It does not constitute a public adjusting engagement, legal opinion, engineering certification, or guarantee
           of coverage. Coverage depends on the Association's policy, deductibles, endorsements, and carrier determination.
           Job #5467 · 456 Timber Trail Ct, Naperville, DuPage County, Illinois 60565 · Survey August 14, 2026.
