@@ -4551,7 +4551,7 @@ function App() {
       address: form.address || proposal.clientCompany || "",
       stateCode: form.stateCode,
       propertyNotes: form.propertyRecordNotes,
-      contractSum: result.finalCost > 0 ? result.finalCost : "",
+      contractSum: result && result.finalCost > 0 ? result.finalCost : "",
     });
     if (!fields.customerName.trim() && !fields.streetAddress.trim()) {
       toast.error("Add client name and job address in Proposal Builder first.");
