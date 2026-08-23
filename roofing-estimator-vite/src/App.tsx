@@ -85,6 +85,7 @@ import {
   type ProposalState,
 } from "./features/measurement/proposalTypes";
 import { buildCoxIlContractHtml, mapCoxIlContractFields } from "./lib/cox/ilContract";
+import { buildCoxMoSolarContractHtml, mapCoxMoSolarContractFields } from "./lib/cox/moSolarContract";
 import pricingCatalog from "./data/ai-cheatsheet-pricing.json";
 
 type RoofLineType = "ridge" | "hip" | "valley" | "eave" | "rake" | "wall-flashing" | "step-flashing";
@@ -4543,6 +4544,34 @@ function App() {
     setTimeout(() => win.print(), 250);
   };
 
+  /** Cox Solar Missouri proposal-contract + RSMo 407 / 429 disclosures (print / Save as PDF). */
+  const printCoxMoSolarContract = () => {
+    const fields = mapCoxMoSolarContractFields({
+      proposal,
+      address: form.address || proposal.clientCompany || "",
+      stateCode: form.stateCode,
+      propertyNotes: form.propertyRecordNotes,
+      contractSum: result.finalCost > 0 ? result.finalCost : "",
+    });
+    if (!fields.customerName.trim() && !fields.streetAddress.trim()) {
+      toast.error("Add client name and job address in Proposal Builder first.");
+      return;
+    }
+    if ((form.stateCode || "").trim().toUpperCase() !== "MO") {
+      toast.message("Printing Cox Solar Missouri contract — confirm the job is in Missouri.");
+    }
+    const html = buildCoxMoSolarContractHtml(fields);
+    const win = window.open("", "_blank", "width=980,height=900");
+    if (!win) {
+      toast.error("Pop-up blocked — allow pop-ups to print the Missouri solar contract.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 250);
+  };
+
   const exportFootprintDxf = useCallback(() => {
     const polys = mapboxFeatures.filter((f: { geometry?: { type?: string } }) => f.geometry?.type === "Polygon");
     if (!polys.length) {
@@ -6544,6 +6573,14 @@ function App() {
             >
               Print Cox IL Contract Pack
             </button>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={printCoxMoSolarContract}
+              title="Cox Solar Missouri proposal-contract using Corvus Pro Solar's EC license, plus RSMo 407 cancellation and 429.012 lien notice"
+            >
+              Print Cox MO Solar Contract
+            </button>
             <button type="button" className="secondary-btn" onClick={exportFootprintDxf} title="2D footprint in feet (local plane) for CAD">
               Export footprint DXF
             </button>
@@ -6553,6 +6590,13 @@ function App() {
               Illinois job — use <strong>Print Cox IL Contract Pack</strong> for the Oak Brook restoration contract,
               Terms &amp; Conditions, cancellation notices (incl. senior + insurance denial), mechanic&apos;s lien notice,
               and &quot;Know Your Consumer Rights&quot; acknowledgment.
+            </p>
+          ) : null}
+          {(form.stateCode || "").trim().toUpperCase() === "MO" ? (
+            <p className="muted" style={{ marginTop: 8 }}>
+              Missouri job — use <strong>Print Cox MO Solar Contract</strong> for the Cox Solar proposal-contract,
+              Corvus Pro Solar EC license disclosure, 3-day home-solicitation cancellation notices (RSMo 407.700–407.720),
+              and the RSMo 429.012 mechanic&apos;s lien notice.
             </p>
           ) : null}
         </section>
