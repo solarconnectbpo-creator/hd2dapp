@@ -29,6 +29,12 @@ const SocialMediaAutomationRoute = lazyRoute(() =>
 const AdMakerAutomationRoute = lazyRoute(() =>
   import("./pages/AdMakerAutomation").then((m) => ({ default: m.AdMakerAutomation })),
 );
+const CoxSolarGuideRoute = lazyRoute(() =>
+  import("./pages/CoxSolarGuide").then((m) => ({ default: m.CoxSolarGuide })),
+);
+const CoxSolarMarketingKitRoute = lazyRoute(() =>
+  import("./pages/CoxSolarMarketingKit").then((m) => ({ default: m.CoxSolarMarketingKit })),
+);
 const AdminUsersRoute = lazyRoute(() => import("./pages/AdminUsers").then((m) => ({ default: m.AdminUsers })));
 const AdminCoursesRoute = lazyRoute(() => import("./pages/AdminCourses").then((m) => ({ default: m.AdminCourses })));
 const CoursesRoute = lazyRoute(() => import("./pages/Courses").then((m) => ({ default: m.Courses })));
@@ -51,6 +57,10 @@ export const router = createBrowserRouter([
   {
     path: "/careers",
     Component: Careers,
+  },
+  {
+    path: "/cox-solar",
+    Component: CoxSolarGuideRoute,
   },
   {
     path: "/admin/login",
@@ -82,6 +92,7 @@ export const router = createBrowserRouter([
               { index: true, Component: MarketingRoute },
               { path: "social", Component: SocialMediaAutomationRoute },
               { path: "ads", Component: AdMakerAutomationRoute },
+              { path: "cox-solar", Component: CoxSolarMarketingKitRoute },
             ],
           },
           { path: "courses", Component: CoursesRoute },
