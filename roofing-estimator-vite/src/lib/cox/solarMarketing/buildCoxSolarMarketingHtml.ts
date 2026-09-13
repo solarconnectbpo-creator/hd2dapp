@@ -11,6 +11,13 @@ import {
 
 export type CoxSolarMarketingHtmlVariant = "guide" | "leavebehind";
 
+export type CoxSolarMarketingHtmlOptions = {
+  /** Logo URL or data URI. Defaults to the public Cox lockup path. */
+  logoSrc?: string;
+};
+
+const DEFAULT_LOGO_SRC = "/cox-roofing-logo.png";
+
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -68,7 +75,7 @@ function sharedStyles(): string {
       display: flex; justify-content: space-between; align-items: center;
       border-bottom: 6px solid #c8102e; padding-bottom: 12px; margin-bottom: 18px;
     }
-    .brand-bar img { height: 64px; width: auto; }
+    .brand-bar img { height: 112px; width: auto; }
     .eyebrow { font-family: Inter, system-ui, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; font-size: 10px; color: #c8102e; font-weight: 700; }
     h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 8px; color: #0f2744; }
     h2 { font-size: 18px; color: #0f2744; margin: 22px 0 8px; border-left: 5px solid #c8102e; padding-left: 10px; }
@@ -89,6 +96,7 @@ function sharedStyles(): string {
     .leave { text-align: center; padding-top: 24px; }
     .leave h1 { font-size: 32px; }
     .leave .pitch { font-size: 20px; max-width: 34em; margin: 12px auto 18px; }
+    @page { size: letter; margin: 0.55in; }
     @media print {
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       .page { padding: 0; max-width: none; }
@@ -98,9 +106,9 @@ function sharedStyles(): string {
   `;
 }
 
-function brandBar(): string {
+function brandBar(logoSrc: string): string {
   return `<div class="brand-bar">
-    <img src="/cox-roofing-logo.png" alt="${esc(COX_SOLAR_BRAND.shortName)}"/>
+    <img src="${esc(logoSrc)}" alt="${esc(COX_SOLAR_BRAND.shortName)}"/>
     <div style="text-align:right;font-family:Inter,system-ui,sans-serif;font-size:11px;color:#0f2744">
       <div class="eyebrow">${esc(COX_SOLAR_BRAND.productName)}</div>
       <div>${esc(COX_SOLAR_BRAND.phoneDisplay)}</div>
@@ -109,7 +117,7 @@ function brandBar(): string {
   </div>`;
 }
 
-function guideBody(): string {
+function guideBody(logoSrc: string): string {
   const why = COX_SOLAR_WHY.map(
     (s) => `<div class="card"><h3>${esc(s.title)}</h3><p>${esc(s.body)}</p></div>`,
   ).join("");
@@ -129,7 +137,7 @@ function guideBody(): string {
     (f) => `<div class="card"><h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p></div>`,
   ).join("");
 
-  return `${brandBar()}
+  return `${brandBar(logoSrc)}
     <p class="eyebrow">Illinois homeowner guide</p>
     <h1>${esc(COX_SOLAR_BRAND.productName)}</h1>
     <p class="pitch">${esc(COX_SOLAR_BRAND.pitch)}</p>
@@ -169,7 +177,7 @@ function guideBody(): string {
     </div>`;
 }
 
-function leavebehindBody(): string {
+function leavebehindBody(logoSrc: string): string {
   const bullets = [
     "Roof inspected or replaced before panels go on.",
     "You can pay for the power the system produces — we handle the rest.",
@@ -182,7 +190,7 @@ function leavebehindBody(): string {
     .map((b) => `<li>${esc(b)}</li>`)
     .join("");
 
-  return `${brandBar()}
+  return `${brandBar(logoSrc)}
     <div class="leave">
       <p class="eyebrow">${esc(COX_SOLAR_BRAND.motto)}</p>
       <h1>${esc(COX_SOLAR_BRAND.productName)}</h1>
@@ -198,12 +206,16 @@ function leavebehindBody(): string {
 }
 
 /** Printable Cox Roofing Solar homeowner guide or one-page leave-behind. */
-export function buildCoxSolarMarketingHtml(variant: CoxSolarMarketingHtmlVariant = "guide"): string {
+export function buildCoxSolarMarketingHtml(
+  variant: CoxSolarMarketingHtmlVariant = "guide",
+  options?: CoxSolarMarketingHtmlOptions,
+): string {
+  const logoSrc = options?.logoSrc || DEFAULT_LOGO_SRC;
   const title =
     variant === "leavebehind"
       ? `${COX_SOLAR_BRAND.productName} — Illinois leave-behind`
       : `${COX_SOLAR_BRAND.productName} — Illinois homeowner guide`;
-  const body = variant === "leavebehind" ? leavebehindBody() : guideBody();
+  const body = variant === "leavebehind" ? leavebehindBody(logoSrc) : guideBody(logoSrc);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

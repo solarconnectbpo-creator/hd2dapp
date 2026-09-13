@@ -23,5 +23,6 @@ export {
   buildCoxSolarMarketingHtml,
   coxSolarNemDiagramSvg,
   openCoxSolarMarketingPrint,
+  type CoxSolarMarketingHtmlOptions,
   type CoxSolarMarketingHtmlVariant,
 } from "./buildCoxSolarMarketingHtml";
