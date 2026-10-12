@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { Printer, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Seo } from "../components/Seo";
-import { coxSolarSolutionsLogoUrl } from "../branding/coxSolarSolutionsLogoUrl";
+import { coxRoofingLogoUrl } from "../branding/coxRoofingLogoUrl";
 import {
   COX_SOLAR_BRAND,
   COX_SOLAR_DISCLAIMER,
@@ -41,9 +41,9 @@ export function CoxSolarGuide() {
       <header className="border-b-4 border-[#c8102e] bg-white">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <img
-            src={coxSolarSolutionsLogoUrl}
-            alt="Cox Solar Solutions"
-            className="h-20 w-auto object-contain sm:h-28"
+            src={coxRoofingLogoUrl}
+            alt="Cox Roofing"
+            className="h-16 w-auto object-contain sm:h-20"
             width={280}
             height={80}
           />

@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Seo } from "../components/Seo";
-import { coxSolarSolutionsLogoUrl } from "../branding/coxSolarSolutionsLogoUrl";
+import { coxRoofingLogoUrl } from "../branding/coxRoofingLogoUrl";
 import {
   COX_SOLAR_BRAND,
   COX_SOLAR_DISCLAIMER,
@@ -25,9 +25,9 @@ export function CoxSolarLeavebehind() {
       <article className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
         <header className="mb-6 flex items-center justify-between gap-4 border-b-[6px] border-[#c8102e] pb-3">
           <img
-            src={coxSolarSolutionsLogoUrl}
-            alt="Cox Solar Solutions"
-            className="h-24 w-auto object-contain sm:h-36"
+            src={coxRoofingLogoUrl}
+            alt="Cox Roofing"
+            className="h-16 w-auto object-contain sm:h-20"
             width={280}
             height={100}
           />

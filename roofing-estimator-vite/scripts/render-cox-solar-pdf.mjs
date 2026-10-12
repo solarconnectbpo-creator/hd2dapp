@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const logoSrc = `data:image/png;base64,${readFileSync(join(root, "public/cox-solar-solutions-logo.png")).toString("base64")}`;
+const logoSrc = `data:image/png;base64,${readFileSync(join(root, "public/cox-roofing-logo.png")).toString("base64")}`;
 const outDir = join(root, "docs/cox-solar");
 mkdirSync(outDir, { recursive: true });
 
@@ -45,7 +45,7 @@ const css = `
     display: flex; justify-content: space-between; align-items: center;
     border-bottom: 6px solid #c8102e; padding-bottom: 12px; margin-bottom: 18px;
   }
-  .brand-bar img { height: 150px; width: auto; }
+  .brand-bar img { height: 72px; width: auto; }
   .eyebrow { font-family: Inter, system-ui, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; font-size: 10px; color: #c8102e; font-weight: 700; }
   h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 8px; color: #0f2744; }
   h2 { font-size: 18px; color: #0f2744; margin: 22px 0 8px; border-left: 5px solid #c8102e; padding-left: 10px; }
@@ -246,7 +246,7 @@ printPdf("Cox-Roofing-Solar-Leavebehind", "Cox Solar Solutions — Illinois leav
 
 const publicLeaveHtml = wrap(
   "Cox Solar Solutions — Illinois leave-behind",
-  leaveBody.replace(logoSrc, "/cox-solar-solutions-logo.png"),
+  leaveBody.replace(logoSrc, "/cox-roofing-logo.png"),
 ).replace("<title>", '<meta name="viewport" content="width=device-width, initial-scale=1"/><title>');
 writeFileSync(join(root, "public/cox-solar-leavebehind.html"), publicLeaveHtml, "utf8");
 console.log("Wrote public/cox-solar-leavebehind.html");
