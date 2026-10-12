@@ -1,12 +1,13 @@
 import { Link } from "react-router";
 import { Seo } from "../components/Seo";
-import { coxRoofingLogoUrl } from "../branding/coxRoofingLogoUrl";
+import { coxSolarSolutionsLogoUrl } from "../branding/coxSolarSolutionsLogoUrl";
 import {
   COX_SOLAR_BRAND,
   COX_SOLAR_DISCLAIMER,
   COX_SOLAR_LEAVEBEHIND_BULLETS,
   COX_SOLAR_LEAVEBEHIND_PATH,
   COX_SOLAR_PUBLIC_PATH,
+  COX_SOLAR_SLICKS_PATH,
 } from "../lib/cox/solarMarketing/coxSolarMarketingContent";
 import { coxSolarNemDiagramSvg } from "../lib/cox/solarMarketing/buildCoxSolarMarketingHtml";
 
@@ -25,8 +26,8 @@ export function CoxSolarLeavebehind() {
       <article className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
         <header className="mb-6 flex items-center justify-between gap-4 border-b-[6px] border-[#c8102e] pb-3">
           <img
-            src={coxRoofingLogoUrl}
-            alt="Cox Roofing"
+            src={coxSolarSolutionsLogoUrl}
+            alt="Cox Solar Solutions"
             className="h-16 w-auto object-contain sm:h-20"
             width={280}
             height={100}
@@ -85,6 +86,10 @@ export function CoxSolarLeavebehind() {
         <p className="mt-4 text-center text-sm">
           <Link to={COX_SOLAR_PUBLIC_PATH} className="font-semibold text-[#0f2744] underline-offset-2 hover:underline">
             Open the full Illinois guide
+          </Link>
+          {" · "}
+          <Link to={COX_SOLAR_SLICKS_PATH} className="font-semibold text-[#0f2744] underline-offset-2 hover:underline">
+            Visual marketing slicks
           </Link>
         </p>
       </article>

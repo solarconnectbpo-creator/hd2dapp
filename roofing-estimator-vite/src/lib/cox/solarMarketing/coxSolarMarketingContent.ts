@@ -272,6 +272,8 @@ export const COX_SOLAR_DISCLAIMER =
 
 export const COX_SOLAR_PUBLIC_PATH = "/cox-solar";
 export const COX_SOLAR_LEAVEBEHIND_PATH = "/cox-solar/leavebehind";
+export const COX_SOLAR_SLICKS_PATH = "/cox-solar/slicks";
+export const COX_SOLAR_SLICKS_PDF_PATH = "/cox-solar-visual-marketing-slicks.pdf";
 export const COX_SOLAR_KIT_PATH = "/marketing/cox-solar";
 
 export const COX_SOLAR_LEAVEBEHIND_BULLETS = [

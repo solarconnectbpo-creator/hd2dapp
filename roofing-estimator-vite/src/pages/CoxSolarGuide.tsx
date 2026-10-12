@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { Printer, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Seo } from "../components/Seo";
-import { coxRoofingLogoUrl } from "../branding/coxRoofingLogoUrl";
+import { coxSolarSolutionsLogoUrl } from "../branding/coxSolarSolutionsLogoUrl";
 import {
   COX_SOLAR_BRAND,
   COX_SOLAR_DISCLAIMER,
@@ -12,6 +12,7 @@ import {
   COX_SOLAR_KIT_PATH,
   COX_SOLAR_LEAVEBEHIND_PATH,
   COX_SOLAR_PROCESS,
+  COX_SOLAR_SLICKS_PATH,
   COX_SOLAR_PUBLIC_PATH,
   COX_SOLAR_WHY,
 } from "../lib/cox/solarMarketing/coxSolarMarketingContent";
@@ -41,8 +42,8 @@ export function CoxSolarGuide() {
       <header className="border-b-4 border-[#c8102e] bg-white">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <img
-            src={coxRoofingLogoUrl}
-            alt="Cox Roofing"
+            src={coxSolarSolutionsLogoUrl}
+            alt="Cox Solar Solutions"
             className="h-16 w-auto object-contain sm:h-20"
             width={280}
             height={80}
@@ -94,6 +95,12 @@ export function CoxSolarGuide() {
                   className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-6 text-sm font-semibold text-white hover:bg-white/10"
                 >
                   One-page leave-behind
+                </Link>
+                <Link
+                  to={COX_SOLAR_SLICKS_PATH}
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-6 text-sm font-semibold text-white hover:bg-white/10"
+                >
+                  Visual marketing slicks
                 </Link>
               </div>
             </div>
@@ -239,6 +246,13 @@ export function CoxSolarGuide() {
             className="font-semibold text-[#0f2744] underline-offset-2 hover:underline"
           >
             door leave-behind
+          </Link>
+          {" · "}
+          <Link
+            to={COX_SOLAR_SLICKS_PATH}
+            className="font-semibold text-[#0f2744] underline-offset-2 hover:underline"
+          >
+            visual marketing slicks
           </Link>
           {" · "}
           <Link to={COX_SOLAR_KIT_PATH} className="font-semibold text-[#0f2744] underline-offset-2 hover:underline">

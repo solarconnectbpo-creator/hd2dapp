@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const logoSrc = `data:image/png;base64,${readFileSync(join(root, "public/cox-roofing-logo.png")).toString("base64")}`;
+const logoSrc = `data:image/png;base64,${readFileSync(join(root, "public/cox-solar-solutions-logo.png")).toString("base64")}`;
 const outDir = join(root, "docs/cox-solar");
 mkdirSync(outDir, { recursive: true });
 
@@ -246,7 +246,7 @@ printPdf("Cox-Roofing-Solar-Leavebehind", "Cox Solar Solutions — Illinois leav
 
 const publicLeaveHtml = wrap(
   "Cox Solar Solutions — Illinois leave-behind",
-  leaveBody.replace(logoSrc, "/cox-roofing-logo.png"),
+  leaveBody.replace(logoSrc, "/cox-solar-solutions-logo.png"),
 ).replace("<title>", '<meta name="viewport" content="width=device-width, initial-scale=1"/><title>');
 writeFileSync(join(root, "public/cox-solar-leavebehind.html"), publicLeaveHtml, "utf8");
 console.log("Wrote public/cox-solar-leavebehind.html");

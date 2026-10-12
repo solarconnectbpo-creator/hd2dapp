@@ -35,6 +35,9 @@ const CoxSolarGuideRoute = lazyRoute(() =>
 const CoxSolarLeavebehindRoute = lazyRoute(() =>
   import("./pages/CoxSolarLeavebehind").then((m) => ({ default: m.CoxSolarLeavebehind })),
 );
+const CoxSolarSlicksRoute = lazyRoute(() =>
+  import("./pages/CoxSolarSlicks").then((m) => ({ default: m.CoxSolarSlicks })),
+);
 const CoxSolarMarketingKitRoute = lazyRoute(() =>
   import("./pages/CoxSolarMarketingKit").then((m) => ({ default: m.CoxSolarMarketingKit })),
 );
@@ -72,6 +75,10 @@ export const router = createBrowserRouter([
   {
     path: "/cox-solar-leavebehind",
     Component: CoxSolarLeavebehindRoute,
+  },
+  {
+    path: "/cox-solar/slicks",
+    Component: CoxSolarSlicksRoute,
   },
   {
     path: "/admin/login",

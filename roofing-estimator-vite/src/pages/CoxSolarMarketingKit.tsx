@@ -10,6 +10,8 @@ import {
   COX_SOLAR_INCENTIVES,
   COX_SOLAR_LEAVEBEHIND_PATH,
   COX_SOLAR_PUBLIC_PATH,
+  COX_SOLAR_SLICKS_PATH,
+  COX_SOLAR_SLICKS_PDF_PATH,
   COX_SOLAR_TALK_TRACKS,
 } from "../lib/cox/solarMarketing/coxSolarMarketingContent";
 import { openCoxSolarMarketingPrint } from "../lib/cox/solarMarketing/buildCoxSolarMarketingHtml";
@@ -55,12 +57,39 @@ export function CoxSolarMarketingKit() {
           Solar closer kit
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-[#8b9199]">
-          Illinois homeowner guide, one-page door leave-behind, talk tracks, and ad copy. Share the public page or
-          print to PDF.
+          Official visual marketing slicks, Illinois homeowner guide, one-page door leave-behind, talk tracks, and ad
+          copy. Share the public page or print to PDF.
         </p>
       </div>
 
-      <div className="mb-8 grid gap-4 lg:grid-cols-3">
+      <div className="mb-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <Card className={`${cardChrome} border-red-500/20 bg-red-500/[0.06]`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-4 w-4 text-red-400" aria-hidden />
+              Official slicks
+            </CardTitle>
+            <CardDescription className="text-[#8b9199]">
+              11-page visual marketing booklet with the Cox Solar Solutions logo on every page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-2">
+              <Button asChild className="w-full gap-2">
+                <Link to={COX_SOLAR_SLICKS_PATH} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  Open {COX_SOLAR_SLICKS_PATH}
+                </Link>
+              </Button>
+              <Button asChild variant="secondary" className="w-full gap-2">
+                <a href={COX_SOLAR_SLICKS_PDF_PATH} download>
+                  <Printer className="h-4 w-4" />
+                  Download PDF
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         <Card className={`${cardChrome} border-red-500/20 bg-red-500/[0.06]`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

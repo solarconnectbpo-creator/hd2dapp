@@ -6,6 +6,8 @@ import {
   COX_SOLAR_INCENTIVES,
   COX_SOLAR_LEAVEBEHIND_BULLETS,
   COX_SOLAR_LEAVEBEHIND_PATH,
+  COX_SOLAR_SLICKS_PATH,
+  COX_SOLAR_SLICKS_PDF_PATH,
   COX_SOLAR_TALK_TRACKS,
   coxSolarContactLine,
 } from "./coxSolarMarketingContent";
@@ -54,8 +56,10 @@ describe("Cox Roofing Solar marketing pack", () => {
     expect(html).toContain("You provide the roof");
     expect(html).toContain("$300 per kW");
     expect(html).toContain("Your Roof, Our Legacy");
-    expect(html).toContain("/cox-roofing-logo.png");
+    expect(html).toContain("/cox-solar-solutions-logo.png");
     expect(COX_SOLAR_LEAVEBEHIND_PATH).toBe("/cox-solar/leavebehind");
+    expect(COX_SOLAR_SLICKS_PATH).toBe("/cox-solar/slicks");
+    expect(COX_SOLAR_SLICKS_PDF_PATH).toBe("/cox-solar-visual-marketing-slicks.pdf");
     expect(COX_SOLAR_LEAVEBEHIND_BULLETS.length).toBeGreaterThanOrEqual(6);
     expect(html).toContain(COX_SOLAR_LEAVEBEHIND_BULLETS[0]);
   });
