@@ -34,7 +34,7 @@ describe("Cox Roofing Solar marketing pack", () => {
 
   it("builds a homeowner guide without competitor brands", () => {
     const html = buildCoxSolarMarketingHtml("guide");
-    expect(html).toContain("Cox Roofing Solar");
+    expect(html).toContain("Cox Solar Solutions");
     expect(html).toContain(COX_SOLAR_BRAND.pitch);
     expect(html).toContain("Illinois Solar for All");
     expect(html).toContain("Smart Solar Billing");
@@ -51,7 +51,7 @@ describe("Cox Roofing Solar marketing pack", () => {
     expect(html).toContain("You provide the roof");
     expect(html).toContain("$300 per kW");
     expect(html).toContain("Your Roof, Our Legacy");
-    expect(html).toContain("/cox-roofing-logo.png");
+    expect(html).toContain("/cox-solar-solutions-logo.svg");
   });
 
   it("renders an original net-metering diagram", () => {

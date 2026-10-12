@@ -16,7 +16,7 @@ export type CoxSolarMarketingHtmlOptions = {
   logoSrc?: string;
 };
 
-const DEFAULT_LOGO_SRC = "/cox-roofing-logo.png";
+const DEFAULT_LOGO_SRC = "/cox-solar-solutions-logo.svg";
 
 function esc(s: string): string {
   return s
@@ -75,7 +75,7 @@ function sharedStyles(): string {
       display: flex; justify-content: space-between; align-items: center;
       border-bottom: 6px solid #c8102e; padding-bottom: 12px; margin-bottom: 18px;
     }
-    .brand-bar img { height: 112px; width: auto; }
+    .brand-bar img { height: 150px; width: auto; }
     .eyebrow { font-family: Inter, system-ui, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; font-size: 10px; color: #c8102e; font-weight: 700; }
     h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 8px; color: #0f2744; }
     h2 { font-size: 18px; color: #0f2744; margin: 22px 0 8px; border-left: 5px solid #c8102e; padding-left: 10px; }
@@ -108,7 +108,7 @@ function sharedStyles(): string {
 
 function brandBar(logoSrc: string): string {
   return `<div class="brand-bar">
-    <img src="${esc(logoSrc)}" alt="${esc(COX_SOLAR_BRAND.shortName)}"/>
+    <img src="${esc(logoSrc)}" alt="${esc(COX_SOLAR_BRAND.productName)}"/>
     <div style="text-align:right;font-family:Inter,system-ui,sans-serif;font-size:11px;color:#0f2744">
       <div class="eyebrow">${esc(COX_SOLAR_BRAND.productName)}</div>
       <div>${esc(COX_SOLAR_BRAND.phoneDisplay)}</div>

@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const logoSrc = `data:image/png;base64,${readFileSync(join(root, "public/cox-roofing-logo.png")).toString("base64")}`;
+const logoSrc = `data:image/svg+xml;base64,${readFileSync(join(root, "public/cox-solar-solutions-logo.svg")).toString("base64")}`;
 const outDir = join(root, "docs/cox-solar");
 mkdirSync(outDir, { recursive: true });
 
@@ -45,7 +45,7 @@ const css = `
     display: flex; justify-content: space-between; align-items: center;
     border-bottom: 6px solid #c8102e; padding-bottom: 12px; margin-bottom: 18px;
   }
-  .brand-bar img { height: 112px; width: auto; }
+  .brand-bar img { height: 150px; width: auto; }
   .eyebrow { font-family: Inter, system-ui, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; font-size: 10px; color: #c8102e; font-weight: 700; }
   h1 { font-size: 28px; line-height: 1.15; margin: 6px 0 8px; color: #0f2744; }
   h2 { font-size: 18px; color: #0f2744; margin: 22px 0 8px; border-left: 5px solid #c8102e; padding-left: 10px; }
@@ -99,9 +99,9 @@ const nem = `<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" role=
 </svg>`;
 
 const brandBar = `<div class="brand-bar">
-  <img src="${logoSrc}" alt="Cox Roofing"/>
+  <img src="${logoSrc}" alt="Cox Solar Solutions"/>
   <div style="text-align:right;font-family:Inter,system-ui,sans-serif;font-size:11px;color:#0f2744">
-    <div class="eyebrow">Cox Roofing Solar</div>
+    <div class="eyebrow">Cox Solar Solutions</div>
     <div>(877) 816-4245</div>
     <div>coxroof.com</div>
   </div>
@@ -112,7 +112,7 @@ const disclaimer =
 
 const guideBody = `${brandBar}
   <p class="eyebrow">Illinois homeowner guide</p>
-  <h1>Cox Roofing Solar</h1>
+  <h1>Cox Solar Solutions</h1>
   <p class="pitch">You provide the roof and only pay for the power your system produces. We take care of everything else.</p>
   <p>Roof-ready solar for Illinois homes. Your Roof, Our Legacy.</p>
 
@@ -184,7 +184,7 @@ const guideBody = `${brandBar}
 const leaveBody = `${brandBar}
   <div class="leave">
     <p class="eyebrow">Your Roof, Our Legacy</p>
-    <h1>Cox Roofing Solar</h1>
+    <h1>Cox Solar Solutions</h1>
     <p class="pitch">You provide the roof and only pay for the power your system produces. We take care of everything else.</p>
     <div class="diagram" style="max-width:560px;margin:0 auto 16px">${nem}</div>
     <ul style="text-align:left;max-width:34em;margin:0 auto 18px;padding-left:1.2em">
@@ -241,5 +241,5 @@ function printPdf(filename, title, body) {
   console.log(`Wrote ${pdfPath}`);
 }
 
-printPdf("Cox-Roofing-Solar-Illinois-Guide", "Cox Roofing Solar — Illinois homeowner guide", guideBody);
-printPdf("Cox-Roofing-Solar-Leavebehind", "Cox Roofing Solar — Illinois leave-behind", leaveBody);
+printPdf("Cox-Roofing-Solar-Illinois-Guide", "Cox Solar Solutions — Illinois homeowner guide", guideBody);
+printPdf("Cox-Roofing-Solar-Leavebehind", "Cox Solar Solutions — Illinois leave-behind", leaveBody);

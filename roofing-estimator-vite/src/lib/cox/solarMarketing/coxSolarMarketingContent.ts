@@ -2,7 +2,7 @@ import { COX_IL_COMPANY } from "../ilContract/coxIlCompany";
 
 /** Cox Roofing Solar — Illinois homeowner marketing copy and closer talk tracks. */
 export const COX_SOLAR_BRAND = {
-  productName: "Cox Roofing Solar",
+  productName: "Cox Solar Solutions",
   legalName: COX_IL_COMPANY.legalName,
   shortName: COX_IL_COMPANY.shortName,
   motto: "Your Roof, Our Legacy",
