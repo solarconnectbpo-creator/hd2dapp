@@ -11,12 +11,12 @@ export const COX_SOLAR_BRAND = {
     "You provide the roof and only pay for the power your system produces. We take care of everything else.",
   addressLine1: COX_IL_COMPANY.addressLine1,
   cityStateZip: COX_IL_COMPANY.cityStateZip,
-  phoneDisplay: COX_IL_COMPANY.phoneDisplay,
-  phoneE164: COX_IL_COMPANY.phoneE164,
-  phoneHref: `tel:${COX_IL_COMPANY.phoneE164}`,
-  websiteDisplay: "coxroof.com",
-  websiteHref: "https://coxroof.com",
-  email: "info@coxroof.com",
+  phoneDisplay: "(773) 308-6115",
+  phoneE164: "+17733086115",
+  phoneHref: "tel:+17733086115",
+  websiteDisplay: "coxsolarsolutions.com",
+  websiteHref: "https://www.coxsolarsolutions.com",
+  email: "seth@coxroof.com",
 } as const;
 
 export type IncentiveKind = "rebate" | "net_metering" | "tax" | "permit";
@@ -256,7 +256,7 @@ export const COX_SOLAR_AD_COPY: readonly AdCopyPreset[] = [
   {
     id: "comed-rebate",
     headline: "ComEd homes: $300 per kW solar rebate",
-    body: "Smart-inverter solar can unlock a $300/kW upfront utility rebate — about $2,100 on a typical 7 kW roof. Cox handles the roof, the array, and the paperwork. Oak Brook office. Call (877) 816-4245.",
+    body: "Smart-inverter solar can unlock a $300/kW upfront utility rebate — about $2,100 on a typical 7 kW roof. Cox handles the roof, the array, and the paperwork. Oak Brook office. Call (773) 308-6115.",
     cta: "See if your address qualifies",
   },
   {
@@ -274,5 +274,5 @@ export const COX_SOLAR_PUBLIC_PATH = "/cox-solar";
 export const COX_SOLAR_KIT_PATH = "/marketing/cox-solar";
 
 export function coxSolarContactLine(): string {
-  return `${COX_SOLAR_BRAND.legalName} · ${COX_SOLAR_BRAND.addressLine1}, ${COX_SOLAR_BRAND.cityStateZip} · ${COX_SOLAR_BRAND.phoneDisplay} · ${COX_SOLAR_BRAND.websiteDisplay}`;
+  return `${COX_SOLAR_BRAND.productName} · A ${COX_SOLAR_BRAND.shortName} company · ${COX_SOLAR_BRAND.addressLine1}, ${COX_SOLAR_BRAND.cityStateZip} · ${COX_SOLAR_BRAND.phoneDisplay} · ${COX_SOLAR_BRAND.websiteDisplay}`;
 }

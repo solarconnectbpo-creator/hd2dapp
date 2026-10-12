@@ -1,4 +1,4 @@
-import logoUrl from "../assets/cox-solar-solutions-logo.svg?url";
+import logoUrl from "../assets/cox-solar-solutions-logo.png?url";
 
-/** Cox Solar Solutions lockup for visual marketing slicks. */
+/** Official Cox Solar Solutions lockup from coxsolarsolutions.com. */
 export const coxSolarSolutionsLogoUrl = logoUrl;

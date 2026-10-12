@@ -16,7 +16,7 @@ export type CoxSolarMarketingHtmlOptions = {
   logoSrc?: string;
 };
 
-const DEFAULT_LOGO_SRC = "/cox-solar-solutions-logo.svg";
+const DEFAULT_LOGO_SRC = "/cox-solar-solutions-logo.png";
 
 function esc(s: string): string {
   return s

@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const logoSrc = `data:image/svg+xml;base64,${readFileSync(join(root, "public/cox-solar-solutions-logo.svg")).toString("base64")}`;
+const logoSrc = `data:image/png;base64,${readFileSync(join(root, "public/cox-solar-solutions-logo.png")).toString("base64")}`;
 const outDir = join(root, "docs/cox-solar");
 mkdirSync(outDir, { recursive: true });
 
@@ -102,8 +102,8 @@ const brandBar = `<div class="brand-bar">
   <img src="${logoSrc}" alt="Cox Solar Solutions"/>
   <div style="text-align:right;font-family:Inter,system-ui,sans-serif;font-size:11px;color:#0f2744">
     <div class="eyebrow">Cox Solar Solutions</div>
-    <div>(877) 816-4245</div>
-    <div>coxroof.com</div>
+    <div>(773) 308-6115</div>
+    <div>coxsolarsolutions.com</div>
   </div>
 </div>`;
 
@@ -174,10 +174,10 @@ const guideBody = `${brandBar}
 
   <div class="cta">
     <strong>Ready for a roof-first solar review?</strong>
-    <p style="margin:6px 0 0">Call (877) 816-4245 · info@coxroof.com · 700 Commerce Dr, Suite 500, Oak Brook, IL 60523</p>
+    <p style="margin:6px 0 0">Call (773) 308-6115 · seth@coxroof.com · 700 Commerce Dr, Suite 500, Oak Brook, IL 60523</p>
   </div>
   <div class="footer">
-    <p>Cox Roofing &amp; Restoration LLC · 700 Commerce Dr, Suite 500, Oak Brook, IL 60523 · (877) 816-4245 · coxroof.com</p>
+    <p>Cox Solar Solutions · A Cox Roofing company · 700 Commerce Dr, Suite 500, Oak Brook, IL 60523 · (773) 308-6115 · coxsolarsolutions.com</p>
     <p class="disclaimer">${disclaimer}</p>
   </div>`;
 
@@ -197,8 +197,8 @@ const leaveBody = `${brandBar}
       <li>Income-eligible Solar for All: no upfront cost, at least 50% energy-value savings when you qualify.</li>
     </ul>
     <div class="cta">
-      <strong>Call (877) 816-4245</strong>
-      <p style="margin:6px 0 0">700 Commerce Dr, Suite 500, Oak Brook, IL 60523 · coxroof.com</p>
+      <strong>Call (773) 308-6115</strong>
+      <p style="margin:6px 0 0">700 Commerce Dr, Suite 500, Oak Brook, IL 60523 · coxsolarsolutions.com</p>
     </div>
     <p class="disclaimer">${disclaimer}</p>
   </div>`;

@@ -10,9 +10,10 @@ import {
 
 describe("Cox Roofing Solar marketing pack", () => {
   it("keeps Oak Brook Cox contact on every leave-behind line", () => {
-    expect(coxSolarContactLine()).toContain(COX_SOLAR_BRAND.legalName);
+    expect(coxSolarContactLine()).toContain(COX_SOLAR_BRAND.productName);
     expect(coxSolarContactLine()).toContain("Oak Brook");
-    expect(coxSolarContactLine()).toContain(COX_SOLAR_BRAND.phoneDisplay);
+    expect(coxSolarContactLine()).toContain("(773) 308-6115");
+    expect(coxSolarContactLine()).toContain("coxsolarsolutions.com");
   });
 
   it("lists the Illinois and Chicago programs from the closer kit", () => {
@@ -51,7 +52,7 @@ describe("Cox Roofing Solar marketing pack", () => {
     expect(html).toContain("You provide the roof");
     expect(html).toContain("$300 per kW");
     expect(html).toContain("Your Roof, Our Legacy");
-    expect(html).toContain("/cox-solar-solutions-logo.svg");
+    expect(html).toContain("/cox-solar-solutions-logo.png");
   });
 
   it("renders an original net-metering diagram", () => {
