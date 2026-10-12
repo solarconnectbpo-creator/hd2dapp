@@ -2,7 +2,11 @@ import { Link } from "react-router";
 import { Megaphone, Share2, Sparkles, Sun } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { COX_SOLAR_KIT_PATH, COX_SOLAR_PUBLIC_PATH } from "../lib/cox/solarMarketing/coxSolarMarketingContent";
+import {
+  COX_SOLAR_KIT_PATH,
+  COX_SOLAR_LEAVEBEHIND_PATH,
+  COX_SOLAR_PUBLIC_PATH,
+} from "../lib/cox/solarMarketing/coxSolarMarketingContent";
 
 const cardChrome = "border-white/[0.07] ring-1 ring-white/[0.04]";
 
@@ -36,6 +40,9 @@ export function Marketing() {
             </Button>
             <Button asChild variant="secondary" className="gap-2">
               <Link to={COX_SOLAR_PUBLIC_PATH}>Homeowner page</Link>
+            </Button>
+            <Button asChild variant="secondary" className="gap-2">
+              <Link to={COX_SOLAR_LEAVEBEHIND_PATH}>Leave-behind</Link>
             </Button>
           </CardContent>
         </Card>

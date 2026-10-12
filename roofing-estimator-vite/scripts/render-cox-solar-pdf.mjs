@@ -243,3 +243,10 @@ function printPdf(filename, title, body) {
 
 printPdf("Cox-Roofing-Solar-Illinois-Guide", "Cox Solar Solutions — Illinois homeowner guide", guideBody);
 printPdf("Cox-Roofing-Solar-Leavebehind", "Cox Solar Solutions — Illinois leave-behind", leaveBody);
+
+const publicLeaveHtml = wrap(
+  "Cox Solar Solutions — Illinois leave-behind",
+  leaveBody.replace(logoSrc, "/cox-solar-solutions-logo.png"),
+).replace("<title>", '<meta name="viewport" content="width=device-width, initial-scale=1"/><title>');
+writeFileSync(join(root, "public/cox-solar-leavebehind.html"), publicLeaveHtml, "utf8");
+console.log("Wrote public/cox-solar-leavebehind.html");

@@ -4,6 +4,7 @@ import {
   COX_SOLAR_FAQ,
   COX_SOLAR_HOW_IT_WORKS,
   COX_SOLAR_INCENTIVES,
+  COX_SOLAR_LEAVEBEHIND_BULLETS,
   COX_SOLAR_PROCESS,
   COX_SOLAR_WHY,
   coxSolarContactLine,
@@ -178,17 +179,7 @@ function guideBody(logoSrc: string): string {
 }
 
 function leavebehindBody(logoSrc: string): string {
-  const bullets = [
-    "Roof inspected or replaced before panels go on.",
-    "You can pay for the power the system produces — we handle the rest.",
-    `ComEd smart-inverter rebate: $300 per kW of solar.`,
-    "Battery rebate: $300 per kWh with a qualifying rate plan / VPP path.",
-    "20-year Illinois property-tax exemption on added solar value.",
-    "Chicago Solar Express and Green Permit fee / timeline savings.",
-    "Income-eligible Solar for All: no upfront cost, at least 50% energy-value savings when you qualify.",
-  ]
-    .map((b) => `<li>${esc(b)}</li>`)
-    .join("");
+  const bullets = COX_SOLAR_LEAVEBEHIND_BULLETS.map((b) => `<li>${esc(b)}</li>`).join("");
 
   return `${brandBar(logoSrc)}
     <div class="leave">

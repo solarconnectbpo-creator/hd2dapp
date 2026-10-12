@@ -32,6 +32,9 @@ const AdMakerAutomationRoute = lazyRoute(() =>
 const CoxSolarGuideRoute = lazyRoute(() =>
   import("./pages/CoxSolarGuide").then((m) => ({ default: m.CoxSolarGuide })),
 );
+const CoxSolarLeavebehindRoute = lazyRoute(() =>
+  import("./pages/CoxSolarLeavebehind").then((m) => ({ default: m.CoxSolarLeavebehind })),
+);
 const CoxSolarMarketingKitRoute = lazyRoute(() =>
   import("./pages/CoxSolarMarketingKit").then((m) => ({ default: m.CoxSolarMarketingKit })),
 );
@@ -61,6 +64,14 @@ export const router = createBrowserRouter([
   {
     path: "/cox-solar",
     Component: CoxSolarGuideRoute,
+  },
+  {
+    path: "/cox-solar/leavebehind",
+    Component: CoxSolarLeavebehindRoute,
+  },
+  {
+    path: "/cox-solar-leavebehind",
+    Component: CoxSolarLeavebehindRoute,
   },
   {
     path: "/admin/login",

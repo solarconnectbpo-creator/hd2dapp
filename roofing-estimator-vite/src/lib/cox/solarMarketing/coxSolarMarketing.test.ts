@@ -4,6 +4,8 @@ import {
   COX_SOLAR_AD_COPY,
   COX_SOLAR_BRAND,
   COX_SOLAR_INCENTIVES,
+  COX_SOLAR_LEAVEBEHIND_BULLETS,
+  COX_SOLAR_LEAVEBEHIND_PATH,
   COX_SOLAR_TALK_TRACKS,
   coxSolarContactLine,
 } from "./coxSolarMarketingContent";
@@ -53,6 +55,9 @@ describe("Cox Roofing Solar marketing pack", () => {
     expect(html).toContain("$300 per kW");
     expect(html).toContain("Your Roof, Our Legacy");
     expect(html).toContain("/cox-solar-solutions-logo.png");
+    expect(COX_SOLAR_LEAVEBEHIND_PATH).toBe("/cox-solar/leavebehind");
+    expect(COX_SOLAR_LEAVEBEHIND_BULLETS.length).toBeGreaterThanOrEqual(6);
+    expect(html).toContain(COX_SOLAR_LEAVEBEHIND_BULLETS[0]);
   });
 
   it("renders an original net-metering diagram", () => {

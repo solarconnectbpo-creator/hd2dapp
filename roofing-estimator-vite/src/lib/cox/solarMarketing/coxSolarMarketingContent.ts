@@ -271,7 +271,18 @@ export const COX_SOLAR_DISCLAIMER =
   "Educational marketing only — not a quote, contract, tax opinion, or guarantee of savings. Incentive amounts, tariffs, income limits, interconnect rules, and permit fees change. Eligibility depends on utility territory, install date, system design, income, and program capacity. Confirm current ComEd, Ameren, Illinois Solar for All, Illinois Shines, and City of Chicago terms before you sign.";
 
 export const COX_SOLAR_PUBLIC_PATH = "/cox-solar";
+export const COX_SOLAR_LEAVEBEHIND_PATH = "/cox-solar/leavebehind";
 export const COX_SOLAR_KIT_PATH = "/marketing/cox-solar";
+
+export const COX_SOLAR_LEAVEBEHIND_BULLETS = [
+  "Roof inspected or replaced before panels go on.",
+  "You can pay for the power the system produces — we handle the rest.",
+  "ComEd smart-inverter rebate: $300 per kW of solar.",
+  "Battery rebate: $300 per kWh with a qualifying rate plan / VPP path.",
+  "20-year Illinois property-tax exemption on added solar value.",
+  "Chicago Solar Express and Green Permit fee / timeline savings.",
+  "Income-eligible Solar for All: no upfront cost, at least 50% energy-value savings when you qualify.",
+] as const;
 
 export function coxSolarContactLine(): string {
   return `${COX_SOLAR_BRAND.productName} · A ${COX_SOLAR_BRAND.shortName} company · ${COX_SOLAR_BRAND.addressLine1}, ${COX_SOLAR_BRAND.cityStateZip} · ${COX_SOLAR_BRAND.phoneDisplay} · ${COX_SOLAR_BRAND.websiteDisplay}`;

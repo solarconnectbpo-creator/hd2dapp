@@ -10,6 +10,7 @@ import {
   COX_SOLAR_HOW_IT_WORKS,
   COX_SOLAR_INCENTIVES,
   COX_SOLAR_KIT_PATH,
+  COX_SOLAR_LEAVEBEHIND_PATH,
   COX_SOLAR_PROCESS,
   COX_SOLAR_PUBLIC_PATH,
   COX_SOLAR_WHY,
@@ -88,6 +89,12 @@ export function CoxSolarGuide() {
                 >
                   See Illinois programs
                 </a>
+                <Link
+                  to={COX_SOLAR_LEAVEBEHIND_PATH}
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-6 text-sm font-semibold text-white hover:bg-white/10"
+                >
+                  One-page leave-behind
+                </Link>
               </div>
             </div>
             <div
@@ -227,6 +234,13 @@ export function CoxSolarGuide() {
         <p className="mx-auto max-w-3xl">{COX_SOLAR_DISCLAIMER}</p>
         <p className="mt-4">
           Field reps:{" "}
+          <Link
+            to={COX_SOLAR_LEAVEBEHIND_PATH}
+            className="font-semibold text-[#0f2744] underline-offset-2 hover:underline"
+          >
+            door leave-behind
+          </Link>
+          {" · "}
           <Link to={COX_SOLAR_KIT_PATH} className="font-semibold text-[#0f2744] underline-offset-2 hover:underline">
             open the closer kit
           </Link>

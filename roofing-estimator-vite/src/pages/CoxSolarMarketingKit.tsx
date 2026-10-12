@@ -8,6 +8,7 @@ import {
   COX_SOLAR_AD_COPY,
   COX_SOLAR_BRAND,
   COX_SOLAR_INCENTIVES,
+  COX_SOLAR_LEAVEBEHIND_PATH,
   COX_SOLAR_PUBLIC_PATH,
   COX_SOLAR_TALK_TRACKS,
 } from "../lib/cox/solarMarketing/coxSolarMarketingContent";
@@ -107,10 +108,18 @@ export function CoxSolarMarketingKit() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" variant="secondary" className="w-full gap-2" onClick={printLeavebehind}>
-              <Printer className="h-4 w-4" />
-              Print one-pager
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button asChild className="w-full gap-2">
+                <Link to={COX_SOLAR_LEAVEBEHIND_PATH} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  Open {COX_SOLAR_LEAVEBEHIND_PATH}
+                </Link>
+              </Button>
+              <Button type="button" variant="secondary" className="w-full gap-2" onClick={printLeavebehind}>
+                <Printer className="h-4 w-4" />
+                Print one-pager
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
