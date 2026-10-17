@@ -1,7 +1,12 @@
 import { Link } from "react-router";
-import { Megaphone, Share2, Sparkles } from "lucide-react";
+import { Megaphone, Share2, Sparkles, Sun } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import {
+  COX_SOLAR_KIT_PATH,
+  COX_SOLAR_LEAVEBEHIND_PATH,
+  COX_SOLAR_PUBLIC_PATH,
+} from "../lib/cox/solarMarketing/coxSolarMarketingContent";
 
 const cardChrome = "border-white/[0.07] ring-1 ring-white/[0.04]";
 
@@ -17,8 +22,31 @@ export function Marketing() {
         </p>
       </div>
 
-      <div className="mb-8">
-        <Card className={`${cardChrome} border-emerald-500/20 bg-emerald-500/[0.06] max-w-2xl`}>
+      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+        <Card className={`${cardChrome} border-red-500/20 bg-red-500/[0.06]`}>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Sun className="h-5 w-5 text-red-400" aria-hidden />
+              <CardTitle>Cox Roofing Solar</CardTitle>
+            </div>
+            <CardDescription className="text-[#8b9199]">
+              Illinois homeowner guide, door leave-behind, talk tracks, and rebate cheat sheet. You provide the roof —
+              they pay for the power.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild className="gap-2">
+              <Link to={COX_SOLAR_KIT_PATH}>Closer kit</Link>
+            </Button>
+            <Button asChild variant="secondary" className="gap-2">
+              <Link to={COX_SOLAR_PUBLIC_PATH}>Homeowner page</Link>
+            </Button>
+            <Button asChild variant="secondary" className="gap-2">
+              <Link to={COX_SOLAR_LEAVEBEHIND_PATH}>Leave-behind</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className={`${cardChrome} border-emerald-500/20 bg-emerald-500/[0.06]`}>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Megaphone className="h-5 w-5 text-emerald-400" aria-hidden />
@@ -49,8 +77,8 @@ export function Marketing() {
         <CardHeader>
           <CardTitle className="text-base">Suggested rollout</CardTitle>
           <CardDescription className="text-[#8b9199]">
-            1) Version campaign pages and landing content where you host static marketing. 2) Draft posts and ad variants in
-            the sections below. 3) Connect OAuth / API keys in environment or a future settings panel.
+            1) Share or print the Cox Roofing Solar guide. 2) Draft posts and ad variants in Social / Ad maker. 3) Connect
+            OAuth / API keys when you are ready to publish.
           </CardDescription>
         </CardHeader>
       </Card>

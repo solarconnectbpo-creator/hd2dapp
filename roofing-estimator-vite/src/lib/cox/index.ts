@@ -45,6 +45,19 @@ export {
 } from "./ilContract";
 
 export {
+  COX_SOLAR_AD_COPY,
+  COX_SOLAR_BRAND,
+  COX_SOLAR_INCENTIVES,
+  COX_SOLAR_KIT_PATH,
+  COX_SOLAR_LEAVEBEHIND_PATH,
+  COX_SOLAR_PUBLIC_PATH,
+  COX_SOLAR_TALK_TRACKS,
+  buildCoxSolarMarketingHtml,
+  coxSolarContactLine,
+  openCoxSolarMarketingPrint,
+} from "./solarMarketing";
+
+export {
   CORVUS_PRO_SOLAR,
   COX_MO_SOLAR_COMPANY,
   buildCoxMoSolarContractHtml,
