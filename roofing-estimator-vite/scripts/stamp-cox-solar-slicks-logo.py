@@ -50,6 +50,45 @@ def navy_to_white(im: Image.Image) -> Image.Image:
     return im
 
 
+def punch_cox_o_counter(im: Image.Image) -> Image.Image:
+    """Cut the white slash out of the navy O so the hole still reads after COX goes white."""
+    px = im.load()
+    w, h = im.size
+    hits: list[tuple[int, int]] = []
+    for y in range(int(h * 0.58), h):
+        for x in range(int(w * 0.34)):
+            r, g, b, a = px[x, y]
+            if a < 180 or r < 200 or g < 200 or b < 200:
+                continue
+            near_navy = False
+            near_red = False
+            for dy in range(-3, 4):
+                for dx in range(-3, 4):
+                    nx, ny = x + dx, y + dy
+                    if not (0 <= nx < w and 0 <= ny < h):
+                        continue
+                    rr, gg, bb, aa = px[nx, ny]
+                    if aa > 180 and bb > 90 and rr < 50 and gg < 90:
+                        near_navy = True
+                    if aa > 180 and rr > 150 and gg < 90 and bb < 90:
+                        near_red = True
+            if near_navy and not near_red:
+                hits.append((x, y))
+    grow = 2
+    mark = set(hits)
+    for x, y in hits:
+        for dx in range(-grow, grow + 1):
+            for dy in range(-grow, grow + 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h:
+                    mark.add((nx, ny))
+    for x, y in mark:
+        r, g, b, a = px[x, y]
+        if a > 8 and r > 160 and g > 160 and b > 160:
+            px[x, y] = (0, 0, 0, 0)
+    return im
+
+
 def fit_logo(logo: Image.Image, box_w: int, box_h: int) -> Image.Image:
     lw, lh = logo.size
     scale = min(box_w / lw, box_h / lh)
@@ -244,7 +283,7 @@ def main() -> None:
 
     solar = Image.open(SOLAR_LOGO).convert("RGBA")
     solar = solar.crop(solar.getbbox())
-    solar_dark = navy_to_white(solar.copy())
+    solar_dark = navy_to_white(punch_cox_o_counter(solar.copy()))
 
     out_paths: list[Path] = []
     for n in range(1, 12):
