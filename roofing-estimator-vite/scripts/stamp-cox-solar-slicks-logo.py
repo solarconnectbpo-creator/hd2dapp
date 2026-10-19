@@ -19,7 +19,7 @@ W, H = 1275, 1650
 # (x, y, w, h, dark, cover_mode)
 # cover_mode: "rect" | "photo" | "pixels"
 PLACEMENTS: dict[int, tuple[int, int, int, int, bool, str]] = {
-    1: (100, 36, 460, 210, True, "photo"),
+    1: (95, 38, 430, 205, True, "photo"),
     2: (48, 28, 340, 175, False, "rect"),
     3: (48, 28, 340, 175, False, "rect"),
     4: (48, 28, 340, 175, False, "rect"),
@@ -106,43 +106,27 @@ def erase_logo_pixels(page: Image.Image, box: tuple[int, int, int, int], bg: tup
     page.paste(crop, (x0, y0))
 
 
-def erase_photo_lockup(page: Image.Image, box: tuple[int, int, int, int], bg: tuple[int, int, int]) -> None:
-    """Remove white / red roofing lockup on a dark photo without painting a plate."""
-    x, y, w, h = box
-    pad = 18
-    x0, y0 = max(0, x - pad), max(0, y - pad)
-    x1, y1 = min(page.size[0], x + w + pad), min(page.size[1], y + h + pad)
-    crop = page.crop((x0, y0, x1, y1)).convert("RGBA")
-    px = crop.load()
-    cw, ch = crop.size
-    hits: list[tuple[int, int]] = []
-    for yy in range(ch):
-        for xx in range(cw):
-            r, g, b, a = px[xx, yy]
-            white = r > 130 and g > 130 and b > 130
-            red = r > 110 and r > g + 25 and r > b + 15
-            mid = (r + g + b) > 150
-            blue_stroke = b > 90 and b > r + 15 and (r + g + b) > 140
-            if white or red or mid or blue_stroke:
-                hits.append((xx, yy))
-    grow = 7
-    mark = set(hits)
-    extra: list[tuple[int, int]] = []
-    for xx, yy in hits:
-        for dx in range(-grow, grow + 1):
-            for dy in range(-grow, grow + 1):
-                nx, ny = xx + dx, yy + dy
-                if 0 <= nx < cw and 0 <= ny < ch and (nx, ny) not in mark:
-                    extra.append((nx, ny))
-                    mark.add((nx, ny))
-    for xx, yy in hits + extra:
-        # sample a nearby sky pixel from the original crop edge
-        sx = min(cw - 1, max(0, xx))
-        sy = min(ch - 1, 2 if yy < ch // 2 else ch - 3)
-        sr, sg, sb, _ = px[min(cw - 1, 2), sy] if xx > cw // 2 else px[cw - 3, sy]
-        # prefer the provided sky sample so we do not re-copy logo crumbs
-        px[xx, yy] = bg + (255,)
-    page.paste(crop, (x0, y0))
+def inpaint_photo_lockup(page: Image.Image) -> Image.Image:
+    """Reconstruct sky under the old roofing lockup so no plate is left behind."""
+    import cv2
+    import numpy as np
+
+    arr = np.array(page.convert("RGB"))
+    y0, y1, x0, x1 = 16, 275, 50, 590
+    region = arr[y0:y1, x0:x1]
+    r = region[:, :, 0].astype(int)
+    g = region[:, :, 1].astype(int)
+    b = region[:, :, 2].astype(int)
+    white = (r > 115) & (g > 115) & (b > 115)
+    red = (r > 100) & (r > g + 20) & (r > b + 12)
+    bright = (r + g + b) > 135
+    blue = (b > 80) & (b > r + 8) & ((r + g + b) > 120)
+    mask_r = (white | red | bright | blue).astype(np.uint8) * 255
+    mask_r = cv2.dilate(mask_r, np.ones((11, 11), np.uint8), iterations=2)
+    full = np.zeros(arr.shape[:2], np.uint8)
+    full[y0:y1, x0:x1] = mask_r
+    out = cv2.inpaint(arr, full, 10, cv2.INPAINT_TELEA)
+    return Image.fromarray(out).convert("RGBA")
 
 
 def cover_old_lockup(
@@ -153,7 +137,8 @@ def cover_old_lockup(
 ) -> None:
     x, y, w, h = box
     if mode == "photo":
-        erase_photo_lockup(page, box, bg)
+        painted = inpaint_photo_lockup(page)
+        page.paste(painted, (0, 0))
         return
     if mode == "pixels":
         erase_logo_pixels(page, box, bg)
