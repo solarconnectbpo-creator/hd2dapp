@@ -37,6 +37,7 @@ FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 
 
 def navy_to_white(im: Image.Image) -> Image.Image:
+    """Turn COX / house-stroke navy white on dark pages. Keep brighter panel blue."""
     px = im.load()
     w, h = im.size
     for y in range(h):
@@ -44,7 +45,7 @@ def navy_to_white(im: Image.Image) -> Image.Image:
             r, g, b, a = px[x, y]
             if a < 8:
                 continue
-            if b > 70 and r < 80 and b > r + 20:
+            if b > 70 and r < 50 and g < 82 and b > r + 20:
                 px[x, y] = (255, 255, 255, a)
     return im
 
