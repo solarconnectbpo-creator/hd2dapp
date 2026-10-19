@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 520" role="img" aria-label="Cox Solar Solutions">
+  <rect width="920" height="520" fill="#ffffff"/>
+  <!-- Sun -->
+  <g transform="translate(118 92)">
+    <circle cx="0" cy="0" r="28" fill="#e2a126"/>
+    <g stroke="#e2a126" stroke-width="6" stroke-linecap="round">
+      <line x1="0" y1="-44" x2="0" y2="-56"/>
+      <line x1="31" y1="-31" x2="40" y2="-40"/>
+      <line x1="44" y1="0" x2="56" y2="0"/>
+    </g>
+  </g>
+  <!-- House cluster -->
+  <g fill="none" stroke="#0f2744" stroke-width="18" stroke-linejoin="miter">
+    <path d="M78 238 L150 168 L222 238"/>
+    <path d="M92 238 V292 H208 V238"/>
+    <path d="M248 214 L430 52 L612 214"/>
+    <path d="M272 214 V348 H588 V214"/>
+    <path d="M640 230 L720 156 L800 230"/>
+    <path d="M656 230 V300 H784 V230"/>
+  </g>
+  <g fill="#c8102e">
+    <polygon points="248,214 430,52 612,214 588,214 430,78 272,214"/>
+  </g>
+  <!-- Solar hatch on main roof -->
+  <g stroke="#0f2744" stroke-width="5" opacity="0.85">
+    <line x1="318" y1="168" x2="542" y2="168"/>
+    <line x1="300" y1="192" x2="560" y2="192"/>
+    <line x1="348" y1="120" x2="390" y2="192"/>
+    <line x1="400" y1="96" x2="458" y2="192"/>
+    <line x1="460" y1="96" x2="518" y2="192"/>
+    <line x1="512" y1="120" x2="554" y2="192"/>
+  </g>
+  <g fill="#0f2744">
+    <rect x="310" y="248" width="36" height="36"/>
+    <rect x="364" y="248" width="36" height="36"/>
+    <rect x="530" y="248" width="36" height="36"/>
+    <rect x="140" y="248" width="28" height="28"/>
+    <rect x="700" y="246" width="28" height="28"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="70" y="430" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="92" font-weight="900" fill="#0f2744">COX</text>
+  <rect x="300" y="358" width="550" height="92" fill="#c8102e"/>
+  <text x="330" y="430" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="72" font-weight="900" fill="#ffffff">SOLAR</text>
+  <rect x="70" y="458" width="780" height="48" fill="#0f2744"/>
+  <text x="460" y="493" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="8" fill="#ffffff">SOLUTIONS</text>
+</svg>

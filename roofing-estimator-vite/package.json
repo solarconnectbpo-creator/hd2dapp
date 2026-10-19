@@ -28,7 +28,8 @@
     "data:mo-parcels": "node scripts/build-mo-open-data-import.mjs",
     "data:mo-parcels:sample": "node scripts/build-mo-open-data-import.mjs --sample",
     "data:mo-commercial-50k": "node scripts/filter-commercial-pm-leads.mjs",
-    "data:leads-10k": "node scripts/generate-leads-sample-10000.mjs"
+    "data:leads-10k": "node scripts/generate-leads-sample-10000.mjs",
+    "pdf:cox-solar": "node scripts/render-cox-solar-pdf.mjs"
   },
   "dependencies": {
     "@maplibre/maplibre-gl-leaflet": "^0.1.3",
